@@ -15,12 +15,21 @@ local SCREEN_W, SCREEN_H = 1024, 768
 local PAGE_W, PAGE_H = 768, 1024
 local UI_SIZE, SMALL_SIZE = 30, 22
 
+-- Reading themes, light to dark. Saved by name.
 local THEMES = {
-    { name = "Paper", bg = { 0.965, 0.945, 0.905 }, fg = { 0.13, 0.12, 0.10 }, dim = { 0.50, 0.46, 0.40 }, sel = { 0.87, 0.82, 0.72 } },
-    { name = "White", bg = { 1, 1, 1 }, fg = { 0, 0, 0 }, dim = { 0.45, 0.45, 0.45 }, sel = { 0.85, 0.85, 0.85 } },
-    { name = "Sepia", bg = { 0.957, 0.925, 0.847 }, fg = { 0.357, 0.275, 0.212 }, dim = { 0.60, 0.52, 0.44 }, sel = { 0.88, 0.80, 0.66 } },
-    { name = "Night", bg = { 0.07, 0.07, 0.07 }, fg = { 0.78, 0.77, 0.74 }, dim = { 0.45, 0.44, 0.42 }, sel = { 0.22, 0.22, 0.22 } },
+    { name = "Paper",     bg = { 0.965, 0.945, 0.905 }, fg = { 0.13, 0.12, 0.10 }, dim = { 0.50, 0.46, 0.40 }, sel = { 0.87, 0.82, 0.72 } },
+    { name = "White",     bg = { 1, 1, 1 },             fg = { 0, 0, 0 },          dim = { 0.45, 0.45, 0.45 }, sel = { 0.85, 0.85, 0.85 } },
+    { name = "Sepia",     bg = { 0.957, 0.925, 0.847 }, fg = { 0.357, 0.275, 0.212 }, dim = { 0.60, 0.52, 0.44 }, sel = { 0.88, 0.80, 0.66 } },
+    { name = "Solarized", bg = { 0.992, 0.965, 0.890 }, fg = { 0.28, 0.357, 0.384 }, dim = { 0.53, 0.59, 0.59 }, sel = { 0.933, 0.910, 0.835 } },
+    { name = "Stone",     bg = { 0.890, 0.882, 0.863 }, fg = { 0.17, 0.17, 0.17 }, dim = { 0.47, 0.46, 0.44 }, sel = { 0.80, 0.79, 0.76 } },
+    { name = "Sage",      bg = { 0.863, 0.902, 0.831 }, fg = { 0.16, 0.22, 0.15 }, dim = { 0.42, 0.49, 0.40 }, sel = { 0.76, 0.83, 0.72 } },
+    { name = "Dusk",      bg = { 0.125, 0.145, 0.192 }, fg = { 0.80, 0.83, 0.88 }, dim = { 0.49, 0.53, 0.60 }, sel = { 0.22, 0.25, 0.32 } },
+    { name = "Night",     bg = { 0.07, 0.07, 0.07 },    fg = { 0.78, 0.77, 0.74 }, dim = { 0.45, 0.44, 0.42 }, sel = { 0.22, 0.22, 0.22 } },
+    { name = "Amber",     bg = { 0.075, 0.055, 0.035 }, fg = { 0.90, 0.64, 0.33 }, dim = { 0.55, 0.40, 0.22 }, sel = { 0.20, 0.14, 0.08 } },
+    { name = "Black",     bg = { 0, 0, 0 },             fg = { 0.62, 0.62, 0.62 }, dim = { 0.36, 0.36, 0.36 }, sel = { 0.16, 0.16, 0.16 } },
 }
+-- Themes used to be saved as a number (their position in the original list).
+local OLD_THEME_NUMBERS = { "Paper", "White", "Sepia", "Night" }
 local MARGINS = { { name = "Narrow", outer = 36, inner = 28 }, { name = "Normal", outer = 60, inner = 44 }, { name = "Wide", outer = 90, inner = 64 } }
 -- Space above and below the text (the header/footer sit inside it).
 local VMARGINS = { { name = "Narrow", size = 60 }, { name = "Normal", size = 76 }, { name = "Wide", size = 110 }, { name = "Extra wide", size = 150 } }
@@ -48,7 +57,11 @@ local message = nil
 
 ---------------------------------------------------------------- utilities
 
-local function theme() return THEMES[S.theme] or THEMES[1] end
+local function theme_index()
+    for i, t in ipairs(THEMES) do if t.name == S.theme then return i end end
+    return 1
+end
+local function theme() return THEMES[theme_index()] end
 local function color(c, a) love.graphics.setColor(c[1], c[2], c[3], a or 1) end
 local function redraw() app.dirty = true end
 
@@ -354,7 +367,7 @@ local function menu_items()
                 Backlight.set(S.brightness)
             end },
         { label = "Theme", value = th.name, adjust = function(d)
-            S.theme = (S.theme - 1 + d) % #THEMES + 1
+            S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
         end },
         { label = "Page turn", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
             adjust = function(d)
@@ -1098,6 +1111,8 @@ function love.load()
     end
 
     S = Store.load_settings()
+    local n = tonumber(S.theme)
+    if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
     Touch.open("gt9xx-0")
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)

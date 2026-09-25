@@ -23,7 +23,8 @@ sideways like an open book and each screen shows one portrait page.
 - **Settings**: text size, font, line spacing, side and top/bottom margins,
   justification, brightness,
   page turn, what a tap does,
-  four themes (Paper, White, Sepia, Night), page info on/off, and jump to %
+  ten themes (Paper, White, Sepia, Solarized, Stone, Sage, Dusk, Night,
+  Amber, Black), page info on/off, and jump to %
 - **Battery-friendly**: redraws only when you press a button
 
 | Library | Contents |

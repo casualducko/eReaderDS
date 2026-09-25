@@ -3,7 +3,7 @@ local M = {}
 
 local DEFAULTS = {
     font = "Gentium Book Plus", font_size = 32, spacing = 1.15, margins = 2, vmargins = 2, justify = true,
-    theme = 1, chrome = true, orient = "left", anim = "flip",
+    theme = "Paper", chrome = true, orient = "left", anim = "flip",
     tap = "menu",      -- what a tap on the touchscreen does while reading: "menu" | "next"
     brightness = -1,   -- percent; -1 = leave the system setting alone
 }
