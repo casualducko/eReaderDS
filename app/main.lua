@@ -361,7 +361,10 @@ local function menu_items()
         { label = "Text size", value = tostring(S.font_size), adjust = function(d)
             S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
         end },
-        { label = "Font", value = fonts.name or S.font, adjust = function(d)
+        -- The font's name is drawn in the font itself: a preview, and the only way
+        -- names in other scripts (e.g. Chinese firmware fonts) can display.
+        { label = "Font", value = fonts.name or S.font,
+          value_font = Fonts.preview(fonts.name or S.font, UI_SIZE), adjust = function(d)
             local list = Fonts.list()
             local idx = 1
             for k, f in ipairs(list) do if f.name == fonts.name then idx = k end end
@@ -637,7 +640,19 @@ local function draw_menu_panel(side)
         color(th.fg)
         local ty = centered_y(ui.font, UI_SIZE, ry, row_h - 4)
         love.graphics.print(it.label, rx, ty)
-        if it.value and it.value ~= "" then
+        local vf = it.value_font
+        if vf and it.value and it.value ~= "" and vf:hasGlyphs(it.value) then
+            local room = rw - ui.font:getWidth(it.label) - 40
+            local open, close = "‹  ", "  ›"
+            local name = fit_text(vf, it.value, room - ui.font:getWidth(open .. close))
+            local right = rx + rw
+            local cw, nw = ui.font:getWidth(close), vf:getWidth(name)
+            love.graphics.print(close, right - cw, ty)
+            love.graphics.print(open, right - cw - nw - ui.font:getWidth(open), ty)
+            love.graphics.setFont(vf)
+            love.graphics.print(name, right - cw - nw, centered_y(vf, UI_SIZE, ry, row_h - 4))
+            love.graphics.setFont(ui.font)
+        elseif it.value and it.value ~= "" then
             local room = rw - ui.font:getWidth(it.label) - 40
             local v = it.value
             if it.adjust then

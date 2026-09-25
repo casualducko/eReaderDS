@@ -248,6 +248,18 @@ local function new_font(face, size)
     return love.graphics.newFont(love.font.newRasterizer(fd, size))
 end
 
+-- The regular face of a family at a size, for showing a font's name in its
+-- own typeface (menus). Cached; nil if it can't be loaded.
+local previews = {}
+function M.preview(name, size)
+    local key = name .. "@" .. size
+    if previews[key] == nil then
+        local ok, font = pcall(new_font, M.find(name).r, size)
+        previews[key] = ok and font or false
+    end
+    return previews[key] or nil
+end
+
 -- Returns fonts {r, i, b, bi, h} for a family at a size, falling back to the
 -- default family if anything fails to load.
 function M.load(name, size)

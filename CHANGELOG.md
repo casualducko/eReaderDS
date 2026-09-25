@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The Font setting shows each font's name in that font, as a preview. This
+  also fixes fonts with non-Latin names (such as the Chinese-named fonts built
+  into the firmware), which showed as empty boxes.
+
 ## v0.2.3
 
 - **Ten built-in fonts.** Serif: Gentium Book Plus, Literata, Charis SIL,
