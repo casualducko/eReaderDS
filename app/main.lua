@@ -1119,10 +1119,10 @@ local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x", [4] = "leftshoulder", 
 -- that direction; it must come back inside RELEASE before it can fire again,
 -- so one push is one press and stick drift never turns pages.
 local STICK_PRESS, STICK_RELEASE = 0.6, 0.3
--- The RG DS Plus stick's axes are rotated 90° from the D-pad: the raw x axis
--- is the stick's up/down (positive = down) and the raw y axis its left/right.
--- Map raw axes to D-pad directions so the stick and D-pad agree.
-local STICK_MAP = { x = { axis = "y", sign = 1 }, y = { axis = "x", sign = -1 } }
+-- Stick axes after the gamepad mapping (leftx = raw axis 0, lefty = raw axis 1,
+-- positive = right/down, like the D-pad). The mapping borrowed from another
+-- port had them off by one, which made the stick's up/down read as left/right.
+local STICK_MAP = { x = { axis = "x", sign = 1 }, y = { axis = "y", sign = 1 } }
 local stick = { x = 0, y = 0 }          -- latched direction per axis: -1, 0, 1
 
 local function stick_axis(raw, value)
@@ -1164,11 +1164,18 @@ function love.joystickpressed(joystick, b)
     local name = RAW[b - 1]
     if name then love.gamepadpressed(joystick, name) end
 end
--- Fallback when the controller has no gamepad mapping (leftx:a1, lefty:a2).
+-- Raw axes: log big movements on any axis (to identify axes on new hardware),
+-- and act on them directly when there's no gamepad mapping (axis 1 = x, 2 = y).
+local raw_logged = {}
 function love.joystickaxis(joystick, axis, value)
+    local big = math.abs(value) >= STICK_PRESS
+    if big and not raw_logged[axis] then
+        print(string.format("[input] raw axis %d = %.2f", axis - 1, value))
+    end
+    raw_logged[axis] = big
     if joystick:isGamepad() then return end
-    if axis == 2 then stick_axis("x", value)
-    elseif axis == 3 then stick_axis("y", value) end
+    if axis == 1 then stick_axis("x", value)
+    elseif axis == 2 then stick_axis("y", value) end
 end
 function love.joystickhat(joystick, _, dir)
     if joystick:isGamepad() then return end
@@ -1204,7 +1211,7 @@ function love.load()
                 ",ANBERNIC-rk3568-keys,a:b0,b:b1,x:b3,y:b2," ..
                 "leftshoulder:b4,rightshoulder:b5,back:b6,start:b7,guide:b8," ..
                 "lefttrigger:b10,righttrigger:b11,dpup:h0.1,dpdown:h0.4," ..
-                "dpleft:h0.8,dpright:h0.2,leftx:a1,lefty:a2,platform:Linux,")
+                "dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,platform:Linux,")
         end
     end
 
