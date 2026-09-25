@@ -1,19 +1,20 @@
 # Changelog
 
-## Unreleased
+## v0.2.3
 
-- D-pad in menus: on Settings rows with nothing to change (like Resume
-  reading), left/right move the selection; in the Library they move up and
-  down the list (A opens a book).
-- Ten built-in fonts. Serif: Gentium Book Plus, Literata, Charis SIL, Source
-  Serif 4, Crimson Text, Bitter. Sans-serif: Atkinson Hyperlegible Next (replaces
-  Atkinson Hyperlegible), Inter, Lexend. Plus OpenDyslexic.
-- The curved-arrow button (right of the Anbernic button) opens and closes
+- **Ten built-in fonts.** Serif: Gentium Book Plus, Literata, Charis SIL,
+  Source Serif 4, Crimson Text, Bitter. Sans-serif: Atkinson Hyperlegible Next
+  (replaces Atkinson Hyperlegible), Inter, Lexend. Plus OpenDyslexic.
+- **Analog stick** works like the D-pad, one push per press.
+- **Curved-arrow button** (right of the Anbernic button) opens and closes
   Settings.
-- The analog stick works like the D-pad (one push per press).
-- Button and key presses are written to `log.txt`, to help identify buttons.
+- **D-pad in menus:** on Settings rows with nothing to change (like Resume
+  reading), left/right move the selection; in the Library they move through
+  the list (A opens a book).
 - Removed **Flip for other hand**: held that way, the buttons end up under the
   wrong hand. Anyone who had it on is switched back to the normal grip.
+- Button, key and stick input is written to `log.txt`, to help diagnose
+  problems.
 
 ## v0.2.2
 
