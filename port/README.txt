@@ -1,5 +1,7 @@
 eReaderDS v@VERSION@ for the Anbernic RG DS Plus
 A two-page ebook reader: hold the device sideways like an open book.
+For the RG DS Plus on its stock firmware only (not the original RG DS, and
+not custom firmware such as ROCKNIX or KNULLI).
 
 INSTALL / UPDATE
   1. Copy "eReaderDS.sh" and the "eReaderDS" folder (from the zip's Ports

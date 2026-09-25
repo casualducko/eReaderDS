@@ -12,6 +12,16 @@ body:
       description: Shown at the top of Settings and at the bottom of the Library (e.g. v0.1.0).
     validations:
       required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device and firmware
+      description: eReaderDS is made for the RG DS Plus on its stock firmware.
+      options:
+        - RG DS Plus, stock firmware
+        - Something else (tell us below)
+    validations:
+      required: true
   - type: textarea
     id: what
     attributes:

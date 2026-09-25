@@ -5,14 +5,17 @@ sideways, like an open book, and each screen shows one page.
 
 ![Reading, held sideways](docs/screenshots/reading.png)
 
-> **This is a test release.** It has been used on the stock Anbernic
-> firmware. If something goes wrong, please
+> **Made for the RG DS Plus on its stock firmware**, the Linux system it
+> ships with. It isn't for the original RG DS (640×480 screens), and it isn't
+> for custom firmware such as ROCKNIX or KNULLI.
+
+> **This is a test release.** If something goes wrong, please
 > [report it](#reporting-problems). It only takes a minute.
 
 ## Install
 
-You need the SD card from the RG DS Plus and any computer (Windows, Mac or
-Linux).
+You need an RG DS Plus on its stock firmware, its SD card, and any computer
+(Windows, Mac or Linux).
 
 1. **Download** `eReaderDS-vX.Y.Z.zip` from the
    [latest release](https://github.com/casualducko/eReaderDS-beta/releases/latest)
@@ -127,8 +130,9 @@ It asks for:
   files inside the EPUB.
 - **Formatting** support is basic: tables, fixed-layout EPUBs, PDF, MOBI and
   DRM-protected books aren't supported.
-- **Tested** on the stock RG DS Plus firmware only. Custom firmwares may use
-  different folders.
+- **RG DS Plus, stock firmware only.** The original RG DS and custom
+  firmware (ROCKNIX, KNULLI and others) aren't supported: they use different
+  screens, folders or display setups.
 
 ## For developers
 
