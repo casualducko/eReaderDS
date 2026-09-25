@@ -328,7 +328,7 @@ local function menu_items()
             build_fonts(); goto_pos(pos.ch, pos.off)
         end },
         { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
-            S.spacing = math.max(1.0, math.min(2.0, S.spacing + d * 0.05)); pages_cache = {}; goto_pos(pos.ch, pos.off)
+            S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100; pages_cache = {}; goto_pos(pos.ch, pos.off)
         end },
         { label = "Margins", value = margins().name, adjust = function(d)
             S.margins = (S.margins - 1 + d) % #MARGINS + 1; pages_cache = {}; goto_pos(pos.ch, pos.off)

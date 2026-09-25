@@ -80,7 +80,9 @@ SD card, then restart the reader.
   reader's font folder (`/mnt/vendor/bin/ebook/resources/fonts`).
 
 Line height follows the text size rather than each font's own line gap, so
-switching fonts keeps roughly the same number of lines per page.
+switching fonts keeps roughly the same number of lines per page. **Line
+spacing** runs from 0.75 to 2.00: 1.00 is about 1.4× the text size, and around
+0.85 matches a typical printed paperback.
 
 ![Atkinson Hyperlegible](docs/screenshots/font-atkinson.png)
 

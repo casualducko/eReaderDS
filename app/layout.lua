@@ -151,11 +151,11 @@ function M.paginate(chapter, ctx)
                     end
                     if first and prefix then
                         page.items[#page.items + 1] = { kind = "text", x = x0 - prefix.w,
-                            y = y + math.max(0, math.floor((lh - F.r:getHeight()) / 2)),
+                            y = y + math.floor((lh - F.r:getHeight()) / 2),
                             text = prefix.text, font = prefix.font }
                     end
                     local x = x0
-                    local ty = y + math.max(0, math.floor((lh - (big and F.h or F.r):getHeight()) / 2))
+                    local ty = y + math.floor((lh - (big and F.h or F.r):getHeight()) / 2)
                     for k, wd in ipairs(line) do
                         for _, fr in ipairs(wd.frags) do
                             page.items[#page.items + 1] = { kind = "text", x = math.floor(x + 0.5), y = ty,
