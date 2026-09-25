@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.1
+
+- Clarified that eReaderDS is for the RG DS Plus on its stock firmware (not
+  the original RG DS or custom firmware), in the README included in the
+  download and in the bug report form.
+
 ## v0.2.0
 
 - Renamed from "Book Reader" to **eReaderDS**. The Ports entry is now
