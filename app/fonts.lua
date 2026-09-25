@@ -5,6 +5,18 @@ local M = {}
 local BUNDLED_DIR = "fonts"   -- inside the LÖVE source
 M.DEFAULT = "Gentium Book Plus"
 
+-- Bundled fonts in menu order: serifs, then sans-serifs, then accessibility.
+local ORDER = {
+    "Gentium Book Plus", "Literata", "Charis SIL", "Source Serif 4", "Crimson Text", "Bitter",
+    "Atkinson Hyperlegible Next", "Inter", "Lexend",
+    "OpenDyslexic",
+}
+local RANK = {}
+for i, name in ipairs(ORDER) do RANK[name] = i end
+
+-- Fonts that were renamed or replaced between versions.
+local ALIASES = { ["Atkinson Hyperlegible"] = "Atkinson Hyperlegible Next" }
+
 local function user_dirs()
     local env = os.getenv("READER_FONTS")
     local dirs = {}
@@ -187,10 +199,10 @@ function M.scan()
             ls:close()
         end
     end
-    -- Default first, then other bundled fonts, then user fonts; alphabetical within.
+    -- Bundled fonts in their curated order, then user fonts alphabetically.
     table.sort(families, function(a, b)
-        local ra = a.name == M.DEFAULT and 0 or (a.bundled and 1 or 2)
-        local rb = b.name == M.DEFAULT and 0 or (b.bundled and 1 or 2)
+        local ra = a.bundled and (RANK[a.name] or 99) or 1000
+        local rb = b.bundled and (RANK[b.name] or 99) or 1000
         if ra ~= rb then return ra < rb end
         return a.name:lower() < b.name:lower()
     end)
@@ -212,6 +224,7 @@ function M.list()
 end
 
 function M.find(name)
+    name = ALIASES[name] or name
     for _, f in ipairs(M.list()) do
         if f.name == name then return f end
     end

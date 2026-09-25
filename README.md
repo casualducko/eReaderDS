@@ -78,7 +78,7 @@ press.
   justification, brightness, what a tap does, page info, and jump to %
 - Eleven themes: Paper, White, Sepia, Solarized, E-ink (grayscale, 16 gray
   levels and a speckled paper grain), Stone, Sage, Dusk, Night, Amber, Black
-- Three built-in fonts, plus your own
+- Ten built-in fonts (serif, sans-serif and OpenDyslexic), plus your own
 - Battery-friendly: it sleeps between button presses
 
 | Library | Contents |
@@ -99,7 +99,16 @@ creates this folder the first time it runs), then pick them in
 together automatically. Use static fonts: a variable font (with `[wght]` in
 its file name) only shows its default weight.
 
-Built in: Gentium Book Plus, Crimson Text and Atkinson Hyperlegible.
+Built in:
+
+| Serif | Sans-serif | Accessibility |
+|---|---|---|
+| Gentium Book Plus (default) | Atkinson Hyperlegible Next | OpenDyslexic |
+| Literata | Inter | |
+| Charis SIL | Lexend | |
+| Source Serif 4 | | |
+| Crimson Text | | |
+| Bitter | | |
 
 ## Troubleshooting
 
@@ -142,10 +151,19 @@ computer, installing from a clone, and making releases.
 
 ## Credits
 
-- Fonts (SIL Open Font License 1.1):
-  [Gentium Book Plus](https://software.sil.org/gentium/) by SIL International,
-  [Crimson Text](https://github.com/googlefonts/Crimson) by Sebastian Kosch,
-  [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/) by the
-  Braille Institute
+- Fonts, all under the SIL Open Font License 1.1 (license files are included
+  in `app/fonts/` and in the download's `LICENSES` folder):
+  - [Gentium Book Plus](https://software.sil.org/gentium/) and
+    [Charis SIL](https://software.sil.org/charis/) by SIL International
+  - [Literata](https://github.com/googlefonts/literata) by TypeTogether for Google
+  - [Source Serif 4](https://github.com/adobe-fonts/source-serif) by Adobe
+  - [Crimson Text](https://github.com/googlefonts/Crimson) by Sebastian Kosch
+  - [Bitter](https://github.com/solmatas/BitterPro) by Huerta Tipográfica
+    (static Regular/Bold instances generated from the variable font)
+  - [Atkinson Hyperlegible Next](https://github.com/googlefonts/atkinson-hyperlegible-next)
+    by the Braille Institute (static instances generated from the variable font)
+  - [Inter](https://github.com/rsms/inter) by Rasmus Andersson
+  - [Lexend](https://github.com/googlefonts/lexend) by the Lexend Project
+  - [OpenDyslexic](https://github.com/antijingoist/opendyslexic) by Abbie Gonzalez
 - Engine: [LÖVE](https://love2d.org) 11.5 (zlib license), from the PortMaster
   aarch64 runtime. See [runtime/NOTICES.md](runtime/NOTICES.md).

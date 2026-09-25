@@ -20,7 +20,7 @@ P="$STAGE/Ports/eReaderDS"
 mkdir -p "$P/app/fonts" "$P/runtime/libs.aarch64" "$P/LICENSES"
 
 cp "$ROOT"/app/*.lua "$P/app/"
-cp "$ROOT"/app/fonts/*.ttf "$P/app/fonts/"
+cp "$ROOT"/app/fonts/*.ttf "$ROOT"/app/fonts/*.otf "$P/app/fonts/"
 cp "$ROOT"/app/fonts/*-OFL.txt "$P/LICENSES/"
 cp "$ROOT/runtime/love.aarch64" "$P/runtime/"
 cp "$ROOT"/runtime/libs.aarch64/* "$P/runtime/libs.aarch64/"

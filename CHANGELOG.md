@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Ten built-in fonts. Serif: Gentium Book Plus, Literata, Charis SIL, Source
+  Serif 4, Crimson Text, Bitter. Sans-serif: Atkinson Hyperlegible Next (replaces
+  Atkinson Hyperlegible), Inter, Lexend. Plus OpenDyslexic.
 - The curved-arrow button (right of the Anbernic button) opens and closes
   Settings.
 - The analog stick works like the D-pad (one push per press).
