@@ -3,7 +3,7 @@ local M = {}
 
 local DEFAULTS = {
     font = "Gentium Book Plus", font_size = 32, spacing = 1.15, margins = 2, justify = true,
-    theme = 1, chrome = true, orient = "left",
+    theme = 1, chrome = true, orient = "left", anim = "flip",
     brightness = -1,   -- percent; -1 = leave the system setting alone
 }
 

@@ -30,6 +30,10 @@ local app = {
 local fonts = {}
 local ui = {}
 local canvases = {}
+local old_canvases = {}       -- previous spread, kept during a page-turn animation
+local shadow_mesh
+local turn_mesh               -- strip mesh for the page being turned
+local TURN_COLS = 24
 local images = {}            -- src -> Image (per open book)
 local book, pages_cache = nil, {}
 local pos = { ch = 1, off = 0 }  -- reading position (start of left page)
@@ -346,6 +350,13 @@ local function menu_items()
         { label = "Theme", value = th.name, adjust = function(d)
             S.theme = (S.theme - 1 + d) % #THEMES + 1
         end },
+        { label = "Page turn", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
+            adjust = function(d)
+                local order = { "flip", "fade", "off" }
+                local idx = 1
+                for k, v in ipairs(order) do if v == S.anim then idx = k end end
+                S.anim = order[(idx - 1 + d) % #order + 1]
+            end },
         { label = "Page info", value = S.chrome and "On" or "Off", adjust = function()
             S.chrome = not S.chrome
         end },
@@ -537,7 +548,7 @@ local function draw_menu_panel(side)
     color(th.fg)
     love.graphics.print("Settings", x, 60)
     local items = menu_items()
-    local row_h = 54
+    local row_h = 50
     draw_list(side, items, menu.sel, 1, #items, x, 150, w, row_h, function(it, _, rx, ry, rw, selected)
         love.graphics.setFont(ui.font)
         color(th.fg)
@@ -623,27 +634,153 @@ local function render_canvases()
     love.graphics.setCanvas()
 end
 
+-- Transform so drawing happens in page coordinates (0..PAGE_W, 0..PAGE_H)
+-- on the screen that shows the given side of the spread.
+local function page_transform(side)
+    if S.orient == "left" then
+        -- Device turned counter-clockwise: top screen on the left.
+        love.graphics.translate(side == "left" and SCREEN_W or SCREEN_W * 2, 0)
+        love.graphics.rotate(math.pi / 2)
+    else
+        -- Device turned clockwise: bottom screen on the left.
+        love.graphics.translate(side == "left" and SCREEN_W or 0, SCREEN_H)
+        love.graphics.rotate(-math.pi / 2)
+    end
+end
+
+-- Draw a page canvas squeezed horizontally toward the spine (s = 1 is flat,
+-- s = 0 is edge-on), darkened by `shade` and faded by `alpha`.
+local function blit_page(canvas, side, s, shade, alpha)
+    s = s or 1
+    if s <= 0 then return end
+    love.graphics.push()
+    page_transform(side)
+    local k = 1 - (shade or 0)
+    love.graphics.setColor(k, k, k, alpha or 1)
+    local x = side == "left" and PAGE_W * (1 - s) or 0
+    love.graphics.draw(canvas, x, 0, 0, s, 1)
+    love.graphics.pop()
+end
+
+-- Draw the page that is turning. s = cos(angle): 1 flat, 0 edge-on.
+-- The spine end is drawn slightly shorter than the outer edge so the page
+-- appears to tilt toward the viewer as it lifts.
+local function blit_turning(canvas, side, s, shade)
+    if s <= 0.001 then return end
+    local lift = 0.10 * math.sqrt(math.max(0, 1 - s * s))   -- sin(angle)
+    local verts = {}
+    for c = 0, TURN_COLS do
+        local u = c / TURN_COLS                     -- 0 at spine, 1 at outer edge
+        local x = u * PAGE_W * s
+        local tu = u
+        if side == "left" then x = PAGE_W - x; tu = 1 - u end
+        local h = 1 - lift * (1 - u)
+        local y0 = PAGE_H * (1 - h) / 2
+        local k = 1 - 0.25 * lift * (1 - u) * 4      -- a little darker toward the fold
+        verts[#verts + 1] = { x, y0, tu, 0, k, k, k, 1 }
+        verts[#verts + 1] = { x, y0 + PAGE_H * h, tu, 1, k, k, k, 1 }
+    end
+    turn_mesh:setVertices(verts)
+    turn_mesh:setTexture(canvas)
+    love.graphics.push()
+    page_transform(side)
+    local k = 1 - (shade or 0)
+    love.graphics.setColor(k, k, k, 1)
+    love.graphics.draw(turn_mesh)
+    love.graphics.pop()
+end
+
+-- Soft shadow cast by a turning page onto the page beneath it. `edge` is the
+-- turning page's outer edge; the shadow fades away from it in direction `dir`.
+local function page_shadow(side, edge, dir, alpha)
+    if alpha <= 0 then return end
+    love.graphics.push()
+    page_transform(side)
+    love.graphics.setColor(0, 0, 0, alpha)
+    love.graphics.draw(shadow_mesh, edge, 0, 0, 70 * dir, PAGE_H)
+    love.graphics.pop()
+end
+
 -- Draw the two page canvases onto the physical screens.
 local function compose()
     local th = theme()
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
-    love.graphics.setColor(1, 1, 1)
-    if S.orient == "left" then
-        -- Device turned counter-clockwise: top screen on the left.
-        love.graphics.draw(canvases[1], 0 + SCREEN_W, 0, math.pi / 2)
-        love.graphics.draw(canvases[2], SCREEN_W + SCREEN_W, 0, math.pi / 2)
+    blit_page(canvases[1], "left")
+    blit_page(canvases[2], "right")
+end
+
+local ANIM_TIME = { flip = 0.38, fade = 0.22 }
+
+-- Page-turn animation between old_canvases and canvases at progress t (0..1).
+local function compose_anim(t)
+    local a = app.anim
+    local th = theme()
+    love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
+    local e = t * t * (3 - 2 * t)              -- ease in/out
+    local old, new = old_canvases, canvases
+    if a.style == "fade" then
+        blit_page(new[1], "left"); blit_page(new[2], "right")
+        blit_page(old[1], "left", 1, 0, 1 - e); blit_page(old[2], "right", 1, 0, 1 - e)
+        return
+    end
+    -- Flip: the turning page folds to the spine, then unfolds on the other side.
+    local first = e < 0.5
+    local s = first and math.cos(e * math.pi) or -math.cos(e * math.pi)
+    local shade, shadow = 0.35 * (1 - s), 0.3 * (1 - s)
+    if a.dir > 0 then
+        blit_page(old[1], "left"); blit_page(new[2], "right")
+        if first then
+            page_shadow("right", PAGE_W * s, 1, shadow)
+            blit_turning(old[2], "right", s, shade)
+        else
+            page_shadow("left", PAGE_W * (1 - s), -1, shadow)
+            blit_turning(new[1], "left", s, shade)
+        end
     else
-        -- Device turned clockwise: bottom screen on the left.
-        love.graphics.draw(canvases[1], SCREEN_W, SCREEN_H, -math.pi / 2)
-        love.graphics.draw(canvases[2], 0, SCREEN_H, -math.pi / 2)
+        blit_page(new[1], "left"); blit_page(old[2], "right")
+        if first then
+            page_shadow("left", PAGE_W * (1 - s), -1, shadow)
+            blit_turning(old[1], "left", s, shade)
+        else
+            page_shadow("right", PAGE_W * s, 1, shadow)
+            blit_turning(new[2], "right", s, shade)
+        end
     end
 end
 
-function love.draw()
+-- Turn the page with the configured animation. `fn` changes the spread.
+local function turn(dir, fn)
+    app.anim = nil
+    if S.anim == "off" or app.mode ~= "reader" or not spread then fn(); redraw(); return end
+    render_canvases()                           -- what is on screen right now
+    local ch, pi = spread.ch, spread.pi
+    canvases, old_canvases = old_canvases, canvases
+    fn()
+    if spread.ch == ch and spread.pi == pi then     -- start/end of book: nothing to animate
+        canvases, old_canvases = old_canvases, canvases
+        return
+    end
     render_canvases()
+    app.anim = { dir = dir, style = S.anim, start = love.timer.getTime(), dur = ANIM_TIME[S.anim] or 0.3 }
+    redraw()
+end
+
+-- Draws one full frame (both screens).
+local function frame()
+    local a = app.anim
+    if a then
+        local t = a.fixed or math.min(1, (love.timer.getTime() - a.start) / a.dur)
+        if t < 1 then compose_anim(t) return end
+        app.anim = nil
+    end
+    render_canvases()
+    compose()
+end
+
+function love.draw()
     love.graphics.push()
     love.graphics.scale(app.scale)
-    compose()
+    frame()
     love.graphics.pop()
 end
 
@@ -665,8 +802,8 @@ local function action(a)
     end
 
     if mode == "reader" then
-        if a == "next" or a == "right" or a == "down" then next_spread()
-        elseif a == "prev" or a == "left" or a == "up" then prev_spread()
+        if a == "next" or a == "right" or a == "down" then turn(1, next_spread)
+        elseif a == "prev" or a == "left" or a == "up" then turn(-1, prev_spread)
         elseif a == "next_section" then jump_section(1)
         elseif a == "prev_section" then jump_section(-1)
         elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1
@@ -769,7 +906,7 @@ function love.touchpressed(_, x, y)
     local w = love.graphics.getWidth()
     local on_top_screen = x < w / 2
     local top_is_left = S.orient == "left"
-    if on_top_screen == top_is_left then prev_spread() else next_spread() end
+    if on_top_screen == top_is_left then turn(-1, prev_spread) else turn(1, next_spread) end
     redraw()
 end
 
@@ -795,6 +932,14 @@ function love.load()
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+    old_canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+    old_canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+    -- Horizontal gradient, opaque at x=0 fading to clear at x=1.
+    shadow_mesh = love.graphics.newMesh({
+        { 0, 0, 0, 0, 1, 1, 1, 1 }, { 1, 0, 1, 0, 1, 1, 1, 0 },
+        { 1, 1, 1, 1, 1, 1, 1, 0 }, { 0, 1, 0, 1, 1, 1, 1, 1 },
+    }, "fan", "static")
+    turn_mesh = love.graphics.newMesh((TURN_COLS + 1) * 2, "strip", "stream")
     ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
     ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
@@ -821,15 +966,22 @@ local function run_test_script()
             if dir then dpad(dir) else action(a) end
         end
     end
+    local freeze = tonumber(os.getenv("READER_ANIM_T") or "")
+    if freeze and app.anim then app.anim.fixed = freeze end
     local out = os.getenv("READER_SHOT")
     if out then
-        local frame = love.graphics.newCanvas(2048, 768)
-        love.graphics.setCanvas(frame)
-        render_canvases()
-        love.graphics.setCanvas(frame)
-        compose()
+        local shot = love.graphics.newCanvas(2048, 768)
+        if app.anim then
+            love.graphics.setCanvas(shot)
+            compose_anim(app.anim.fixed or 0.5)
+        else
+            love.graphics.setCanvas(shot)
+            render_canvases()
+            love.graphics.setCanvas(shot)
+            compose()
+        end
         love.graphics.setCanvas()
-        local png = frame:newImageData():encode("png"):getString()
+        local png = shot:newImageData():encode("png"):getString()
         local f = io.open(out, "wb"); f:write(png); f:close()
         love.event.quit()
     end
@@ -840,7 +992,7 @@ function love.run()
     love.load(love.arg.parseGameArguments(arg), arg)
     run_test_script()
     return function()
-        if app.dirty and love.graphics.isActive() then
+        if (app.dirty or app.anim) and love.graphics.isActive() then
             app.dirty = false
             love.graphics.origin()
             love.draw()
@@ -864,7 +1016,9 @@ function love.run()
             local r = handle(name, a, b, c, d, e, f)
             if r then return r end
         end
-        if not got then
+        if app.anim then
+            love.timer.sleep(0.001)            -- animating: next frame (vsync paces it)
+        elseif not got then
             local r = handle(love.event.wait())
             if r then return r end
         end

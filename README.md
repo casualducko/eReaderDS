@@ -14,10 +14,12 @@ sideways like an open book and each screen shows one portrait page.
 - **Book-style layout**: justified text, paragraph indents, and each chapter
   starts on a new page
 - **Library** with cover previews and per-book progress
+- **Page-turn animation**: a 3D page flip across the hinge, or a fade, or off
 - **Remembers your place** in every book and reopens the last one on launch
 - **Fonts**: three bundled (Gentium Book Plus, Crimson Text, Atkinson
   Hyperlegible), plus any `.ttf`/`.otf` you add yourself
 - **Settings**: text size, font, line spacing, margins, justification, brightness,
+  page turn,
   four themes (Paper, White, Sepia, Night), page info on/off, and go to %
 - **Battery-friendly**: redraws only when you press a button
 
@@ -86,6 +88,22 @@ spacing** runs from 0.75 to 2.00: 1.00 is about 1.4× the text size, and around
 
 ![Atkinson Hyperlegible](docs/screenshots/font-atkinson.png)
 
+## Page turns
+
+**Settings → Page turn** chooses the animation:
+
+- **Flip** (default): the right page tilts up and folds toward the hinge,
+  then lands on the left screen, with shading and a soft shadow on the page
+  beneath. Turning back mirrors it. Takes about 0.4 seconds.
+- **Fade**: a quick cross-fade between spreads.
+- **Off**: instant.
+
+Pressing again during a turn finishes it immediately and starts the next, so
+fast paging never waits. The reader draws continuous frames only while a page
+is turning, and otherwise sleeps until the next button press.
+
+![Page turn in progress](docs/screenshots/page-turn.png)
+
 ## Controls
 
 Hold the device turned counter-clockwise: the top screen is the left page and
@@ -139,7 +157,11 @@ Ports/BookReader/
   starting and restores it afterwards, so the reader's level doesn't stick
   outside it.
 - **Idle.** A custom `love.run` waits for input events instead of drawing
-  60 frames a second.
+  60 frames a second. It only renders frames while a page-turn animation
+  runs.
+- **Page turns.** Both spreads are kept as canvases. The turning page is
+  drawn as a strip mesh whose spine end shrinks as it lifts, which gives the
+  3D tilt.
 
 ### Source layout
 
@@ -186,6 +208,7 @@ tools/sideways.py frame.png view.png   # how it looks held sideways (needs Pillo
 | `READER_FONTS` | Colon-separated user font folders (device default: `Ebook/Fonts` and the firmware font folder) |
 | `READER_BACKLIGHT` | Backlight sysfs root, useful for testing with fake files |
 | `READER_SCRIPT` / `READER_SHOT` | Run actions, save a PNG of the frame, then quit |
+| `READER_ANIM_T` | With `READER_SHOT`, freeze a page turn at this progress (0–1) |
 | `READER_DEBUG` | Print layout timings |
 
 ## Known limitations
