@@ -22,7 +22,7 @@ sideways like an open book and each screen shows one portrait page.
   Hyperlegible), plus any `.ttf`/`.otf` you add yourself
 - **Settings**: text size, font, line spacing, margins, justification, brightness,
   page turn, what a tap does,
-  four themes (Paper, White, Sepia, Night), page info on/off, and go to %
+  four themes (Paper, White, Sepia, Night), page info on/off, and jump to %
 - **Battery-friendly**: redraws only when you press a button
 
 | Library | Contents |
