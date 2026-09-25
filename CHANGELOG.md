@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- New **E-ink** theme: light gray paper, soft black text and a faint paper
-  grain, like an e-ink reader's screen.
+- New **E-ink** theme that mimics an e-ink screen: everything, including
+  covers, is shown in grayscale with 16 gray levels and a fine speckled grain
+  on cool gray paper.
 
 ## v0.2.1
 

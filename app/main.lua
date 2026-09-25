@@ -22,7 +22,7 @@ local THEMES = {
     { name = "White",     bg = { 1, 1, 1 },             fg = { 0, 0, 0 },          dim = { 0.45, 0.45, 0.45 }, sel = { 0.85, 0.85, 0.85 } },
     { name = "Sepia",     bg = { 0.957, 0.925, 0.847 }, fg = { 0.357, 0.275, 0.212 }, dim = { 0.60, 0.52, 0.44 }, sel = { 0.88, 0.80, 0.66 } },
     { name = "Solarized", bg = { 0.992, 0.965, 0.890 }, fg = { 0.28, 0.357, 0.384 }, dim = { 0.53, 0.59, 0.59 }, sel = { 0.933, 0.910, 0.835 } },
-    { name = "E-ink",     bg = { 0.855, 0.851, 0.827 }, fg = { 0.11, 0.11, 0.11 }, dim = { 0.40, 0.40, 0.39 }, sel = { 0.74, 0.74, 0.72 }, grain = true },
+    { name = "E-ink",     bg = { 0.82, 0.82, 0.81 },    fg = { 0.12, 0.12, 0.12 }, dim = { 0.40, 0.40, 0.40 }, sel = { 0.67, 0.67, 0.66 }, eink = true },
     { name = "Stone",     bg = { 0.890, 0.882, 0.863 }, fg = { 0.17, 0.17, 0.17 }, dim = { 0.47, 0.46, 0.44 }, sel = { 0.80, 0.79, 0.76 } },
     { name = "Sage",      bg = { 0.863, 0.902, 0.831 }, fg = { 0.16, 0.22, 0.15 }, dim = { 0.42, 0.49, 0.40 }, sel = { 0.76, 0.83, 0.72 } },
     { name = "Dusk",      bg = { 0.125, 0.145, 0.192 }, fg = { 0.80, 0.83, 0.88 }, dim = { 0.49, 0.53, 0.60 }, sel = { 0.22, 0.25, 0.32 } },
@@ -46,7 +46,22 @@ local ui = {}
 local canvases = {}
 local old_canvases = {}       -- previous spread, kept during a page-turn animation
 local shadow_mesh
-local grain_image, grain_quad    -- faint paper texture for the E-ink theme
+-- E-ink look: pages go through a filter that turns them grayscale, mixes in a
+-- fixed noise pattern and reduces them to 16 gray levels, like an e-ink panel.
+-- The noise makes flat areas speckle between neighbouring grays.
+local eink_shader, eink_noise
+local EINK_SHADER = [[
+extern Image noise;
+extern float amount;
+vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
+    vec4 c = Texel(tex, tc) * color;
+    float g = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+    float n = Texel(noise, sc / 256.0).r - 0.5;
+    g = clamp(g + n * amount, 0.0, 1.0);
+    g = floor(g * 15.0 + 0.5) / 15.0;
+    return vec4(vec3(g), c.a);
+}
+]]
 local turn_mesh               -- strip mesh for the page being turned
 local TURN_COLS = 24
 local images = {}            -- src -> Image (per open book)
@@ -695,10 +710,6 @@ local function render_canvases()
         love.graphics.setCanvas(canvases[i])
         love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
         love.graphics.origin()
-        if th.grain then
-            love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.draw(grain_image, grain_quad, 0, 0)
-        end
         painter(side)
         if app.mode == "menu" and side == "left" then
             love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
@@ -775,18 +786,35 @@ local function page_shadow(side, edge, dir, alpha)
     love.graphics.pop()
 end
 
+local function set_theme_shader(on)
+    if on and theme().eink and eink_shader then
+        love.graphics.setShader(eink_shader)
+    else
+        love.graphics.setShader()
+    end
+end
+
 -- Draw the two page canvases onto the physical screens.
 local function compose()
+    set_theme_shader(true)
     local th = theme()
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
     blit_page(canvases[1], "left")
     blit_page(canvases[2], "right")
+    set_theme_shader(false)
 end
 
 local ANIM_TIME = { flip = 0.38, fade = 0.22 }
 
 -- Page-turn animation between old_canvases and canvases at progress t (0..1).
+local compose_anim_frame
 local function compose_anim(t)
+    set_theme_shader(true)
+    compose_anim_frame(t)
+    set_theme_shader(false)
+end
+
+function compose_anim_frame(t)
     local a = app.anim
     local th = theme()
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
@@ -1137,29 +1165,25 @@ function love.load()
         { 1, 1, 1, 1, 1, 1, 1, 0 }, { 0, 1, 0, 1, 1, 1, 1, 1 },
     }, "fan", "static")
     turn_mesh = love.graphics.newMesh((TURN_COLS + 1) * 2, "strip", "stream")
-    -- Paper grain: fine speckle plus soft blotches, tiled over the page. A fixed
-    -- seed keeps the texture identical every time, like a real screen's.
+    -- Fixed white-noise texture for the E-ink filter (same pattern every run,
+    -- like a real panel's grain).
     local rng = love.math.newRandomGenerator(1234)
-    local G = 256
-    local grain = love.image.newImageData(G, G)
-    local coarse = {}
-    for k = 0, 16 * 16 - 1 do coarse[k] = rng:random() end
-    grain:mapPixel(function(x, y)
-        -- blotches: bilinear-interpolated 16x16 value noise (tileable)
-        local fx, fy = x / G * 16, y / G * 16
-        local x0, y0 = math.floor(fx), math.floor(fy)
-        local tx, ty = fx - x0, fy - y0
-        local function c(i, j) return coarse[(j % 16) * 16 + (i % 16)] end
-        local blot = (c(x0, y0) * (1 - tx) + c(x0 + 1, y0) * tx) * (1 - ty)
-            + (c(x0, y0 + 1) * (1 - tx) + c(x0 + 1, y0 + 1) * tx) * ty
-        local n = (rng:random() - 0.5) * 0.9 + (blot - 0.5) * 0.6
-        if n >= 0 then return 1, 1, 1, n * 0.10 end
-        return 0, 0, 0, -n * 0.10
+    local noise = love.image.newImageData(256, 256)
+    noise:mapPixel(function()
+        local v = rng:random()
+        return v, v, v, 1
     end)
-    grain_image = love.graphics.newImage(grain)
-    grain_image:setWrap("repeat", "repeat")
-    grain_image:setFilter("nearest", "nearest")
-    grain_quad = love.graphics.newQuad(0, 0, PAGE_W, PAGE_H, G, G)
+    eink_noise = love.graphics.newImage(noise)
+    eink_noise:setWrap("repeat", "repeat")
+    eink_noise:setFilter("nearest", "nearest")
+    local ok, sh = pcall(love.graphics.newShader, EINK_SHADER)
+    if ok then
+        eink_shader = sh
+        eink_shader:send("noise", eink_noise)
+        eink_shader:send("amount", 1.3 / 15)
+    else
+        print("[eink] shader unavailable: " .. tostring(sh))
+    end
     ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
     ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)

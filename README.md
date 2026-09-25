@@ -75,8 +75,8 @@ you see it.
   the last book reopens on launch
 - Settings: text size, font, line spacing, side and top/bottom margins,
   justification, brightness, what a tap does, page info, and jump to %
-- Eleven themes: Paper, White, Sepia, Solarized, E-ink (gray paper with a
-  faint grain), Stone, Sage, Dusk, Night, Amber, Black
+- Eleven themes: Paper, White, Sepia, Solarized, E-ink (grayscale, 16 gray
+  levels and a speckled paper grain), Stone, Sage, Dusk, Night, Amber, Black
 - Three built-in fonts, plus your own
 - Battery-friendly: it sleeps between button presses
 
