@@ -21,9 +21,19 @@ for d in /sys/class/backlight/*; do
     BL_SAVED="$BL_SAVED $d=$(cat "$d/brightness")"
 done
 printf '[launch] backlight:%s\n' "${BL_SAVED:- none}"
+# Route the bottom touchscreen to the app (the firmware's app mode), as other
+# dual-screen ports do; the previous mode is restored on exit.
+TP=/sys/class/anbernic_misc/tpctrl
+TP_SAVED=""
+if [ -r "$TP" ] && [ -w "$TP" ]; then
+    TP_SAVED=$(cat "$TP")
+    [ "$TP_SAVED" = 1 ] && printf '0\n' > "$TP"
+    printf '[launch] tpctrl %s -> %s\n' "$TP_SAVED" "$(cat "$TP")"
+fi
 cd "$APP_DIR/app" || exit 1
 "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app"
 rc=$?
+[ -n "$TP_SAVED" ] && printf '%s\n' "$TP_SAVED" > "$TP" 2>/dev/null
 for e in $BL_SAVED; do
     printf '%s\n' "${e##*=}" > "${e%=*}/brightness" 2>/dev/null
 done

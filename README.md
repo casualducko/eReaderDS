@@ -15,6 +15,7 @@ sideways like an open book and each screen shows one portrait page.
   starts on a new page
 - **Library** with cover previews and per-book progress
 - **Page-turn animation**: a 3D page flip across the hinge, or a fade, or off
+- **Touch brightness**: slide a finger up or down on the bottom screen, like a Kobo
 - **Remembers your place** in every book and reopens the last one on launch
 - **Fonts**: three bundled (Gentium Book Plus, Crimson Text, Atkinson
   Hyperlegible), plus any `.ttf`/`.otf` you add yourself
@@ -104,6 +105,17 @@ is turning, and otherwise sleeps until the next button press.
 
 ![Page turn in progress](docs/screenshots/page-turn.png)
 
+## Touch brightness
+
+Slide a finger up or down on the bottom (touch) screen to change brightness.
+Up means brighter, as the page is held. A popup shows the level while you
+slide and fades out shortly after you let go. Finger movement is mapped on a
+curve, so the dim end, where it matters most for night reading, gets finer
+control. The level is saved, just like the **Brightness** setting.
+
+Only mostly vertical slides count, and they must travel a short distance
+first, so resting a thumb on the screen doesn't change anything.
+
 ## Controls
 
 Hold the device turned counter-clockwise: the top screen is the left page and
@@ -156,6 +168,12 @@ Ports/BookReader/
   to the same percentage. `launch.sh` saves the system brightness before
   starting and restores it afterwards, so the reader's level doesn't stick
   outside it.
+- **Touch.** SDL doesn't deliver this touchscreen to apps, so `touch.lua`
+  reads the `gt9xx-0` evdev device directly (non-blocking, through LuaJIT
+  FFI). `launch.sh` switches `/sys/class/anbernic_misc/tpctrl` to app mode
+  (0) while the reader runs and restores it afterwards. Because touch events
+  can't wake the event wait, the loop polls about 40 times a second while a
+  touchscreen is available.
 - **Idle.** A custom `love.run` waits for input events instead of drawing
   60 frames a second. It only renders frames while a page-turn animation
   runs.
@@ -173,6 +191,7 @@ Ports/BookReader/
 | `app/zip.lua` | Minimal ZIP reader (stored and deflate) |
 | `app/store.lua` | Settings and progress files |
 | `app/backlight.lua` | Screen brightness through sysfs |
+| `app/touch.lua` | Raw evdev touchscreen reader (LuaJIT FFI) |
 | `app/fonts.lua` | Font discovery, family/style grouping from the font name table, loading |
 | `app/conf.lua` | LÖVE window configuration |
 | `port/` | Device launch scripts |
@@ -189,7 +208,8 @@ cd app
 READER_SCALE=0.5 READER_BOOKS=~/Books READER_DATA=/tmp/reader-data love .
 ```
 
-On a computer the arrow keys are page directions. Space/PageDown turns
+On a computer the arrow keys are page directions, and dragging with the mouse
+on the right half of the window stands in for the touchscreen. Space/PageDown turns
 forward, Enter selects, Esc goes back, `m` opens settings, `t` opens
 contents, and `q` quits.
 
@@ -208,13 +228,15 @@ tools/sideways.py frame.png view.png   # how it looks held sideways (needs Pillo
 | `READER_FONTS` | Colon-separated user font folders (device default: `Ebook/Fonts` and the firmware font folder) |
 | `READER_BACKLIGHT` | Backlight sysfs root, useful for testing with fake files |
 | `READER_SCRIPT` / `READER_SHOT` | Run actions, save a PNG of the frame, then quit |
+| `READER_TOUCH` | With `READER_SHOT`, simulate a touch drag `x0,y0,x1,y1` in bottom-screen coordinates |
+| `READER_TOUCH_DEV` | Touchscreen evdev path (default: found by name `gt9xx-0`) |
 | `READER_ANIM_T` | With `READER_SHOT`, freeze a page turn at this progress (0–1) |
 | `READER_DEBUG` | Print layout timings |
 
 ## Known limitations
 
-- **No touch.** Touch input on this device needs raw evdev access, so pages
-  can't be turned by tapping yet.
+- **Touch is for brightness only.** Tapping or swiping to turn pages isn't
+  implemented.
 - **Page counts.** "Pages left in chapter" counts only to the end of the
   current file inside the EPUB, so it can undercount chapters that span files.
 - **Styling.** Only a small CSS subset is used (italic, bold, centering,

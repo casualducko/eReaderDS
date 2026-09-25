@@ -9,6 +9,7 @@ local Layout = require("layout")
 local Store = require("store")
 local Backlight = require("backlight")
 local Fonts = require("fonts")
+local Touch = require("touch")
 
 local SCREEN_W, SCREEN_H = 1024, 768
 local PAGE_W, PAGE_H = 768, 1024
@@ -781,6 +782,80 @@ local function turn(dir, fn)
     redraw()
 end
 
+---------------------------------------------------------------- touch brightness
+
+-- Brightness popup shown while sliding a finger on the touchscreen.
+local overlay = nil        -- { side, pct, hide_at }
+local gesture = nil        -- current touch: { side, u0, v0, mode, p0 }
+
+-- Bottom-screen native coordinates (0..1024 x 0..768) -> page side + page coords.
+local function touch_to_page(sx, sy)
+    if S.orient == "left" then return "right", sy, SCREEN_W - sx end
+    return "left", SCREEN_H - sy, sx
+end
+
+local function current_brightness()
+    if S.brightness >= 0 then return S.brightness end
+    return Backlight.get() or 50
+end
+
+local function touch_event(kind, sx, sy)
+    local side, u, v = touch_to_page(sx, sy)
+    local now = love.timer.getTime()
+    if kind == "down" then
+        gesture = { side = side, u0 = u, v0 = v }
+    elseif kind == "move" and gesture then
+        local du, dv = u - gesture.u0, v - gesture.v0
+        if not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
+            -- Mostly vertical slide: brightness. Work in sqrt space so the
+            -- dim end gets finer control.
+            gesture.mode = "brightness"
+            gesture.v0 = v
+            gesture.p0 = math.sqrt(current_brightness() / 100)
+        end
+        if gesture.mode == "brightness" then
+            local p = gesture.p0 + (gesture.v0 - v) / (PAGE_H * 0.8)
+            local pct = math.max(1, math.min(100, math.floor(p * p * 100 + 0.5)))
+            if Backlight.available() and pct ~= S.brightness then
+                S.brightness = pct
+                Backlight.set(pct)
+            end
+            overlay = { side = gesture.side, pct = Backlight.available() and pct or nil, hide_at = now + 1e9 }
+            redraw()
+        end
+    elseif kind == "up" and gesture then
+        if gesture.mode == "brightness" then
+            if overlay then overlay.hide_at = now + 0.9 end
+            Store.save_settings(S)
+        end
+        gesture = nil
+    end
+end
+
+local function draw_overlay()
+    if not overlay then return end
+    love.graphics.push()
+    page_transform(overlay.side)
+    local w, h = 460, 118
+    local x, y = (PAGE_W - w) / 2, 120
+    love.graphics.setColor(0.08, 0.08, 0.08, 0.94)
+    love.graphics.rectangle("fill", x, y, w, h, 22, 22)
+    love.graphics.setColor(1, 1, 1, 0.95)
+    love.graphics.setFont(ui.font)
+    if overlay.pct then
+        love.graphics.print("Brightness", x + 28, y + 14)
+        love.graphics.printf(overlay.pct .. "%", x, y + 14, w - 28, "right")
+        local bx, by, bw = x + 28, y + 76, w - 56
+        love.graphics.setColor(1, 1, 1, 0.25)
+        love.graphics.rectangle("fill", bx, by, bw, 12, 6, 6)
+        love.graphics.setColor(1, 1, 1, 0.95)
+        love.graphics.rectangle("fill", bx, by, math.max(12, bw * overlay.pct / 100), 12, 6, 6)
+    else
+        love.graphics.printf("Brightness unavailable", x, y + 38, w, "center")
+    end
+    love.graphics.pop()
+end
+
 -- Draws one full frame (both screens).
 local function frame()
     local a = app.anim
@@ -797,7 +872,22 @@ function love.draw()
     love.graphics.push()
     love.graphics.scale(app.scale)
     frame()
+    draw_overlay()
     love.graphics.pop()
+end
+
+-- Desktop testing: the mouse on the bottom-screen half acts as a finger.
+function love.mousepressed(x, y)
+    x, y = x / app.scale, y / app.scale
+    if x >= SCREEN_W and not Touch.enabled then touch_event("down", x - SCREEN_W, y) end
+end
+function love.mousemoved(x, y)
+    if gesture and not Touch.enabled and love.mouse.isDown(1) then
+        touch_event("move", math.max(0, x / app.scale - SCREEN_W), y / app.scale)
+    end
+end
+function love.mousereleased(x, y)
+    if gesture and not Touch.enabled then touch_event("up", x / app.scale - SCREEN_W, y / app.scale) end
 end
 
 ---------------------------------------------------------------- input
@@ -916,16 +1006,6 @@ function love.keypressed(key)
     if a then action(a) end
 end
 
--- Touch: tap the right page to go forward, the left page to go back.
-function love.touchpressed(_, x, y)
-    if app.mode ~= "reader" then return end
-    local w = love.graphics.getWidth()
-    local on_top_screen = x < w / 2
-    local top_is_left = S.orient == "left"
-    if on_top_screen == top_is_left then turn(-1, prev_spread) else turn(1, next_spread) end
-    redraw()
-end
-
 ---------------------------------------------------------------- main loop
 
 function love.load()
@@ -945,6 +1025,7 @@ function love.load()
     end
 
     S = Store.load_settings()
+    Touch.open("gt9xx-0")
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
@@ -982,6 +1063,13 @@ local function run_test_script()
             if dir then dpad(dir) else action(a) end
         end
     end
+    local drag = os.getenv("READER_TOUCH")
+    if drag then
+        local x0, y0, x1, y1 = drag:match("([%d.]+),([%d.]+),([%d.]+),([%d.]+)")
+        x0, y0, x1, y1 = tonumber(x0), tonumber(y0), tonumber(x1), tonumber(y1)
+        touch_event("down", x0, y0)
+        for k = 1, 10 do touch_event("move", x0 + (x1 - x0) * k / 10, y0 + (y1 - y0) * k / 10) end
+    end
     local freeze = tonumber(os.getenv("READER_ANIM_T") or "")
     if freeze and app.anim then app.anim.fixed = freeze end
     local out = os.getenv("READER_SHOT")
@@ -996,6 +1084,7 @@ local function run_test_script()
             love.graphics.setCanvas(shot)
             compose()
         end
+        draw_overlay()
         love.graphics.setCanvas()
         local png = shot:newImageData():encode("png"):getString()
         local f = io.open(out, "wb"); f:write(png); f:close()
@@ -1032,8 +1121,13 @@ function love.run()
             local r = handle(name, a, b, c, d, e, f)
             if r then return r end
         end
+        if Touch.enabled and Touch.poll(touch_event) then got = true end
+        if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
         if app.anim then
             love.timer.sleep(0.001)            -- animating: next frame (vsync paces it)
+        elseif Touch.enabled or overlay then
+            -- Touch events don't wake love.event.wait(), so poll at a gentle rate.
+            if not got and not app.dirty then love.timer.sleep(gesture and 0.008 or 0.025) end
         elseif not got then
             local r = handle(love.event.wait())
             if r then return r end
