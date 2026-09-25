@@ -1148,6 +1148,12 @@ local function stick_axis(raw, value)
     local neg, pos = "left", "right"
     if which == "y" then neg, pos = "up", "down" end
     local cur = stick[which]
+    -- While reading, only the stick's up/down (left/right as held) turns
+    -- pages; up/down as held is ignored so a sideways nudge doesn't flip pages.
+    if which == "x" and app.mode == "reader" then
+        if math.abs(value) < STICK_RELEASE then stick[which] = 0 end
+        return
+    end
     if cur == 0 then
         if value >= STICK_PRESS then
             stick[which] = 1

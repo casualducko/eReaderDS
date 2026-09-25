@@ -55,8 +55,8 @@ buttons are under your right hand.
 | **Menu** (home) | Quit | Quit |
 
 The D-pad follows the way you're holding it: forward means right or down, as
-you see it. The **analog stick** works just like the D-pad, one push per
-press.
+you see it. The **analog stick** works like the D-pad, one push per press;
+while reading, only left/right (as held) turn pages.
 
 **Touch** (the bottom screen):
 

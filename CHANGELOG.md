@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- While reading, the analog stick turns pages only with left/right (as held);
+  up/down as held no longer flips pages. It still moves through menus.
 - The Font setting shows each font's name in that font, as a preview. This
   also fixes fonts with non-Latin names (such as the Chinese-named fonts built
   into the firmware), which showed as empty boxes.
