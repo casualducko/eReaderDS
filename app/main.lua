@@ -1119,15 +1119,19 @@ local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x", [4] = "leftshoulder", 
 -- that direction; it must come back inside RELEASE before it can fire again,
 -- so one push is one press and stick drift never turns pages.
 local STICK_PRESS, STICK_RELEASE = 0.6, 0.3
+-- The RG DS Plus stick reports up/down opposite to the D-pad; flip it so the
+-- stick and D-pad agree.
+local STICK_FLIP = { x = 1, y = -1 }
 local stick = { x = 0, y = 0 }          -- latched direction per axis: -1, 0, 1
 
 local function stick_axis(which, value)
+    value = value * STICK_FLIP[which]
     local neg, pos = "left", "right"
     if which == "y" then neg, pos = "up", "down" end
     local cur = stick[which]
     if cur == 0 then
-        if value >= STICK_PRESS then stick[which] = 1; dpad(pos)
-        elseif value <= -STICK_PRESS then stick[which] = -1; dpad(neg) end
+        if value >= STICK_PRESS then stick[which] = 1; print("[input] stick " .. pos); dpad(pos)
+        elseif value <= -STICK_PRESS then stick[which] = -1; print("[input] stick " .. neg); dpad(neg) end
     elseif math.abs(value) < STICK_RELEASE then
         stick[which] = 0
     end
