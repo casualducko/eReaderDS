@@ -358,6 +358,9 @@ local function menu_items()
                 for k, v in ipairs(order) do if v == S.anim then idx = k end end
                 S.anim = order[(idx - 1 + d) % #order + 1]
             end },
+        { label = "Tap", value = S.tap == "next" and "Next page" or "Open menu", adjust = function()
+            S.tap = S.tap == "next" and "menu" or "next"
+        end },
         { label = "Page info", value = S.chrome and "On" or "Off", adjust = function()
             S.chrome = not S.chrome
         end },
@@ -555,7 +558,7 @@ local function draw_library(side)
     end
 end
 
-local MENU_TOP, MENU_ROW_H = 150, 50
+local MENU_TOP, MENU_ROW_H = 150, 48
 
 local function draw_menu_panel(side)
     local th = theme()
@@ -972,7 +975,7 @@ end
 function app.on_tap(side, u, v)
     local mode = app.mode
     if mode == "reader" then
-        action("menu")
+        if S.tap == "next" then turn(1, next_spread) else action("menu") end
     elseif mode == "menu" then
         -- The settings panel is drawn on the right page.
         local m = MARGINS[2]

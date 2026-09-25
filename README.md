@@ -21,7 +21,7 @@ sideways like an open book and each screen shows one portrait page.
 - **Fonts**: three bundled (Gentium Book Plus, Crimson Text, Atkinson
   Hyperlegible), plus any `.ttf`/`.otf` you add yourself
 - **Settings**: text size, font, line spacing, margins, justification, brightness,
-  page turn,
+  page turn, what a tap does,
   four themes (Paper, White, Sepia, Night), page info on/off, and go to %
 - **Battery-friendly**: redraws only when you press a button
 
@@ -110,7 +110,9 @@ is turning, and otherwise sleeps until the next button press.
 
 The bottom screen is a touchscreen.
 
-- **Tap while reading** to open Settings.
+- **Tap while reading** to open Settings, or to turn to the next page. Choose
+  which in **Settings → Tap** (default: Open menu). With Next page, the
+  Start/X/B/Select buttons still open Settings.
 - **Tap a settings row** to use it, the same as pressing A: actions run, and
   options step to their next value. When you hold the device
   counter-clockwise, the settings panel is on the touchscreen. Tap the
@@ -250,8 +252,8 @@ tools/sideways.py frame.png view.png   # how it looks held sideways (needs Pillo
 
 ## Known limitations
 
-- **Touch doesn't turn pages.** Tapping opens Settings rather than turning
-  the page, and swiping isn't used.
+- **Touch turns pages forward only.** With **Tap → Next page**, taps go
+  forward; going back uses the buttons, and swiping isn't used.
 - **Page counts.** "Pages left in chapter" counts only to the end of the
   current file inside the EPUB, so it can undercount chapters that span files.
 - **Styling.** Only a small CSS subset is used (italic, bold, centering,
