@@ -24,7 +24,7 @@ BUTTONS
 TOUCH (bottom screen)
   Swipe left/right ......... turn pages
   Slide up/down ............ brightness
-  Tap ...................... open settings (or turn pages: Settings > Tap)
+  Tap right / left half ..... next / previous (or open settings: Settings > Tap)
 
 YOUR OWN FONTS
   Copy .ttf/.otf files into Ebook/Fonts, then choose them in Settings > Font.

@@ -54,8 +54,8 @@ you see it.
 
 - **Swipe** left or right to turn pages.
 - **Slide** up or down to change brightness.
-- **Tap** to open Settings, or set **Settings → Tap** to turn pages instead
-  (tap the right half for forward, the left half for back).
+- **Tap** the right half of the page to go forward, the left half to go back.
+  Prefer taps to open Settings? Set **Settings → Tap** to **Open menu**.
 
 ## Features
 
