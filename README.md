@@ -15,8 +15,8 @@ sideways like an open book and each screen shows one portrait page.
   starts on a new page
 - **Library** with cover previews and per-book progress
 - **Page-turn animation**: a 3D page flip across the hinge, or a fade, or off
-- **Touch**: tap to open settings and tap its rows; slide up or down for
-  brightness, like a Kobo
+- **Touch**: swipe or tap to turn pages, tap to open settings and use its
+  rows, and slide up or down for brightness, like a Kobo
 - **Remembers your place** in every book and reopens the last one on launch
 - **Fonts**: three bundled (Gentium Book Plus, Crimson Text, Atkinson
   Hyperlegible), plus any `.ttf`/`.otf` you add yourself
@@ -111,8 +111,11 @@ is turning, and otherwise sleeps until the next button press.
 
 The bottom screen is a touchscreen.
 
-- **Tap while reading** to open Settings, or to turn to the next page. Choose
-  which in **Settings → Tap** (default: Open menu). With Next page, the
+- **Swipe** left for the next page and right for the previous one, as with a
+  paper book. Swipes work whatever the Tap setting is.
+- **Tap while reading** to open Settings, or to turn pages. Choose which in
+  **Settings → Tap** (default: Open menu). With **Turn pages**, tapping the
+  right half of the page goes forward and the left half goes back, and the
   Start/X/B/Select buttons still open Settings.
 - **Tap a settings row** to use it, the same as pressing A: actions run, and
   options step to their next value. When you hold the device
@@ -121,7 +124,9 @@ The bottom screen is a touchscreen.
 - **Tap in Contents** to go back to reading.
 - **Slide** to change brightness (below).
 
-A tap is a touch shorter than half a second that moves less than 30 px.
+A tap is a touch shorter than half a second that moves less than 30 px. A
+swipe is a mostly horizontal movement of more than 60 px, and a brightness
+slide is a mostly vertical one, so the gestures don't get mixed up.
 
 ### Brightness
 
@@ -253,8 +258,8 @@ tools/sideways.py frame.png view.png   # how it looks held sideways (needs Pillo
 
 ## Known limitations
 
-- **Touch turns pages forward only.** With **Tap → Next page**, taps go
-  forward; going back uses the buttons, and swiping isn't used.
+- **Touch works on one page only.** Only the bottom screen is a
+  touchscreen, so taps and swipes land on whichever page it shows.
 - **Page counts.** "Pages left in chapter" counts only to the end of the
   current file inside the EPUB, so it can undercount chapters that span files.
 - **Styling.** Only a small CSS subset is used (italic, bold, centering,

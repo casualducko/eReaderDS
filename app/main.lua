@@ -363,7 +363,7 @@ local function menu_items()
                 for k, v in ipairs(order) do if v == S.anim then idx = k end end
                 S.anim = order[(idx - 1 + d) % #order + 1]
             end },
-        { label = "Tap", value = S.tap == "next" and "Next page" or "Open menu", adjust = function()
+        { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
             S.tap = S.tap == "next" and "menu" or "next"
         end },
         { label = "Page info", value = S.chrome and "On" or "Off", adjust = function()
@@ -836,11 +836,14 @@ local function touch_event(kind, sx, sy)
     local side, u, v = touch_to_page(sx, sy)
     local now = love.timer.getTime()
     if kind == "down" then
-        gesture = { side = side, u0 = u, v0 = v, t0 = now, moved = 0 }
+        gesture = { side = side, u0 = u, v0 = v, u = u, t0 = now, moved = 0 }
     elseif kind == "move" and gesture then
         local du, dv = u - gesture.u0, v - gesture.v0
         gesture.moved = math.max(gesture.moved, math.abs(du), math.abs(dv))
-        if not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
+        gesture.u = u
+        if not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
+            gesture.mode = "swipe"          -- mostly horizontal: page turn on release
+        elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
             -- Mostly vertical slide: brightness. Work in sqrt space so the
             -- dim end gets finer control.
             gesture.mode = "brightness"
@@ -861,6 +864,12 @@ local function touch_event(kind, sx, sy)
         if gesture.mode == "brightness" then
             if overlay then overlay.hide_at = now + 0.9 end
             Store.save_settings(S)
+        elseif gesture.mode == "swipe" then
+            -- Swipe left (toward the page's left edge) = next page, like a book.
+            local du = gesture.u - gesture.u0
+            if app.mode == "reader" and math.abs(du) > 60 and now - gesture.t0 < 1.0 then
+                if du < 0 then turn(1, next_spread) else turn(-1, prev_spread) end
+            end
         elseif gesture.moved < 30 and now - gesture.t0 < 0.5 and app.on_tap then
             app.on_tap(gesture.side, gesture.u0, gesture.v0)
         end
@@ -1003,7 +1012,12 @@ end
 function app.on_tap(side, u, v)
     local mode = app.mode
     if mode == "reader" then
-        if S.tap == "next" then turn(1, next_spread) else action("menu") end
+        if S.tap == "next" then
+            -- Turn pages: right half of the page goes forward, left half back.
+            if u >= PAGE_W / 2 then turn(1, next_spread) else turn(-1, prev_spread) end
+        else
+            action("menu")
+        end
     elseif mode == "menu" then
         -- The settings panel is drawn on the right page.
         local m = MARGINS[2]
