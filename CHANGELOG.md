@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.0
 
 - Renamed from "Book Reader" to **eReaderDS**. The Ports entry is now
   `eReaderDS.sh` and the folder `Ports/eReaderDS`. Settings and reading

@@ -32,4 +32,4 @@ YOUR OWN FONTS
 PROBLEMS?
   Ports/eReaderDS/log.txt describes the last run. Please attach it
   when reporting a problem:
-  https://github.com/casualducko/eReaderDS/issues
+  https://github.com/casualducko/eReaderDS-beta/issues

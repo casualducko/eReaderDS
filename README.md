@@ -15,7 +15,7 @@ You need the SD card from the RG DS Plus and any computer (Windows, Mac or
 Linux).
 
 1. **Download** `eReaderDS-vX.Y.Z.zip` from the
-   [latest release](https://github.com/casualducko/eReaderDS/releases/latest)
+   [latest release](https://github.com/casualducko/eReaderDS-beta/releases/latest)
    and unzip it on your computer.
 2. **Copy two items onto the card.** Open the unzipped `Ports` folder. It
    contains `eReaderDS.sh` and a `eReaderDS` folder. Copy both into the
@@ -110,7 +110,7 @@ Built in: Gentium Book Plus, Crimson Text and Atkinson Hyperlegible.
 
 ## Reporting problems
 
-[Open a bug report](https://github.com/casualducko/eReaderDS/issues/new?template=bug_report.yml).
+[Open a bug report](https://github.com/casualducko/eReaderDS-beta/issues/new?template=bug_report.yml).
 It asks for:
 
 - The **version**, shown at the top of Settings and at the bottom of the
