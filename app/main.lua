@@ -1,0 +1,863 @@
+-- Book Reader for the Anbernic RG DS Plus.
+-- Hold the device sideways like a book: each screen shows one portrait page.
+--
+-- The two 1024x768 screens form one 2048x768 window (top screen = x 0..1023,
+-- bottom screen = x 1024..2047). Each page is drawn on a 768x1024 canvas and
+-- rotated onto its screen.
+local Book = require("book")
+local Layout = require("layout")
+local Store = require("store")
+local Backlight = require("backlight")
+
+local SCREEN_W, SCREEN_H = 1024, 768
+local PAGE_W, PAGE_H = 768, 1024
+local UI_SIZE, SMALL_SIZE = 30, 22
+
+local THEMES = {
+    { name = "Paper", bg = { 0.965, 0.945, 0.905 }, fg = { 0.13, 0.12, 0.10 }, dim = { 0.50, 0.46, 0.40 }, sel = { 0.87, 0.82, 0.72 } },
+    { name = "White", bg = { 1, 1, 1 }, fg = { 0, 0, 0 }, dim = { 0.45, 0.45, 0.45 }, sel = { 0.85, 0.85, 0.85 } },
+    { name = "Sepia", bg = { 0.957, 0.925, 0.847 }, fg = { 0.357, 0.275, 0.212 }, dim = { 0.60, 0.52, 0.44 }, sel = { 0.88, 0.80, 0.66 } },
+    { name = "Night", bg = { 0.07, 0.07, 0.07 }, fg = { 0.78, 0.77, 0.74 }, dim = { 0.45, 0.44, 0.42 }, sel = { 0.22, 0.22, 0.22 } },
+}
+local MARGINS = { { name = "Narrow", outer = 36, inner = 28 }, { name = "Normal", outer = 60, inner = 44 }, { name = "Wide", outer = 90, inner = 64 } }
+
+local S                      -- settings (persisted)
+local app = {
+    mode = "library",        -- library | reader | menu | toc | message
+    dirty = true,
+}
+local fonts = {}
+local ui = {}
+local canvases = {}
+local images = {}            -- src -> Image (per open book)
+local book, pages_cache = nil, {}
+local pos = { ch = 1, off = 0 }  -- reading position (start of left page)
+local spread = nil           -- { ch, pi, pages }
+local library = { items = {}, sel = 1, top = 1 }
+local menu = { sel = 1 }
+local toc = { sel = 1, top = 1 }
+local message = nil
+
+---------------------------------------------------------------- utilities
+
+local function theme() return THEMES[S.theme] or THEMES[1] end
+local function color(c, a) love.graphics.setColor(c[1], c[2], c[3], a or 1) end
+local function redraw() app.dirty = true end
+
+local function fit_text(font, text, w)
+    if font:getWidth(text) <= w then return text end
+    local utf8 = require("utf8")
+    local n = utf8.len(text) or #text
+    while n > 0 do
+        local cut = text:sub(1, (utf8.offset(text, n + 1) or (#text + 1)) - 1) .. "…"
+        if font:getWidth(cut) <= w then return cut end
+        n = n - 1
+    end
+    return "…"
+end
+
+local function load_font(file, size)
+    local ok, f = pcall(love.graphics.newFont, "fonts/" .. file, size)
+    if ok then return f end
+    return love.graphics.newFont(size)
+end
+
+local function build_fonts()
+    local sz = S.font_size
+    fonts.r = load_font("GentiumBookPlus-Regular.ttf", sz)
+    fonts.i = load_font("GentiumBookPlus-Italic.ttf", sz)
+    fonts.b = load_font("GentiumBookPlus-Bold.ttf", sz)
+    fonts.bi = load_font("GentiumBookPlus-BoldItalic.ttf", sz)
+    fonts.h = load_font("GentiumBookPlus-Bold.ttf", math.floor(sz * 1.45))
+    pages_cache = {}
+end
+
+local function margins() return MARGINS[S.margins] or MARGINS[2] end
+local HEADER_H, FOOTER_H = 64, 64
+local function content_size()
+    local m = margins()
+    return PAGE_W - m.outer - m.inner, PAGE_H - HEADER_H - FOOTER_H - 24
+end
+
+---------------------------------------------------------------- images
+
+local function get_image(src)
+    local img = images[src]
+    if img == nil then
+        img = false
+        local data = book and book:read_resource(src)
+        if data then
+            local ok, res = pcall(function()
+                return love.graphics.newImage(love.filesystem.newFileData(data, src))
+            end)
+            if ok then img = res end
+        end
+        images[src] = img
+    end
+    return img or nil
+end
+
+---------------------------------------------------------------- pagination
+
+local function pages_for(ch)
+    local p = pages_cache[ch]
+    if not p then
+        local c = book:chapter(ch)
+        if not c then return nil end
+        local w, h = content_size()
+        local breaks = {}
+        for _, t in ipairs(book.toc) do
+            if t.chapter == ch then breaks[#breaks + 1] = (t.anchor and c.anchors[t.anchor]) or 0 end
+        end
+        table.sort(breaks)
+        local t0 = love.timer.getTime()
+        p = Layout.paginate(c, {
+            breaks = breaks,
+            fonts = fonts, w = w, h = h, spacing = S.spacing, justify = S.justify,
+            indent = true,
+            image_size = function(src)
+                local img = get_image(src)
+                if img then return img:getDimensions() end
+            end,
+        })
+        pages_cache[ch] = p
+        if os.getenv("READER_DEBUG") then
+            print(string.format("layout ch=%d pages=%d %.0fms", ch, #p, (love.timer.getTime() - t0) * 1000))
+        end
+    end
+    return p
+end
+
+local function set_spread(ch, pi)
+    local pages = pages_for(ch)
+    if pi % 2 == 0 then pi = pi - 1 end
+    pi = math.max(1, math.min(pi, #pages))
+    if pi % 2 == 0 then pi = pi - 1 end
+    spread = { ch = ch, pi = pi, pages = pages }
+    pos.ch, pos.off = ch, pages[pi].off
+    redraw()
+end
+
+local function goto_pos(ch, off)
+    ch = math.max(1, math.min(ch, #book.chapters))
+    local pages = pages_for(ch)
+    set_spread(ch, Layout.find_page(pages, off))
+end
+
+local function save_progress()
+    if book then
+        Store.set_progress(book.path, pos.ch, pos.off, book:fraction(pos.ch, pos.off))
+    end
+end
+
+local function next_spread()
+    if not spread then return end
+    if spread.pi + 2 <= #spread.pages then
+        set_spread(spread.ch, spread.pi + 2)
+    elseif spread.ch < #book.chapters then
+        set_spread(spread.ch + 1, 1)
+    else
+        return
+    end
+    save_progress()
+end
+
+local function prev_spread()
+    if not spread then return end
+    if spread.pi - 2 >= 1 then
+        set_spread(spread.ch, spread.pi - 2)
+    elseif spread.ch > 1 then
+        local pages = pages_for(spread.ch - 1)
+        set_spread(spread.ch - 1, #pages)
+    else
+        return
+    end
+    save_progress()
+end
+
+-- TOC entries with resolved positions (chapter, offset).
+local function toc_pos(t)
+    if t.off == nil then
+        local c = book:chapter(t.chapter)
+        t.off = (t.anchor and c.anchors[t.anchor]) or 0
+    end
+    return t.chapter, t.off
+end
+
+local function current_section()
+    local best
+    for idx, t in ipairs(book.toc) do
+        if t.chapter < pos.ch then best = idx
+        elseif t.chapter == pos.ch then
+            local _, off = toc_pos(t)
+            -- a section counts once it starts anywhere on the visible spread
+            local limit = spread.pages[spread.pi + 2] and spread.pages[spread.pi + 2].off or math.huge
+            if off < limit then best = idx else break end
+        else break end
+    end
+    return best
+end
+
+local function jump_section(dir)
+    if #book.toc == 0 then
+        if dir > 0 and pos.ch < #book.chapters then set_spread(pos.ch + 1, 1)
+        elseif dir < 0 then set_spread(math.max(1, spread.pi > 1 and pos.ch or pos.ch - 1), 1) end
+        save_progress(); return
+    end
+    local cur = current_section() or 0
+    local target
+    if dir > 0 then target = book.toc[cur + 1]
+    else
+        -- go to start of current section, or previous one if already at its start
+        local t = book.toc[cur]
+        if t then
+            local ch, off = toc_pos(t)
+            local pages = pages_for(ch)
+            local pi = Layout.find_page(pages, off)
+            if pi % 2 == 0 then pi = pi - 1 end
+            if ch == spread.ch and pi == spread.pi then target = book.toc[cur - 1] else target = t end
+        end
+    end
+    if target then
+        goto_pos(toc_pos(target))
+        save_progress()
+    end
+end
+
+---------------------------------------------------------------- opening books
+
+local function show_message(text)
+    message = text
+    app.mode = "message"
+    redraw()
+end
+
+local function open_book(path)
+    local ok, b, err = pcall(Book.open, path)
+    if not ok or not b then
+        show_message("Could not open this book.\n\n" .. tostring(ok and err or b))
+        return
+    end
+    book = b
+    images, pages_cache = {}, {}
+    local pr = Store.get_progress(path)
+    app.mode = "reader"
+    if pr then goto_pos(pr.ch, pr.off) else goto_pos(1, 0) end
+    Store.set_last(path)
+    save_progress()
+end
+
+local function scan_library()
+    local items = {}
+    local seen = {}
+    for _, dir in ipairs(Store.book_dirs()) do
+        local p = io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
+        if p then
+            for name in p:lines() do
+                local ext = (name:match("%.([^.]+)$") or ""):lower()
+                if (ext == "epub" or ext == "txt") and not name:match("^%._") then
+                    local path = dir .. "/" .. name
+                    if not seen[path] then
+                        seen[path] = true
+                        local base = name:gsub("%.[^.]+$", "")
+                        local title, author = base:match("^(.-)%s+%-%s+(.+)$")
+                        items[#items + 1] = { path = path, title = title or base, author = author or "" }
+                    end
+                end
+            end
+            p:close()
+        end
+    end
+    table.sort(items, function(a, b) return a.title:lower() < b.title:lower() end)
+    library.items = items
+    library.sel = math.max(1, math.min(library.sel, #items))
+    library.preview = nil
+end
+
+local function library_preview()
+    local it = library.items[library.sel]
+    if not it then return nil end
+    if library.preview and library.preview.path == it.path then return library.preview end
+    local pv = { path = it.path }
+    local ok, b = pcall(Book.open, it.path)
+    if ok and b then
+        pv.title, pv.author = b.title, b.author
+        if b.cover then
+            local data = b:read_resource(b.cover)
+            if data then
+                local ok2, img = pcall(function()
+                    return love.graphics.newImage(love.filesystem.newFileData(data, b.cover))
+                end)
+                if ok2 then pv.cover = img end
+            end
+        end
+    end
+    library.preview = pv
+    return pv
+end
+
+local function go_library()
+    save_progress()
+    Store.flush()
+    scan_library()
+    for i, it in ipairs(library.items) do
+        if book and it.path == book.path then library.sel = i end
+    end
+    app.mode = "library"
+    redraw()
+end
+
+---------------------------------------------------------------- menu
+
+local function menu_items()
+    local th = theme()
+    return {
+        { label = "Resume reading", act = function() app.mode = "reader" end },
+        { label = "Contents", act = function()
+            if #book.toc == 0 then return end
+            toc.sel = current_section() or 1
+            toc.top = nil
+            app.mode = "toc"
+        end },
+        { label = "Text size", value = tostring(S.font_size), adjust = function(d)
+            S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
+        end },
+        { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
+            S.spacing = math.max(1.0, math.min(2.0, S.spacing + d * 0.05)); pages_cache = {}; goto_pos(pos.ch, pos.off)
+        end },
+        { label = "Margins", value = margins().name, adjust = function(d)
+            S.margins = (S.margins - 1 + d) % #MARGINS + 1; pages_cache = {}; goto_pos(pos.ch, pos.off)
+        end },
+        { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
+            S.justify = not S.justify; pages_cache = {}; goto_pos(pos.ch, pos.off)
+        end },
+        { label = "Brightness", value = Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a",
+            adjust = function(d)
+                if not Backlight.available() then return end
+                local cur = S.brightness >= 0 and S.brightness or Backlight.get() or 50
+                S.brightness = Backlight.step(cur, d)
+                Backlight.set(S.brightness)
+            end },
+        { label = "Theme", value = th.name, adjust = function(d)
+            S.theme = (S.theme - 1 + d) % #THEMES + 1
+        end },
+        { label = "Page info", value = S.chrome and "On" or "Off", adjust = function()
+            S.chrome = not S.chrome
+        end },
+        { label = "Flip for other hand", act = function()
+            S.orient = S.orient == "left" and "right" or "left"
+        end },
+        { label = "Go to " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%", value = "", adjust = function(d)
+            local f = book:fraction(pos.ch, pos.off) + d * 0.01
+            goto_pos(book:locate(math.max(0, math.min(1, f))))
+            save_progress()
+        end },
+        { label = "Library", act = go_library },
+        { label = "Quit", act = function() love.event.quit() end },
+    }
+end
+
+---------------------------------------------------------------- drawing
+
+local function draw_header_footer(side, left_text, right_text)
+    if not S.chrome then return end
+    local th = theme()
+    local m = margins()
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    if left_text then
+        love.graphics.printf(fit_text(ui.small, left_text, w), x, 26, w, side == "left" and "left" or "right")
+    end
+    if right_text then
+        love.graphics.printf(right_text, x, PAGE_H - 26 - ui.small:getHeight(), w, side == "left" and "left" or "right")
+    end
+end
+
+local function draw_page(page, side)
+    local th = theme()
+    local m = margins()
+    local ox = side == "left" and m.outer or m.inner
+    local oy = HEADER_H + 12
+    if not page then return end
+    for _, it in ipairs(page.items) do
+        if it.kind == "text" then
+            color(th.fg)
+            love.graphics.setFont(it.font)
+            love.graphics.print(it.text, ox + it.x, oy + it.y)
+        elseif it.kind == "image" then
+            local img = get_image(it.src)
+            if img then
+                love.graphics.setColor(1, 1, 1)
+                local iw, ih = img:getDimensions()
+                love.graphics.draw(img, ox + it.x, oy + it.y, 0, it.w / iw, it.h / ih)
+            end
+        elseif it.kind == "rule" then
+            color(th.dim)
+            love.graphics.setLineWidth(2)
+            love.graphics.line(ox + it.x, oy + it.y, ox + it.x + it.w, oy + it.y)
+        end
+    end
+end
+
+local function draw_reader_pages()
+    local sec = current_section()
+    local sec_title = sec and book.toc[sec].title or ""
+    local frac = book:fraction(pos.ch, pos.off)
+    local left, right = spread.pages[spread.pi], spread.pages[spread.pi + 1]
+
+    -- pages left in this section
+    local left_info
+    local nxt = sec and book.toc[sec + 1] or (not sec and book.toc[1])
+    local remaining
+    if nxt and nxt.chapter == spread.ch then
+        local _, off = toc_pos(nxt)
+        remaining = Layout.find_page(spread.pages, off) - (spread.pi + 1)
+        if off > 0 and spread.pages[Layout.find_page(spread.pages, off)].off == off then
+            remaining = remaining - 1
+        end
+    else
+        remaining = #spread.pages - (spread.pi + 1)
+    end
+    if remaining and remaining > 0 then
+        left_info = remaining == 1 and "1 page left in chapter" or (remaining .. " pages left in chapter")
+    end
+
+    return function(side)
+        if side == "left" then
+            draw_page(left, "left")
+            draw_header_footer("left", book.title, left_info)
+        else
+            draw_page(right, "right")
+            draw_header_footer("right", sec_title, string.format("%d%%", math.floor(frac * 100 + 0.5)))
+        end
+    end
+end
+
+local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
+    local th = theme()
+    for r = 0, rows - 1 do
+        local idx = first + r
+        local it = items[idx]
+        if not it then break end
+        local ry = y + r * row_h
+        if idx == sel then
+            color(th.sel)
+            love.graphics.rectangle("fill", x - 14, ry - 4, w + 28, row_h - 4, 10, 10)
+        end
+        render(it, idx, x, ry, w, idx == sel)
+    end
+end
+
+local function list_rows(row_h) return math.floor((PAGE_H - 200) / row_h) end
+
+local function draw_library(side)
+    local th = theme()
+    local m = MARGINS[2]
+    if side == "left" then
+        local x, w = m.outer, PAGE_W - m.outer - m.inner
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Library", x, 60)
+        local row_h = 96
+        local rows = list_rows(row_h)
+        if #library.items == 0 then
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.printf("No books found.\n\nCopy .epub or .txt files into the Ebook folder on your SD card.",
+                x, 180, w, "left")
+            return
+        end
+        if library.sel < library.top then library.top = library.sel end
+        if library.sel >= library.top + rows then library.top = library.sel - rows + 1 end
+        draw_list(side, library.items, library.sel, library.top, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.print(fit_text(ui.font, it.title, rw - 90), rx, ry)
+            local pr = Store.get_progress(it.path)
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.print(fit_text(ui.small, it.author, rw - 90), rx, ry + 40)
+            if pr then
+                love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "%", rx, ry + 8, rw, "right")
+            end
+        end)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print("A  open      B  back to book      Menu  quit", x, PAGE_H - 70)
+    else
+        local pv = library_preview()
+        if not pv then return end
+        local x, w = MARGINS[2].inner, PAGE_W - MARGINS[2].outer - MARGINS[2].inner
+        local y = 80
+        if pv.cover then
+            local iw, ih = pv.cover:getDimensions()
+            local s = math.min(w / iw, 620 / ih)
+            love.graphics.setColor(1, 1, 1)
+            love.graphics.draw(pv.cover, x + (w - iw * s) / 2, y, 0, s, s)
+            y = y + ih * s + 40
+        else
+            y = 260
+        end
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.printf(pv.title or "", x, y, w, "center")
+        local _, lines = ui.title:getWrap(pv.title or "", w)
+        y = y + #lines * ui.title:getHeight() + 12
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.printf(pv.author or "", x, y, w, "center")
+        local pr = Store.get_progress(pv.path)
+        if pr then
+            y = y + 60
+            local bw = w * 0.6
+            local bx = x + (w - bw) / 2
+            color(th.sel)
+            love.graphics.rectangle("fill", bx, y, bw, 8, 4, 4)
+            color(th.fg)
+            love.graphics.rectangle("fill", bx, y, bw * pr.pct, 8, 4, 4)
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "% read", x, y + 20, w, "center")
+        end
+    end
+end
+
+local function draw_menu_panel(side)
+    local th = theme()
+    local m = MARGINS[2]
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print("Settings", x, 60)
+    local items = menu_items()
+    local row_h = 58
+    draw_list(side, items, menu.sel, 1, #items, x, 150, w, row_h, function(it, _, rx, ry, rw, selected)
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.print(it.label, rx, ry + 6)
+        if it.value and it.value ~= "" then
+            local v = it.adjust and ("‹  " .. it.value .. "  ›") or it.value
+            love.graphics.printf(v, rx, ry + 6, rw, "right")
+        elseif it.adjust then
+            love.graphics.printf("‹  ›", rx, ry + 6, rw, "right")
+        end
+    end)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.printf("A select    ‹ › change    B back", x, PAGE_H - 70, w, "left")
+end
+
+local function draw_toc(side)
+    local th = theme()
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    local row_h = 58
+    local rows = list_rows(row_h)
+    -- two columns: left page then right page
+    if not toc.top then toc.top = math.max(1, toc.sel - rows) end
+    if toc.sel < toc.top then toc.top = toc.sel end
+    if toc.sel >= toc.top + rows * 2 then toc.top = toc.sel - rows * 2 + 1 end
+    local first = side == "left" and toc.top or toc.top + rows
+    if side == "left" then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Contents", x, 60)
+    end
+    draw_list(side, book.toc, toc.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        local indent = math.max(0, (it.depth or 1) - 1) * 28
+        love.graphics.print(fit_text(ui.font, it.title, rw - indent), rx + indent, ry + 6)
+    end)
+end
+
+local function draw_message(side)
+    local th = theme()
+    if side == "left" then
+        local m = MARGINS[2]
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.printf(message or "", m.outer, 200, PAGE_W - m.outer - m.inner, "left")
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print("Press A to continue", m.outer, PAGE_H - 70)
+    end
+end
+
+local function render_canvases()
+    local th = theme()
+    local painter
+    if app.mode == "reader" then
+        painter = draw_reader_pages()
+    elseif app.mode == "menu" then
+        local reader = draw_reader_pages()
+        painter = function(side)
+            if side == "left" then reader("left") else draw_menu_panel(side) end
+        end
+    elseif app.mode == "toc" then painter = draw_toc
+    elseif app.mode == "message" then painter = draw_message
+    else painter = draw_library end
+
+    for i, side in ipairs({ "left", "right" }) do
+        love.graphics.setCanvas(canvases[i])
+        love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
+        love.graphics.origin()
+        painter(side)
+        if app.mode == "menu" and side == "left" then
+            love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
+            love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
+        end
+    end
+    love.graphics.setCanvas()
+end
+
+-- Draw the two page canvases onto the physical screens.
+local function compose()
+    local th = theme()
+    love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
+    love.graphics.setColor(1, 1, 1)
+    if S.orient == "left" then
+        -- Device turned counter-clockwise: top screen on the left.
+        love.graphics.draw(canvases[1], 0 + SCREEN_W, 0, math.pi / 2)
+        love.graphics.draw(canvases[2], SCREEN_W + SCREEN_W, 0, math.pi / 2)
+    else
+        -- Device turned clockwise: bottom screen on the left.
+        love.graphics.draw(canvases[1], SCREEN_W, SCREEN_H, -math.pi / 2)
+        love.graphics.draw(canvases[2], 0, SCREEN_H, -math.pi / 2)
+    end
+end
+
+function love.draw()
+    render_canvases()
+    love.graphics.push()
+    love.graphics.scale(app.scale)
+    compose()
+    love.graphics.pop()
+end
+
+---------------------------------------------------------------- input
+
+-- Physical d-pad -> direction on the sideways page.
+local ROTATE = {
+    left = { up = "left", right = "up", down = "right", left = "down" },
+    right = { up = "right", right = "down", down = "left", left = "up" },
+}
+
+local function action(a)
+    local mode = app.mode
+    if a == "quit" then love.event.quit() return end
+
+    if mode == "message" then
+        if a == "confirm" or a == "back" then app.mode = book and "reader" or "library"; redraw() end
+        return
+    end
+
+    if mode == "reader" then
+        if a == "next" or a == "right" or a == "down" then next_spread()
+        elseif a == "prev" or a == "left" or a == "up" then prev_spread()
+        elseif a == "next_section" then jump_section(1)
+        elseif a == "prev_section" then jump_section(-1)
+        elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1
+        elseif a == "toc" and #book.toc > 0 then
+            toc.sel = current_section() or 1; toc.top = nil; app.mode = "toc"
+        end
+        redraw()
+        return
+    end
+
+    if mode == "menu" then
+        local items = menu_items()
+        if a == "up" then menu.sel = (menu.sel - 2) % #items + 1
+        elseif a == "down" then menu.sel = menu.sel % #items + 1
+        elseif a == "left" or a == "right" or a == "prev" or a == "next" then
+            local it = items[menu.sel]
+            if it.adjust then it.adjust((a == "left" or a == "prev") and -1 or 1) end
+        elseif a == "confirm" then
+            local it = items[menu.sel]
+            if it.act then it.act() elseif it.adjust then it.adjust(1) end
+        elseif a == "back" or a == "menu" then app.mode = "reader" end
+        Store.save_settings(S)
+        redraw()
+        return
+    end
+
+    if mode == "toc" then
+        local n = #book.toc
+        local rows = list_rows(58)
+        if a == "up" then toc.sel = math.max(1, toc.sel - 1)
+        elseif a == "down" then toc.sel = math.min(n, toc.sel + 1)
+        elseif a == "left" or a == "prev" then toc.sel = math.max(1, toc.sel - rows)
+        elseif a == "right" or a == "next" then toc.sel = math.min(n, toc.sel + rows)
+        elseif a == "confirm" then
+            goto_pos(toc_pos(book.toc[toc.sel])); save_progress(); app.mode = "reader"
+        elseif a == "back" or a == "toc" or a == "menu" then app.mode = "reader" end
+        redraw()
+        return
+    end
+
+    if mode == "library" then
+        local n = #library.items
+        if n > 0 then
+            if a == "up" or a == "prev" then library.sel = math.max(1, library.sel - 1)
+            elseif a == "down" or a == "next" then library.sel = math.min(n, library.sel + 1)
+            elseif a == "confirm" or a == "right" then open_book(library.items[library.sel].path) end
+        end
+        if a == "menu" and book then app.mode = "menu"; menu.sel = 1 end
+        if a == "back" and book then app.mode = "reader" end
+        redraw()
+    end
+end
+
+local BUTTON = {
+    a = "confirm", b = "back", x = "menu", y = "toc",
+    start = "menu", back = "menu", guide = "quit",
+    rightshoulder = "next", leftshoulder = "prev",
+    righttrigger = "next_section", lefttrigger = "prev_section",
+}
+
+local function dpad(dir)
+    action(ROTATE[S.orient][dir])
+end
+
+function love.gamepadpressed(_, button)
+    local d = button:match("^dp(%a+)$")
+    if d then dpad(d) return end
+    local a = BUTTON[button]
+    if a then action(a) end
+end
+
+-- Fallback when the controller has no gamepad mapping.
+local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x", [4] = "leftshoulder", [5] = "rightshoulder",
+    [6] = "back", [7] = "start", [8] = "guide", [10] = "lefttrigger", [11] = "righttrigger" }
+function love.joystickpressed(joystick, b)
+    if joystick:isGamepad() then return end
+    local name = RAW[b - 1]
+    if name then love.gamepadpressed(joystick, name) end
+end
+function love.joystickhat(joystick, _, dir)
+    if joystick:isGamepad() then return end
+    local map = { u = "up", d = "down", l = "left", r = "right" }
+    if map[dir] then dpad(map[dir]) end
+end
+
+-- Keyboard (for testing on a computer; arrow keys are page directions).
+local KEYS = {
+    right = "right", left = "left", up = "up", down = "down",
+    space = "next", pagedown = "next", pageup = "prev", ["return"] = "confirm",
+    escape = "back", m = "menu", t = "toc", q = "quit", n = "next_section", p = "prev_section",
+}
+function love.keypressed(key)
+    local a = KEYS[key]
+    if a then action(a) end
+end
+
+-- Touch: tap the right page to go forward, the left page to go back.
+function love.touchpressed(_, x, y)
+    if app.mode ~= "reader" then return end
+    local w = love.graphics.getWidth()
+    local on_top_screen = x < w / 2
+    local top_is_left = S.orient == "left"
+    if on_top_screen == top_is_left then prev_spread() else next_spread() end
+    redraw()
+end
+
+---------------------------------------------------------------- main loop
+
+function love.load()
+    app.scale = love.graphics.getWidth() / 2048
+    if os.getenv("READER_SCALE") == nil then pcall(love.window.setPosition, 0, 0, 1) end
+    love.graphics.setDefaultFilter("linear", "linear")
+    love.keyboard.setKeyRepeat(true)
+
+    for _, joystick in ipairs(love.joystick.getJoysticks()) do
+        if joystick:getName() == "ANBERNIC-rk3568-keys" then
+            love.joystick.loadGamepadMappings(joystick:getGUID() ..
+                ",ANBERNIC-rk3568-keys,a:b0,b:b1,x:b3,y:b2," ..
+                "leftshoulder:b4,rightshoulder:b5,back:b6,start:b7,guide:b8," ..
+                "lefttrigger:b10,righttrigger:b11,dpup:h0.1,dpdown:h0.4," ..
+                "dpleft:h0.8,dpright:h0.2,leftx:a1,lefty:a2,platform:Linux,")
+        end
+    end
+
+    S = Store.load_settings()
+    if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
+    canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+    canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+    ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
+    ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
+    ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
+    build_fonts()
+
+    scan_library()
+    local last = Store.get_last()
+    if last and io.open(last, "rb") then open_book(last) end
+end
+
+function love.quit()
+    save_progress()
+    Store.save_settings(S)
+    Store.flush()
+    return false
+end
+
+-- Scripted actions + screenshot, for testing without the device.
+local function run_test_script()
+    local script = os.getenv("READER_SCRIPT")
+    if script then
+        for a in script:gmatch("[^,]+") do
+            local dir = a:match("^dp(%a+)$")
+            if dir then dpad(dir) else action(a) end
+        end
+    end
+    local out = os.getenv("READER_SHOT")
+    if out then
+        local frame = love.graphics.newCanvas(2048, 768)
+        love.graphics.setCanvas(frame)
+        render_canvases()
+        love.graphics.setCanvas(frame)
+        compose()
+        love.graphics.setCanvas()
+        local png = frame:newImageData():encode("png"):getString()
+        local f = io.open(out, "wb"); f:write(png); f:close()
+        love.event.quit()
+    end
+end
+
+-- Event-driven loop: sleep until input arrives and only redraw on change.
+function love.run()
+    love.load(love.arg.parseGameArguments(arg), arg)
+    run_test_script()
+    return function()
+        if app.dirty and love.graphics.isActive() then
+            app.dirty = false
+            love.graphics.origin()
+            love.draw()
+            love.graphics.present()
+        end
+        local function handle(name, a, b, c, d, e, f)
+            if not name then return end
+            if name == "quit" then
+                if not love.quit() then return a or 0 end
+            elseif name == "visible" or name == "focus" or name == "resize" or name == "displayrotated" then
+                redraw()
+            end
+            if love.handlers[name] then love.handlers[name](a, b, c, d, e, f) end
+        end
+        -- Events pushed by the app itself (e.g. quit) sit in LÖVE's own queue,
+        -- which love.event.wait() never looks at, so drain that first.
+        local got = false
+        love.event.pump()
+        for name, a, b, c, d, e, f in love.event.poll() do
+            got = true
+            local r = handle(name, a, b, c, d, e, f)
+            if r then return r end
+        end
+        if not got then
+            local r = handle(love.event.wait())
+            if r then return r end
+        end
+    end
+end
