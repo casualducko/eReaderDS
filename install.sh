@@ -9,7 +9,9 @@ SD="${1:-/Volumes/ROMS}"
 HERE=$(cd "$(dirname "$0")" && pwd)
 D="$SD/Ports/BookReader"
 
-mkdir -p "$D/app/fonts" "$D/data" "$D/runtime/libs.aarch64"
+# Replace the app folder wholesale; settings and progress live in data/.
+rm -rf "$D/app"
+mkdir -p "$D/app/fonts" "$D/data" "$D/runtime/libs.aarch64" "$SD/Ebook/Fonts"
 cp "$HERE"/app/*.lua "$D/app/"
 cp "$HERE"/app/fonts/* "$D/app/fonts/"
 cp "$HERE/port/launch.sh" "$D/"

@@ -24,7 +24,10 @@ function M.paginate(chapter, ctx)
     local pages = {}
     local page = { items = {} }
     local y = 0
-    local base_lh = math.floor(F.r:getHeight() * ctx.spacing + 0.5)
+    -- Line height follows the text size, so switching fonts keeps the same
+    -- density even when fonts report very different line gaps.
+    local size = ctx.size or F.r:getHeight()
+    local base_lh = math.floor(math.max(F.r:getHeight(), size * 1.4) * ctx.spacing + 0.5)
 
     local function new_page()
         if #page.items > 0 or page.off then pages[#pages + 1] = page end
@@ -83,7 +86,7 @@ function M.paginate(chapter, ctx)
                 if i and b then return F.bi elseif i then return F.i elseif b then return F.b end
                 return F.r
             end
-            local lh = big and math.floor(F.h:getHeight() * ctx.spacing + 0.5) or base_lh
+            local lh = big and math.floor(math.max(F.h:getHeight(), size * 1.45 * 1.4) * ctx.spacing + 0.5) or base_lh
             local space_w = (big and F.h or F.r):getWidth(" ")
 
             -- Break runs into words made of styled fragments.
@@ -147,13 +150,15 @@ function M.paginate(chapter, ctx)
                         gap = space_w + (avail - lw) / (#line - 1)
                     end
                     if first and prefix then
-                        page.items[#page.items + 1] = { kind = "text", x = x0 - prefix.w, y = y,
+                        page.items[#page.items + 1] = { kind = "text", x = x0 - prefix.w,
+                            y = y + math.max(0, math.floor((lh - F.r:getHeight()) / 2)),
                             text = prefix.text, font = prefix.font }
                     end
                     local x = x0
+                    local ty = y + math.max(0, math.floor((lh - (big and F.h or F.r):getHeight()) / 2))
                     for k, wd in ipairs(line) do
                         for _, fr in ipairs(wd.frags) do
-                            page.items[#page.items + 1] = { kind = "text", x = math.floor(x + 0.5), y = y,
+                            page.items[#page.items + 1] = { kind = "text", x = math.floor(x + 0.5), y = ty,
                                 text = fr.text, font = fr.font }
                             x = x + fr.w
                         end

@@ -8,6 +8,7 @@ local Book = require("book")
 local Layout = require("layout")
 local Store = require("store")
 local Backlight = require("backlight")
+local Fonts = require("fonts")
 
 local SCREEN_W, SCREEN_H = 1024, 768
 local PAGE_W, PAGE_H = 768, 1024
@@ -63,12 +64,9 @@ local function load_font(file, size)
 end
 
 local function build_fonts()
-    local sz = S.font_size
-    fonts.r = load_font("GentiumBookPlus-Regular.ttf", sz)
-    fonts.i = load_font("GentiumBookPlus-Italic.ttf", sz)
-    fonts.b = load_font("GentiumBookPlus-Bold.ttf", sz)
-    fonts.bi = load_font("GentiumBookPlus-BoldItalic.ttf", sz)
-    fonts.h = load_font("GentiumBookPlus-Bold.ttf", math.floor(sz * 1.45))
+    local loaded, name = Fonts.load(S.font, S.font_size)
+    for k, v in pairs(loaded) do fonts[k] = v end
+    fonts.name = name
     pages_cache = {}
 end
 
@@ -113,7 +111,7 @@ local function pages_for(ch)
         local t0 = love.timer.getTime()
         p = Layout.paginate(c, {
             breaks = breaks,
-            fonts = fonts, w = w, h = h, spacing = S.spacing, justify = S.justify,
+            fonts = fonts, size = S.font_size, w = w, h = h, spacing = S.spacing, justify = S.justify,
             indent = true,
             image_size = function(src)
                 local img = get_image(src)
@@ -321,6 +319,13 @@ local function menu_items()
         end },
         { label = "Text size", value = tostring(S.font_size), adjust = function(d)
             S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
+        end },
+        { label = "Font", value = fonts.name or S.font, adjust = function(d)
+            local list = Fonts.list()
+            local idx = 1
+            for k, f in ipairs(list) do if f.name == fonts.name then idx = k end end
+            S.font = list[(idx - 1 + d) % #list + 1].name
+            build_fonts(); goto_pos(pos.ch, pos.off)
         end },
         { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
             S.spacing = math.max(1.0, math.min(2.0, S.spacing + d * 0.05)); pages_cache = {}; goto_pos(pos.ch, pos.off)
@@ -532,13 +537,17 @@ local function draw_menu_panel(side)
     color(th.fg)
     love.graphics.print("Settings", x, 60)
     local items = menu_items()
-    local row_h = 58
+    local row_h = 54
     draw_list(side, items, menu.sel, 1, #items, x, 150, w, row_h, function(it, _, rx, ry, rw, selected)
         love.graphics.setFont(ui.font)
         color(th.fg)
         love.graphics.print(it.label, rx, ry + 6)
         if it.value and it.value ~= "" then
-            local v = it.adjust and ("‹  " .. it.value .. "  ›") or it.value
+            local room = rw - ui.font:getWidth(it.label) - 40
+            local v = it.value
+            if it.adjust then
+                v = "‹  " .. fit_text(ui.font, v, room - ui.font:getWidth("‹    ›")) .. "  ›"
+            end
             love.graphics.printf(v, rx, ry + 6, rw, "right")
         elseif it.adjust then
             love.graphics.printf("‹  ›", rx, ry + 6, rw, "right")

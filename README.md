@@ -15,7 +15,9 @@ sideways like an open book and each screen shows one portrait page.
   starts on a new page
 - **Library** with cover previews and per-book progress
 - **Remembers your place** in every book and reopens the last one on launch
-- **Settings**: text size, line spacing, margins, justification, brightness,
+- **Fonts**: three bundled (Gentium Book Plus, Crimson Text, Atkinson
+  Hyperlegible), plus any `.ttf`/`.otf` you add yourself
+- **Settings**: text size, font, line spacing, margins, justification, brightness,
   four themes (Paper, White, Sepia, Night), page info on/off, and go to %
 - **Battery-friendly**: redraws only when you press a button
 
@@ -56,6 +58,32 @@ different copy, point the installer at it:
 LOVE_RUNTIME=/path/to/love_11.5 ./install.sh
 ```
 
+## Fonts
+
+Choose a font in **Settings → Font**. The book re-flows right away.
+
+**Bundled:** Gentium Book Plus (the default), Crimson Text, and Atkinson
+Hyperlegible, a sans-serif designed for legibility.
+
+**Adding your own:** copy `.ttf` or `.otf` files into `Ebook/Fonts/` on the
+SD card, then restart the reader.
+
+- **Styles are grouped automatically.** The reader reads each font's internal
+  family and style names, so a family's regular, italic, bold and bold-italic
+  files become one entry, whatever the files are called.
+- **Missing styles fall back.** A family with only a regular file uses it for
+  italic and bold too. A family with only semibold uses that for bold.
+- **Use static fonts.** Variable fonts (files with `[wght]` in the name) only
+  show their default weight. A `.ttc` collection contributes only its first
+  face.
+- **Firmware fonts are included.** The reader also looks in the built-in
+  reader's font folder (`/mnt/vendor/bin/ebook/resources/fonts`).
+
+Line height follows the text size rather than each font's own line gap, so
+switching fonts keeps roughly the same number of lines per page.
+
+![Atkinson Hyperlegible](docs/screenshots/font-atkinson.png)
+
 ## Controls
 
 Hold the device turned counter-clockwise: the top screen is the left page and
@@ -81,6 +109,7 @@ it, whichever way that is.
 
 ```
 Ebook/                      your books (.epub, .txt)
+Ebook/Fonts/                your own fonts (.ttf, .otf)
 Ports/Book Reader.sh        Ports menu entry
 Ports/BookReader/
   launch.sh                 sets up Wayland and starts LÖVE
@@ -120,6 +149,7 @@ Ports/BookReader/
 | `app/zip.lua` | Minimal ZIP reader (stored and deflate) |
 | `app/store.lua` | Settings and progress files |
 | `app/backlight.lua` | Screen brightness through sysfs |
+| `app/fonts.lua` | Font discovery, family/style grouping from the font name table, loading |
 | `app/conf.lua` | LÖVE window configuration |
 | `port/` | Device launch scripts |
 | `tools/` | Desktop testing helpers |
@@ -151,6 +181,7 @@ tools/sideways.py frame.png view.png   # how it looks held sideways (needs Pillo
 | `READER_BOOKS` | Colon-separated book folders (device default: `/mnt/mmc/Ebook:/mnt/sdcard/Ebook`) |
 | `READER_DATA` | Where settings and progress are stored |
 | `READER_SCALE` | Window scale for desktop testing (also makes the window bordered) |
+| `READER_FONTS` | Colon-separated user font folders (device default: `Ebook/Fonts` and the firmware font folder) |
 | `READER_BACKLIGHT` | Backlight sysfs root, useful for testing with fake files |
 | `READER_SCRIPT` / `READER_SHOT` | Run actions, save a PNG of the frame, then quit |
 | `READER_DEBUG` | Print layout timings |
@@ -167,6 +198,9 @@ tools/sideways.py frame.png view.png   # how it looks held sideways (needs Pillo
 
 ## Credits
 
-- Font: [Gentium Book Plus](https://software.sil.org/gentium/) by SIL
-  International, SIL Open Font License 1.1 (`app/fonts/OFL.txt`)
+- Fonts, all under the SIL Open Font License 1.1 (license files in `app/fonts/`):
+  - [Gentium Book Plus](https://software.sil.org/gentium/) by SIL International
+  - [Crimson Text](https://github.com/googlefonts/Crimson) by Sebastian Kosch
+  - [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/) by
+    the Braille Institute
 - Engine: [LÖVE](https://love2d.org), zlib license
