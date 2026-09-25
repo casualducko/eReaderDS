@@ -451,6 +451,14 @@ local function draw_reader_pages()
     end
 end
 
+-- y for print() so a line of text looks vertically centered in a box.
+-- Uses the baseline and cap height rather than the font's line box, which
+-- includes descender space and makes text sit low.
+local function centered_y(font, size, top, height)
+    local mid = font:getBaseline() - size * 0.34     -- visual middle of the text
+    return math.floor(top + height / 2 - mid + 0.5)
+end
+
 local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
     local th = theme()
     for r = 0, rows - 1 do
@@ -460,7 +468,7 @@ local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
         local ry = y + r * row_h
         if idx == sel then
             color(th.sel)
-            love.graphics.rectangle("fill", x - 14, ry - 4, w + 28, row_h - 4, 10, 10)
+            love.graphics.rectangle("fill", x - 14, ry, w + 28, row_h - 4, 10, 10)
         end
         render(it, idx, x, ry, w, idx == sel)
     end
@@ -490,13 +498,19 @@ local function draw_library(side)
         draw_list(side, library.items, library.sel, library.top, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
             love.graphics.setFont(ui.font)
             color(th.fg)
-            love.graphics.print(fit_text(ui.font, it.title, rw - 90), rx, ry)
+            -- Center the title + author block: from the title's cap height to
+            -- the author's baseline.
+            local top = ui.font:getBaseline() - UI_SIZE * 0.68
+            local bottom = 40 + ui.small:getBaseline()
+            local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
+            love.graphics.print(fit_text(ui.font, it.title, rw - 90), rx, ty)
             local pr = Store.get_progress(it.path)
             love.graphics.setFont(ui.small)
             color(th.dim)
-            love.graphics.print(fit_text(ui.small, it.author, rw - 90), rx, ry + 40)
+            love.graphics.print(fit_text(ui.small, it.author, rw - 90), rx, ty + 40)
             if pr then
-                love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "%", rx, ry + 8, rw, "right")
+                love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "%", rx,
+                    ty + ui.font:getBaseline() - ui.small:getBaseline(), rw, "right")
             end
         end)
         love.graphics.setFont(ui.small)
@@ -552,16 +566,17 @@ local function draw_menu_panel(side)
     draw_list(side, items, menu.sel, 1, #items, x, 150, w, row_h, function(it, _, rx, ry, rw, selected)
         love.graphics.setFont(ui.font)
         color(th.fg)
-        love.graphics.print(it.label, rx, ry + 6)
+        local ty = centered_y(ui.font, UI_SIZE, ry, row_h - 4)
+        love.graphics.print(it.label, rx, ty)
         if it.value and it.value ~= "" then
             local room = rw - ui.font:getWidth(it.label) - 40
             local v = it.value
             if it.adjust then
                 v = "‹  " .. fit_text(ui.font, v, room - ui.font:getWidth("‹    ›")) .. "  ›"
             end
-            love.graphics.printf(v, rx, ry + 6, rw, "right")
+            love.graphics.printf(v, rx, ty, rw, "right")
         elseif it.adjust then
-            love.graphics.printf("‹  ›", rx, ry + 6, rw, "right")
+            love.graphics.printf("‹  ›", rx, ty, rw, "right")
         end
     end)
     love.graphics.setFont(ui.small)
@@ -590,7 +605,8 @@ local function draw_toc(side)
         love.graphics.setFont(ui.font)
         color(th.fg)
         local indent = math.max(0, (it.depth or 1) - 1) * 28
-        love.graphics.print(fit_text(ui.font, it.title, rw - indent), rx + indent, ry + 6)
+        love.graphics.print(fit_text(ui.font, it.title, rw - indent), rx + indent,
+            centered_y(ui.font, UI_SIZE, ry, row_h - 4))
     end)
 end
 
