@@ -40,3 +40,6 @@ fi
 dot_clean -m "$SD/Ports" 2>/dev/null || true
 sync
 echo "Installed Book Reader v$VERSION to $D"
+echo "Eject the card before removing it (Finder, or: diskutil eject \"$SD\")."
+echo "macOS can hold writes to FAT cards until eject; pulling it early can leave"
+echo "the device reading a half-updated folder."
