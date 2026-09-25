@@ -15,7 +15,8 @@ sideways like an open book and each screen shows one portrait page.
   starts on a new page
 - **Library** with cover previews and per-book progress
 - **Page-turn animation**: a 3D page flip across the hinge, or a fade, or off
-- **Touch brightness**: slide a finger up or down on the bottom screen, like a Kobo
+- **Touch**: tap to open settings and tap its rows; slide up or down for
+  brightness, like a Kobo
 - **Remembers your place** in every book and reopens the last one on launch
 - **Fonts**: three bundled (Gentium Book Plus, Crimson Text, Atkinson
   Hyperlegible), plus any `.ttf`/`.otf` you add yourself
@@ -105,7 +106,21 @@ is turning, and otherwise sleeps until the next button press.
 
 ![Page turn in progress](docs/screenshots/page-turn.png)
 
-## Touch brightness
+## Touch
+
+The bottom screen is a touchscreen.
+
+- **Tap while reading** to open Settings.
+- **Tap a settings row** to use it, the same as pressing A: actions run, and
+  options step to their next value. When you hold the device
+  counter-clockwise, the settings panel is on the touchscreen. Tap the
+  dimmed book page to close it.
+- **Tap in Contents** to go back to reading.
+- **Slide** to change brightness (below).
+
+A tap is a touch shorter than half a second that moves less than 30 px.
+
+### Brightness
 
 Slide a finger up or down on the bottom (touch) screen to change brightness.
 Up means brighter, as the page is held. A popup shows the level while you
@@ -235,8 +250,8 @@ tools/sideways.py frame.png view.png   # how it looks held sideways (needs Pillo
 
 ## Known limitations
 
-- **Touch is for brightness only.** Tapping or swiping to turn pages isn't
-  implemented.
+- **Touch doesn't turn pages.** Tapping opens Settings rather than turning
+  the page, and swiping isn't used.
 - **Page counts.** "Pages left in chapter" counts only to the end of the
   current file inside the EPUB, so it can undercount chapters that span files.
 - **Styling.** Only a small CSS subset is used (italic, bold, centering,

@@ -555,6 +555,8 @@ local function draw_library(side)
     end
 end
 
+local MENU_TOP, MENU_ROW_H = 150, 50
+
 local function draw_menu_panel(side)
     local th = theme()
     local m = MARGINS[2]
@@ -563,8 +565,8 @@ local function draw_menu_panel(side)
     color(th.fg)
     love.graphics.print("Settings", x, 60)
     local items = menu_items()
-    local row_h = 50
-    draw_list(side, items, menu.sel, 1, #items, x, 150, w, row_h, function(it, _, rx, ry, rw, selected)
+    local row_h = MENU_ROW_H
+    draw_list(side, items, menu.sel, 1, #items, x, MENU_TOP, w, row_h, function(it, _, rx, ry, rw, selected)
         love.graphics.setFont(ui.font)
         color(th.fg)
         local ty = centered_y(ui.font, UI_SIZE, ry, row_h - 4)
@@ -803,9 +805,10 @@ local function touch_event(kind, sx, sy)
     local side, u, v = touch_to_page(sx, sy)
     local now = love.timer.getTime()
     if kind == "down" then
-        gesture = { side = side, u0 = u, v0 = v }
+        gesture = { side = side, u0 = u, v0 = v, t0 = now, moved = 0 }
     elseif kind == "move" and gesture then
         local du, dv = u - gesture.u0, v - gesture.v0
+        gesture.moved = math.max(gesture.moved, math.abs(du), math.abs(dv))
         if not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
             -- Mostly vertical slide: brightness. Work in sqrt space so the
             -- dim end gets finer control.
@@ -827,6 +830,8 @@ local function touch_event(kind, sx, sy)
         if gesture.mode == "brightness" then
             if overlay then overlay.hide_at = now + 0.9 end
             Store.save_settings(S)
+        elseif gesture.moved < 30 and now - gesture.t0 < 0.5 and app.on_tap then
+            app.on_tap(gesture.side, gesture.u0, gesture.v0)
         end
         gesture = nil
     end
@@ -963,6 +968,27 @@ local function action(a)
     end
 end
 
+-- A quick tap on the touchscreen (page coordinates of the touched side).
+function app.on_tap(side, u, v)
+    local mode = app.mode
+    if mode == "reader" then
+        action("menu")
+    elseif mode == "menu" then
+        -- The settings panel is drawn on the right page.
+        local m = MARGINS[2]
+        local idx = math.floor((v - MENU_TOP) / MENU_ROW_H) + 1
+        local items = menu_items()
+        if side == "right" and u >= m.inner - 14 and u <= PAGE_W - m.outer + 14 and items[idx] then
+            menu.sel = idx
+            action("confirm")
+        elseif side == "left" then
+            action("back")            -- tapped the dimmed book page: close
+        end
+    elseif mode == "toc" or mode == "message" then
+        action("back")
+    end
+end
+
 local BUTTON = {
     a = "confirm", b = "back", x = "menu", y = "toc",
     start = "menu", back = "menu", guide = "quit",
@@ -1069,6 +1095,7 @@ local function run_test_script()
         x0, y0, x1, y1 = tonumber(x0), tonumber(y0), tonumber(x1), tonumber(y1)
         touch_event("down", x0, y0)
         for k = 1, 10 do touch_event("move", x0 + (x1 - x0) * k / 10, y0 + (y1 - y0) * k / 10) end
+        touch_event("up", x1, y1)
     end
     local freeze = tonumber(os.getenv("READER_ANIM_T") or "")
     if freeze and app.anim then app.anim.fixed = freeze end
