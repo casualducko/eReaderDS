@@ -50,6 +50,7 @@ buttons are under your right hand.
 | **R2 / L2** | Next / previous chapter | |
 | **Y** | Contents | |
 | **Start**, **Select**, **X** or **B** | Settings | Back |
+| **↩ button** (right of the Anbernic button) | Settings | Close Settings |
 | **A** | | Select |
 | **Menu** (home) | Quit | Quit |
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The curved-arrow button (right of the Anbernic button) opens and closes
+  Settings.
+- Button and key presses are written to `log.txt`, to help identify buttons.
 - Removed **Flip for other hand**: held that way, the buttons end up under the
   wrong hand. Anyone who had it on is switched back to the normal grip.
 

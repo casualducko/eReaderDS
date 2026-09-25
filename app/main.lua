@@ -4,6 +4,9 @@
 -- The two 1024x768 screens form one 2048x768 window (top screen = x 0..1023,
 -- bottom screen = x 1024..2047). Each page is drawn on a 768x1024 canvas and
 -- rotated onto its screen.
+-- Write log lines immediately, so log.txt is complete even after a crash.
+io.stdout:setvbuf("line")
+
 local Book = require("book")
 local Layout = require("layout")
 local Store = require("store")
@@ -1106,7 +1109,15 @@ end
 -- Fallback when the controller has no gamepad mapping.
 local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x", [4] = "leftshoulder", [5] = "rightshoulder",
     [6] = "back", [7] = "start", [8] = "guide", [10] = "lefttrigger", [11] = "righttrigger" }
+-- Raw buttons that aren't in the gamepad mapping. Button 9 is the one the
+-- mapping skips; on the RG DS Plus it's likely the curved-arrow button next
+-- to the Anbernic button. It toggles Settings.
+local EXTRA = { [9] = "menu" }
 function love.joystickpressed(joystick, b)
+    -- Every press goes to log.txt, so unknown buttons can be identified.
+    print(string.format("[input] joystick %q button %d", joystick:getName(), b - 1))
+    local extra = EXTRA[b - 1]
+    if extra then action(extra) return end
     if joystick:isGamepad() then return end
     local name = RAW[b - 1]
     if name then love.gamepadpressed(joystick, name) end
@@ -1122,8 +1133,11 @@ local KEYS = {
     right = "right", left = "left", up = "up", down = "down",
     space = "next", pagedown = "next", pageup = "prev", ["return"] = "confirm",
     escape = "back", m = "menu", t = "toc", q = "quit", n = "next_section", p = "prev_section",
+    -- Keys a system/back button might send: toggle Settings.
+    appback = "menu", apphome = "menu", menu = "menu", application = "menu",
 }
-function love.keypressed(key)
+function love.keypressed(key, scancode)
+    print(string.format("[input] key %s (scancode %s)", key, scancode))
     local a = KEYS[key]
     if a then action(a) end
 end
