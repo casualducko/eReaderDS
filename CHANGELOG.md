@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.1
 
 - Tapping the touchscreen now turns pages by default (right half forward,
   left half back). Choose **Settings → Tap → Open menu** for the old behavior.
