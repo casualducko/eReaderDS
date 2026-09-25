@@ -10,6 +10,7 @@ local Store = require("store")
 local Backlight = require("backlight")
 local Fonts = require("fonts")
 local Touch = require("touch")
+local VERSION = require("version")
 
 local SCREEN_W, SCREEN_H = 1024, 768
 local PAGE_W, PAGE_H = 768, 1024
@@ -538,6 +539,7 @@ local function draw_library(side)
         love.graphics.setFont(ui.small)
         color(th.dim)
         love.graphics.print("A  open      B  back to book      Menu  quit", x, PAGE_H - 70)
+        love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
     else
         local pv = library_preview()
         if not pv then return end
@@ -606,6 +608,9 @@ local function draw_menu_panel(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print("Settings", x, 60)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.printf("v" .. VERSION, x, 78, w, "right")
     local items = menu_items()
     local row_h, rows, top = menu_layout(#items)
     if top > 1 then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP - 16, true) end
@@ -1110,6 +1115,7 @@ function love.load()
         end
     end
 
+    print("[reader] Book Reader v" .. VERSION)
     S = Store.load_settings()
     local n = tonumber(S.theme)
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end

@@ -1,0 +1,7 @@
+# Scripts run on the device and must keep Unix line endings.
+*.sh  text eol=lf
+*.lua text eol=lf
+*.txt text eol=lf
+*.ttf binary
+*.aarch64 binary
+*.so* binary

@@ -8,11 +8,27 @@ export SDL_VIDEODRIVER=wayland
 export SDL_VIDEO_DOUBLE_BUFFER=1
 export LOVE_GRAPHICS_USE_OPENGLES=1
 export LD_LIBRARY_PATH="$APP_DIR/runtime/libs.aarch64:/usr/lib:/lib"
-export READER_DATA="$APP_DIR/data"
+# Settings and reading progress live outside the app folder, so replacing
+# Ports/BookReader with a newer version never loses them.
+if [ -d /mnt/mmc ]; then
+    export READER_DATA="${READER_DATA:-/mnt/mmc/Ebook/.bookreader}"
+else
+    export READER_DATA="${READER_DATA:-$APP_DIR/data}"
+fi
 export READER_BOOKS="${READER_BOOKS:-/mnt/mmc/Ebook:/mnt/sdcard/Ebook}"
 mkdir -p "$READER_DATA"
-exec > "$READER_DATA/log.txt" 2>&1
+# Older versions kept data in Ports/BookReader/data: move it once.
+if [ "$READER_DATA" != "$APP_DIR/data" ] && [ -d "$APP_DIR/data" ] && [ ! -f "$READER_DATA/settings.txt" ]; then
+    for f in settings.txt progress.txt last.txt; do
+        [ -f "$APP_DIR/data/$f" ] && mv "$APP_DIR/data/$f" "$READER_DATA/$f"
+    done
+    MIGRATED=1
+fi
+# First run: make the folders people put books and fonts in.
+[ -d /mnt/mmc ] && mkdir -p /mnt/mmc/Ebook/Fonts 2>/dev/null
+exec > "$APP_DIR/log.txt" 2>&1
 printf '[launch] %s\n' "$(date -Iseconds 2>/dev/null || date)"
+printf '[launch] data=%s%s\n' "$READER_DATA" "${MIGRATED:+ (moved from $APP_DIR/data)}"
 chmod +x "$APP_DIR/runtime/love.aarch64" 2>/dev/null || true
 # Remember the system brightness so the reader's own level doesn't stick afterwards.
 BL_SAVED=""

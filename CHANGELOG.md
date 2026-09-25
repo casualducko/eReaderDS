@@ -1,0 +1,16 @@
+# Changelog
+
+## v0.1.0
+
+First test release.
+
+- Two-page reading across both screens, held sideways like a book, for either hand
+- EPUB and plain text, with italics, bold, headings, images, covers and contents
+- Library with covers and progress; remembers your place in every book
+- Settings: text size, font, line spacing, side and top/bottom margins,
+  justification, brightness, ten themes, page-turn animation, page info
+- Fonts: Gentium Book Plus, Crimson Text, Atkinson Hyperlegible, plus your own
+  from `Ebook/Fonts`
+- Page turns: 3D flip, fade or off
+- Touch (bottom screen): swipe to turn pages, slide for brightness, tap to open
+  settings or turn pages

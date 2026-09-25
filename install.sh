@@ -1,6 +1,7 @@
 #!/bin/bash
-# Install or update Book Reader on the RG DS Plus SD card.
-# Settings and reading progress in Ports/BookReader/data are kept.
+# Install or update Book Reader on an RG DS Plus SD card from a clone of this
+# repo (macOS/Linux). Most people should use the release zip instead: see README.
+# Settings and reading progress (Ebook/.bookreader) are kept.
 #
 #   ./install.sh [/Volumes/ROMS]
 set -e
@@ -9,33 +10,33 @@ SD="${1:-/Volumes/ROMS}"
 HERE=$(cd "$(dirname "$0")" && pwd)
 D="$SD/Ports/BookReader"
 
-# Replace the app folder wholesale; settings and progress live in data/.
+# Replace the app folder wholesale; settings and progress live in Ebook/.bookreader.
 rm -rf "$D/app"
-mkdir -p "$D/app/fonts" "$D/data" "$D/runtime/libs.aarch64" "$SD/Ebook/Fonts"
+mkdir -p "$D/app/fonts" "$D/runtime/libs.aarch64" "$SD/Ebook/Fonts"
 cp "$HERE"/app/*.lua "$D/app/"
 cp "$HERE"/app/fonts/* "$D/app/fonts/"
 cp "$HERE/port/launch.sh" "$D/"
 cp "$HERE/port/Book Reader.sh" "$SD/Ports/"
+VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$HERE/app/version.lua")
+sed "s/@VERSION@/$VERSION/g" "$HERE/port/README.txt" > "$D/README.txt"
 
-# LÖVE 11.5 aarch64 runtime (not stored in this repo).
-if [ ! -f "$D/runtime/love.aarch64" ]; then
-    SRC="${LOVE_RUNTIME:-}"
-    if [ -z "$SRC" ]; then
-        for c in "$SD"/Ports/*/runtime "$SD"/PortMaster/runtimes/love_11.5; do
-            if [ -f "$c/love.aarch64" ] && [ -d "$c/libs.aarch64" ]; then SRC="$c"; break; fi
-        done
-    fi
-    if [ -z "$SRC" ]; then
-        echo "No LÖVE 11.5 runtime found. Set LOVE_RUNTIME to a folder containing"
-        echo "love.aarch64 and libs.aarch64/ (e.g. from a PortMaster love_11.5 runtime)."
-        exit 1
-    fi
-    echo "Copying LÖVE runtime from $SRC"
+# LÖVE 11.5 aarch64 runtime: from this repo, or another port on the card.
+SRC="${LOVE_RUNTIME:-}"
+[ -z "$SRC" ] && [ -f "$HERE/runtime/love.aarch64" ] && SRC="$HERE/runtime"
+if [ -z "$SRC" ] && [ ! -f "$D/runtime/love.aarch64" ]; then
+    for c in "$SD"/Ports/*/runtime "$SD"/PortMaster/runtimes/love_11.5; do
+        if [ "$c" != "$D/runtime" ] && [ -f "$c/love.aarch64" ] && [ -d "$c/libs.aarch64" ]; then SRC="$c"; break; fi
+    done
+fi
+if [ -n "$SRC" ]; then
     cp "$SRC/love.aarch64" "$D/runtime/"
     cp "$SRC"/libs.aarch64/* "$D/runtime/libs.aarch64/"
-    [ -f "$SRC/LICENSE-love.txt" ] && cp "$SRC/LICENSE-love.txt" "$D/runtime/"
+elif [ ! -f "$D/runtime/love.aarch64" ]; then
+    echo "No LÖVE 11.5 runtime found. Set LOVE_RUNTIME to a folder containing"
+    echo "love.aarch64 and libs.aarch64/."
+    exit 1
 fi
 
 dot_clean -m "$SD/Ports" 2>/dev/null || true
 sync
-echo "Installed to $D"
+echo "Installed Book Reader v$VERSION to $D"

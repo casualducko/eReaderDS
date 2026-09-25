@@ -1,10 +1,6 @@
 .DS_Store
 ._*
-# Device runtime binaries are copied from the SD card by install.sh
-runtime/
-*.aarch64
-*.so
-*.so.*
 # Local test output
 data/
 *.tmp
+dist/

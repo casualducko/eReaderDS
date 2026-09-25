@@ -1,0 +1,40 @@
+name: Bug report
+description: Something doesn't work or looks wrong on the device
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for testing! The log file makes most problems quick to fix.
+  - type: input
+    id: version
+    attributes:
+      label: Book Reader version
+      description: Shown at the top of Settings and at the bottom of the Library (e.g. v0.1.0).
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you saw instead. Photos of the screens help.
+    validations:
+      required: true
+  - type: input
+    id: book
+    attributes:
+      label: Book (if it's about one book)
+      description: Title and where it came from (e.g. Project Gutenberg, Calibre conversion). No need to attach the book.
+  - type: dropdown
+    id: grip
+    attributes:
+      label: How were you holding it?
+      options:
+        - Turned counter-clockwise (default)
+        - Turned clockwise ("Flip for other hand")
+        - Not relevant
+  - type: textarea
+    id: log
+    attributes:
+      label: log.txt
+      description: Contents of Ports/BookReader/log.txt on the SD card, copied right after the problem.
+      render: text
