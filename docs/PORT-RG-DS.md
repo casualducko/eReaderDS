@@ -82,6 +82,21 @@ which amounts to a separate project. The first RG DS version should say:
 3. Implement dpiscale rendering and screen detection in one pass, then test
    with them.
 
+## Reference: RG DS Plus input devices (stock firmware)
+
+From `/proc/bus/input/devices`, logged by `keyprobe.lua`, for comparison with
+the RG DS:
+
+| Device | Name | Notes |
+|---|---|---|
+| event0 | `rk805 pwrkey` | Power button |
+| event1 | `gt9xx-0` | Bottom touchscreen (0–1024 × 0–768) |
+| event2 | `headset-keys` | Headset button |
+| event3 | `rockchip-rk817 Headset` | Headset jack |
+| event4 | `adc-keys` | Curved-arrow button → `KEY_BACK` (158), SDL key `appback` |
+| event5 | `ANBERNIC-rk3568-keys` | Gamepad. Stick click = button 9 (`BTN_TL2`, 313). Stick axes: raw 0 = left/right, raw 1 = up/down (+ = down) |
+| event6 | `dierct-keys-polled` | Other polled keys |
+
 ## Sources
 
 - [Anbernic: RG DS vs. RG DS Plus](https://anbernic.com/blogs/news/rg-ds-plus-vs-rg-ds)
