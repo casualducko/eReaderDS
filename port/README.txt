@@ -22,6 +22,8 @@ BUTTONS
   R2 / L2 .................. next / previous chapter
   Y ........................ contents        Start/Select/X/B ..... settings
   A ........................ select          Menu (home) .......... quit
+  Curved-arrow button ...... open/close settings
+  Analog stick ............. same as the D-pad
 
 TOUCH (bottom screen)
   Swipe left/right ......... turn pages

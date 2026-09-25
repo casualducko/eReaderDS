@@ -1109,6 +1109,29 @@ end
 -- Fallback when the controller has no gamepad mapping.
 local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x", [4] = "leftshoulder", [5] = "rightshoulder",
     [6] = "back", [7] = "start", [8] = "guide", [10] = "lefttrigger", [11] = "righttrigger" }
+-- Analog stick acts like the D-pad: pushing past PRESS counts as one press in
+-- that direction; it must come back inside RELEASE before it can fire again,
+-- so one push is one press and stick drift never turns pages.
+local STICK_PRESS, STICK_RELEASE = 0.6, 0.3
+local stick = { x = 0, y = 0 }          -- latched direction per axis: -1, 0, 1
+
+local function stick_axis(which, value)
+    local neg, pos = "left", "right"
+    if which == "y" then neg, pos = "up", "down" end
+    local cur = stick[which]
+    if cur == 0 then
+        if value >= STICK_PRESS then stick[which] = 1; dpad(pos)
+        elseif value <= -STICK_PRESS then stick[which] = -1; dpad(neg) end
+    elseif math.abs(value) < STICK_RELEASE then
+        stick[which] = 0
+    end
+end
+
+function love.gamepadaxis(_, axis, value)
+    if axis == "leftx" then stick_axis("x", value)
+    elseif axis == "lefty" then stick_axis("y", value) end
+end
+
 -- Raw buttons that aren't in the gamepad mapping. Button 9 is the one the
 -- mapping skips; on the RG DS Plus it's likely the curved-arrow button next
 -- to the Anbernic button. It toggles Settings.
@@ -1121,6 +1144,12 @@ function love.joystickpressed(joystick, b)
     if joystick:isGamepad() then return end
     local name = RAW[b - 1]
     if name then love.gamepadpressed(joystick, name) end
+end
+-- Fallback when the controller has no gamepad mapping (leftx:a1, lefty:a2).
+function love.joystickaxis(joystick, axis, value)
+    if joystick:isGamepad() then return end
+    if axis == 2 then stick_axis("x", value)
+    elseif axis == 3 then stick_axis("y", value) end
 end
 function love.joystickhat(joystick, _, dir)
     if joystick:isGamepad() then return end
@@ -1218,7 +1247,10 @@ local function run_test_script()
     if script then
         for a in script:gmatch("[^,]+") do
             local dir = a:match("^dp(%a+)$")
-            if dir then dpad(dir) else action(a) end
+            local sa, sv = a:match("^stick:(%a):([%-%d.]+)$")
+            if dir then dpad(dir)
+            elseif sa then stick_axis(sa, tonumber(sv))
+            else action(a) end
         end
     end
     local drag = os.getenv("READER_TOUCH")

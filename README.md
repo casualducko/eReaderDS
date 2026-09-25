@@ -55,7 +55,8 @@ buttons are under your right hand.
 | **Menu** (home) | Quit | Quit |
 
 The D-pad follows the way you're holding it: forward means right or down, as
-you see it.
+you see it. The **analog stick** works just like the D-pad, one push per
+press.
 
 **Touch** (the bottom screen):
 
