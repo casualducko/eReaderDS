@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- New **E-ink** theme: light gray paper, soft black text and a faint paper
+  grain, like an e-ink reader's screen.
+
 ## v0.2.1
 
 - Clarified that eReaderDS is for the RG DS Plus on its stock firmware (not

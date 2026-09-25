@@ -22,6 +22,7 @@ local THEMES = {
     { name = "White",     bg = { 1, 1, 1 },             fg = { 0, 0, 0 },          dim = { 0.45, 0.45, 0.45 }, sel = { 0.85, 0.85, 0.85 } },
     { name = "Sepia",     bg = { 0.957, 0.925, 0.847 }, fg = { 0.357, 0.275, 0.212 }, dim = { 0.60, 0.52, 0.44 }, sel = { 0.88, 0.80, 0.66 } },
     { name = "Solarized", bg = { 0.992, 0.965, 0.890 }, fg = { 0.28, 0.357, 0.384 }, dim = { 0.53, 0.59, 0.59 }, sel = { 0.933, 0.910, 0.835 } },
+    { name = "E-ink",     bg = { 0.855, 0.851, 0.827 }, fg = { 0.11, 0.11, 0.11 }, dim = { 0.40, 0.40, 0.39 }, sel = { 0.74, 0.74, 0.72 }, grain = true },
     { name = "Stone",     bg = { 0.890, 0.882, 0.863 }, fg = { 0.17, 0.17, 0.17 }, dim = { 0.47, 0.46, 0.44 }, sel = { 0.80, 0.79, 0.76 } },
     { name = "Sage",      bg = { 0.863, 0.902, 0.831 }, fg = { 0.16, 0.22, 0.15 }, dim = { 0.42, 0.49, 0.40 }, sel = { 0.76, 0.83, 0.72 } },
     { name = "Dusk",      bg = { 0.125, 0.145, 0.192 }, fg = { 0.80, 0.83, 0.88 }, dim = { 0.49, 0.53, 0.60 }, sel = { 0.22, 0.25, 0.32 } },
@@ -45,6 +46,7 @@ local ui = {}
 local canvases = {}
 local old_canvases = {}       -- previous spread, kept during a page-turn animation
 local shadow_mesh
+local grain_image, grain_quad    -- faint paper texture for the E-ink theme
 local turn_mesh               -- strip mesh for the page being turned
 local TURN_COLS = 24
 local images = {}            -- src -> Image (per open book)
@@ -693,6 +695,10 @@ local function render_canvases()
         love.graphics.setCanvas(canvases[i])
         love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
         love.graphics.origin()
+        if th.grain then
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.draw(grain_image, grain_quad, 0, 0)
+        end
         painter(side)
         if app.mode == "menu" and side == "left" then
             love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
@@ -1131,6 +1137,29 @@ function love.load()
         { 1, 1, 1, 1, 1, 1, 1, 0 }, { 0, 1, 0, 1, 1, 1, 1, 1 },
     }, "fan", "static")
     turn_mesh = love.graphics.newMesh((TURN_COLS + 1) * 2, "strip", "stream")
+    -- Paper grain: fine speckle plus soft blotches, tiled over the page. A fixed
+    -- seed keeps the texture identical every time, like a real screen's.
+    local rng = love.math.newRandomGenerator(1234)
+    local G = 256
+    local grain = love.image.newImageData(G, G)
+    local coarse = {}
+    for k = 0, 16 * 16 - 1 do coarse[k] = rng:random() end
+    grain:mapPixel(function(x, y)
+        -- blotches: bilinear-interpolated 16x16 value noise (tileable)
+        local fx, fy = x / G * 16, y / G * 16
+        local x0, y0 = math.floor(fx), math.floor(fy)
+        local tx, ty = fx - x0, fy - y0
+        local function c(i, j) return coarse[(j % 16) * 16 + (i % 16)] end
+        local blot = (c(x0, y0) * (1 - tx) + c(x0 + 1, y0) * tx) * (1 - ty)
+            + (c(x0, y0 + 1) * (1 - tx) + c(x0 + 1, y0 + 1) * tx) * ty
+        local n = (rng:random() - 0.5) * 0.9 + (blot - 0.5) * 0.6
+        if n >= 0 then return 1, 1, 1, n * 0.10 end
+        return 0, 0, 0, -n * 0.10
+    end)
+    grain_image = love.graphics.newImage(grain)
+    grain_image:setWrap("repeat", "repeat")
+    grain_image:setFilter("nearest", "nearest")
+    grain_quad = love.graphics.newQuad(0, 0, PAGE_W, PAGE_H, G, G)
     ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
     ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
