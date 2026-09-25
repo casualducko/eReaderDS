@@ -20,7 +20,8 @@ sideways like an open book and each screen shows one portrait page.
 - **Remembers your place** in every book and reopens the last one on launch
 - **Fonts**: three bundled (Gentium Book Plus, Crimson Text, Atkinson
   Hyperlegible), plus any `.ttf`/`.otf` you add yourself
-- **Settings**: text size, font, line spacing, margins, justification, brightness,
+- **Settings**: text size, font, line spacing, side and top/bottom margins,
+  justification, brightness,
   page turn, what a tap does,
   four themes (Paper, White, Sepia, Night), page info on/off, and jump to %
 - **Battery-friendly**: redraws only when you press a button

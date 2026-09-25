@@ -22,6 +22,8 @@ local THEMES = {
     { name = "Night", bg = { 0.07, 0.07, 0.07 }, fg = { 0.78, 0.77, 0.74 }, dim = { 0.45, 0.44, 0.42 }, sel = { 0.22, 0.22, 0.22 } },
 }
 local MARGINS = { { name = "Narrow", outer = 36, inner = 28 }, { name = "Normal", outer = 60, inner = 44 }, { name = "Wide", outer = 90, inner = 64 } }
+-- Space above and below the text (the header/footer sit inside it).
+local VMARGINS = { { name = "Narrow", size = 60 }, { name = "Normal", size = 76 }, { name = "Wide", size = 110 }, { name = "Extra wide", size = 150 } }
 
 local S                      -- settings (persisted)
 local app = {
@@ -76,10 +78,10 @@ local function build_fonts()
 end
 
 local function margins() return MARGINS[S.margins] or MARGINS[2] end
-local HEADER_H, FOOTER_H = 64, 64
+local function vmargin() return (VMARGINS[S.vmargins] or VMARGINS[2]).size end
 local function content_size()
     local m = margins()
-    return PAGE_W - m.outer - m.inner, PAGE_H - HEADER_H - FOOTER_H - 24
+    return PAGE_W - m.outer - m.inner, PAGE_H - vmargin() * 2
 end
 
 ---------------------------------------------------------------- images
@@ -335,8 +337,11 @@ local function menu_items()
         { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
             S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100; pages_cache = {}; goto_pos(pos.ch, pos.off)
         end },
-        { label = "Margins", value = margins().name, adjust = function(d)
+        { label = "Side margins", value = margins().name, adjust = function(d)
             S.margins = (S.margins - 1 + d) % #MARGINS + 1; pages_cache = {}; goto_pos(pos.ch, pos.off)
+        end },
+        { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
+            S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; pages_cache = {}; goto_pos(pos.ch, pos.off)
         end },
         { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
             S.justify = not S.justify; pages_cache = {}; goto_pos(pos.ch, pos.off)
@@ -399,7 +404,7 @@ local function draw_page(page, side)
     local th = theme()
     local m = margins()
     local ox = side == "left" and m.outer or m.inner
-    local oy = HEADER_H + 12
+    local oy = vmargin()
     if not page then return end
     for _, it in ipairs(page.items) do
         if it.kind == "text" then
@@ -558,7 +563,28 @@ local function draw_library(side)
     end
 end
 
-local MENU_TOP, MENU_ROW_H = 150, 48
+-- Settings list geometry. Rows shrink (down to a minimum) to fit every item;
+-- if there are still too many, the list scrolls with the selection.
+local MENU_TOP, MENU_BOTTOM = 140, PAGE_H - 90
+local MENU_ROW_MAX, MENU_ROW_MIN = 52, 44
+
+local function menu_layout(n)
+    local avail = MENU_BOTTOM - MENU_TOP
+    local row_h = math.max(MENU_ROW_MIN, math.min(MENU_ROW_MAX, math.floor(avail / n)))
+    local rows = math.min(n, math.floor(avail / row_h))
+    -- keep the selection visible
+    menu.top = menu.top or 1
+    if menu.sel < menu.top then menu.top = menu.sel end
+    if menu.sel > menu.top + rows - 1 then menu.top = menu.sel - rows + 1 end
+    menu.top = math.max(1, math.min(menu.top, n - rows + 1))
+    return row_h, rows, menu.top
+end
+
+local function scroll_arrow(x, y, up)
+    local s = 9
+    if up then love.graphics.polygon("fill", x - s, y + s, x + s, y + s, x, y - s + 2)
+    else love.graphics.polygon("fill", x - s, y - s, x + s, y - s, x, y + s - 2) end
+end
 
 local function draw_menu_panel(side)
     local th = theme()
@@ -568,8 +594,10 @@ local function draw_menu_panel(side)
     color(th.fg)
     love.graphics.print("Settings", x, 60)
     local items = menu_items()
-    local row_h = MENU_ROW_H
-    draw_list(side, items, menu.sel, 1, #items, x, MENU_TOP, w, row_h, function(it, _, rx, ry, rw, selected)
+    local row_h, rows, top = menu_layout(#items)
+    if top > 1 then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP - 16, true) end
+    if top + rows - 1 < #items then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP + rows * row_h + 6, false) end
+    draw_list(side, items, menu.sel, top, rows, x, MENU_TOP, w, row_h, function(it, _, rx, ry, rw, selected)
         love.graphics.setFont(ui.font)
         color(th.fg)
         local ty = centered_y(ui.font, UI_SIZE, ry, row_h - 4)
@@ -979,8 +1007,10 @@ function app.on_tap(side, u, v)
     elseif mode == "menu" then
         -- The settings panel is drawn on the right page.
         local m = MARGINS[2]
-        local idx = math.floor((v - MENU_TOP) / MENU_ROW_H) + 1
         local items = menu_items()
+        local row_h, rows, top = menu_layout(#items)
+        local r = math.floor((v - MENU_TOP) / row_h)
+        local idx = (r >= 0 and r < rows) and top + r or nil
         if side == "right" and u >= m.inner - 14 and u <= PAGE_W - m.outer + 14 and items[idx] then
             menu.sel = idx
             action("confirm")
