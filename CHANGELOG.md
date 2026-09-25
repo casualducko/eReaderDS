@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.2
 
 - New **E-ink** theme that mimics an e-ink screen: everything, including
   covers, is shown in grayscale with 16 gray levels and a fine speckled grain
