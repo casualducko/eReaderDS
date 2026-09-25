@@ -23,7 +23,7 @@ BUTTONS
   Y ........................ contents        Start/Select/X/B ..... settings
   A ........................ select          Menu (home) .......... quit
   Curved-arrow button ...... open/close settings
-  Analog stick ............. same as the D-pad
+  Analog stick ............. same as the D-pad; press it in to select
 
 TOUCH (bottom screen)
   Swipe left/right ......... turn pages

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pressing the analog stick in selects (like A) instead of opening Settings.
+- The log now lists the device's input devices and each raw key press, to
+  help identify buttons.
 - While reading, the analog stick turns pages only with left/right (as held);
   up/down as held no longer flips pages. It still moves through menus.
 - The Font setting shows each font's name in that font, as a preview. This

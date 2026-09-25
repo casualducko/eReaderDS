@@ -13,6 +13,7 @@ local Store = require("store")
 local Backlight = require("backlight")
 local Fonts = require("fonts")
 local Touch = require("touch")
+local KeyProbe = require("keyprobe")
 local VERSION = require("version")
 
 local SCREEN_W, SCREEN_H = 1024, 768
@@ -1172,10 +1173,11 @@ function love.gamepadaxis(_, axis, value)
     elseif axis == "lefty" then stick_axis("y", value) end
 end
 
--- Raw buttons that aren't in the gamepad mapping. Button 9 is the one the
--- mapping skips; on the RG DS Plus it's likely the curved-arrow button next
--- to the Anbernic button. It toggles Settings.
-local EXTRA = { [9] = "menu" }
+-- Raw buttons that aren't in the gamepad mapping. On the RG DS Plus, button 9
+-- is pressing the analog stick in: it acts as OK (A). (The curved-arrow button
+-- next to the Anbernic button is a separate "adc-keys" device that sends the
+-- Back key; see KEYS below, where it toggles Settings.)
+local EXTRA = { [9] = "confirm" }
 function love.joystickpressed(joystick, b)
     -- Every press goes to log.txt, so unknown buttons can be identified.
     print(string.format("[input] joystick %q button %d", joystick:getName(), b - 1))
@@ -1209,7 +1211,7 @@ local KEYS = {
     right = "right", left = "left", up = "up", down = "down",
     space = "next", pagedown = "next", pageup = "prev", ["return"] = "confirm",
     escape = "back", m = "menu", t = "toc", q = "quit", n = "next_section", p = "prev_section",
-    -- Keys a system/back button might send: toggle Settings.
+    -- The curved-arrow button sends Back (adc-keys, KEY_BACK): toggle Settings.
     appback = "menu", apphome = "menu", menu = "menu", application = "menu",
 }
 function love.keypressed(key, scancode)
@@ -1241,6 +1243,7 @@ function love.load()
     local n = tonumber(S.theme)
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
     Touch.open("gt9xx-0")
+    KeyProbe.open(nil, "gt9xx-0")
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
@@ -1360,6 +1363,7 @@ function love.run()
             if r then return r end
         end
         if Touch.enabled and Touch.poll(touch_event) then got = true end
+        if KeyProbe.enabled and KeyProbe.poll() then got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
         if app.anim then
             love.timer.sleep(0.001)            -- animating: next frame (vsync paces it)

@@ -51,7 +51,7 @@ buttons are under your right hand.
 | **Y** | Contents | |
 | **Start**, **Select**, **X** or **B** | Settings | Back |
 | **↩ button** (right of the Anbernic button) | Settings | Close Settings |
-| **A** | | Select |
+| **A**, or pressing the stick in | | Select |
 | **Menu** (home) | Quit | Quit |
 
 The D-pad follows the way you're holding it: forward means right or down, as
