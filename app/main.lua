@@ -1,4 +1,4 @@
--- Book Reader for the Anbernic RG DS Plus.
+-- eReaderDS for the Anbernic RG DS Plus.
 -- Hold the device sideways like a book: each screen shows one portrait page.
 --
 -- The two 1024x768 screens form one 2048x768 window (top screen = x 0..1023,
@@ -1115,7 +1115,7 @@ function love.load()
         end
     end
 
-    print("[reader] Book Reader v" .. VERSION)
+    print("[reader] eReaderDS v" .. VERSION)
     S = Store.load_settings()
     local n = tonumber(S.theme)
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end

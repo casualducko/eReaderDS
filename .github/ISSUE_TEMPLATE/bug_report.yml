@@ -8,7 +8,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Book Reader version
+      label: eReaderDS version
       description: Shown at the top of Settings and at the bottom of the Library (e.g. v0.1.0).
     validations:
       required: true
@@ -36,5 +36,5 @@ body:
     id: log
     attributes:
       label: log.txt
-      description: Contents of Ports/BookReader/log.txt on the SD card, copied right after the problem.
+      description: Contents of Ports/eReaderDS/log.txt on the SD card, copied right after the problem.
       render: text

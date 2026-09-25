@@ -1,9 +1,9 @@
 function love.conf(t)
-    t.identity = "book-reader"
+    t.identity = "ereaderds"
     t.version = "11.5"
     t.console = false
     local scale = tonumber(os.getenv("READER_SCALE")) or 1
-    t.window.title = "Book Reader"
+    t.window.title = "eReaderDS"
     t.window.width = math.floor(2048 * scale)
     t.window.height = math.floor(768 * scale)
     t.window.borderless = os.getenv("READER_SCALE") == nil

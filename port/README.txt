@@ -1,13 +1,13 @@
-BOOK READER v@VERSION@ for the Anbernic RG DS Plus
+eReaderDS v@VERSION@ for the Anbernic RG DS Plus
 A two-page ebook reader: hold the device sideways like an open book.
 
 INSTALL / UPDATE
-  1. Copy "Book Reader.sh" and the "BookReader" folder (from the zip's Ports
+  1. Copy "eReaderDS.sh" and the "eReaderDS" folder (from the zip's Ports
      folder) into the Ports folder on the SD card.
   2. Put .epub or .txt books in the "Ebook" folder on the card.
-  3. On the device: Ports > Book Reader.
+  3. On the device: Ports > eReaderDS.
   Updating: copy the two items from a newer version the same way, replacing
-  the old ones. Your settings and reading progress (kept in Ebook/.bookreader) stay.
+  the old ones. Your settings and reading progress (kept in Ebook/.ereaderds) stay.
   Don't drag the whole Ports folder onto the card: replacing it would remove
   your other ports.
 
@@ -30,6 +30,6 @@ YOUR OWN FONTS
   Copy .ttf/.otf files into Ebook/Fonts, then choose them in Settings > Font.
 
 PROBLEMS?
-  Ports/BookReader/log.txt describes the last run. Please attach it
+  Ports/eReaderDS/log.txt describes the last run. Please attach it
   when reporting a problem:
-  https://github.com/casualducko/rg-ds-plus-ereader/issues
+  https://github.com/casualducko/eReaderDS/issues

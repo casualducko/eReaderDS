@@ -28,7 +28,7 @@ jobs:
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: BookReader
+          name: eReaderDS
           path: ${{ steps.build.outputs.zip }}
 
       - name: Publish release
@@ -38,4 +38,4 @@ jobs:
         run: |
           notes=$(awk -v v="## ${GITHUB_REF_NAME}" '$0==v{f=1;next} /^## /{f=0} f' CHANGELOG.md)
           gh release create "${GITHUB_REF_NAME}" "${{ steps.build.outputs.zip }}" \
-            --title "Book Reader ${GITHUB_REF_NAME}" --notes "${notes:-See CHANGELOG.md}" --prerelease
+            --title "eReaderDS ${GITHUB_REF_NAME}" --notes "${notes:-See CHANGELOG.md}" --prerelease

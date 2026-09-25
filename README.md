@@ -1,4 +1,4 @@
-# Book Reader for the RG DS Plus
+# eReaderDS for the RG DS Plus
 
 A two-page ebook reader for the **Anbernic RG DS Plus**. Turn the device
 sideways, like an open book, and each screen shows one page.
@@ -14,19 +14,23 @@ sideways, like an open book, and each screen shows one page.
 You need the SD card from the RG DS Plus and any computer (Windows, Mac or
 Linux).
 
-1. **Download** `BookReader-vX.Y.Z.zip` from the
-   [latest release](https://github.com/casualducko/rg-ds-plus-ereader/releases/latest)
+1. **Download** `eReaderDS-vX.Y.Z.zip` from the
+   [latest release](https://github.com/casualducko/eReaderDS/releases/latest)
    and unzip it on your computer.
 2. **Copy two items onto the card.** Open the unzipped `Ports` folder. It
-   contains `Book Reader.sh` and a `BookReader` folder. Copy both into the
+   contains `eReaderDS.sh` and a `eReaderDS` folder. Copy both into the
    `Ports` folder on the SD card, next to your other ports.
 3. **Add books**: copy `.epub` or `.txt` files into the card's `Ebook` folder.
-4. Put the card back, then open **Ports → Book Reader** on the device.
+4. Put the card back, then open **Ports → eReaderDS** on the device.
 
 To **update**, copy the two items from a newer release the same way and
 replace the old ones when asked. Your settings, reading positions and fonts
-are kept: they live in the `Ebook` folder (`Ebook/.bookreader` and
+are kept: they live in the `Ebook` folder (`Ebook/.ereaderds` and
 `Ebook/Fonts`), which the download never touches.
+
+> **Used "Book Reader" (v0.1.x)?** It's now called eReaderDS. Install it as
+> above, then delete `Ports/Book Reader.sh` and `Ports/BookReader` from the
+> card. Your settings and reading positions carry over automatically.
 
 > Don't drag the whole `Ports` folder onto the card: on a Mac, choosing
 > **Replace** would remove your other ports.
@@ -97,8 +101,8 @@ Built in: Gentium Book Plus, Crimson Text and Atkinson Hyperlegible.
 
 | Problem | Try this |
 |---|---|
-| **Book Reader isn't in the Ports menu** | Check that `Ports/Book Reader.sh` and the `Ports/BookReader` folder are at the top level of the card, not inside another folder. |
-| **Black screen, or it closes right away** | Look at `Ports/BookReader/log.txt` on the card and include it in a [bug report](#reporting-problems). |
+| **eReaderDS isn't in the Ports menu** | Check that `Ports/eReaderDS.sh` and the `Ports/eReaderDS` folder are at the top level of the card, not inside another folder. |
+| **Black screen, or it closes right away** | Look at `Ports/eReaderDS/log.txt` on the card and include it in a [bug report](#reporting-problems). |
 | **"No books found"** | Books go in the `Ebook` folder at the top level of the card, as `.epub` or `.txt`. |
 | **A book won't open or looks wrong** | Some EPUBs use unusual formatting. DRM-protected books, PDF and MOBI aren't supported. |
 | **Pages are upside down** | Use **Settings → Flip for other hand**, or hold it the other way. |
@@ -106,13 +110,13 @@ Built in: Gentium Book Plus, Crimson Text and Atkinson Hyperlegible.
 
 ## Reporting problems
 
-[Open a bug report](https://github.com/casualducko/rg-ds-plus-ereader/issues/new?template=bug_report.yml).
+[Open a bug report](https://github.com/casualducko/eReaderDS/issues/new?template=bug_report.yml).
 It asks for:
 
 - The **version**, shown at the top of Settings and at the bottom of the
   Library (for example `v0.1.0`).
 - **What happened**. Photos of the screens help a lot.
-- The contents of **`Ports/BookReader/log.txt`** from the SD card,
+- The contents of **`Ports/eReaderDS/log.txt`** from the SD card,
   copied right after the problem.
 
 ## Known limitations

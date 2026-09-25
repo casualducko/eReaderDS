@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Renamed from "Book Reader" to **eReaderDS**. The Ports entry is now
+  `eReaderDS.sh` and the folder `Ports/eReaderDS`. Settings and reading
+  positions are copied over from Book Reader automatically; delete
+  `Ports/Book Reader.sh` and `Ports/BookReader` afterwards.
+
 ## v0.1.1
 
 - Tapping the touchscreen now turns pages by default (right half forward,

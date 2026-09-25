@@ -1,4 +1,4 @@
-# Developing Book Reader
+# Developing eReaderDS
 
 Notes for working on the code. For installing and using the reader, see the
 [README](../README.md).
@@ -48,8 +48,8 @@ With the SD card mounted (macOS/Linux):
 ./install.sh /path/to/card   # any other mount point
 ```
 
-It replaces `Ports/BookReader/app`, updates the launchers and runtime, and
-leaves settings and progress (`Ebook/.bookreader`) alone.
+It replaces `Ports/eReaderDS/app`, updates the launchers and runtime, and
+leaves settings and progress (`Ebook/.ereaderds`) alone.
 
 ## Making a release
 
@@ -59,7 +59,7 @@ leaves settings and progress (`Ebook/.bookreader`) alone.
    ```sh
    git tag v0.2.0 && git push origin main v0.2.0
    ```
-3. The **Release** workflow builds `BookReader-vX.Y.Z.zip` with
+3. The **Release** workflow builds `eReaderDS-vX.Y.Z.zip` with
    `tools/build-release.sh`, and publishes it as a GitHub pre-release using
    that version's changelog section as the notes.
 
@@ -74,12 +74,12 @@ one keeps everything the reader has saved.
 ```
 Ebook/                      your books (.epub, .txt)
 Ebook/Fonts/                your own fonts (.ttf, .otf)
-Ebook/.bookreader/          saved state (outside the app, so updates keep it)
+Ebook/.ereaderds/          saved state (outside the app, so updates keep it)
   settings.txt              your settings
   progress.txt              position in each book
   last.txt                  the last book you opened
-Ports/Book Reader.sh        Ports menu entry
-Ports/BookReader/
+Ports/eReaderDS.sh        Ports menu entry
+Ports/eReaderDS/
   launch.sh                 sets up Wayland and starts LÖVE
   app/                      Lua sources and fonts
   runtime/                  LÖVE 11.5 aarch64
