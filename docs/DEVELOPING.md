@@ -96,7 +96,9 @@ Ports/eReaderDS/
   rotates that canvas onto its screen.
 - **Input.** Buttons arrive as the joystick `ANBERNIC-rk3568-keys`. The
   reader loads a gamepad mapping for it, and turns physical D-pad directions
-  into on-page directions based on the current grip.
+  into on-page directions for the sideways grip. (The code still supports a
+  flipped grip via `S.orient`, but it is no longer offered: the buttons
+  would sit under the wrong hand.)
 - **Brightness.** The reader sets every device under `/sys/class/backlight`
   to the same percentage. `launch.sh` saves the system brightness before
   starting and restores it afterwards, so the reader's level doesn't stick

@@ -400,9 +400,6 @@ local function menu_items()
         { label = "Page info", value = S.chrome and "On" or "Off", adjust = function()
             S.chrome = not S.chrome
         end },
-        { label = "Flip for other hand", act = function()
-            S.orient = S.orient == "left" and "right" or "left"
-        end },
         { label = "Jump to % (" .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. ")", value = "", adjust = function(d)
             local f = book:fraction(pos.ch, pos.off) + d * 0.01
             goto_pos(book:locate(math.max(0, math.min(1, f))))

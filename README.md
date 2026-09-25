@@ -41,8 +41,7 @@ are kept: they live in the `Ebook` folder (`Ebook/.ereaderds` and
 ## Using it
 
 **Hold it** turned counter-clockwise: the top screen is the left page and the
-buttons are under your right hand. Left-handed? Use **Settings → Flip for
-other hand**.
+buttons are under your right hand.
 
 | Button | Reading | In menus |
 |---|---|---|
@@ -108,7 +107,7 @@ Built in: Gentium Book Plus, Crimson Text and Atkinson Hyperlegible.
 | **Black screen, or it closes right away** | Look at `Ports/eReaderDS/log.txt` on the card and include it in a [bug report](#reporting-problems). |
 | **"No books found"** | Books go in the `Ebook` folder at the top level of the card, as `.epub` or `.txt`. |
 | **A book won't open or looks wrong** | Some EPUBs use unusual formatting. DRM-protected books, PDF and MOBI aren't supported. |
-| **Pages are upside down** | Use **Settings → Flip for other hand**, or hold it the other way. |
+| **Pages are upside down** | Turn the device the other way: counter-clockwise, with the buttons on the right. |
 | **Screen too dim after leaving** | The reader restores your normal brightness when it quits normally. If it crashed, change brightness in the system menu. |
 
 ## Reporting problems

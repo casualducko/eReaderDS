@@ -15,7 +15,7 @@ INSTALL / UPDATE
 
 HOLDING IT
   Turn the device counter-clockwise: the top screen is the left page and the
-  buttons are under your right hand. Settings > Flip for other hand switches.
+  buttons are under your right hand.
 
 BUTTONS
   R / D-pad forward ........ next pages      L / D-pad back ....... previous

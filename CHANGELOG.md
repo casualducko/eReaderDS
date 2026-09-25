@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Removed **Flip for other hand**: held that way, the buttons end up under the
+  wrong hand. Anyone who had it on is switched back to the normal grip.
+
 ## v0.2.2
 
 - New **E-ink** theme that mimics an e-ink screen: everything, including

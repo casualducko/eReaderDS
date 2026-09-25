@@ -64,7 +64,9 @@ function M.load_settings()
         elseif type(def) == "boolean" then s[k] = v == "true"
         else s[k] = v end
     end
-    if s.orient ~= "left" and s.orient ~= "right" then s.orient = "left" end
+    -- The flipped grip was removed (the buttons end up under the wrong hand), so
+    -- anyone who had it set goes back to the normal one.
+    s.orient = "left"
     return s
 end
 

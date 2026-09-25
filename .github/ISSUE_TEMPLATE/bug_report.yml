@@ -34,14 +34,6 @@ body:
     attributes:
       label: Book (if it's about one book)
       description: Title and where it came from (e.g. Project Gutenberg, Calibre conversion). No need to attach the book.
-  - type: dropdown
-    id: grip
-    attributes:
-      label: How were you holding it?
-      options:
-        - Turned counter-clockwise (default)
-        - Turned clockwise ("Flip for other hand")
-        - Not relevant
   - type: textarea
     id: log
     attributes:
