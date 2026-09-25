@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- D-pad in menus: on Settings rows with nothing to change (like Resume
+  reading), left/right move the selection; in the Library they move up and
+  down the list (A opens a book).
 - Ten built-in fonts. Serif: Gentium Book Plus, Literata, Charis SIL, Source
   Serif 4, Crimson Text, Bitter. Sans-serif: Atkinson Hyperlegible Next (replaces
   Atkinson Hyperlegible), Inter, Lexend. Plus OpenDyslexic.

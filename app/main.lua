@@ -1023,7 +1023,13 @@ local function action(a)
         elseif a == "down" then menu.sel = menu.sel % #items + 1
         elseif a == "left" or a == "right" or a == "prev" or a == "next" then
             local it = items[menu.sel]
-            if it.adjust then it.adjust((a == "left" or a == "prev") and -1 or 1) end
+            local back = a == "left" or a == "prev"
+            if it.adjust then
+                it.adjust(back and -1 or 1)
+            elseif a == "left" or a == "right" then
+                -- Rows with nothing to change: left/right move the selection.
+                menu.sel = back and (menu.sel - 2) % #items + 1 or menu.sel % #items + 1
+            end
         elseif a == "confirm" then
             local it = items[menu.sel]
             if it.act then it.act() elseif it.adjust then it.adjust(1) end
@@ -1050,9 +1056,9 @@ local function action(a)
     if mode == "library" then
         local n = #library.items
         if n > 0 then
-            if a == "up" or a == "prev" then library.sel = math.max(1, library.sel - 1)
-            elseif a == "down" or a == "next" then library.sel = math.min(n, library.sel + 1)
-            elseif a == "confirm" or a == "right" then open_book(library.items[library.sel].path) end
+            if a == "up" or a == "left" or a == "prev" then library.sel = math.max(1, library.sel - 1)
+            elseif a == "down" or a == "right" or a == "next" then library.sel = math.min(n, library.sel + 1)
+            elseif a == "confirm" then open_book(library.items[library.sel].path) end
         end
         if a == "menu" and book then app.mode = "menu"; menu.sel = 1 end
         if a == "back" and book then app.mode = "reader" end
