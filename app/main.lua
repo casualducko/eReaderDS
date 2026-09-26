@@ -493,8 +493,11 @@ end
 -- The "Notes" button at the bottom left of the right page (the touchscreen):
 -- x, y, w, h.
 function note.button()
-    local w = ui.small:getWidth("Notes") + 40
-    return margins().inner - 14, PAGE_H - 26 - ui.small:getHeight() - 10, w, ui.small:getHeight() + 20
+    local w, h = ui.small:getWidth("Notes") + 36, ui.small:getHeight() + 10
+    -- Sit clear of the progress bar along the bottom edge.
+    local bar = (S.sb_show and S.sb_bar ~= "none") and (({ 3, 6, 10 })[S.sb_bar_size] or 6) or 0   -- BAR_PX
+    local bottom = PAGE_H - 10 - bar - 8
+    return margins().inner - 14, bottom - h, w, h
 end
 
 -- The selected note laid out as pages (cached per target).
