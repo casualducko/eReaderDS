@@ -7,7 +7,8 @@
   show or hide all the status bars at once.
 - Themes are listed alphabetically in Settings.
 - **Pinch to change the text size** on the touchscreen: spread two fingers
-  for bigger text, pinch for smaller, one step at a time with the size shown.
+  for bigger text, pinch for smaller. While pinching, a panel shows the new
+  size, the percentage and a sample line; the page changes when you let go.
 
 ## v0.3.0
 

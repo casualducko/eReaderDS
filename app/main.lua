@@ -2717,29 +2717,32 @@ end
 
 local function touch_event(kind, sx, sy)
     local now = love.timer.getTime()
-    -- Two-finger pinch while reading: text size, one step (2) for every 15%
-    -- the fingers spread or close. (sx is the distance between them.)
+    -- Two-finger pinch while reading: previews a text size (shown with a
+    -- percentage and a sample line) and applies it when the fingers lift.
+    -- The size follows the square root of the pinch, so it changes gently.
     if kind == "pinch_start" then
         gesture = app.mode == "reader" and { mode = "pinch", d0 = math.max(40, sx), size0 = S.font_size }
             or { mode = "ignore" }
         return
     elseif kind == "pinch" then
         if gesture and gesture.mode == "pinch" then
-            local steps = math.floor(math.log(math.max(1, sx) / gesture.d0) / math.log(1.15) + 0.5)
-            local size = math.max(18, math.min(64, gesture.size0 + steps * 2))
-            if size ~= S.font_size then
-                S.font_size = size
-                build_fonts()
-                goto_pos(pos.ch, pos.off)
-            end
-            overlay = { side = "right", text = "Text size " .. S.font_size, hide_at = now + 1e9 }
+            local ratio = math.sqrt(math.max(1, sx) / gesture.d0)
+            local size = math.max(18, math.min(64, math.floor(gesture.size0 * ratio + 0.5)))
+            gesture.size = size
+            overlay = { side = "right", pinch = size, pct = math.floor(size / gesture.size0 * 100 + 0.5),
+                hide_at = now + 1e9 }
             redraw()
         end
         return
     elseif kind == "pinch_end" then
         if gesture and gesture.mode == "pinch" then
-            if overlay then overlay.hide_at = now + 0.9 end
-            Store.save_settings(S)
+            if overlay then overlay.hide_at = now + 0.7 end
+            if gesture.size and gesture.size ~= S.font_size then
+                S.font_size = gesture.size
+                build_fonts()
+                goto_pos(pos.ch, pos.off)
+                Store.save_settings(S)
+            end
         end
         gesture = nil
         return
@@ -2816,6 +2819,23 @@ local function draw_overlay()
     if not overlay then return end
     love.graphics.push()
     page_transform(overlay.side)
+    if overlay.pinch then
+        -- Pinching: the size it will become, and a sample at that size.
+        local w, h = 560, 200
+        local x, y = (PAGE_W - w) / 2, 110
+        love.graphics.setColor(0.08, 0.08, 0.08, 0.94)
+        love.graphics.rectangle("fill", x, y, w, h, 22, 22)
+        love.graphics.setColor(1, 1, 1, 0.95)
+        love.graphics.setFont(ui.font)
+        love.graphics.print("Text size " .. overlay.pinch, x + 28, y + 16)
+        love.graphics.printf(overlay.pct .. "%", x, y + 16, w - 28, "right")
+        local f = Fonts.preview(fonts.name or S.font, overlay.pinch) or ui.font
+        love.graphics.setFont(f)
+        local sample = fit_text(f, "The quick brown fox", w - 56)
+        love.graphics.printf(sample, x + 28, y + 70 + (110 - f:getHeight()) / 2, w - 56, "center")
+        love.graphics.pop()
+        return
+    end
     if overlay.text then
         local w, h = 460, 80
         local x, y = (PAGE_W - w) / 2, 120
