@@ -88,6 +88,7 @@ local function load_ssl()
         long SSL_get_verify_result(const SSL *s);
         const char *X509_verify_cert_error_string(long n);
         unsigned long ERR_get_error(void);
+        void ERR_clear_error(void);
         void ERR_error_string_n(unsigned long e, char *buf, size_t len);
     ]])
     -- macOS's own libssl aborts the process when loaded, so use Homebrew's there.
@@ -131,15 +132,21 @@ local function wait(sock, writing)
     if #(writing and w or r) == 0 then error("the server stopped responding") end
 end
 
+-- OpenSSL keeps a per-thread queue of errors; SSL_get_error() looks at it,
+-- so it's emptied before each call and after reading an error out of it.
+local function clear_errors() pcall(function() ssl.ERR_clear_error() end) end
+
 local function ssl_error_text(s, ret)
     local e = ssl.SSL_get_error(s, ret)
     local ok, code = pcall(function() return ssl.ERR_get_error() end)
+    local text = "TLS error " .. e
     if ok and code ~= 0 then
         local buf = ffi.new("char[256]")
         ssl.ERR_error_string_n(code, buf, 256)
-        return ffi.string(buf)
+        text = ffi.string(buf)
     end
-    return "TLS error " .. e
+    clear_errors()
+    return text
 end
 
 -- Wrap a connected LuaSocket TCP socket in TLS. Returns recv(n), send(s), close().
@@ -152,6 +159,7 @@ local function tls_wrap(sock, host, verify)
     ssl.SSL_ctrl(s, 55, 0, ffi.cast("void *", host))           -- SNI: SSL_CTRL_SET_TLSEXT_HOSTNAME
     if verify then ssl.SSL_set1_host(s, host) end
     while true do
+        clear_errors()
         local ret = ssl.SSL_connect(s)
         if ret == 1 then break end
         local e = ssl.SSL_get_error(s, ret)
@@ -160,6 +168,7 @@ local function tls_wrap(sock, host, verify)
         else
             local v = tonumber(ssl.SSL_get_verify_result(s))
             if v ~= 0 then
+                clear_errors()
                 error("the server's certificate couldn't be verified (" ..
                     ffi.string(ssl.X509_verify_cert_error_string(v)) .. ")")
             end
@@ -170,6 +179,7 @@ local function tls_wrap(sock, host, verify)
     local t = {}
     function t.recv(n)
         while true do
+            clear_errors()
             local ret = ssl.SSL_read(s, buf, math.min(n, 65536))
             if ret > 0 then return ffi.string(buf, ret) end
             local e = ssl.SSL_get_error(s, ret)
@@ -182,6 +192,7 @@ local function tls_wrap(sock, host, verify)
     function t.send(data)
         local i = 0
         while i < #data do
+            clear_errors()
             local ret = ssl.SSL_write(s, ffi.cast("const char *", data) + i, #data - i)
             if ret > 0 then i = i + ret
             else
@@ -238,7 +249,11 @@ local function connect(u, verify)
         error("couldn't connect to " .. u.host .. " (" .. tostring(err) .. ")")
     end
     sock:settimeout(0)
-    if u.scheme == "https" then return tls_wrap(sock, u.host, verify) end
+    if u.scheme == "https" then
+        local ok, t = pcall(tls_wrap, sock, u.host, verify)
+        if not ok then sock:close(); error(t, 0) end
+        return t
+    end
     return plain_wrap(sock)
 end
 
@@ -293,7 +308,12 @@ local function auth_header(auth, opts, path)
     local cnonce = hex_md5(tostring(os.time()) .. tostring(math.random())):sub(1, 16)
     local ha1 = hex_md5(opts.user .. ":" .. (p.realm or "") .. ":" .. (opts.password or ""))
     local ha2 = hex_md5("GET:" .. path)
-    local qop = p.qop and (p.qop:match("auth%-int") and not p.qop:match("auth[^-]") and nil or "auth")
+    -- qop is a list like "auth,auth-int"; plain "auth" is what we answer.
+    local qop
+    if p.qop then
+        for q in p.qop:gmatch("[^,%s]+") do if q == "auth" then qop = "auth" end end
+        if not qop then error("the server asked for a login this reader doesn't support", 0) end
+    end
     local response
     if qop then
         response = hex_md5(ha1 .. ":" .. p.nonce .. ":" .. nc .. ":" .. cnonce .. ":" .. qop .. ":" .. ha2)
@@ -357,7 +377,8 @@ local function request(url, opts, auth, sink)
                 local total = tonumber(headers["content-length"])
                 if (headers["transfer-encoding"] or ""):lower():find("chunked") then
                     while true do
-                        local size = tonumber(r.line():match("^%s*(%x+)"), 16)
+                        local hex = r.line():match("^%s*(%x+)")
+                        local size = hex and tonumber(hex, 16)
                         if not size then error("bad chunked response") end
                         if size == 0 then break end
                         local left = size
@@ -393,7 +414,9 @@ local function request(url, opts, auth, sink)
     return status, headers
 end
 
-local auth_cache = {}      -- host -> { scheme, params } learned from the last challenge
+local auth_cache = {}      -- "scheme://host:port" -> { scheme, params } from the last challenge
+
+local function origin(u) return u.scheme .. "://" .. u.host .. ":" .. u.port end
 
 -- GET a URL. opts: user, password, verify (default true), sink(chunk, total)
 -- (without one the body is returned as a string). Follows redirects and
@@ -407,10 +430,15 @@ function M.get(url, opts)
         sink = function(d) parts[#parts + 1] = d end
     end
     local tried_auth = false
+    local start = M.parse_url(url)
     for _ = 1, 8 do
         local u = M.parse_url(url)
-        local host = u and u.host or ""
-        local status, headers = request(url, opts, auth_cache[host], sink)
+        if not u then error("not a web address: " .. tostring(url), 0) end
+        local host = origin(u)
+        -- The user name and password only go to the catalog's own server, and
+        -- never over plain http after starting on https.
+        local own = start and u.host == start.host and (u.scheme == start.scheme or u.scheme == "https")
+        local status, headers = request(url, own and opts or {}, own and auth_cache[host] or nil, sink)
         if status == 200 then
             return parts and table.concat(parts) or true, url
         elseif status == 301 or status == 302 or status == 303 or status == 307 or status == 308 then
@@ -418,6 +446,7 @@ function M.get(url, opts)
             url = M.resolve(url, headers.location)
         elseif status == 401 then
             if not opts.user then error("this catalog needs a user name and password (add them to opds.txt)") end
+            if not own then error("another site asked for a login", 0) end
             if tried_auth and not (auth_cache[host] and auth_cache[host].stale) then
                 error("the server didn't accept the user name or password")
             end

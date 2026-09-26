@@ -94,8 +94,9 @@ local function dz_chunk(dz, k)
     dz.f:seek("set", dz.offsets[k])
     local raw = dz.f:read(dz.offsets[k + 1] - dz.offsets[k]) or ""
     -- Chunks end with a full flush, not the end of a stream: add an empty
-    -- final block so the chunk inflates on its own.
-    if k < dz.chcnt then raw = raw .. "\3\0" end
+    -- final block so the chunk inflates on its own. (The real dictzip tool
+    -- does this to the last chunk too; after a finished stream it's ignored.)
+    raw = raw .. "\3\0"
     local ok, out = pcall(love.data.decompress, "string", "deflate", raw)
     c = ok and out or ""
     dz.cache[k] = c
@@ -124,6 +125,7 @@ local function load_dict(ifo_path)
     local base = ifo_path:gsub("%.ifo$", "")
     local d = { name = info.bookname or base:match("[^/]+$"), base = base,
         type = info.sametypesequence, loaded = false,
+        wide = info.idxoffsetbits == "64",       -- 8-byte offsets in the index
         words = info.wordcount, idxsize = info.idxfilesize }
     return d
 end
@@ -142,13 +144,20 @@ local function ensure(d)
         end
     end
     if not idx then return false end
-    d.idx = word_list(idx, 8)
+    d.idx = word_list(idx, d.wide and 12 or 8)
     local syn = read_file(d.base .. ".syn")
     if syn then d.syn = word_list(syn, 4) end
     d.dz = open_dictzip(d.base .. ".dict.dz")
     if not d.dz then
         d.file = io.open(d.base .. ".dict", "rb")
-        if not d.file then return false end
+        if not d.file then
+            -- A plain gzip file (no dictzip index): unpack it whole, if small.
+            local gz = read_file(d.base .. ".dict.dz")
+            if not gz or #gz > 30e6 then return false end
+            local ok, out = pcall(love.data.decompress, "string", "gzip", gz)
+            if not ok then return false end
+            d.plain = out
+        end
     end
     d.ok = true
     return true
@@ -156,9 +165,15 @@ end
 
 local function entry_text(d, i)
     local after = d.idx.ends[i] + 2
-    local off, size = u32(d.idx.data, after), u32(d.idx.data, after + 4)
+    local off, size
+    if d.wide then
+        off, size = u32(d.idx.data, after) * 4294967296 + u32(d.idx.data, after + 4), u32(d.idx.data, after + 8)
+    else
+        off, size = u32(d.idx.data, after), u32(d.idx.data, after + 4)
+    end
     local raw
     if d.dz then raw = dz_read(d.dz, off, size)
+    elseif d.plain then raw = d.plain:sub(off + 1, off + size)
     else d.file:seek("set", off); raw = d.file:read(size) or "" end
     local t = d.type
     if not t or t == "" then
@@ -234,10 +249,24 @@ end
 
 -- Tidy a word taken from the page: curly quotes, surrounding punctuation,
 -- possessives.
+-- Punctuation that's more than one byte in UTF-8: “ ” – — « » …
+local WIDE_PUNCT = { "\226\128\156", "\226\128\157", "\226\128\147", "\226\128\148",
+    "\194\171", "\194\187", "\226\128\166" }
+
 function M.clean(word)
     word = word:gsub("\226\128\153", "'"):gsub("\226\128\152", "'")         -- ’ ‘
-    word = word:gsub("^[%p\226\128\156\157\148\147\194\171\187]+", "")
-    word = word:gsub("[%p\226\128\156\157\148\147\194\171\187]+$", "")
+    -- Strip punctuation from both ends, whole characters at a time (never
+    -- part of a letter like the ë in "Zoë").
+    local changed = true
+    while changed and word ~= "" do
+        changed = false
+        local w2 = word:gsub("^%p+", ""):gsub("%p+$", "")
+        for _, p in ipairs(WIDE_PUNCT) do
+            if w2:sub(1, #p) == p then w2 = w2:sub(#p + 1) end
+            if #w2 >= #p and w2:sub(-#p) == p then w2 = w2:sub(1, -#p - 1) end
+        end
+        if w2 ~= word then word, changed = w2, true end
+    end
     word = word:gsub("'s$", ""):gsub("s'$", "s")
     return word
 end

@@ -33,7 +33,7 @@ local function load()
 end
 
 -- Break points for a word of ASCII letters, as prefix lengths in ascending
--- order ("hyphenation" -> {2, 6, 7}: hy-phen-ation).
+-- order ("hyphenation" -> {2, 6}: hy-phen-ation).
 function M.points(word)
     if #word < LEFT + RIGHT then return {} end
     local lower = word:lower()

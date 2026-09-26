@@ -177,6 +177,15 @@ local function parse_html(html, base, classes, show_notes)
         if last and not last.br and last.i == s.i and last.b == s.b and last.link == s.link and last.sup == s.sup then
             last.text = last.text .. t
         else
+            if s.link and s.link.lead == nil then
+                -- A link at the very start of a paragraph is a note's own
+                -- label ("[1] The note..."), not a reference to a note.
+                local lead = true
+                for _, r in ipairs(runs) do
+                    if r.br or (r.text and r.text:find("%S")) then lead = false; break end
+                end
+                s.link.lead = lead
+            end
             runs[#runs + 1] = { text = t, i = s.i, b = s.b, off = off, link = s.link, sup = s.sup }
         end
         off = off + #t
@@ -206,14 +215,16 @@ local function parse_html(html, base, classes, show_notes)
                 local frag = href:match("#(.+)$")
                 local kind = (attr(tag, "epub:type") or "") .. " " .. (attr(tag, "role") or "")
                 s.link = { target = frag and (file .. "#" .. urldecode(frag)) or file,
-                    noteref = kind:find("noteref") ~= nil, sup = parent.sup }
+                    noteref = kind:find("noteref") ~= nil, sup = parent.sup,
+                    backlink = kind:find("backlink") ~= nil }
                 if s.link.noteref then s.sup = true end        -- note numbers are superscript
             end
         end
         -- EPUB 3 footnotes are shown on the other page, not in the text.
         if name == "aside" then
             local kind = (attr(tag, "epub:type") or "") .. " " .. (attr(tag, "role") or "")
-            if not show_notes and (kind:find("footnote") or kind:find("endnote") or kind:find("rearnote")) then
+            -- (Endnotes stay: they're often a chapter of their own.)
+            if not show_notes and kind:find("footnote") then
                 s.hidden = true
             end
         end
@@ -540,25 +551,31 @@ function Book:find_id(file, frag)
     end
 end
 
--- Whether a link points back at a link (a note's "return to text" link),
--- rather than at a note.
-function Book:is_backlink(target)
-    local file, frag = target:match("^(.-)#(.+)$")
-    if not file then return false end
-    local html, lt = self:find_id(file, frag)
-    if not html then return false end
-    local tag = html:match("^<[^>]*>", lt) or ""
-    return tag:match("^<[%w]*:?a[%s>]") ~= nil and attr(tag, "href") ~= nil
-end
-
 function Book:note(target)
     local file, frag = target:match("^(.-)#(.+)$")
     if not file then return nil end
     local html, lt = self:find_id(file, frag)
     if not html then return nil end
     local name = (html:match("^<([%w:%-]+)", lt) or ""):lower():gsub("^.*:", "")
+    -- The end of an element starting at `start` (same-name tags may nest).
+    local function element_end(start, tag)
+        local depth, pos = 0, start
+        while true do
+            local s, e, close = html:find("<(/?)" .. tag .. "[%s/>]", pos)
+            if not s then return nil end
+            local tag_end = html:find(">", s, true) or e
+            if close == "/" then
+                depth = depth - 1
+                if depth == 0 then return tag_end end
+            elseif html:sub(tag_end - 1, tag_end) ~= "/>" then
+                depth = depth + 1
+            end
+            pos = tag_end + 1
+        end
+    end
     if not NOTE_BLOCKS[name] then
-        -- An inline anchor: use the nearest block that starts before it.
+        -- An inline anchor: the nearest block around it, or, for an empty
+        -- anchor just before a block ("<a id=n2></a><p>Note 2</p>"), the next one.
         local best, best_name
         for _, b in ipairs({ "p", "li", "aside", "div", "dd", "section", "blockquote" }) do
             local from = 1
@@ -569,23 +586,18 @@ function Book:note(target)
                 from = s + 1
             end
         end
+        local best_end = best and element_end(best, best_name)
+        if not best or (best_end and best_end < lt) then
+            best, best_name = nil, nil
+            for _, b in ipairs({ "p", "li", "aside", "div", "dd", "blockquote" }) do
+                local s = html:find("<" .. b .. "[%s>]", lt)
+                if s and (not best or s < best) then best, best_name = s, b end
+            end
+        end
         if not best then return nil end
         lt, name = best, best_name
     end
-    -- The end of that element (same-name tags may nest, e.g. div in div).
-    local depth, pos, stop = 0, lt, nil
-    while true do
-        local s, e, close = html:find("<(/?)" .. name .. "[%s/>]", pos)
-        if not s then break end
-        local tag_end = html:find(">", s, true) or e
-        if close == "/" then
-            depth = depth - 1
-            if depth == 0 then stop = tag_end; break end
-        elseif html:sub(tag_end - 1, tag_end) ~= "/>" then
-            depth = depth + 1
-        end
-        pos = tag_end + 1
-    end
+    local stop = element_end(lt, name)
     local snippet = html:sub(lt, stop or math.min(#html, lt + 4000))
     if #snippet > 12000 then snippet = snippet:sub(1, 12000) end
     local blocks = parse_html("<body>" .. snippet .. "</body>", file, self.classes, true)

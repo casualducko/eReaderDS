@@ -335,6 +335,17 @@ local function remember_jump()
     jump = { ch = pos.ch, off = pos.off, turns = 0 }
 end
 
+-- Jump somewhere, remembering where you were so B can go back, unless the
+-- jump didn't actually move (e.g. picking the chapter you're already in).
+function app.jump_to(ch, off)
+    local from = spread and (spread.ch .. ":" .. spread.pi)
+    local had = jump
+    remember_jump()
+    goto_pos(ch, off)
+    if jump ~= had and spread and spread.ch .. ":" .. spread.pi == from then jump = had end
+    save_progress()
+end
+
 local function jump_turned()
     if jump then
         jump.turns = jump.turns + 1
@@ -441,7 +452,7 @@ local note = { refs = {}, sel = 1, page = 1, cache = {} }
 -- like "1", "[12]", "*", "†" or "[a]" (Gutenberg and most older books).
 function note.is_ref(link, text)
     if link.noteref then return true end
-    if not link.target:find("#") then return false end
+    if link.lead or link.backlink or not link.target:find("#") then return false end
     local t = text:gsub("%s", "")
     return t:match("^%[?%(?%d+%)?%]?%.?$") ~= nil
         or t:match("^%[?[%*\226\194]+[\128-\191]*%]?$") ~= nil      -- * † ‡ § ¶
@@ -476,16 +487,17 @@ function note.collect()
     end
     local out = {}
     for _, r in ipairs(refs) do
-        if note.is_ref(r.link, r.text) and not book:is_backlink(r.link.target) then out[#out + 1] = r end
+        if note.is_ref(r.link, r.text) then out[#out + 1] = r end
     end
     return out
 end
 
 -- Note references on the spread on screen, worked out once per spread.
 function note.on_spread()
-    local key = tostring(spread.pages) .. "|" .. spread.pi
-    if note.spread_key ~= key then
-        note.spread_key, note.spread_refs = key, note.collect()
+    -- Compared by identity (holding the table), so a rebuilt layout never
+    -- matches an old one.
+    if note.spread_pages ~= spread.pages or note.spread_pi ~= spread.pi then
+        note.spread_pages, note.spread_pi, note.spread_refs = spread.pages, spread.pi, note.collect()
     end
     return note.spread_refs
 end
@@ -502,7 +514,8 @@ end
 
 -- The selected note laid out as pages (cached per target).
 function note.pages(r)
-    local key = r.link.target .. "|" .. S.font_size .. "|" .. S.font .. "|" .. S.spacing .. "|" .. S.margins
+    local key = book.path .. "|" .. r.link.target .. "|" .. S.font_size .. "|" .. S.font .. "|"
+        .. S.spacing .. "|" .. S.margins .. "|" .. tostring(S.justify)
     local p = note.cache[key]
     if p == nil then
         local blocks = book:note(r.link.target)
@@ -562,13 +575,19 @@ function look.collect()
     for k, side in ipairs({ "left", "right" }) do
         local page = spread.pages[spread.pi + k - 1]
         local ox = side == "left" and m.outer or m.inner
-        local prev, prev_x
+        local prev, prev_x, prev_base
         for _, it in ipairs(page and page.items or {}) do
             if it.kind == "text" then
                 local x, y = ox + it.x, oy + it.y
                 local w, h = it.font:getWidth(it.text), it.font:getHeight()
-                if not prev_x or x < prev_x then line = line + 1; prev = nil end
+                -- A new line: the text moved down (superscripts sit a little
+                -- higher, so allow for that) or back to the left.
+                local base = y + it.font:getBaseline()
+                if not prev_x or x < prev_x or math.abs(base - prev_base) > h * 0.6 then
+                    line = line + 1; prev = nil
+                end
                 prev_x = x
+                if not prev then prev_base = base end
                 if prev and x <= prev.x2 + 1 then
                     prev.text = prev.text .. it.text
                     prev.x2, prev.y, prev.y2 = x + w, math.min(prev.y, y), math.max(prev.y2, y + h)
@@ -791,6 +810,7 @@ local function show_message(text)
 end
 
 local function open_book(path)
+    library.confirm = nil
     local ok, b, err = pcall(Book.open, path)
     if not ok or not b then
         show_message("Could not open this book.\n\n" .. tostring(ok and err or b))
@@ -853,6 +873,13 @@ function library.sort(items)
     end)
 end
 
+-- Get books state (see "get books (OPDS)" below); declared here so the
+-- library scan can see whether a download is running.
+local net = { thread = nil, next_id = 0, handlers = {}, count = 0 }
+-- The "Get books" screen. Its functions live on the table to stay under
+-- Lua's limit on local variables.
+local shop = { catalog = nil, stack = {}, covers = {}, cover_order = {}, dl = nil }
+
 local function scan_library()
     local items = {}
     local seen = {}
@@ -861,6 +888,8 @@ local function scan_library()
         if p then
             for name in p:lines() do
                 local ext = (name:match("%.([^.]+)$") or ""):lower()
+                -- Left over from a download that was cut off.
+                if ext == "part" and not shop.dl then os.remove(dir .. "/" .. name) end
                 if (ext == "epub" or ext == "txt") and not name:match("^%._") then
                     local path = dir .. "/" .. name
                     if not seen[path] then
@@ -931,16 +960,16 @@ end
 
 -- Delete a book file (Y in the library, then A to confirm).
 function library.delete(path)
-    if book and book.path == path then
-        save_progress()
-        book:close()
-        book, jump = nil, nil
-        clear_book_caches()
-    end
+    if book and book.path == path then save_progress() end
     local ok, err = os.remove(path)
     if not ok then
         show_message("Could not delete this book.\n\n" .. tostring(err))
         return
+    end
+    if book and book.path == path then
+        book:close()
+        book, jump, spread = nil, nil, nil
+        clear_book_caches()
     end
     previews[path] = nil
     Store.forget(path)
@@ -970,10 +999,6 @@ end
 
 -- Network jobs run on a thread (networker.lua); replies are dispatched here
 -- from the main loop by job id.
-local net = { thread = nil, next_id = 0, handlers = {}, count = 0 }
--- The "Get books" screen. Its functions live on the table to stay under
--- Lua's limit on local variables.
-local shop = { catalog = nil, stack = {}, covers = {}, cover_order = {}, dl = nil }
 
 function shop.net_job(job, handler)
     if not net.thread then
@@ -997,7 +1022,7 @@ function shop.net_poll()
         if not msg then break end
         got = true
         local h = net.handlers[msg.id]
-        if msg.kind ~= "progress" then
+        if msg.kind ~= "progress" and h then
             net.handlers[msg.id] = nil
             net.count = net.count - 1
         end
@@ -1008,6 +1033,10 @@ function shop.net_poll()
         local err = net.thread:getError() or "network thread stopped"
         print("[net] " .. err)
         net.thread = nil
+        -- Don't let a new thread pick up the old jobs or replies.
+        love.thread.getChannel("net_jobs"):clear()
+        love.thread.getChannel("net_out"):clear()
+        love.thread.getChannel("net_cancel"):clear()
         for id, h in pairs(net.handlers) do h({ id = id, kind = "error", message = err }) end
         net.handlers, net.count = {}, 0
         got = true
@@ -1029,6 +1058,7 @@ end
 
 function shop.load_page(pg, url, append)
     pg.loading, pg.error = true, nil
+    pg.retry = { url = url, append = append }      -- what A retries if this fails
     shop.net_job(shop.catalog_opts({ kind = "fetch", url = url }), function(msg)
         pg.loading = false
         if msg.kind == "error" then pg.error = msg.message; return end
@@ -1040,6 +1070,8 @@ function shop.load_page(pg, url, append)
             pg.entries = feed.entries
         end
         pg.next = feed.next
+        pg.sel = math.max(1, math.min(pg.sel, #pg.entries))
+        pg.top = math.max(1, math.min(pg.top, pg.sel))
     end)
 end
 
@@ -1060,6 +1092,9 @@ end
 -- "Get books" from the library: a list of catalogs (yours from opds.txt,
 -- then the free built-in ones), and how to add your own.
 function shop.start()
+    library.confirm = nil
+    shop.dir = nil
+    for url, c in pairs(shop.covers) do if c == false then shop.covers[url] = nil end end
     local entries = {}
     for _, c in ipairs(library.catalogs or {}) do
         local u = Opds.parse_url(c.url)
@@ -1076,15 +1111,26 @@ function shop.start()
 end
 
 -- Is this book already in the library (same file name, or same title)?
+-- Worked out once per entry (it's drawn every frame) and cached in
+-- it.have: a path, or false.
 function shop.have(it)
     if not it.book then return nil end
-    local path = Store.download_dir() .. "/" .. Opds.file_name(it)
+    if it.have ~= nil then return it.have or nil end
+    shop.dir = shop.dir or Store.download_dir()
+    local path = shop.dir .. "/" .. Opds.file_name(it)
     local f = io.open(path, "rb")
-    if f then f:close(); return path end
+    if f then f:close(); it.have = path; return path end
+    -- Or a book with the same title and author (either may lack the author).
     local t = it.title:lower()
+    local a = ((it.author or ""):match("^[^,&]+") or ""):lower():gsub("%s+$", "")
     for _, b in ipairs(library.items) do
-        if b.path and b.title:lower() == t then return b.path end
+        local ba = (b.author or ""):lower()
+        if b.path and b.title:lower() == t and (a == "" or ba == "" or ba == a) then
+            it.have = b.path
+            return b.path
+        end
     end
+    it.have = false
 end
 
 -- Cover for the selected entry, fetched when the network is idle.
@@ -1100,12 +1146,15 @@ function shop.cover(it)
             return love.graphics.newImage(love.filesystem.newFileData(data, "cover"))
         end)
         shop.covers[url] = ok and img or false
+        shop.cover_order[#shop.cover_order + 1] = url
+        if #shop.cover_order > 12 then shop.covers[table.remove(shop.cover_order, 1)] = nil end
         return ok and img or nil
     end
     if net.count == 0 then
         shop.covers[url] = false
         shop.net_job(shop.catalog_opts({ kind = "fetch", url = url }), function(msg)
-            if msg.kind ~= "done" then return end
+            -- Failed or huge (decoding happens here, on the UI thread): no cover.
+            if msg.kind ~= "done" or #msg.body > 4000000 then return end
             local ok, img = pcall(function()
                 return love.graphics.newImage(love.filesystem.newFileData(msg.body, "cover"))
             end)
@@ -1118,11 +1167,11 @@ function shop.cover(it)
 end
 
 function shop.start_download(it)
-    local dir = Store.download_dir()
-    local dest = dir .. "/" .. Opds.file_name(it)
+    shop.dir = shop.dir or Store.download_dir()
+    local dest = shop.dir .. "/" .. Opds.file_name(it)
     local dl = { item = it, got = 0, total = it.book.size or 0, dest = dest }
     shop.dl = dl
-    shop.net_job(shop.catalog_opts({ kind = "download", url = it.book.href, dest = dest, size = it.book.size }), function(msg)
+    dl.id = shop.net_job(shop.catalog_opts({ kind = "download", url = it.book.href, dest = dest, size = it.book.size }), function(msg)
         if msg.kind == "progress" then
             dl.got, dl.total = msg.got, msg.total
         elseif msg.kind == "done" then
@@ -1141,7 +1190,7 @@ end
 
 function shop.back()
     if shop.dl then
-        love.thread.getChannel("net_cancel"):push(true)
+        love.thread.getChannel("net_cancel"):push(shop.dl.id)
         return
     end
     table.remove(shop.stack)
@@ -1154,8 +1203,9 @@ end
 function shop.confirm()
     local pg = shop.page()
     if not pg then return end
-    if pg.error then
-        if #pg.entries > 0 and pg.next then shop.load_page(pg, pg.next, true) else shop.load_page(pg, pg.url) end
+    if pg.error and (#pg.entries == 0 or not (pg.entries[pg.sel] or {}).book) then
+        local r = pg.retry or { url = pg.url }
+        shop.load_page(pg, r.url, r.append)
         return
     end
     local it = pg.entries[pg.sel]
@@ -2637,7 +2687,9 @@ local function touch_event(kind, sx, sy)
         local du, dv = u - gesture.u0, v - gesture.v0
         gesture.moved = math.max(gesture.moved, math.abs(du), math.abs(dv))
         gesture.u = u
-        if not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
+        if gesture.held then
+            -- A press-and-hold (look-up) doesn't turn into a swipe or slide.
+        elseif not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
             gesture.mode = "swipe"          -- mostly horizontal: page turn on release
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
             -- Mostly vertical slide: brightness. Work in sqrt space so the
@@ -2956,7 +3008,7 @@ function handle_action(a)
             if e.action then
                 toggle_bookmark()
             else
-                remember_jump(); goto_pos(e.ch, e.off); save_progress(); app.mode = "reader"
+                app.jump_to(e.ch, e.off); app.mode = "reader"
             end
         elseif a == "toc" and bm.sel > 1 then              -- Y deletes
             local list = {}
@@ -2981,7 +3033,7 @@ function handle_action(a)
         elseif a == "left" or a == "prev" then toc.sel = math.max(1, toc.sel - rows)
         elseif a == "right" or a == "next" then toc.sel = math.min(n, toc.sel + rows)
         elseif a == "confirm" then
-            remember_jump(); goto_pos(toc_pos(book.toc[toc.sel])); save_progress(); app.mode = "reader"
+            app.jump_to(toc_pos(book.toc[toc.sel])); app.mode = "reader"
         elseif a == "back" or a == "toc" or a == "menu" then app.mode = "reader" end
         redraw()
         return
@@ -3029,7 +3081,8 @@ function handle_action(a)
             -- "Delete this book?" is showing: A deletes, anything else keeps it.
             local path = library.confirm
             library.confirm = nil
-            if a == "confirm" then library.delete(path) end
+            local it = library.items[library.sel]
+            if a == "confirm" and it and it.path == path then library.delete(path) end
             redraw()
             return
         end
@@ -3053,9 +3106,13 @@ end
 -- Pressing and holding on the touchscreen: look up the word under the finger.
 function app.on_hold(side, u, v)
     if app.mode ~= "reader" and app.mode ~= "lookup" then return end
+    -- In look-up mode the other page is the definition: holds there do nothing.
+    local cur = look.words[look.sel]
+    if app.mode == "lookup" and cur and side ~= cur.side then return end
+    local saved = look.words
     look.words = look.collect()
     local w = look.hit(side, u, v)
-    if w then look.open(w) end
+    if w then look.open(w) else look.words = saved end
 end
 
 -- A quick tap on the touchscreen (page coordinates of the touched side).
@@ -3069,7 +3126,8 @@ function app.on_tap(side, u, v)
         elseif side == "right" and #note.on_spread() > 0 and u >= bx - 16 and u <= bx + bw + 16
             and v >= by - 16 and v <= by + bh + 16 then
             note.open()                       -- the Notes button
-        elseif jump and side == "right" and v > PAGE_H - 90 then
+        elseif jump and side == "right" and v > PAGE_H - 90
+            and u >= margins().inner + (PAGE_W - margins().outer - margins().inner) * 0.35 then
             go_back()                         -- the "Back to ..." line
         elseif side == "right" and u > PAGE_W - 150 and v < 150 then
             toggle_bookmark()                 -- top-right corner, like a Kindle
@@ -3100,11 +3158,16 @@ function app.on_tap(side, u, v)
         end
     elseif mode == "lookup" then
         -- Another word on this page: look that up. Anywhere else: close.
-        local _, i = look.hit(side, u, v)
+        -- (Only on the page with the text; the other page is the definition.)
+        local cur = look.words[look.sel]
+        local _, i
+        if cur and side == cur.side then _, i = look.hit(side, u, v) end
         if i then look.sel = i; look.find(); redraw() else action("back") end
     elseif mode == "note" then
         -- Another note number on this page: show that one. Anywhere else: close.
-        local _, i = note.hit(note.refs, side, u, v)
+        local cur = note.refs[note.sel]
+        local _, i
+        if cur and side == cur.side then _, i = note.hit(note.refs, side, u, v) end
         if i then note.sel, note.page = i, 1; redraw() else action("back") end
     elseif mode == "shop" then
         -- Tap a row to open it; tap the right page to download or read.
@@ -3177,7 +3240,7 @@ function love.gamepadaxis(_, axis, value)
 end
 
 -- Raw buttons that aren't in the gamepad mapping. On the RG DS Plus, button 9
--- is pressing the analog stick in: it acts as OK (A). (The curved-arrow button
+-- is pressing the analog stick in: Settings while reading, OK (A) elsewhere. (The curved-arrow button
 -- next to the Anbernic button is a separate "adc-keys" device that sends the
 -- Back key; see KEYS below, where it toggles Settings.)
 local EXTRA = { [9] = "stick" }        -- pressing the stick in
@@ -3304,6 +3367,13 @@ function love.load()
 end
 
 function love.quit()
+    if net.thread then
+        -- Stop a download (its .part file is removed) and the network thread.
+        if shop.dl then love.thread.getChannel("net_cancel"):push(shop.dl.id) end
+        love.thread.getChannel("net_jobs"):clear()
+        love.thread.getChannel("net_jobs"):push({ kind = "quit" })
+        net.thread:wait()
+    end
     save_progress()
     Store.save_settings(S)
     Store.flush()

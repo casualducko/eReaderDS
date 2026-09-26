@@ -4,7 +4,7 @@
 --   { id, kind = "progress", got, total }   (downloads, a few times a second)
 --   { id, kind = "done", body }             (fetch: the body; download: none)
 --   { id, kind = "error", message }
--- Pushing anything to "net_cancel" stops the running download.
+-- Pushing a download's job id to "net_cancel" stops that download.
 require("love.filesystem")
 require("love.data")
 require("love.timer")
@@ -28,8 +28,14 @@ local function run(job)
     if not f then error("couldn't write to the SD card (" .. tostring(err) .. ")", 0) end
     local got, last = 0, 0
     opts.sink = function(chunk, total)
-        if cancel:pop() then error("cancelled", 0) end
-        f:write(chunk)
+        -- Cancels for earlier jobs are stale; one for a later job waits.
+        while true do
+            local c = cancel:peek()
+            if not c or (type(c) == "number" and c > job.id) then break end
+            cancel:pop()
+            if c == job.id or c == true then error("cancelled", 0) end
+        end
+        if not f:write(chunk) then error("couldn't write to the SD card (is it full?)", 0) end
         got = got + #chunk
         local now = love.timer.getTime()
         if now - last > 0.2 then
@@ -38,7 +44,19 @@ local function run(job)
         end
     end
     local ok, e = pcall(Net.get, job.url, opts)
-    f:close()
+    if not f:close() and ok then ok, e = false, "couldn't write to the SD card (is it full?)" end
+    -- An EPUB is a zip: it must start with a zip header and end with the zip
+    -- directory, or the download was cut short.
+    if ok and job.dest:lower():match("%.epub$") then
+        local chk = io.open(part, "rb")
+        local head = chk and chk:read(4)
+        local size = chk and chk:seek("end") or 0
+        local tail = ""
+        if chk then chk:seek("set", math.max(0, size - 65557)); tail = chk:read("*a") or ""; chk:close() end
+        if head ~= "PK\3\4" or not tail:find("PK\5\6", 1, true) then
+            ok, e = false, "the download was incomplete"
+        end
+    end
     if not ok then os.remove(part); error(e, 0) end
     os.remove(job.dest)
     if not os.rename(part, job.dest) then
@@ -51,7 +69,6 @@ end
 while true do
     local job = jobs:demand()
     if job.kind == "quit" then break end
-    cancel:clear()
     local ok, err = pcall(run, job)
     if not ok then
         out:push({ id = job.id, kind = "error", message = tostring(err):gsub("^[^:]*:%d+: ", "") })

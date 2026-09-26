@@ -37,14 +37,24 @@ local last_written = {}          -- file -> text, to skip writes that change not
 
 local function write_atomic(file, text)
     if last_written[file] == text then return true end
-    last_written[file] = text
     local tmp = file .. ".tmp"
     local f = io.open(tmp, "wb")
     if not f then return false end
-    f:write(text)
+    local ok = f:write(text)
     f:close()
-    os.remove(file)
-    return os.rename(tmp, file)
+    if not ok then os.remove(tmp); return false end
+    -- rename() replaces the old file in one step, so a power cut leaves either
+    -- the old file or the new one. (Remove first only if a rename over an
+    -- existing file isn't allowed.)
+    local renamed = os.rename(tmp, file)
+    if not renamed then
+        os.remove(file)
+        renamed = os.rename(tmp, file)
+    end
+    -- Remember it only once it's really on the card, so a failed write is
+    -- retried next time.
+    if renamed then last_written[file] = text end
+    return renamed
 end
 
 local function read_kv(file)
@@ -93,6 +103,18 @@ function M.load_settings()
         elseif type(def) == "boolean" then s[k] = v == "true"
         else s[k] = v end
     end
+    -- Values edited by hand (or from older versions) that aren't valid fall
+    -- back to the default.
+    local ENUMS = {
+        lib_sort = { recent = true, title = true, author = true, progress = true },
+        lid = { sleep = true, screen = true },
+        tap = { next = true, menu = true },
+        anim = { flip = true, fade = true, off = true },
+    }
+    for k, allowed in pairs(ENUMS) do
+        if allowed and not allowed[s[k]] then s[k] = DEFAULTS[k] end
+    end
+    s.read_cps = math.max(3, math.min(80, s.read_cps))
     -- The flipped grip was removed (the buttons end up under the wrong hand), so
     -- anyone who had it set goes back to the normal one.
     s.orient = "left"
