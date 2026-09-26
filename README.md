@@ -59,7 +59,7 @@ To make a tap open Settings instead, use **Settings → Tap**.
 - Library with covers and progress; your place in every book is saved
 - Text size, line spacing, margins and brightness settings
 - Customizable status bar: titles, chapter pages ("12 pages left" or "Page 3
-  of 15"), percent of the book left, a progress bar across both pages, and battery
+  of 15"), percent of the book read, a progress bar across both pages, and battery
 - 11 themes, including E-ink (grayscale, with paper grain), Night and Amber
 - 10 built-in fonts, plus your own
 - Only redraws when something changes, to save battery

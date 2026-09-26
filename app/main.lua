@@ -629,7 +629,7 @@ local function draw_reader_pages()
         info.pages_text = string.format("Page %d of %d", math.max(1, spread.pi - first + 1), math.max(1, last - first + 1))
     end
     if S.sb_percent then
-        info.percent_text = string.format("%d%% left in book", 100 - math.floor(frac * 100 + 0.5))
+        info.percent_text = string.format("%d%% read", math.floor(frac * 100 + 0.5))
     end
     if S.sb_bar == "book" then
         info.bar_frac = frac
