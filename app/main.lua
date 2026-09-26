@@ -14,6 +14,7 @@ local Backlight = require("backlight")
 local Fonts = require("fonts")
 local Touch = require("touch")
 local KeyProbe = require("keyprobe")
+local Battery = require("battery")
 local VERSION = require("version")
 
 local SCREEN_W, SCREEN_H = 1024, 768
@@ -349,7 +350,47 @@ end
 
 ---------------------------------------------------------------- menu
 
+-- Status bar option values, in cycling order.
+local SB = {
+    title = { "none", "book", "chapter", "both" },
+    pages = { "hide", "left", "of" },
+    bar = { "none", "chapter", "book" },
+    bar_size = { 1, 2, 3 },
+}
+local SB_NAMES = {
+    title = { none = "None", book = "Book", chapter = "Chapter", both = "Both" },
+    pages = { hide = "Hide", left = "Pages left", of = "Page X of Y" },
+    bar = { none = "None", chapter = "Chapter", book = "Book" },
+    bar_size = { [1] = "Thin", [2] = "Medium", [3] = "Thick" },
+}
+local BAR_PX = { 3, 6, 10 }
+
+local function cycle(list, cur, d)
+    local idx = 1
+    for k, v in ipairs(list) do if v == cur then idx = k end end
+    return list[(idx - 1 + d) % #list + 1]
+end
+
+local function status_items()
+    return {
+        { label = "Title", value = SB_NAMES.title[S.sb_title], adjust = function(d)
+            S.sb_title = cycle(SB.title, S.sb_title, d) end },
+        { label = "Chapter pages", value = SB_NAMES.pages[S.sb_pages], adjust = function(d)
+            S.sb_pages = cycle(SB.pages, S.sb_pages, d) end },
+        { label = "Book percentage", value = S.sb_percent and "Show" or "Hide", adjust = function()
+            S.sb_percent = not S.sb_percent end },
+        { label = "Progress bar", value = SB_NAMES.bar[S.sb_bar], adjust = function(d)
+            S.sb_bar = cycle(SB.bar, S.sb_bar, d) end },
+        { label = "Bar thickness", value = SB_NAMES.bar_size[S.sb_bar_size], adjust = function(d)
+            S.sb_bar_size = cycle(SB.bar_size, S.sb_bar_size, d) end },
+        { label = "Battery", value = Battery.get() and (S.sb_battery and "Show" or "Hide") or "n/a",
+          adjust = function() S.sb_battery = not S.sb_battery end },
+        { label = "Back", act = function() menu.page = "main"; menu.sel = menu.status_row or 1; menu.top = nil end },
+    }
+end
+
 local function menu_items()
+    if menu.page == "status" then return status_items() end
     local th = theme()
     return {
         { label = "Resume reading", act = function() app.mode = "reader" end },
@@ -404,8 +445,8 @@ local function menu_items()
         { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
             S.tap = S.tap == "next" and "menu" or "next"
         end },
-        { label = "Page info", value = S.chrome and "On" or "Off", adjust = function()
-            S.chrome = not S.chrome
+        { label = "Status bar", value = "›", act = function(self_idx)
+            menu.status_row = menu.sel; menu.page = "status"; menu.sel = 1; menu.top = nil
         end },
         { label = "Jump to % (" .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. ")", value = "", adjust = function(d)
             local f = book:fraction(pos.ch, pos.off) + d * 0.01
@@ -419,22 +460,6 @@ local function menu_items()
 end
 
 ---------------------------------------------------------------- drawing
-
-local function draw_header_footer(side, left_text, right_text)
-    if not S.chrome then return end
-    local th = theme()
-    local m = margins()
-    local x = side == "left" and m.outer or m.inner
-    local w = PAGE_W - m.outer - m.inner
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    if left_text then
-        love.graphics.printf(fit_text(ui.small, left_text, w), x, 26, w, side == "left" and "left" or "right")
-    end
-    if right_text then
-        love.graphics.printf(right_text, x, PAGE_H - 26 - ui.small:getHeight(), w, side == "left" and "left" or "right")
-    end
-end
 
 local function draw_page(page, side)
     local th = theme()
@@ -462,46 +487,143 @@ local function draw_page(page, side)
     end
 end
 
-local function draw_reader_pages()
-    local sec = current_section()
-    local sec_title = sec and book.toc[sec].title or ""
-    local frac = book:fraction(pos.ch, pos.off)
-    local left, right = spread.pages[spread.pi], spread.pages[spread.pi + 1]
-
-    -- pages left in this section
-    local left_info
-    local nxt = sec and book.toc[sec + 1] or (not sec and book.toc[1])
-    local remaining
-    if nxt and nxt.chapter == spread.ch then
-        local _, off = toc_pos(nxt)
-        remaining = Layout.find_page(spread.pages, off) - (spread.pi + 1)
-        if off > 0 and spread.pages[Layout.find_page(spread.pages, off)].off == off then
-            remaining = remaining - 1
-        end
-    else
-        remaining = #spread.pages - (spread.pi + 1)
-    end
-    if remaining and remaining > 0 then
-        left_info = remaining == 1 and "1 page left in chapter" or (remaining .. " pages left in chapter")
-    end
-
-    return function(side)
-        if side == "left" then
-            draw_page(left, "left")
-            draw_header_footer("left", book.title, left_info)
-        else
-            draw_page(right, "right")
-            draw_header_footer("right", sec_title, string.format("%d%%", math.floor(frac * 100 + 0.5)))
-        end
-    end
-end
-
 -- y for print() so a line of text looks vertically centered in a box.
 -- Uses the baseline and cap height rather than the font's line box, which
 -- includes descender space and makes text sit low.
 local function centered_y(font, size, top, height)
     local mid = font:getBaseline() - size * 0.34     -- visual middle of the text
     return math.floor(top + height / 2 - mid + 0.5)
+end
+
+-- Small battery icon with the percentage; returns its width. x is the left edge.
+local function draw_battery(x, y, b, measure)
+    local label = b.pct .. "%"
+    local bw, bh = 30, 15
+    local w = bw + 4 + 8 + ui.small:getWidth(label)
+    if measure then return w end
+    local th = theme()
+    local by = y + math.floor((ui.small:getHeight() - bh) / 2)
+    color(th.dim)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", x, by, bw, bh, 3, 3)
+    love.graphics.rectangle("fill", x + bw, by + 4, 3, bh - 8)
+    local fill = math.max(2, math.floor((bw - 6) * b.pct / 100))
+    love.graphics.rectangle("fill", x + 3, by + 3, fill, bh - 6, 1, 1)
+    if b.charging then
+        color(th.bg)
+        local cx, cy = x + bw / 2, by + bh / 2
+        love.graphics.polygon("fill", cx + 2, cy - 7, cx - 4, cy + 1, cx, cy + 1, cx - 2, cy + 7, cx + 4, cy - 1, cx, cy - 1)
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print(label, x + bw + 12, y)
+    return w
+end
+
+-- Status bar for one page. info: { book_title, chapter_title, pages_text,
+-- percent_text, bar_frac, battery }
+local function draw_status(side, info)
+    local th = theme()
+    local m = margins()
+    local outer_x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    local head_y, foot_y = 26, PAGE_H - 30 - ui.small:getHeight()
+    love.graphics.setFont(ui.small)
+
+    -- Battery sits by the hinge at the top of the right page.
+    local reserve = 0
+    if side == "right" and info.battery then
+        reserve = draw_battery(m.inner, head_y, info.battery) + 24
+    end
+
+    local t = S.sb_title
+    local title
+    if side == "left" and (t == "book" or t == "both") then title = info.book_title
+    elseif side == "right" and (t == "chapter" or t == "both") then title = info.chapter_title
+    elseif side == "right" and t == "book" then title = nil end
+    if title and title ~= "" then
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        local tw = w - reserve
+        love.graphics.printf(fit_text(ui.small, title, tw), outer_x + (side == "right" and reserve or 0), head_y,
+            tw, side == "left" and "left" or "right")
+    end
+
+    color(th.dim)
+    love.graphics.setFont(ui.small)
+    if side == "left" and info.pages_text then
+        love.graphics.printf(info.pages_text, outer_x, foot_y, w, "left")
+    elseif side == "right" and info.percent_text then
+        love.graphics.printf(info.percent_text, outer_x, foot_y, w, "right")
+    end
+
+    -- Progress bar: one continuous ribbon along the bottom of both pages.
+    if info.bar_frac then
+        local h = BAR_PX[S.sb_bar_size] or BAR_PX[2]
+        local y = PAGE_H - 10 - h
+        local x0 = side == "left" and m.outer or 0
+        local x1 = side == "left" and PAGE_W or PAGE_W - m.outer
+        local total = (PAGE_W - m.outer) * 2
+        local done = info.bar_frac * total
+        local here = side == "left" and done or done - (PAGE_W - m.outer)
+        color(th.dim, 0.25)
+        love.graphics.rectangle("fill", x0, y, x1 - x0, h)
+        if here > 0 then
+            color(th.fg, 0.75)
+            love.graphics.rectangle("fill", x0, y, math.min(x1 - x0, here), h)
+        end
+    end
+end
+
+local function draw_reader_pages()
+    local sec = current_section()
+    local frac = book:fraction(pos.ch, pos.off)
+    local left, right = spread.pages[spread.pi], spread.pages[spread.pi + 1]
+    local pages = spread.pages
+
+    -- The current section's page range within this chapter file.
+    local first, last = 1, #pages
+    local cur = sec and book.toc[sec]
+    if cur and cur.chapter == spread.ch then
+        local _, off = toc_pos(cur)
+        first = Layout.find_page(pages, off)
+    end
+    local nxt = sec and book.toc[sec + 1] or (not sec and book.toc[1])
+    if nxt and nxt.chapter == spread.ch then
+        local _, off = toc_pos(nxt)
+        local p = Layout.find_page(pages, off)
+        if pages[p].off == off and p > first then last = p - 1 else last = p end
+    end
+    local shown = math.min(spread.pi + 1, #pages)
+
+    local info = {
+        book_title = book.title,
+        chapter_title = cur and cur.title or "",
+        battery = S.sb_battery and Battery.get() or nil,
+    }
+    if S.sb_pages == "left" then
+        local remaining = last - shown
+        if remaining > 0 then
+            info.pages_text = remaining == 1 and "1 page left in chapter" or (remaining .. " pages left in chapter")
+        end
+    elseif S.sb_pages == "of" then
+        info.pages_text = string.format("Page %d of %d", math.max(1, spread.pi - first + 1), math.max(1, last - first + 1))
+    end
+    if S.sb_percent then info.percent_text = string.format("%d%%", math.floor(frac * 100 + 0.5)) end
+    if S.sb_bar == "book" then
+        info.bar_frac = frac
+    elseif S.sb_bar == "chapter" then
+        info.bar_frac = math.max(0, math.min(1, (shown - first + 1) / math.max(1, last - first + 1)))
+    end
+
+    return function(side)
+        if side == "left" then
+            draw_page(left, "left")
+        else
+            draw_page(right, "right")
+        end
+        draw_status(side, info)
+    end
 end
 
 local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
@@ -629,7 +751,7 @@ local function draw_menu_panel(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print("Settings", x, 60)
+    love.graphics.print(menu.page == "status" and "Status bar" or "Settings", x, 60)
     love.graphics.setFont(ui.small)
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, 78, w, "right")
@@ -777,7 +899,7 @@ local function render_canvases()
         love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
         love.graphics.origin()
         painter(side)
-        if app.mode == "menu" and side == "left" then
+        if app.mode == "menu" and side == "left" and menu.page ~= "status" then
             love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
             love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
         end
@@ -1075,7 +1197,7 @@ local function action(a)
         elseif a == "prev" or a == "left" or a == "up" then turn(-1, prev_spread)
         elseif a == "next_section" then jump_section(1)
         elseif a == "prev_section" then jump_section(-1)
-        elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1
+        elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil
         elseif a == "toc" and #book.toc > 0 then
             toc.sel = current_section() or 1; toc.top = nil; app.mode = "toc"
         end
@@ -1099,7 +1221,9 @@ local function action(a)
         elseif a == "confirm" then
             local it = items[menu.sel]
             if it.act then it.act() elseif it.adjust then it.adjust(1) end
-        elseif a == "back" or a == "menu" then app.mode = "reader" end
+        elseif a == "back" and menu.page == "status" then
+            menu.page = "main"; menu.sel = menu.status_row or 1; menu.top = nil
+        elseif a == "back" or a == "menu" then app.mode = "reader"; menu.page = "main" end
         Store.save_settings(S)
         redraw()
         return
@@ -1132,7 +1256,7 @@ local function action(a)
             elseif a == "down" or a == "right" or a == "next" then library.sel = math.min(n, library.sel + 1)
             elseif a == "confirm" then open_book(library.items[library.sel].path) end
         end
-        if a == "menu" and book then app.mode = "menu"; menu.sel = 1 end
+        if a == "menu" and book then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil end
         if a == "back" and book then app.mode = "reader" end
         redraw()
     end
@@ -1292,6 +1416,11 @@ function love.load()
 
     print("[reader] eReaderDS v" .. VERSION)
     S = Store.load_settings()
+    if S.chrome == false then
+        -- "Page info: Off" from older versions: hide the status bar text.
+        S.sb_title, S.sb_pages, S.sb_percent = "none", "hide", false
+        S.chrome = true
+    end
     local n = tonumber(S.theme)
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
     Touch.open("gt9xx-0")

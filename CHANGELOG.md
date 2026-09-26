@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Status bar settings** (Settings → Status bar, replacing Page info), with a
+  live preview: title (none, book, chapter or both); chapter pages (hide,
+  pages left, or page X of Y); book percentage; a progress bar for the chapter
+  or book that runs across both pages, in three thicknesses; and battery level.
+
 ## v0.2.6
 
 - The analog stick turns pages in all four directions again, like the D-pad
