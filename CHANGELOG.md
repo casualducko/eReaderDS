@@ -1,15 +1,15 @@
 # Changelog
 
-## Unreleased
+## v0.2.4
 
-- Pressing the analog stick in selects (like A) instead of opening Settings.
+- **Font previews:** the Font setting shows each font's name in that font.
+  This also fixes fonts with non-Latin names (such as the Chinese-named fonts
+  built into the firmware), which showed as empty boxes.
+- **Analog stick:** pressing it in selects (like A) instead of opening
+  Settings. While reading, only left/right (as held) turn pages; up/down as
+  held no longer flips pages. It still moves through menus.
 - The log now lists the device's input devices and each raw key press, to
   help identify buttons.
-- While reading, the analog stick turns pages only with left/right (as held);
-  up/down as held no longer flips pages. It still moves through menus.
-- The Font setting shows each font's name in that font, as a preview. This
-  also fixes fonts with non-Latin names (such as the Chinese-named fonts built
-  into the firmware), which showed as empty boxes.
 
 ## v0.2.3
 
