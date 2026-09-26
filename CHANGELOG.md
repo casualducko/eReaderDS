@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.2.7
 
+- The chapter progress bar is on by default (Settings → Status bar →
+  Progress bar).
 - The book percentage reads "45% read".
 - Status bar layout: the battery sits in the top outer corner of the right
   page, and with Title set to Chapter the chapter name shows at the top of the

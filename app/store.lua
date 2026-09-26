@@ -8,7 +8,7 @@ local DEFAULTS = {
     tap = "next",      -- what a tap on the touchscreen does while reading: "menu" | "next"
     -- status bar
     sb_title = "both", sb_pages = "left", sb_percent = true,
-    sb_bar = "none", sb_bar_size = 2, sb_battery = true,
+    sb_bar = "chapter", sb_bar_size = 2, sb_battery = true,
     brightness = -1,   -- percent; -1 = leave the system setting alone
 }
 
