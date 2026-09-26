@@ -628,11 +628,26 @@ function look.layout()
         blocks[#blocks + 1] = { kind = "text", heading = 1, off = 0,
             runs = { { text = r.word, i = false, b = true, off = 0 } } }
         local body
+        -- Symbols the reading fonts lack (small squares used as bullets).
+        local text = r.text:gsub("\226\150[\170\171\160\161]", "•")
+        -- Some entries are huge (a big dictionary's "run" is 600 KB): show
+        -- the start, cut at a paragraph so the markup stays whole.
+        local LIMIT = 16000
+        local cut = #text > LIMIT
+        if cut then
+            local last
+            for pos in text:sub(1, LIMIT):gmatch("()</[pP]>") do last = pos end
+            if not last then
+                for pos in text:sub(1, LIMIT):gmatch("()</blockquote>") do last = pos end
+            end
+            text = text:sub(1, last and last - 1 or LIMIT):gsub("<[^>]*$", "")
+        end
         if r.type == "h" or r.type == "g" or r.type == "x" then
-            body = Book.parse_html("<body>" .. r.text .. "</body>", "", {})
+            if cut then text = text .. "<p><i>(The rest of this entry is too long to show.)</i></p>" end
+            body = Book.parse_html("<body>" .. text .. "</body>", "", {})
         else
             body = {}
-            for para in (r.text .. "\n"):gmatch("([^\n]*)\n") do
+            for para in (text .. "\n"):gmatch("([^\n]*)\n") do
                 if para:find("%S") then
                     body[#body + 1] = { kind = "text", off = 0, runs = { { text = para, i = false, b = false, off = 0 } } }
                 end

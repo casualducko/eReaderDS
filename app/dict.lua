@@ -123,7 +123,8 @@ local function load_dict(ifo_path)
     for k, v in ifo:gmatch("([%w_]+)=([^\r\n]*)") do info[k] = v end
     local base = ifo_path:gsub("%.ifo$", "")
     local d = { name = info.bookname or base:match("[^/]+$"), base = base,
-        type = info.sametypesequence, loaded = false }
+        type = info.sametypesequence, loaded = false,
+        words = info.wordcount, idxsize = info.idxfilesize }
     return d
 end
 
@@ -179,13 +180,19 @@ function M.scan(dirs)
     local list = {}
     local seen = {}
     for _, dir in ipairs(dirs) do
-        local p = io.popen('find "' .. dir .. '" -maxdepth 3 -name "*.ifo" 2>/dev/null | sort')
+        local p = io.popen('find -L "' .. dir .. '" -maxdepth 3 -name "*.ifo" 2>/dev/null | sort')
         if p then
             for path in p:lines() do
                 if not seen[path] then
                     seen[path] = true
                     local d = load_dict(path)
-                    if d then list[#list + 1] = d end
+                    -- The same dictionary copied twice (e.g. a folder inside
+                    -- a folder) only counts once.
+                    local key = d and (d.name .. "|" .. (d.words or "") .. "|" .. (d.idxsize or ""))
+                    if d and not seen[key] then
+                        seen[key] = true
+                        list[#list + 1] = d
+                    end
                 end
             end
             p:close()
