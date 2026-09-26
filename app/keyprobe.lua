@@ -71,7 +71,7 @@ function M.poll()
                     print(string.format("[evdev] %q switch %d = %d", d.name, e.code, e.value))
                     any = true
                 elseif e.type == EV_KEY and e.value == 1 then
-                    print(string.format("[evdev] %q key %d", d.name, e.code))
+                    if logged < LIMIT then print(string.format("[evdev] %q key %d", d.name, e.code)) end
                     if M.handler then M.handler(d.name, e.code) end
                     logged = logged + 1
                     any = true

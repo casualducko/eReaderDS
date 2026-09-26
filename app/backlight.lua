@@ -61,6 +61,26 @@ function M.set(pct)
     end
 end
 
+-- Turn the screens' backlights off or back on (for the lid). Uses bl_power when
+-- the driver has it (4 = powered down), otherwise brightness 0; `pct` restores.
+function M.power(on, pct)
+    for _, d in ipairs(devices or scan()) do
+        local f = io.open(d.dir .. "/bl_power", "w")
+        if f then
+            f:write(on and "0" or "4")
+            f:close()
+        end
+    end
+    if on then
+        if pct then M.set(pct) end
+    else
+        for _, d in ipairs(devices or scan()) do
+            local f = io.open(d.dir .. "/brightness", "w")
+            if f then f:write("0"); f:close() end
+        end
+    end
+end
+
 -- Step to the next level up (dir = 1) or down (dir = -1) from pct.
 function M.step(pct, dir)
     local L = M.LEVELS

@@ -545,6 +545,9 @@ local function menu_items()
                       Backlight.set(S.brightness)
                   end
               end },
+            { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
+                S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
+            end },
         }),
         section("Page turns", {
             { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
@@ -845,8 +848,8 @@ end
 -- Settings list geometry. Items are grouped under small section headers;
 -- item rows shrink (down to a minimum) so everything fits, and if it still
 -- doesn't, the list scrolls with the selection.
-local MENU_TOP, MENU_BOTTOM = 124, PAGE_H - 78
-local MENU_ROW_MAX, MENU_ROW_MIN = 52, 40
+local MENU_TOP, MENU_BOTTOM = 120, PAGE_H - 78
+local MENU_ROW_MAX, MENU_ROW_MIN = 52, 38
 local MENU_HEADER_H, MENU_GAP_H = 30, 10
 
 -- Returns the visible rows ({ kind = "item"|"header"|"gap", y, h, idx, text })
@@ -1381,6 +1384,66 @@ end
 
 ---------------------------------------------------------------- input
 
+---------------------------------------------------------------- lid
+
+-- The RG DS Plus reports its lid through the power-key device: key 110 when it
+-- closes, 111 when it opens. The firmware only sleeps for its own apps, so the
+-- reader does it: save, screens off, then suspend (or just screens off).
+local LID_DEVICE, LID_CLOSE, LID_OPEN = "rk805 pwrkey", 110, 111
+local RESLEEP_AFTER = 5              -- seconds awake with the lid still closed
+local lid = { closed = false }
+
+local function suspend()
+    -- Blocks until the device wakes up again.
+    print("[lid] suspending")
+    local f = io.open("/sys/power/state", "w")
+    if not f then print("[lid] cannot open /sys/power/state"); return false end
+    f:setvbuf("no")                         -- write now, so errors show up here
+    local ok, err = f:write("mem")
+    f:close()
+    if not ok then print("[lid] suspend refused: " .. tostring(err)); return false end
+    print("[lid] woke up")
+    return true
+end
+
+local function lid_closed()
+    if lid.closed then return end
+    lid.closed = true
+    save_progress()
+    Store.save_settings(S)
+    Store.flush()
+    lid.pct = S.brightness >= 0 and S.brightness or Backlight.get() or 50
+    Backlight.power(false)
+    lid.since = love.timer.getTime()
+    if S.lid == "sleep" then
+        if not suspend() then S.lid_failed = true end
+        lid.since = love.timer.getTime()
+    end
+end
+
+local function lid_opened()
+    if not lid.closed then return end
+    lid.closed = false
+    Backlight.power(true, lid.pct)
+    redraw()
+end
+
+-- Called by the main loop while the lid is closed and the device is awake
+-- (e.g. woken by something else): go back to sleep after a few seconds.
+local function lid_tick()
+    if lid.closed and S.lid == "sleep" and not S.lid_failed
+        and love.timer.getTime() - lid.since > RESLEEP_AFTER then
+        suspend()
+        lid.since = love.timer.getTime()
+    end
+end
+
+function app.on_raw_key(device, code)
+    if device ~= LID_DEVICE then return end
+    if code == LID_CLOSE then lid_closed()
+    elseif code == LID_OPEN then lid_opened() end
+end
+
 -- Input logging for identifying buttons: the first presses of each session go
 -- to log.txt, then it stops, so reading doesn't keep writing to the SD card.
 local INPUT_LOG_LIMIT = 40
@@ -1399,6 +1462,7 @@ local ROTATE = {
 }
 
 local function action(a)
+    if lid.closed then return end         -- pocket presses while the lid is shut
     local mode = app.mode
     if a == "quit" then love.event.quit() return end
 
@@ -1642,7 +1706,7 @@ function love.load()
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
     Timezone.apply(S.tz)
     Touch.open("gt9xx-0")
-    KeyProbe.open(nil, "gt9xx-0")
+    KeyProbe.open(function(device, code) app.on_raw_key(device, code) end, "gt9xx-0")
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
@@ -1698,7 +1762,9 @@ local function run_test_script()
         for a in script:gmatch("[^,]+") do
             local dir = a:match("^dp(%a+)$")
             local sa, sv = a:match("^stick:(%a):([%-%d.]+)$")
-            if dir then dpad(dir)
+            if a == "lid:close" or a == "lid:open" then
+                app.on_raw_key(LID_DEVICE, a == "lid:close" and LID_CLOSE or LID_OPEN)
+            elseif dir then dpad(dir)
             elseif sa then stick_axis(sa, tonumber(sv))
             else action(a) end
         end
@@ -1738,7 +1804,7 @@ function love.run()
     love.load(love.arg.parseGameArguments(arg), arg)
     run_test_script()
     return function()
-        if (app.dirty or app.anim) and love.graphics.isActive() then
+        if (app.dirty or app.anim) and love.graphics.isActive() and not lid.closed then
             app.dirty = false
             love.graphics.origin()
             love.draw()
@@ -1762,10 +1828,14 @@ function love.run()
             local r = handle(name, a, b, c, d, e, f)
             if r then return r end
         end
-        if Touch.enabled and Touch.poll(touch_event) then got = true end
+        if Touch.enabled and Touch.poll(lid.closed and function() end or touch_event) then got = true end
         if KeyProbe.enabled and KeyProbe.poll() then got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
         if save_due and love.timer.getTime() >= save_due then save_progress() end
+        if lid.closed then
+            lid_tick()
+            love.timer.sleep(0.25)              -- screens are off: check rarely
+        end
         if S.sb_show and S.sb_clock ~= "off" and (app.mode == "reader" or app.mode == "menu") then
             local minute = os.date("%H%M")
             if minute ~= app.clock_minute then app.clock_minute = minute; redraw() end

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Closing the lid** now sleeps the device while eReaderDS is open: it saves
+  your place, turns the screens off and suspends; opening the lid wakes it on
+  the same page. Settings → Closing the lid can switch to "Screen off" (screens
+  off without suspending) if sleep misbehaves. Buttons and touches are
+  ignored while the lid is closed.
+
 ## v0.2.9
 
 - Even top and bottom margins: the space left under the last line is now split
