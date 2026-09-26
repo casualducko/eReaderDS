@@ -6,6 +6,7 @@ local DEFAULTS = {
     font = "Gentium Book Plus", font_size = 32, spacing = 1.15, margins = 2, vmargins = 2, justify = true,
     hyphenate = false, -- English books only (the patterns are US English)
     lib_sort = "recent", -- library order: "recent" | "title" | "author" | "progress"
+    dict = "all",      -- dictionary for look-ups: "all" or a dictionary's name
     theme = "Paper", chrome = true, orient = "left", anim = "flip",
     tap = "next",      -- what a tap on the touchscreen does while reading: "menu" | "next"
     -- status bar

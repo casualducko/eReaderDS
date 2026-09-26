@@ -7,7 +7,8 @@
   by word and up/down line by line across both pages, and the definition shows
   on the other page. Finds base forms ("ran" → run, "mice" → mouse) and joins
   words split by hyphenation. An English dictionary (WordNet 3.1) is built in;
-  add StarDict dictionaries to `Ebook/Dictionaries`. **Y no longer opens
+  add StarDict dictionaries to `Ebook/Dictionaries`, and pick one (or All) in
+  Settings → Page turns & device → Dictionary. **Y no longer opens
   Contents**; it's in Settings.
 - **Settings fits on one screen.** Contents, Bookmarks, Jump to % and
   Library, then **Text** (font, size, spacing, justify, hyphenation) and

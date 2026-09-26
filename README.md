@@ -117,7 +117,8 @@ An English dictionary (WordNet) is built in. To add others (other languages,
 bigger dictionaries), copy **StarDict** dictionaries into `Ebook/Dictionaries`
 on the SD card, each as its `.ifo`, `.idx` and `.dict` or `.dict.dz` files
 (plus `.syn` if there is one). They're the same files KOReader uses.
-Definitions from every dictionary that has the word are shown, yours first.
+Definitions from every dictionary that has the word are shown, yours first;
+to use just one, pick it in **Settings → Page turns & device → Dictionary**.
 
 ## Getting books over Wi-Fi
 

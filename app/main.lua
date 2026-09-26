@@ -607,7 +607,7 @@ function look.find()
     end
     look.results, look.word = {}, look.dict.clean(w.text)
     for _, t in ipairs(tries) do
-        local r = look.dict.lookup(t)
+        local r = look.dict.lookup(t, look.only())
         if #r > 0 then look.results, look.word = r, look.dict.clean(t); break end
     end
     look.page = 1
@@ -666,13 +666,24 @@ function look.layout()
     return look.pages
 end
 
+-- Find dictionaries (once): Ebook/Dictionaries first, then the built-in one.
+function look.scan()
+    if look.dict.list then return look.dict.list end
+    local dirs = {}
+    for _, d in ipairs(Store.book_dirs()) do dirs[#dirs + 1] = d .. "/Dictionaries" end
+    dirs[#dirs + 1] = love.filesystem.getSource() .. "/dict"
+    return look.dict.scan(dirs)
+end
+
+-- The dictionary chosen in Settings (nil = all of them).
+function look.only()
+    if S.dict == "all" then return nil end
+    for _, d in ipairs(look.scan()) do if d.name == S.dict then return d.name end end
+    return nil                              -- it's been removed: use all
+end
+
 function look.open(word)
-    if not look.dict.list then
-        local dirs = {}
-        for _, d in ipairs(Store.book_dirs()) do dirs[#dirs + 1] = d .. "/Dictionaries" end
-        dirs[#dirs + 1] = love.filesystem.getSource() .. "/dict"
-        look.dict.scan(dirs)
-    end
+    look.scan()
     look.words = look.collect()
     if #look.words == 0 then app.toast("No words on these pages"); return end
     look.sel = 1
@@ -1297,6 +1308,13 @@ local function more_items()
               adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
             { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
                 S.tap = S.tap == "next" and "menu" or "next"
+            end },
+        }),
+        section("Look up", {
+            { label = "Dictionary", value = look.only() or "All", adjust = function(d)
+                local names = { "all" }
+                for _, x in ipairs(look.scan()) do names[#names + 1] = x.name end
+                S.dict = cycle(names, look.only() or "all", d)
             end },
         }),
         section("Device", {

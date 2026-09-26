@@ -244,12 +244,12 @@ end
 
 -- Look a word up in every dictionary. Returns a list of
 -- { dict = name, word = headword, text = definition, type = "h"|"m"|... }.
-function M.lookup(word)
+function M.lookup(word, only)
     word = M.clean(word)
     if word == "" then return {} end
     local results = {}
     for _, d in ipairs(M.list or {}) do
-        if ensure(d) then
+        if (not only or d.name == only) and ensure(d) then
             -- The word as written (if it's an entry), then its base form
             -- ("running": the adjective, then the verb "run").
             local found, exact_done, base_done = {}, false, false
