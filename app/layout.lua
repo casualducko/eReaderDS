@@ -102,6 +102,9 @@ function M.paginate(chapter, ctx)
                     words[#words + 1] = { br = true, off = run.off }
                 else
                     local t, font = run.text, font_for(run.i, run.b)
+                    -- Superscripts (mostly note numbers): smaller and raised.
+                    local rise = 0
+                    if run.sup and F.sup and not big then font, rise = F.sup, math.floor(size * 0.38) end
                     local i, n = 1, #t
                     while i <= n do
                         local a, b = t:find(" +", i)
@@ -112,7 +115,7 @@ function M.paginate(chapter, ctx)
                             local frag = sanitize(t:sub(i, e))
                             local fw = font:getWidth(frag)
                             if not cur then cur = { frags = {}, w = 0, off = run.off + i - 1 } end
-                            cur.frags[#cur.frags + 1] = { text = frag, font = font, w = fw }
+                            cur.frags[#cur.frags + 1] = { text = frag, font = font, w = fw, link = run.link, rise = rise }
                             cur.w = cur.w + fw
                             i = e + 1
                         end
@@ -160,8 +163,13 @@ function M.paginate(chapter, ctx)
                     local ty = y + math.floor((lh - (big and F.h or F.r):getHeight()) / 2)
                     for k, wd in ipairs(line) do
                         for _, fr in ipairs(wd.frags) do
-                            page.items[#page.items + 1] = { kind = "text", x = math.floor(x + 0.5), y = ty,
-                                text = fr.text, font = fr.font }
+                            -- Line up baselines (a smaller font has a shorter ascent), then raise.
+                            local by = ty
+                            if fr.font ~= (big and F.h or F.r) then
+                                by = ty + (big and F.h or F.r):getBaseline() - fr.font:getBaseline() - (fr.rise or 0)
+                            end
+                            page.items[#page.items + 1] = { kind = "text", x = math.floor(x + 0.5), y = math.floor(by),
+                                text = fr.text, font = fr.font, link = fr.link }
                             x = x + fr.w
                         end
                         if k < #line then x = x + gap end
@@ -185,8 +193,8 @@ function M.paginate(chapter, ctx)
                     if not best then return nil end
                     local rest = fr.text:sub(best.at + 1)
                     local rw = fr.font:getWidth(rest)
-                    return { frags = { { text = best.text, font = fr.font, w = best.w } }, w = best.w, off = wd.off },
-                        { frags = { { text = rest, font = fr.font, w = rw } }, w = rw, off = wd.off + best.at }
+                    return { frags = { { text = best.text, font = fr.font, w = best.w, link = fr.link, rise = fr.rise } }, w = best.w, off = wd.off },
+                        { frags = { { text = rest, font = fr.font, w = rw, link = fr.link, rise = fr.rise } }, w = rw, off = wd.off + best.at }
                 end
 
                 local hyphen_run = 0      -- consecutive lines ending in a hyphen

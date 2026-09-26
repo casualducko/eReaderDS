@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Footnotes on the facing page.** Press A while reading (or tap a note
+  number on the bottom screen): the note number is outlined and its note
+  appears on the other page, so the text never moves. Left/right steps through
+  the notes on the spread, up/down pages through a long note, and B closes.
+  Works with EPUB 3 footnotes and endnotes and the numbered notes in older
+  books (e.g. Project Gutenberg). EPUB 3 pop-up footnotes no longer appear in
+  the middle of the text, and note numbers are drawn as small superscripts.
 - The L/R and L2/R2 shoulder buttons no longer do anything. Pages turn with the
   D-pad, stick or touch; values change with left/right; chapters are
   reached from Contents.

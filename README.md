@@ -37,7 +37,7 @@ buttons are under your right hand. Directions below are as you hold it.
 | Button | Reading | Menus |
 |---|---|---|
 | D-pad | Turn pages (right/down forward, left/up back) | Up/down move; left/right change a value (or move, on rows without one) |
-| A | | Select |
+| A | Show the notes on these pages | Select |
 | Press the stick in | Settings | Select |
 | B | Settings (or go back after a jump) | Back |
 | Select | Bookmark this page (again to remove) | Close (in the library: Get books) |
@@ -49,7 +49,8 @@ The **analog stick** works like the D-pad.
 
 **Touch** (bottom screen): swipe left/right to turn pages, and slide up/down
 for brightness (keep sliding below 1% for Extra dim). Tapping the right or left half turns pages forward or back, and tapping the
-top-right corner bookmarks the page.
+top-right corner bookmarks the page. Tapping a note number shows the note on
+the left page.
 To make a tap open Settings instead, use **Settings → Tap**.
 
 ## Features
@@ -61,6 +62,9 @@ To make a tap open Settings instead, use **Settings → Tap**.
 - Library with covers and progress, sorted by recent, title, author or
   progress (D-pad left/right); your place in every book is saved
 - Delete books from the library (Y, then A to confirm)
+- Footnotes on the facing page: press A (or tap a note number) and the note
+  appears on the other page while the text stays put; left/right steps
+  through the notes on the spread
 - Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
   from Settings → Bookmarks
 - Text size, line spacing, margins and brightness settings

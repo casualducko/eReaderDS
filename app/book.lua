@@ -92,6 +92,7 @@ local function style_props(body)
     local ta = body:match("text%-align%s*:%s*([%w%-]+)")
     if ta == "center" then p.center = true elseif ta then p.center = false end
     if body:match("display%s*:%s*none") then p.hidden = true end
+    if body:match("vertical%-align%s*:%s*super") then p.sup = true end
     return p
 end
 
@@ -125,7 +126,7 @@ local SKIP = { head = true, script = true, style = true, title = true }
 local VOID = { br = true, hr = true, img = true, image = true, meta = true, link = true,
     input = true, col = true, area = true, base = true, wbr = true, source = true }
 
-local function parse_html(html, base, classes)
+local function parse_html(html, base, classes, show_notes)
     local blocks, anchors = {}, {}
     local off = 0
     local stack = {}          -- open elements with their style
@@ -173,10 +174,10 @@ local function parse_html(html, base, classes)
         local s = style()
         local runs = cur.runs
         local last = runs[#runs]
-        if last and not last.br and last.i == s.i and last.b == s.b then
+        if last and not last.br and last.i == s.i and last.b == s.b and last.link == s.link and last.sup == s.sup then
             last.text = last.text .. t
         else
-            runs[#runs + 1] = { text = t, i = s.i, b = s.b, off = off }
+            runs[#runs + 1] = { text = t, i = s.i, b = s.b, off = off, link = s.link, sup = s.sup }
         end
         off = off + #t
     end
@@ -184,7 +185,8 @@ local function parse_html(html, base, classes)
     local function push(name, tag)
         local parent = style()
         local s = { name = name, i = parent.i, b = parent.b, center = parent.center,
-            heading = parent.heading, list = parent.list, hidden = parent.hidden }
+            heading = parent.heading, list = parent.list, hidden = parent.hidden,
+            link = parent.link, sup = parent.sup }
         if name == "i" or name == "em" or name == "cite" or name == "var" or name == "dfn" then s.i = true end
         if name == "b" or name == "strong" then s.b = true end
         if name == "center" then s.center = true end
@@ -196,6 +198,25 @@ local function parse_html(html, base, classes)
             s.center = true
         end
         if name == "li" then s.list = true end
+        if name == "sup" then s.sup = true end
+        if name == "a" then
+            local href = attr(tag, "href")
+            if href and not href:match("^%a[%w+.-]*:") then        -- in-book links only
+                local file = href:sub(1, 1) == "#" and base or resolve(base, href)
+                local frag = href:match("#(.+)$")
+                local kind = (attr(tag, "epub:type") or "") .. " " .. (attr(tag, "role") or "")
+                s.link = { target = frag and (file .. "#" .. urldecode(frag)) or file,
+                    noteref = kind:find("noteref") ~= nil, sup = parent.sup }
+                if s.link.noteref then s.sup = true end        -- note numbers are superscript
+            end
+        end
+        -- EPUB 3 footnotes are shown on the other page, not in the text.
+        if name == "aside" then
+            local kind = (attr(tag, "epub:type") or "") .. " " .. (attr(tag, "role") or "")
+            if not show_notes and (kind:find("footnote") or kind:find("endnote") or kind:find("rearnote")) then
+                s.hidden = true
+            end
+        end
         local cls = attr(tag, "class")
         if cls then
             for c in cls:gmatch("%S+") do
@@ -272,7 +293,7 @@ local function parse_html(html, base, classes)
                         if not VOID[name] and not selfclose then
                             local s = push(name, tag)
                             if s.hidden then skipping = skipping + 1; s.skip = true end
-                            if BLOCK[name] and (name == "p" or name:match("^h%d$") or name == "li") then
+                            if skipping == 0 and BLOCK[name] and (name == "p" or name:match("^h%d$") or name == "li") then
                                 ensure_block()
                                 cur.explicit = true
                             end
@@ -495,6 +516,100 @@ function Book:locate(frac)
         end
     end
     return 1, 0
+end
+
+-- The text of a footnote: the element a link points to ("file#id"), or the
+-- paragraph (list item, aside...) around it when the id is on a small inline
+-- anchor. Returns blocks like a chapter's, or nil.
+local NOTE_BLOCKS = { p = true, li = true, aside = true, div = true, dd = true, dt = true,
+    section = true, blockquote = true, td = true, span = false }
+-- The raw HTML of a file and the position of the tag with id `frag`.
+function Book:find_id(file, frag)
+    if not self.zip then return nil end
+    if self.html_cache and self.html_cache.file == file then
+    else
+        self.html_cache = { file = file, html = self.zip:read(file) }
+    end
+    local html = self.html_cache.html
+    if not html then return nil end
+    local esc = frag:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+    local at = html:find("[%s]id%s*=%s*[\"']" .. esc .. "[\"']")
+    if not at then return nil end
+    for i = at, 1, -1 do
+        if html:byte(i) == 60 then return html, i end              -- "<"
+    end
+end
+
+-- Whether a link points back at a link (a note's "return to text" link),
+-- rather than at a note.
+function Book:is_backlink(target)
+    local file, frag = target:match("^(.-)#(.+)$")
+    if not file then return false end
+    local html, lt = self:find_id(file, frag)
+    if not html then return false end
+    local tag = html:match("^<[^>]*>", lt) or ""
+    return tag:match("^<[%w]*:?a[%s>]") ~= nil and attr(tag, "href") ~= nil
+end
+
+function Book:note(target)
+    local file, frag = target:match("^(.-)#(.+)$")
+    if not file then return nil end
+    local html, lt = self:find_id(file, frag)
+    if not html then return nil end
+    local name = (html:match("^<([%w:%-]+)", lt) or ""):lower():gsub("^.*:", "")
+    if not NOTE_BLOCKS[name] then
+        -- An inline anchor: use the nearest block that starts before it.
+        local best, best_name
+        for _, b in ipairs({ "p", "li", "aside", "div", "dd", "section", "blockquote" }) do
+            local from = 1
+            while true do
+                local s = html:find("<" .. b .. "[%s>]", from)
+                if not s or s > lt then break end
+                if not best or s > best then best, best_name = s, b end
+                from = s + 1
+            end
+        end
+        if not best then return nil end
+        lt, name = best, best_name
+    end
+    -- The end of that element (same-name tags may nest, e.g. div in div).
+    local depth, pos, stop = 0, lt, nil
+    while true do
+        local s, e, close = html:find("<(/?)" .. name .. "[%s/>]", pos)
+        if not s then break end
+        local tag_end = html:find(">", s, true) or e
+        if close == "/" then
+            depth = depth - 1
+            if depth == 0 then stop = tag_end; break end
+        elseif html:sub(tag_end - 1, tag_end) ~= "/>" then
+            depth = depth + 1
+        end
+        pos = tag_end + 1
+    end
+    local snippet = html:sub(lt, stop or math.min(#html, lt + 4000))
+    if #snippet > 12000 then snippet = snippet:sub(1, 12000) end
+    local blocks = parse_html("<body>" .. snippet .. "</body>", file, self.classes, true)
+    local out = {}
+    for _, b in ipairs(blocks) do
+        if b.kind == "text" then
+            b.list, b.center, b.heading = nil, nil, 0
+            -- Drop "back to the text" links (↩, ↑, ^, "Back").
+            local runs = {}
+            for _, r in ipairs(b.runs) do
+                local t = r.text and r.text:gsub("%s", "") or ""
+                if not (r.link and (t == "" or t:match("^[\226\128-\191%^]+$") or t:lower() == "back"
+                        or t:lower() == "return")) then
+                    runs[#runs + 1] = r
+                end
+            end
+            b.runs = runs
+            if #runs > 0 then out[#out + 1] = b end
+        elseif b.kind ~= "blank" then
+            out[#out + 1] = b
+        end
+    end
+    if #out == 0 then return nil end
+    return out
 end
 
 function Book:read_resource(p)

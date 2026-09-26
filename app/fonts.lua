@@ -271,6 +271,7 @@ function M.load(name, size)
             b = new_font(f.b, size),
             bi = new_font(f.bi, size),
             h = new_font(f.b, math.floor(size * 1.45)),
+            sup = new_font(f.r, math.floor(size * 0.65)),      -- superscripts (note numbers)
         }
     end
     local ok, res = pcall(load_family, fam)
@@ -280,7 +281,8 @@ function M.load(name, size)
     ok, res = pcall(load_family, def)
     if ok then return res, def.name end
     local f = love.graphics.newFont(size)
-    return { r = f, i = f, b = f, bi = f, h = love.graphics.newFont(math.floor(size * 1.45)) }, "Default"
+    return { r = f, i = f, b = f, bi = f, h = love.graphics.newFont(math.floor(size * 1.45)),
+        sup = love.graphics.newFont(math.floor(size * 0.65)) }, "Default"
 end
 
 return M

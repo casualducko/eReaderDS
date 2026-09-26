@@ -430,6 +430,102 @@ local function jump_section(dir)
     end
 end
 
+---------------------------------------------------------------- footnotes
+
+-- A (or tapping a note number) shows the notes referenced on this spread,
+-- one at a time, on the facing page, so the text never moves. Functions live
+-- on the table to stay under Lua's local-variable limit.
+local note = { refs = {}, sel = 1, page = 1, cache = {} }
+
+-- Which links are note references: marked as such (EPUB 3), or short markers
+-- like "1", "[12]", "*", "†" or "[a]" (Gutenberg and most older books).
+function note.is_ref(link, text)
+    if link.noteref then return true end
+    if not link.target:find("#") then return false end
+    local t = text:gsub("%s", "")
+    return t:match("^%[?%(?%d+%)?%]?%.?$") ~= nil
+        or t:match("^%[?[%*\226\194]+[\128-\191]*%]?$") ~= nil      -- * † ‡ § ¶
+        or t:match("^%[%a%]$") ~= nil
+        or (link.sup and #t <= 4)
+end
+
+-- Note references on the visible spread, in reading order, with their boxes
+-- in page coordinates.
+function note.collect()
+    local refs, by_link = {}, {}
+    local m = margins()
+    local oy = text_top()
+    for k, side in ipairs({ "left", "right" }) do
+        local page = spread.pages[spread.pi + k - 1]
+        local ox = side == "left" and m.outer or m.inner
+        for _, it in ipairs(page and page.items or {}) do
+            if it.kind == "text" and it.link then
+                local x, y = ox + it.x, oy + it.y
+                local w, h = it.font:getWidth(it.text), it.font:getHeight()
+                local r = by_link[it.link]
+                if r and r.side == side then
+                    r.text = r.text .. it.text
+                    r.x2, r.y2 = math.max(r.x2, x + w), math.max(r.y2, y + h)
+                elseif not r then
+                    r = { link = it.link, side = side, text = it.text, x = x, y = y, x2 = x + w, y2 = y + h }
+                    by_link[it.link] = r
+                    refs[#refs + 1] = r
+                end
+            end
+        end
+    end
+    local out = {}
+    for _, r in ipairs(refs) do
+        if note.is_ref(r.link, r.text) and not book:is_backlink(r.link.target) then out[#out + 1] = r end
+    end
+    return out
+end
+
+-- The selected note laid out as pages (cached per target).
+function note.pages(r)
+    local key = r.link.target .. "|" .. S.font_size .. "|" .. S.font .. "|" .. S.spacing .. "|" .. S.margins
+    local p = note.cache[key]
+    if p == nil then
+        local blocks = book:note(r.link.target)
+        if blocks then
+            local w, h = content_size()
+            p = Layout.paginate({ blocks = blocks }, {
+                fonts = fonts, size = S.font_size, w = w, h = h - 60, spacing = S.spacing,
+                justify = S.justify, indent = false, image_size = get_image_size,
+            })
+        else
+            p = false
+        end
+        note.cache = { [key] = p }         -- one note at a time is plenty
+    end
+    return p or nil
+end
+
+-- Open note mode (at a given ref, or the first on the spread).
+function note.open(ref)
+    note.refs = note.collect()
+    if #note.refs == 0 then
+        app.toast("No notes on these pages")
+        return
+    end
+    note.sel, note.page = 1, 1
+    for i, r in ipairs(note.refs) do
+        if ref and r.link == ref.link then note.sel = i end
+    end
+    reading_pause()
+    app.mode = "note"
+    redraw()
+end
+
+-- The ref (if any) at a touch point on a page.
+function note.hit(refs, side, u, v)
+    for i, r in ipairs(refs) do
+        if r.side == side and u >= r.x - 24 and u <= r.x2 + 24 and v >= r.y - 20 and v <= r.y2 + 20 then
+            return r, i
+        end
+    end
+end
+
 ---------------------------------------------------------------- bookmarks
 
 -- A bookmark is a position in the text (chapter + offset), so it survives
@@ -1087,11 +1183,11 @@ end
 
 ---------------------------------------------------------------- drawing
 
-local function draw_page(page, side)
+local function draw_page(page, side, top)
     local th = theme()
     local m = margins()
     local ox = side == "left" and m.outer or m.inner
-    local oy = text_top()
+    local oy = top or text_top()
     if not page then return end
     for _, it in ipairs(page.items) do
         if it.kind == "text" then
@@ -1763,6 +1859,47 @@ local function draw_menu_panel(side)
     love.graphics.printf("A select    ‹ › change    B back", x, PAGE_H - 70, w, "left")
 end
 
+-- Box around the selected note number.
+function note.highlight(r)
+    local th = theme()
+    color(th.fg, 0.85)
+    love.graphics.setLineWidth(3)
+    love.graphics.rectangle("line", r.x - 6, r.y - 2, r.x2 - r.x + 12, r.y2 - r.y + 4, 6, 6)
+end
+
+-- The note itself, on the page facing its number.
+function note.draw_panel(side)
+    local th = theme()
+    local r = note.refs[note.sel]
+    local m = margins()
+    local ox = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    local top = text_top()
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local head = "Note " .. r.text:gsub("^%s+", ""):gsub("%s+$", "")
+    if #note.refs > 1 then head = head .. "   ·   " .. note.sel .. " of " .. #note.refs end
+    love.graphics.print(head, ox, top - 6)
+    love.graphics.setLineWidth(1)
+    love.graphics.line(ox, top + 30, ox + w, top + 30)
+    local pages = note.pages(r)
+    if not pages then
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.printf("This note couldn't be found in the book.", ox, top + 60, w, "left")
+    else
+        note.page = math.max(1, math.min(note.page, #pages))
+        draw_page(pages[note.page], side, top + 60)
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local hint = (#note.refs > 1 and "‹ ›  other notes      " or "") .. "B  close"
+    if pages and #pages > 1 then
+        hint = "▲▼  page " .. note.page .. " of " .. #pages .. "      " .. hint
+    end
+    love.graphics.print(hint, ox, PAGE_H - 26 - ui.small:getHeight())
+end
+
 local function draw_toc(side)
     local th = theme()
     local m = MARGINS[2]
@@ -2018,6 +2155,12 @@ local function render_canvases()
             if side == "left" then reader("left") else draw_jump_panel() end
         end
     elseif app.mode == "shop" then painter = shop.draw
+    elseif app.mode == "note" then
+        local reader = draw_reader_pages()
+        local r = note.refs[note.sel]
+        painter = function(side)
+            if side == r.side then reader(side); note.highlight(r) else note.draw_panel(side) end
+        end
     elseif app.mode == "about" then painter = draw_about
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
@@ -2468,6 +2611,7 @@ function handle_action(a)
         elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil
         elseif a == "toc" and #book.toc > 0 then
             toc.sel = current_section() or 1; toc.top = nil; app.mode = "toc"
+        elseif a == "confirm" then note.open()
         end
         redraw()
         return
@@ -2565,6 +2709,20 @@ function handle_action(a)
         return
     end
 
+    if mode == "note" then
+        if a == "left" or a == "right" then
+            note.sel = (note.sel - 1 + (a == "right" and 1 or -1)) % #note.refs + 1
+            note.page = 1
+        elseif a == "up" or a == "down" then
+            note.page = math.max(1, note.page + (a == "down" and 1 or -1))
+        elseif a == "confirm" or a == "back" or a == "menu" or a == "bookmark" then
+            app.mode = "reader"
+            reading.since = love.timer.getTime()
+        end
+        redraw()
+        return
+    end
+
     if mode == "shop" then
         if a == "up" then shop.move(-1)
         elseif a == "down" then shop.move(1)
@@ -2606,7 +2764,10 @@ end
 function app.on_tap(side, u, v)
     local mode = app.mode
     if mode == "reader" then
-        if jump and side == "right" and v > PAGE_H - 90 then
+        local ref = side == "right" and note.hit(note.collect(), side, u, v)
+        if ref then
+            note.open(ref)                    -- a note number: show the note on the left page
+        elseif jump and side == "right" and v > PAGE_H - 90 then
             go_back()                         -- the "Back to ..." line
         elseif side == "right" and u > PAGE_W - 150 and v < 150 then
             toggle_bookmark()                 -- top-right corner, like a Kindle
@@ -2635,6 +2796,10 @@ function app.on_tap(side, u, v)
         if side == "right" and u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then
             shop.start()
         end
+    elseif mode == "note" then
+        -- Another note number on this page: show that one. Anywhere else: close.
+        local _, i = note.hit(note.refs, side, u, v)
+        if i then note.sel, note.page = i, 1; redraw() else action("back") end
     elseif mode == "shop" then
         -- Tap a row to open it; tap the right page to download or read.
         local pg = shop.page()
