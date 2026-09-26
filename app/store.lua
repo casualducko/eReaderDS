@@ -28,7 +28,11 @@ local function path(name)
     return DIR .. "/" .. name
 end
 
+local last_written = {}          -- file -> text, to skip writes that change nothing
+
 local function write_atomic(file, text)
+    if last_written[file] == text then return true end
+    last_written[file] = text
     local tmp = file .. ".tmp"
     local f = io.open(tmp, "wb")
     if not f then return false end

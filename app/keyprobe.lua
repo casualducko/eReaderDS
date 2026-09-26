@@ -12,6 +12,7 @@ if not ok_ffi or ffi.os ~= "Linux" then return M end
 pcall(ffi.cdef, [[
     int open(const char *path, int flags);
     long read(int fd, void *buf, unsigned long count);
+    int close(int fd);
     struct rgds_input_event { long tv_sec; long tv_usec; unsigned short type; unsigned short code; int value; };
 ]])
 local C = ffi.C
@@ -44,8 +45,10 @@ local function list_devices()
 end
 
 -- Open every key-capable device except the touchscreen; route presses to
--- handler(device_name, code) and log them.
-function M.open(handler, skip)
+-- handler(device_name, code) and log them. After the first presses are logged,
+-- only the devices named in `watch` keep being read.
+function M.open(handler, skip, watch)
+    M.watch = watch or {}
     for _, d in ipairs(list_devices()) do
         if d.has_keys and d.name ~= skip then
             local fd = C.open("/dev/input/" .. d.event, O_NONBLOCK)
@@ -79,9 +82,15 @@ function M.poll()
             end
         end
     end
-    if logged >= LIMIT and not M.handler then
+    if logged >= LIMIT and not M.trimmed then
+        M.trimmed = true
         print("[evdev] (further presses not logged)")
-        M.enabled = false
+        local keep = {}
+        for _, d in ipairs(devices) do
+            if M.handler and M.watch[d.name] then keep[#keep + 1] = d else C.close(d.fd) end
+        end
+        devices = keep
+        M.enabled = #devices > 0
     end
     return any
 end

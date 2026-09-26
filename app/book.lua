@@ -347,9 +347,7 @@ local function basename_title(path)
     return (n:gsub("%.[^.]+$", ""))
 end
 
-local function open_epub(path)
-    local z, err = Zip.open(path)
-    if not z then return nil, err end
+local function open_epub_zip(path, z)
     local container = z:read("META-INF/container.xml")
     if not container then return nil, "missing container.xml" end
     local opf_path = container:match('full%-path%s*=%s*"([^"]+)"')
@@ -412,6 +410,15 @@ local function open_epub(path)
         if t.chapter then book.toc[#book.toc + 1] = t end
     end
     return book
+end
+
+local function open_epub(path)
+    local z, err = Zip.open(path)
+    if not z then return nil, err end
+    local ok, book, why = pcall(open_epub_zip, path, z)
+    if ok and book then return book end
+    z:close()
+    return nil, ok and why or book
 end
 
 local function open_txt(path)

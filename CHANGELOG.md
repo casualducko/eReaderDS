@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Uses much less memory on long reading sessions: only the last few chapters'
+  layouts and the most recently shown illustrations are kept (about half the
+  memory in testing), and layout reads image sizes from file headers instead
+  of decoding every illustration.
+- Fewer SD card writes: settings and progress are only written when they
+  change (not on every menu move).
+- Input diagnostics stop reading devices other than the lid once logging ends.
+- A broken EPUB no longer leaves its file open.
+
 ## v0.2.10
 
 - **Closing the lid** now sleeps the device while eReaderDS is open: it saves

@@ -74,8 +74,19 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
 ]]
 local turn_mesh               -- strip mesh for the page being turned
 local TURN_COLS = 24
-local images = {}            -- src -> Image (per open book)
-local book, pages_cache = nil, {}
+local book = nil
+-- Caches for the open book, kept small (1 GB of RAM): laid-out pages for the
+-- few most recent chapters, decoded images for the most recently drawn ones,
+-- and image sizes (read from file headers, so layout never decodes images).
+local PAGES_KEEP, IMAGES_KEEP = 4, 12
+local pages_cache, pages_order = {}, {}
+local images, images_order, image_dims = {}, {}, {}
+local function clear_pages() pages_cache, pages_order = {}, {} end
+local function clear_book_caches()
+    for _, img in pairs(images) do if img then img:release() end end
+    images, images_order, image_dims = {}, {}, {}
+    clear_pages()
+end
 local pos = { ch = 1, off = 0 }  -- reading position (start of left page)
 local spread = nil           -- { ch, pi, pages }
 local library = { items = {}, sel = 1, top = 1 }
@@ -115,7 +126,7 @@ local function build_fonts()
     local loaded, name = Fonts.load(S.font, S.font_size)
     for k, v in pairs(loaded) do fonts[k] = v end
     fonts.name = name
-    pages_cache = {}
+    clear_pages()
 end
 
 local function margins() return MARGINS[S.margins] or MARGINS[2] end
@@ -141,6 +152,7 @@ end
 
 ---------------------------------------------------------------- images
 
+-- Decoded image for drawing (least recently used ones are released).
 local function get_image(src)
     local img = images[src]
     if img == nil then
@@ -153,8 +165,59 @@ local function get_image(src)
             if ok then img = res end
         end
         images[src] = img
+        images_order[#images_order + 1] = src
+        if #images_order > IMAGES_KEEP then
+            local old = table.remove(images_order, 1)
+            if images[old] then images[old]:release() end
+            images[old] = nil
+        end
     end
     return img or nil
+end
+
+-- Width and height from the image file's header (PNG, JPEG, GIF), falling back
+-- to decoding. Used by layout, so pages can be laid out without decoding.
+local function header_dims(d)
+    local function be16(i) local a, b = d:byte(i, i + 1); return a * 256 + b end
+    local function be32(i) return be16(i) * 65536 + be16(i + 2) end
+    if d:sub(1, 8) == "\137PNG\r\n\26\n" and #d >= 24 then return be32(17), be32(21) end
+    if d:sub(1, 4) == "GIF8" and #d >= 10 then
+        local w1, w2, h1, h2 = d:byte(7, 10); return w1 + w2 * 256, h1 + h2 * 256
+    end
+    if d:byte(1) == 0xFF and d:byte(2) == 0xD8 then
+        local i = 3
+        while i + 8 <= #d do
+            if d:byte(i) ~= 0xFF then i = i + 1
+            else
+                local m = d:byte(i + 1)
+                if m >= 0xC0 and m <= 0xCF and m ~= 0xC4 and m ~= 0xC8 and m ~= 0xCC then
+                    return be16(i + 7), be16(i + 5)
+                elseif m == 0xD8 or m == 0x01 or (m >= 0xD0 and m <= 0xD7) or m == 0xFF then
+                    i = i + 2
+                else
+                    i = i + 2 + be16(i + 2)
+                end
+            end
+        end
+    end
+end
+
+local function get_image_size(src)
+    local dims = image_dims[src]
+    if dims == nil then
+        dims = false
+        local data = book and book:read_resource(src)
+        if data then
+            local w, h = header_dims(data)
+            if not w then
+                local ok, id = pcall(love.image.newImageData, love.filesystem.newFileData(data, src))
+                if ok then w, h = id:getDimensions(); id:release() end
+            end
+            if w and w > 0 and h and h > 0 then dims = { w, h } end
+        end
+        image_dims[src] = dims
+    end
+    if dims then return dims[1], dims[2] end
 end
 
 ---------------------------------------------------------------- pagination
@@ -175,14 +238,19 @@ local function pages_for(ch)
             breaks = breaks,
             fonts = fonts, size = S.font_size, w = w, h = h, spacing = S.spacing, justify = S.justify,
             indent = true,
-            image_size = function(src)
-                local img = get_image(src)
-                if img then return img:getDimensions() end
-            end,
+            image_size = get_image_size,
         })
         pages_cache[ch] = p
+        pages_order[#pages_order + 1] = ch
+        -- Keep the few most recent chapters (never the one on screen).
+        while #pages_order > PAGES_KEEP do
+            local k = 1
+            if spread and pages_order[k] == spread.ch then k = 2 end
+            pages_cache[table.remove(pages_order, k)] = nil
+        end
         if os.getenv("READER_DEBUG") then
-            print(string.format("layout ch=%d pages=%d %.0fms", ch, #p, (love.timer.getTime() - t0) * 1000))
+            print(string.format("layout ch=%d pages=%d %.0fms lua=%.0fMB", ch, #p, (love.timer.getTime() - t0) * 1000,
+                collectgarbage("count") / 1024))
         end
     end
     return p
@@ -311,7 +379,7 @@ local function open_book(path)
     end
     if book and book ~= b then book:close() end
     book = b
-    images, pages_cache = {}, {}
+    clear_book_caches()
     local pr = Store.get_progress(path)
     app.mode = "reader"
     if pr then goto_pos(pr.ch, pr.off) else goto_pos(1, 0) end
@@ -434,7 +502,7 @@ local function join(...)
     return out
 end
 
-local function relayout() pages_cache = {}; goto_pos(pos.ch, pos.off) end
+local function relayout() clear_pages(); goto_pos(pos.ch, pos.off) end
 
 local function status_items()
     return join(
@@ -1706,7 +1774,8 @@ function love.load()
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
     Timezone.apply(S.tz)
     Touch.open("gt9xx-0")
-    KeyProbe.open(function(device, code) app.on_raw_key(device, code) end, "gt9xx-0")
+    KeyProbe.open(function(device, code) app.on_raw_key(device, code) end, "gt9xx-0",
+        { [LID_DEVICE] = true })
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
@@ -1768,6 +1837,10 @@ local function run_test_script()
             elseif sa then stick_axis(sa, tonumber(sv))
             else action(a) end
         end
+    end
+    if os.getenv("READER_DEBUG") then
+        collectgarbage("collect")
+        print(string.format("[debug] memory after script: lua=%.1fMB", collectgarbage("count") / 1024))
     end
     local drag = os.getenv("READER_TOUCH")
     if drag then
