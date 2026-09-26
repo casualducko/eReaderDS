@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.5
 
 - Shorter, up-to-date README and in-download README.txt; problem reports can
   go to whoever sent you the zip.
