@@ -17,8 +17,11 @@ pcall(ffi.cdef, [[
 local C = ffi.C
 local O_NONBLOCK, EV_KEY = 2048, 1
 
-local devices = {}     -- { fd, name, handler = function(code) }
+local devices = {}     -- { fd, name }
 local buf
+-- Log the first presses of a session, then stop reading these devices so the
+-- probe costs nothing while reading.
+local LIMIT, logged = 40, 0
 
 -- Parse /proc/bus/input/devices into { name, event } entries (and log it).
 local function list_devices()
@@ -65,10 +68,15 @@ function M.poll()
                 if e.type == EV_KEY and e.value == 1 then
                     print(string.format("[evdev] %q key %d", d.name, e.code))
                     if M.handler then M.handler(d.name, e.code) end
+                    logged = logged + 1
                     any = true
                 end
             end
         end
+    end
+    if logged >= LIMIT and not M.handler then
+        print("[evdev] (further presses not logged)")
+        M.enabled = false
     end
     return any
 end

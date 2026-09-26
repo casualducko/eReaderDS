@@ -493,11 +493,9 @@ function Book:read_resource(p)
     return self.zip and self.zip:read(p)
 end
 
--- Metadata only (title/author) without keeping the book around.
-function M.peek(path)
-    local ok, b = pcall(M.open, path)
-    if ok and b then return { title = b.title, author = b.author, book = b } end
-    return { title = basename_title(path), author = "" }
+-- Release the open book file (EPUBs keep it open to read chapters on demand).
+function Book:close()
+    if self.zip then self.zip:close() end
 end
 
 return M

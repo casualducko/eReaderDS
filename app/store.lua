@@ -1,13 +1,14 @@
--- Settings and reading progress, stored as small text files next to the app.
+-- Settings and reading progress, stored as small text files in READER_DATA
+-- (Ebook/.ereaderds on the device, outside the app folder so updates keep them).
 local M = {}
 
 local DEFAULTS = {
     font = "Gentium Book Plus", font_size = 32, spacing = 1.15, margins = 2, vmargins = 2, justify = true,
     theme = "Paper", chrome = true, orient = "left", anim = "flip",
-    tap = "next",
+    tap = "next",      -- what a tap on the touchscreen does while reading: "menu" | "next"
     -- status bar
     sb_title = "both", sb_pages = "left", sb_percent = true,
-    sb_bar = "none", sb_bar_size = 2, sb_battery = true,      -- what a tap on the touchscreen does while reading: "menu" | "next"
+    sb_bar = "none", sb_bar_size = 2, sb_battery = true,
     brightness = -1,   -- percent; -1 = leave the system setting alone
 }
 

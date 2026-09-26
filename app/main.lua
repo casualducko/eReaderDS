@@ -43,7 +43,7 @@ local VMARGINS = { { name = "Narrow", size = 60 }, { name = "Normal", size = 76 
 
 local S                      -- settings (persisted)
 local app = {
-    mode = "library",        -- library | reader | menu | toc | message
+    mode = "library",        -- library | reader | menu | toc | about | message
     dirty = true,
 }
 local fonts = {}
@@ -185,10 +185,21 @@ local function goto_pos(ch, off)
     set_spread(ch, Layout.find_page(pages, off))
 end
 
+local save_due = nil          -- time a delayed progress save should happen
+
 local function save_progress()
+    save_due = nil
     if book then
         Store.set_progress(book.path, pos.ch, pos.off, book:fraction(pos.ch, pos.off))
     end
+end
+
+-- After a page turn, save once the reader pauses, instead of rewriting the
+-- progress file on the SD card for every page. The main loop only wakes on its
+-- own while it's polling the touchscreen; otherwise save straight away.
+local SAVE_DELAY = 2
+local function save_progress_soon()
+    if Touch.enabled then save_due = love.timer.getTime() + SAVE_DELAY else save_progress() end
 end
 
 local function next_spread()
@@ -200,7 +211,7 @@ local function next_spread()
     else
         return
     end
-    save_progress()
+    save_progress_soon()
 end
 
 local function prev_spread()
@@ -213,7 +224,7 @@ local function prev_spread()
     else
         return
     end
-    save_progress()
+    save_progress_soon()
 end
 
 -- TOC entries with resolved positions (chapter, offset).
@@ -279,6 +290,7 @@ local function open_book(path)
         show_message("Could not open this book.\n\n" .. tostring(ok and err or b))
         return
     end
+    if book and book ~= b then book:close() end
     book = b
     images, pages_cache = {}, {}
     local pr = Store.get_progress(path)
@@ -312,13 +324,15 @@ local function scan_library()
     table.sort(items, function(a, b) return a.title:lower() < b.title:lower() end)
     library.items = items
     library.sel = math.max(1, math.min(library.sel, #items))
-    library.preview = nil
 end
 
+-- Title, author and cover for the selected book, cached so moving through the
+-- library doesn't reopen books (a few most recent are kept).
+local previews, preview_order = {}, {}
 local function library_preview()
     local it = library.items[library.sel]
     if not it then return nil end
-    if library.preview and library.preview.path == it.path then return library.preview end
+    if previews[it.path] then return previews[it.path] end
     local pv = { path = it.path }
     local ok, b = pcall(Book.open, it.path)
     if ok and b then
@@ -332,8 +346,11 @@ local function library_preview()
                 if ok2 then pv.cover = img end
             end
         end
+        if b ~= book then b:close() end
     end
-    library.preview = pv
+    previews[it.path] = pv
+    preview_order[#preview_order + 1] = it.path
+    if #preview_order > 6 then previews[table.remove(preview_order, 1)] = nil end
     return pv
 end
 
@@ -436,16 +453,11 @@ local function menu_items()
             S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
         end },
         { label = "Page turn", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
-            adjust = function(d)
-                local order = { "flip", "fade", "off" }
-                local idx = 1
-                for k, v in ipairs(order) do if v == S.anim then idx = k end end
-                S.anim = order[(idx - 1 + d) % #order + 1]
-            end },
+            adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
         { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
             S.tap = S.tap == "next" and "menu" or "next"
         end },
-        { label = "Status bar", value = "›", act = function(self_idx)
+        { label = "Status bar", value = "›", act = function()
             menu.status_row = menu.sel; menu.page = "status"; menu.sel = 1; menu.top = nil
         end },
         { label = "Jump to % (" .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. ")", value = "", adjust = function(d)
@@ -527,7 +539,7 @@ local function draw_status(side, info)
     local m = margins()
     local outer_x = side == "left" and m.outer or m.inner
     local w = PAGE_W - m.outer - m.inner
-    local head_y, foot_y = 26, PAGE_H - 30 - ui.small:getHeight()
+    local head_y, foot_y = 26, PAGE_H - 26 - ui.small:getHeight()
     love.graphics.setFont(ui.small)
 
     -- Battery sits by the hinge at the top of the right page.
@@ -539,8 +551,7 @@ local function draw_status(side, info)
     local t = S.sb_title
     local title
     if side == "left" and (t == "book" or t == "both") then title = info.book_title
-    elseif side == "right" and (t == "chapter" or t == "both") then title = info.chapter_title
-    elseif side == "right" and t == "book" then title = nil end
+    elseif side == "right" and (t == "chapter" or t == "both") then title = info.chapter_title end
     if title and title ~= "" then
         love.graphics.setFont(ui.small)
         color(th.dim)
@@ -1177,6 +1188,17 @@ end
 
 ---------------------------------------------------------------- input
 
+-- Input logging for identifying buttons: the first presses of each session go
+-- to log.txt, then it stops, so reading doesn't keep writing to the SD card.
+local INPUT_LOG_LIMIT = 40
+local input_logged = 0
+local function log_input(fmt, ...)
+    if input_logged >= INPUT_LOG_LIMIT then return end
+    input_logged = input_logged + 1
+    print("[input] " .. string.format(fmt, ...))
+    if input_logged == INPUT_LOG_LIMIT then print("[input] (further input not logged)") end
+end
+
 -- Physical d-pad -> direction on the sideways page.
 local ROTATE = {
     left = { up = "left", right = "up", down = "right", left = "down" },
@@ -1317,27 +1339,22 @@ local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x", [4] = "leftshoulder", 
 -- that direction; it must come back inside RELEASE before it can fire again,
 -- so one push is one press and stick drift never turns pages.
 local STICK_PRESS, STICK_RELEASE = 0.6, 0.3
--- Stick axes after the gamepad mapping (leftx = raw axis 0, lefty = raw axis 1,
+-- Axes follow the gamepad mapping (leftx = raw axis 0, lefty = raw axis 1,
 -- positive = right/down, like the D-pad). The mapping borrowed from another
 -- port had them off by one, which made the stick's up/down read as left/right.
-local STICK_MAP = { x = { axis = "x", sign = 1 }, y = { axis = "y", sign = 1 } }
 local stick = { x = 0, y = 0 }          -- latched direction per axis: -1, 0, 1
 
-local function stick_axis(raw, value)
-    local m = STICK_MAP[raw]
-    local which = m.axis
-    local raw_value = value
-    value = value * m.sign
+local function stick_axis(which, value)
     local neg, pos = "left", "right"
     if which == "y" then neg, pos = "up", "down" end
     local cur = stick[which]
     if cur == 0 then
         if value >= STICK_PRESS then
             stick[which] = 1
-            print(string.format("[input] stick raw %s=%.2f -> %s", raw, raw_value, pos)); dpad(pos)
+            log_input("stick %s=%.2f -> %s", which, value, pos); dpad(pos)
         elseif value <= -STICK_PRESS then
             stick[which] = -1
-            print(string.format("[input] stick raw %s=%.2f -> %s", raw, raw_value, neg)); dpad(neg)
+            log_input("stick %s=%.2f -> %s", which, value, neg); dpad(neg)
         end
     elseif math.abs(value) < STICK_RELEASE then
         stick[which] = 0
@@ -1356,7 +1373,7 @@ end
 local EXTRA = { [9] = "confirm" }
 function love.joystickpressed(joystick, b)
     -- Every press goes to log.txt, so unknown buttons can be identified.
-    print(string.format("[input] joystick %q button %d", joystick:getName(), b - 1))
+    log_input("joystick %q button %d", joystick:getName(), b - 1)
     local extra = EXTRA[b - 1]
     if extra then action(extra) return end
     if joystick:isGamepad() then return end
@@ -1369,7 +1386,7 @@ local raw_logged = {}
 function love.joystickaxis(joystick, axis, value)
     local big = math.abs(value) >= STICK_PRESS
     if big and not raw_logged[axis] then
-        print(string.format("[input] raw axis %d = %.2f", axis - 1, value))
+        log_input("raw axis %d = %.2f", axis - 1, value)
     end
     raw_logged[axis] = big
     if joystick:isGamepad() then return end
@@ -1390,9 +1407,15 @@ local KEYS = {
     -- The curved-arrow button sends Back (adc-keys, KEY_BACK): toggle Settings.
     appback = "menu", apphome = "menu", menu = "menu", application = "menu",
 }
-function love.keypressed(key, scancode)
-    print(string.format("[input] key %s (scancode %s)", key, scancode))
+local REPEATABLE = { right = true, left = true, up = true, down = true, next = true, prev = true }
+function love.keypressed(key, scancode, isrepeat)
     local a = KEYS[key]
+    if isrepeat then
+        -- Holding a key repeats movement only (the Back button toggles Settings).
+        if a and REPEATABLE[a] then action(a) end
+        return
+    end
+    log_input("key %s (scancode %s)", key, scancode)
     if a then action(a) end
 end
 
@@ -1462,7 +1485,8 @@ function love.load()
 
     scan_library()
     local last = Store.get_last()
-    if last and io.open(last, "rb") then open_book(last) end
+    local f = last and io.open(last, "rb")
+    if f then f:close(); open_book(last) end
 end
 
 function love.quit()
@@ -1501,8 +1525,7 @@ local function run_test_script()
             love.graphics.setCanvas(shot)
             compose_anim(app.anim.fixed or 0.5)
         else
-            love.graphics.setCanvas(shot)
-            render_canvases()
+            render_canvases()           -- renders the page canvases, then resets
             love.graphics.setCanvas(shot)
             compose()
         end
@@ -1546,6 +1569,7 @@ function love.run()
         if Touch.enabled and Touch.poll(touch_event) then got = true end
         if KeyProbe.enabled and KeyProbe.poll() then got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
+        if save_due and love.timer.getTime() >= save_due then save_progress() end
         if app.anim then
             love.timer.sleep(0.001)            -- animating: next frame (vsync paces it)
         elseif Touch.enabled or overlay then
