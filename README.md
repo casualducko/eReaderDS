@@ -58,9 +58,10 @@ To make a tap open Settings instead, use **Settings → Tap**.
 
 - Two-page spreads with a page-flip animation (or fade, or none)
 - EPUB and plain text, with italics, headings, images, covers and contents
-- Justified text with hyphenation (English books), indents, and each
+- Justified text, optional hyphenation (English books), indents, and each
   chapter starting on a new page
-- Library with covers and progress; your place in every book is saved
+- Library with covers and progress, sorted by recent, title, author or
+  progress (L/R); your place in every book is saved
 - Delete books from the library (Y, then A to confirm)
 - Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
   from Settings → Bookmarks

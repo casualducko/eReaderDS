@@ -505,7 +505,53 @@ local function open_book(path)
     app.mode = "reader"
     if pr then goto_pos(pr.ch, pr.off) else goto_pos(1, 0) end
     Store.set_last(path)
+    Store.set_opened(path)
     save_progress()
+end
+
+-- Library order, chosen with L/R in the library.
+local SORTS = { "recent", "title", "author", "progress" }
+local SORT_NAMES = { recent = "Recent", title = "Title", author = "Author", progress = "Progress" }
+
+-- "The Hobbit" sorts under H; authors sort by last name.
+local function title_key(t) return (t:lower():gsub("^the%s+", ""):gsub("^an?%s+", "")) end
+local function author_key(a)
+    a = (a or ""):lower():match("^[^,&]+") or ""
+    a = a:gsub("%s+$", "")
+    return a:match("(%S+)$") or ""
+end
+
+function library.sort(items)
+    local mode = S.lib_sort
+    local key = {}
+    for _, it in ipairs(items) do
+        local k = { title = title_key(it.title) }
+        if mode == "recent" then
+            k.t = Store.get_opened(it.path) or 0
+        elseif mode == "author" then
+            k.a = author_key(it.author)
+        elseif mode == "progress" then
+            -- Books you're reading (most read first), then unread, then finished.
+            local pr = Store.get_progress(it.path)
+            local pct = pr and pr.pct or 0
+            k.group = (pct >= 0.99 and 3) or (pct > 0 and 1) or 2
+            k.pct = pct
+        end
+        key[it] = k
+    end
+    table.sort(items, function(a, b)
+        local x, y = key[a], key[b]
+        if mode == "recent" and x.t ~= y.t then return x.t > y.t end
+        if mode == "author" and x.a ~= y.a then
+            if x.a == "" or y.a == "" then return y.a == "" end   -- no author: last
+            return x.a < y.a
+        end
+        if mode == "progress" then
+            if x.group ~= y.group then return x.group < y.group end
+            if x.pct ~= y.pct then return x.pct > y.pct end
+        end
+        return x.title < y.title
+    end)
 end
 
 local function scan_library()
@@ -529,7 +575,7 @@ local function scan_library()
             p:close()
         end
     end
-    table.sort(items, function(a, b) return a.title:lower() < b.title:lower() end)
+    library.sort(items)
     -- Online catalogs from opds.txt come first, as "Get books" rows.
     local ok, catalogs = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
     if not ok then print("[opds] " .. tostring(catalogs)); catalogs = {} end
@@ -538,6 +584,20 @@ local function scan_library()
     end
     library.items = items
     library.sel = math.max(1, math.min(library.sel, #items))
+end
+
+-- Change the order, keeping the same book selected.
+function library.cycle_sort(d)
+    local cur = library.items[library.sel]
+    local i = 1
+    for k, v in ipairs(SORTS) do if v == S.lib_sort then i = k end end
+    S.lib_sort = SORTS[(i - 1 + d) % #SORTS + 1]
+    Store.save_settings(S)
+    scan_library()
+    for k, it in ipairs(library.items) do
+        if it.path and cur and it.path == cur.path then library.sel = k end
+    end
+    library.top = 1
 end
 
 -- Title, author and cover for the selected book, cached so moving through the
@@ -1268,6 +1328,13 @@ local function draw_library(side)
         love.graphics.setFont(ui.title)
         color(th.fg)
         love.graphics.print("Library", x, 60)
+        if #library.items > 0 then
+            -- The sort order, changed with L/R (or a tap), like a settings value.
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.printf("‹ " .. SORT_NAMES[S.lib_sort] .. " ›", x,
+                60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
+        end
         local row_h = 96
         local rows = list_rows(row_h)
         if #library.items == 0 then
@@ -1300,7 +1367,7 @@ local function draw_library(side)
         end)
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.print("A  open      Y  delete" .. (book and "      B  back to book" or ""), x, PAGE_H - 70)
+        love.graphics.print("A  open      Y  delete      L R  sort" .. (book and "      B  back" or ""), x, PAGE_H - 70)
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
     else
         local pv = library_preview()
@@ -2479,8 +2546,9 @@ function handle_action(a)
             return
         end
         if n > 0 then
-            if a == "up" or a == "left" or a == "prev" then library.sel = math.max(1, library.sel - 1)
-            elseif a == "down" or a == "right" or a == "next" then library.sel = math.min(n, library.sel + 1)
+            if a == "up" or a == "left" then library.sel = math.max(1, library.sel - 1)
+            elseif a == "down" or a == "right" then library.sel = math.min(n, library.sel + 1)
+            elseif a == "prev" or a == "next" then library.cycle_sort(a == "next" and 1 or -1)
             elseif a == "confirm" then
                 local it = library.items[library.sel]
                 if it.catalog then shop.open(it.catalog) else open_book(it.path) end
@@ -2522,6 +2590,8 @@ function app.on_tap(side, u, v)
         elseif side == "left" then
             action("back")            -- tapped the dimmed book page: close
         end
+    elseif mode == "library" then
+        if side == "left" and v < 150 and u > PAGE_W / 2 then action("next") end    -- the sort order
     elseif mode == "shop" then
         -- Tap a row to open it; tap the right page to download or read.
         local pg = shop.page()

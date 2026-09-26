@@ -4,7 +4,8 @@ local M = {}
 
 local DEFAULTS = {
     font = "Gentium Book Plus", font_size = 32, spacing = 1.15, margins = 2, vmargins = 2, justify = true,
-    hyphenate = true,  -- English books only (the patterns are US English)
+    hyphenate = false, -- English books only (the patterns are US English)
+    lib_sort = "recent", -- library order: "recent" | "title" | "author" | "progress"
     theme = "Paper", chrome = true, orient = "left", anim = "flip",
     tap = "next",      -- what a tap on the touchscreen does while reading: "menu" | "next"
     -- status bar
@@ -197,11 +198,46 @@ end
 
 function M.set_last(p) write_atomic(path("last.txt"), p .. "\n") end
 
+-- opened.txt: when each book was last opened: path \t unix time.
+local opened
+local function load_opened()
+    if opened then return opened end
+    opened = {}
+    local f = io.open(path("opened.txt"), "rb")
+    if f then
+        for line in f:lines() do
+            local p, t = line:match("^(.-)\t(%d+)$")
+            if p then opened[p] = tonumber(t) end
+        end
+        f:close()
+    else
+        -- First run with this file: the book open last counts as most recent.
+        local last = M.get_last()
+        if last then opened[last] = os.time() end
+    end
+    return opened
+end
+
+local function write_opened()
+    local out = {}
+    for p, t in pairs(load_opened()) do out[#out + 1] = p .. "\t" .. t end
+    table.sort(out)
+    write_atomic(path("opened.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
+end
+
+function M.get_opened(p) return load_opened()[p] end
+
+function M.set_opened(p)
+    load_opened()[p] = os.time()
+    write_opened()
+end
+
 -- Forget a deleted book: its progress, bookmarks and "last opened".
 function M.forget(p)
     load_progress()[p] = nil
     write_progress()
     M.set_bookmarks(p, {})
+    if load_opened()[p] then load_opened()[p] = nil; write_opened() end
     if M.get_last() == p then
         os.remove(path("last.txt"))
         last_written[path("last.txt")] = nil

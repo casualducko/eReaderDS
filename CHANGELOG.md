@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- **Hyphenation** for English books (Settings → Hyphenation, on by default).
+- **Library sorting**: L/R (or tap the order at the top) switches between
+  Recent (last opened first, the default), Title, Author (by last name) and
+  Progress (books you're reading first, then unread, then finished).
+- **Hyphenation** for English books (Settings → Hyphenation, off by default).
   Long words break at the line end when the line would otherwise be
   stretched, using TeX's US English patterns, and never more than two lines
   in a row.
