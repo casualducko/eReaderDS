@@ -39,6 +39,22 @@ tools/sideways.py frame.png view.png   # how it looks held sideways (needs Pillo
 | `READER_ANIM_T` | With `READER_SHOT`, freeze a page turn at this progress (0–1) |
 | `READER_DEBUG` | Print layout timings |
 
+## Installing over Wi-Fi (SSH)
+
+The stock firmware runs an SSH server (user `root`, password `root`). Once
+your computer's key is installed on the device (`ssh-copy-id root@<ip>`, run
+in a real terminal), you can update the device while it stays on:
+
+```sh
+./install.sh --ssh 192.168.1.140   # remembers the address in .device
+./install.sh --ssh                 # later installs
+tools/device.sh log                # read Ports/eReaderDS/log.txt
+tools/device.sh data               # settings, progress, bookmarks
+```
+
+It replaces the app files only, and sends the engine only if the device doesn't
+have it yet. Quit and reopen eReaderDS on the device to load a new version.
+
 ## Installing from a clone
 
 With the SD card mounted (macOS/Linux):

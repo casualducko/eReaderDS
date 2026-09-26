@@ -3,11 +3,47 @@
 # repo (macOS/Linux). Most people should use the release zip instead: see README.
 # Settings and reading progress (Ebook/.ereaderds) are kept.
 #
-#   ./install.sh [/Volumes/ROMS]
+#   ./install.sh [/Volumes/ROMS]      from the SD card in the computer
+#   ./install.sh --ssh [device-ip]    over Wi-Fi to the device (SSH as root)
 set -e
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+# Over Wi-Fi: ./install.sh --ssh [host]   (host defaults to the one in .device)
+if [ "${1:-}" = "--ssh" ]; then
+    HOST="${2:-$(cat "$HERE/.device" 2>/dev/null)}"
+    [ -n "$HOST" ] || { echo "Usage: ./install.sh --ssh <device-ip>  (or put the IP in .device)"; exit 1; }
+    [ -n "${2:-}" ] && echo "$HOST" > "$HERE/.device"
+    SSH="ssh -o BatchMode=yes -o ConnectTimeout=8 root@$HOST"
+    VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$HERE/app/version.lua")
+    STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
+    P="$STAGE/Ports/eReaderDS"
+    mkdir -p "$P/app/fonts"
+    cp "$HERE"/app/*.lua "$P/app/"
+    cp "$HERE"/app/fonts/* "$P/app/fonts/"
+    cp "$HERE/port/launch.sh" "$P/"
+    cp "$HERE/port/eReaderDS.sh" "$STAGE/Ports/"
+    sed "s/@VERSION@/$VERSION/g" "$HERE/port/README.txt" > "$P/README.txt"
+    # The engine only goes over the first time.
+    if ! $SSH test -f /mnt/mmc/Ports/eReaderDS/runtime/love.aarch64; then
+        mkdir -p "$P/runtime"
+        cp -R "$HERE/runtime/love.aarch64" "$HERE/runtime/libs.aarch64" "$P/runtime/"
+    fi
+    COPYFILE_DISABLE=1 tar -C "$STAGE" -czf - Ports | $SSH '
+        set -e
+        cd /mnt/mmc
+        rm -rf Ports/eReaderDS/app
+        tar -xzf -
+        chmod +x Ports/eReaderDS.sh Ports/eReaderDS/launch.sh
+        [ -f Ports/eReaderDS/runtime/love.aarch64 ] && chmod +x Ports/eReaderDS/runtime/love.aarch64
+        mkdir -p Ebook/Fonts
+        sync'
+    echo "Installed eReaderDS v$VERSION on $HOST over SSH."
+    echo "If eReaderDS is open on the device, quit and reopen it to load the new version."
+    exit 0
+fi
+
 SD="${1:-/Volumes/ROMS}"
 [ -d "$SD/Ports" ] || { echo "SD card not found at $SD (expected a Ports folder)"; exit 1; }
-HERE=$(cd "$(dirname "$0")" && pwd)
 D="$SD/Ports/eReaderDS"
 
 # Replace the app folder wholesale; settings and progress live in Ebook/.ereaderds.
