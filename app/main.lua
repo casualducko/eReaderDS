@@ -38,6 +38,8 @@ local THEMES = {
     { name = "Black",     bg = { 0, 0, 0 },             fg = { 0.62, 0.62, 0.62 }, dim = { 0.36, 0.36, 0.36 }, sel = { 0.16, 0.16, 0.16 } },
 }
 -- Themes used to be saved as a number (their position in the original list).
+-- Listed alphabetically in Settings.
+table.sort(THEMES, function(a, b) return a.name:lower() < b.name:lower() end)
 local OLD_THEME_NUMBERS = { "Paper", "White", "Sepia", "Night" }
 local MARGINS = { { name = "Narrow", outer = 36, inner = 28 }, { name = "Normal", outer = 60, inner = 44 }, { name = "Wide", outer = 90, inner = 64 } }
 -- Space above and below the text (the header/footer sit inside it).
@@ -3172,8 +3174,11 @@ function app.on_tap(side, u, v)
         elseif jump and side == "right" and v > PAGE_H - 90
             and u >= margins().inner + (PAGE_W - margins().outer - margins().inner) * 0.35 then
             go_back()                         -- the "Back to ..." line
-        elseif side == "right" and u > PAGE_W - 150 and v < 150 then
+        elseif side == "right" and u > PAGE_W - 170 and v < 150 then
             toggle_bookmark()                 -- top-right corner, like a Kindle
+        elseif side == "right" and v < 90 and u > PAGE_W - 230 then
+            -- A gap between the bookmark corner and the status bar strip, so a
+            -- slightly-off bookmark tap does nothing rather than the wrong thing.
         elseif side == "right" and v < 90 then
             -- The top edge (left of the bookmark corner): show or hide all
             -- the status bars.
