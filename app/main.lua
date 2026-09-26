@@ -871,14 +871,16 @@ local function draw_status(side, info)
     end
 end
 
-local function format_time(seconds)
+-- "4 h 10 min", or compact "4h 10m".
+local function format_time(seconds, compact)
+    local H, M = compact and "h" or " h", compact and "m" or " min"
     local m = seconds / 60
-    if m < 1 then return "<1 min" end
-    if m < 60 then return string.format("%d min", math.floor(m + 0.5)) end
+    if m < 1 then return "<1" .. M end
+    if m < 60 then return string.format("%d%s", math.floor(m + 0.5), M) end
     local h = math.floor(m / 60)
     local mm = math.floor(m - h * 60 + 0.5)
     if mm == 60 then h, mm = h + 1, 0 end
-    return mm > 0 and string.format("%d h %d min", h, mm) or string.format("%d h", h)
+    return mm > 0 and string.format("%d%s %d%s", h, H, mm, M) or string.format("%d%s", h, H)
 end
 
 -- Characters left in the book after offset `off` of chapter `ch`. Chapters
@@ -943,8 +945,8 @@ local function draw_reader_pages()
         if nxt and nxt.chapter == spread.ch then section_end = select(2, toc_pos(nxt)) end
         local left = section_end - end_off
         if left > 0 then
-            local t = format_time(left / S.read_cps)
-            info.pages_text = info.pages_text and (info.pages_text .. " · " .. t) or (t .. " left in chapter")
+            local t = format_time(left / S.read_cps, true)
+            info.pages_text = info.pages_text and (info.pages_text .. " (" .. t .. ")") or (t .. " left in chapter")
         end
     end
     if S.sb_time == "book" or S.sb_time == "both" then

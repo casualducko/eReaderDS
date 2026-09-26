@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Time left** in the chapter and book ("12 pages left in chapter · 9 min",
+- **Time left** in the chapter and book ("12 pages left in chapter (9m)",
   "45% read · 4 h 10 min left"), learned from how fast you actually read.
   Quick flips, long pauses, jumps and time in menus are ignored; it starts at
   about 250 words a minute. Show or hide each in Settings → Status bar →
