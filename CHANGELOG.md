@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Dictionary on the facing page.** Press Y while reading (or press and hold a
+  word on the touchscreen): a cursor goes on a word, left/right move it word
+  by word and up/down line by line across both pages, and the definition shows
+  on the other page. Finds base forms ("ran" → run, "mice" → mouse) and joins
+  words split by hyphenation. An English dictionary (WordNet 3.1) is built in;
+  add StarDict dictionaries to `Ebook/Dictionaries`. **Y no longer opens
+  Contents**; it's in Settings.
 - **Settings fits on one screen.** Contents, Bookmarks, Jump to % and
   Library, then **Text** (font, size, spacing, justify, hyphenation) and
   **Page** (margins, top/bottom margins, theme, brightness). Set-once options

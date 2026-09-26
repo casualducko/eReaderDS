@@ -42,14 +42,14 @@ buttons are under your right hand. Directions below are as you hold it.
 | B | Settings (or go back after a jump) | Back |
 | Select | Bookmark this page (again to remove) | Close (in the library: Get books) |
 | Start, X, or the ↩ button | Settings | Close |
-| Y | Contents | Delete the book (library) |
+| Y | Look up a word | Delete the book (library) |
 | Menu (Anbernic button) | Quit | Quit |
 
 The **analog stick** works like the D-pad.
 
 **Touch** (bottom screen): swipe left/right to turn pages, and slide up/down
 for brightness (keep sliding below 1% for Extra dim). Tapping the right or left half turns pages forward or back, and tapping the
-top-right corner bookmarks the page. Tapping a note number shows the note on
+top-right corner bookmarks the page. Press and hold a word to look it up. Tapping a note number shows the note on
 the left page, and a **Notes** button appears at the bottom of the page
 whenever there are notes on the spread (including on the top screen).
 To make a tap open Settings instead, use **Settings → Page turns & device → Tap**.
@@ -66,6 +66,10 @@ To make a tap open Settings instead, use **Settings → Page turns & device → 
 - Footnotes on the facing page: press A (or tap a note number) and the note
   appears on the other page while the text stays put; left/right steps
   through the notes on the spread
+- Dictionary on the facing page: press Y (or hold a word on the touchscreen)
+  and move a cursor word by word; the definition shows on the other page.
+  English (WordNet) is built in, and you can add StarDict dictionaries (see
+  below)
 - Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
   from Settings → Bookmarks
 - Text size, line spacing, margins and brightness settings
@@ -100,6 +104,20 @@ Lexend (sans-serif); and OpenDyslexic.
 then choose them in **Settings → Font**. Regular, italic and bold files of a
 family are grouped automatically. Use static fonts: variable fonts (with
 `[wght]` in the name) only show one weight.
+
+## Dictionaries
+
+Press **Y** while reading to look up words: a cursor appears on the first
+word, left/right move it word by word and up/down line by line, across both
+pages, and the definition shows on the facing page (A shows more of a long
+entry, B closes). On the touchscreen, press and hold a word. Contents is in
+**Settings**.
+
+An English dictionary (WordNet) is built in. To add others (other languages,
+bigger dictionaries), copy **StarDict** dictionaries into `Ebook/Dictionaries`
+on the SD card, each as its `.ifo`, `.idx` and `.dict` or `.dict.dz` files
+(plus `.syn` if there is one). They're the same files KOReader uses.
+Definitions from every dictionary that has the word are shown, yours first.
 
 ## Getting books over Wi-Fi
 
@@ -184,5 +202,8 @@ eReaderDS is created by **casualducko**. It also appears in **Settings → About
   [hyph-utf8](https://www.hyphenation.org/tex) package, © Gerard D.C.
   Kuiken, free to copy and modify with the notice kept (see
   `app/hyph/en-us.txt`).
+- Dictionary: [WordNet](https://wordnet.princeton.edu) 3.1, © 2011
+  Princeton University, used under the WordNet license (see
+  `app/dict/WordNet-LICENSE.txt`), converted by `tools/build-wordnet.py`.
 - Engine: [LÖVE](https://love2d.org) 11.5 (zlib license), from the PortMaster
   aarch64 runtime. See [runtime/NOTICES.md](runtime/NOTICES.md).

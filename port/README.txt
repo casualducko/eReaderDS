@@ -17,7 +17,7 @@ CONTROLS (hold it turned counter-clockwise; directions as held)
   Select ................ bookmark this page (press again to remove);
                           in the library: get books over Wi-Fi
   Start, X, ↩ ........... open / close settings
-  Y ..................... contents
+  Y ..................... look up a word (contents: in settings)
   Menu (Anbernic) ....... quit
   Analog stick .......... like the D-pad
 

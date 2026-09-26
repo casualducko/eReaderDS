@@ -17,9 +17,10 @@ if [ "${1:-}" = "--ssh" ]; then
     VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$HERE/app/version.lua")
     STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
     P="$STAGE/Ports/eReaderDS"
-    mkdir -p "$P/app/fonts" "$P/app/hyph"
+    mkdir -p "$P/app/fonts" "$P/app/hyph" "$P/app/dict"
     cp "$HERE"/app/*.lua "$P/app/"
     cp "$HERE"/app/hyph/* "$P/app/hyph/"
+    cp "$HERE"/app/dict/* "$P/app/dict/"
     cp "$HERE"/app/fonts/* "$P/app/fonts/"
     cp "$HERE/port/launch.sh" "$P/"
     cp "$HERE/port/eReaderDS.sh" "$STAGE/Ports/"
@@ -36,7 +37,7 @@ if [ "${1:-}" = "--ssh" ]; then
         tar -xzf -
         chmod +x Ports/eReaderDS.sh Ports/eReaderDS/launch.sh
         [ -f Ports/eReaderDS/runtime/love.aarch64 ] && chmod +x Ports/eReaderDS/runtime/love.aarch64
-        mkdir -p Ebook/Fonts
+        mkdir -p Ebook/Fonts Ebook/Dictionaries
         sync'
     echo "Installed eReaderDS v$VERSION on $HOST over SSH."
     echo "If eReaderDS is open on the device, quit and reopen it to load the new version."
@@ -49,9 +50,10 @@ D="$SD/Ports/eReaderDS"
 
 # Replace the app folder wholesale; settings and progress live in Ebook/.ereaderds.
 rm -rf "$D/app"
-mkdir -p "$D/app/fonts" "$D/app/hyph" "$D/runtime/libs.aarch64" "$SD/Ebook/Fonts"
+mkdir -p "$D/app/fonts" "$D/app/hyph" "$D/app/dict" "$D/runtime/libs.aarch64" "$SD/Ebook/Fonts" "$SD/Ebook/Dictionaries"
 cp "$HERE"/app/*.lua "$D/app/"
 cp "$HERE"/app/hyph/* "$D/app/hyph/"
+cp "$HERE"/app/dict/* "$D/app/dict/"
 cp "$HERE"/app/fonts/* "$D/app/fonts/"
 cp "$HERE/port/launch.sh" "$D/"
 cp "$HERE/port/eReaderDS.sh" "$SD/Ports/"

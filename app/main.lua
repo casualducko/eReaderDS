@@ -545,6 +545,164 @@ function note.hit(refs, side, u, v)
     end
 end
 
+---------------------------------------------------------------- dictionary
+
+-- Y (or pressing and holding a word on the touchscreen) puts a cursor on a
+-- word; its definition shows on the facing page. Left/right move word by
+-- word, up/down line by line, across both pages.
+local look = { words = {}, sel = 1, page = 1, fonts = nil, dict = require("dict") }
+
+-- The words on the visible spread, in reading order: { side, text, line,
+-- x, y, x2, y2 } in page coordinates. Pieces of one word (a note number
+-- after it, a change of style) are joined.
+function look.collect()
+    local words, line = {}, 0
+    local m = margins()
+    local oy = text_top()
+    for k, side in ipairs({ "left", "right" }) do
+        local page = spread.pages[spread.pi + k - 1]
+        local ox = side == "left" and m.outer or m.inner
+        local prev, prev_x
+        for _, it in ipairs(page and page.items or {}) do
+            if it.kind == "text" then
+                local x, y = ox + it.x, oy + it.y
+                local w, h = it.font:getWidth(it.text), it.font:getHeight()
+                if not prev_x or x < prev_x then line = line + 1; prev = nil end
+                prev_x = x
+                if prev and x <= prev.x2 + 1 then
+                    prev.text = prev.text .. it.text
+                    prev.x2, prev.y, prev.y2 = x + w, math.min(prev.y, y), math.max(prev.y2, y + h)
+                else
+                    prev = { side = side, text = it.text, line = line, x = x, y = y, x2 = x + w, y2 = y + h }
+                    words[#words + 1] = prev
+                end
+            end
+        end
+    end
+    -- Only things worth looking up (not dashes or note numbers).
+    local out = {}
+    for _, w in ipairs(words) do
+        if w.text:find("%a") or w.text:find("[\195-\201]") then out[#out + 1] = w end
+    end
+    return out
+end
+
+-- Look up the selected word. A word split by hyphenation at the end of a
+-- line is joined back together first.
+function look.find()
+    local w = look.words[look.sel]
+    if not w then look.results = {}; return end
+    local tries = { w.text }
+    local nxt, prv = look.words[look.sel + 1], look.words[look.sel - 1]
+    if w.text:sub(-1) == "-" and nxt and nxt.line == w.line + 1 then
+        table.insert(tries, 1, w.text:sub(1, -2) .. nxt.text)
+        table.insert(tries, 2, w.text .. nxt.text)
+    elseif prv and prv.text:sub(-1) == "-" and prv.line == w.line - 1 then
+        table.insert(tries, 1, prv.text:sub(1, -2) .. w.text)
+        table.insert(tries, 2, prv.text .. w.text)
+    end
+    -- Hyphenated compounds with no entry of their own: their parts.
+    for part in look.dict.clean(w.text):gmatch("[^%-\226]+") do
+        if part:find("%a") then tries[#tries + 1] = part end
+    end
+    look.results, look.word = {}, look.dict.clean(w.text)
+    for _, t in ipairs(tries) do
+        local r = look.dict.lookup(t)
+        if #r > 0 then look.results, look.word = r, look.dict.clean(t); break end
+    end
+    look.page = 1
+    look.pages = nil
+end
+
+-- Definitions laid out as pages, in a slightly smaller size of the reading font.
+function look.layout()
+    if look.pages then return look.pages end
+    local size = math.max(18, math.floor(S.font_size * 0.8))
+    if not look.fonts or look.fonts_key ~= S.font .. size then
+        look.fonts = Fonts.load(S.font, size)
+        look.fonts_key = S.font .. size
+    end
+    local blocks = {}
+    for _, r in ipairs(look.results) do
+        local off = #blocks
+        blocks[#blocks + 1] = { kind = "text", heading = 1, off = 0,
+            runs = { { text = r.word, i = false, b = true, off = 0 } } }
+        local body
+        if r.type == "h" or r.type == "g" or r.type == "x" then
+            body = Book.parse_html("<body>" .. r.text .. "</body>", "", {})
+        else
+            body = {}
+            for para in (r.text .. "\n"):gmatch("([^\n]*)\n") do
+                if para:find("%S") then
+                    body[#body + 1] = { kind = "text", off = 0, runs = { { text = para, i = false, b = false, off = 0 } } }
+                end
+            end
+        end
+        for _, b in ipairs(body) do
+            if b.kind == "text" then b.center, b.list = nil, nil end
+            blocks[#blocks + 1] = b
+        end
+    end
+    local w, h = content_size()
+    look.pages = Layout.paginate({ blocks = blocks }, {
+        fonts = look.fonts, size = size, w = w, h = h - 60, spacing = 1.0,
+        justify = false, indent = false, image_size = function() return nil end,
+    })
+    return look.pages
+end
+
+function look.open(word)
+    if not look.dict.list then
+        local dirs = {}
+        for _, d in ipairs(Store.book_dirs()) do dirs[#dirs + 1] = d .. "/Dictionaries" end
+        dirs[#dirs + 1] = love.filesystem.getSource() .. "/dict"
+        look.dict.scan(dirs)
+    end
+    look.words = look.collect()
+    if #look.words == 0 then app.toast("No words on these pages"); return end
+    look.sel = 1
+    for i, w in ipairs(look.words) do
+        if word and w.side == word.side and w.x == word.x and w.y == word.y then look.sel = i end
+    end
+    look.find()
+    reading_pause()
+    app.mode = "lookup"
+    redraw()
+end
+
+-- Move the cursor: by words (left/right) or to the nearest word on the
+-- line above or below (up/down).
+function look.move(a)
+    local ws, cur = look.words, look.words[look.sel]
+    if a == "left" or a == "right" then
+        look.sel = math.max(1, math.min(#ws, look.sel + (a == "right" and 1 or -1)))
+    else
+        local target = cur.line + (a == "down" and 1 or -1)
+        -- Lines with no words (images, blank) are skipped.
+        local best, best_d
+        for _ = 1, 20 do
+            for i, w in ipairs(ws) do
+                if w.line == target then
+                    local d = math.abs((w.x + w.x2) / 2 - (cur.x + cur.x2) / 2)
+                    if w.side ~= cur.side then d = math.abs(w.x - cur.x) end
+                    if not best_d or d < best_d then best, best_d = i, d end
+                end
+            end
+            if best then break end
+            target = target + (a == "down" and 1 or -1)
+        end
+        if best then look.sel = best end
+    end
+    look.find()
+end
+
+-- The word (if any) at a touch point.
+function look.hit(side, u, v)
+    for i, w in ipairs(look.words) do
+        if w.side == side and u >= w.x - 6 and u <= w.x2 + 6 and v >= w.y - 6 and v <= w.y2 + 6 then return w, i end
+    end
+end
+
 ---------------------------------------------------------------- bookmarks
 
 -- A bookmark is a position in the text (chapter + offset), so it survives
@@ -1941,8 +2099,41 @@ function note.draw_panel(side)
     color(th.dim)
     local hint = (#note.refs > 1 and "‹ ›  other notes      " or "") .. "B  close"
     if pages and #pages > 1 then
-        hint = "▲▼  page " .. note.page .. " of " .. #pages .. "      " .. hint
+        hint = "up/down  page " .. note.page .. " of " .. #pages .. "      " .. hint
     end
+    love.graphics.print(hint, ox, PAGE_H - 26 - ui.small:getHeight())
+end
+
+-- The definition, on the page facing the selected word.
+function look.draw_panel(side)
+    local th = theme()
+    local m = margins()
+    local ox = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    local top = text_top()
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local r = look.results[1]
+    love.graphics.print(r and r.dict or "Dictionary", ox, top - 6)
+    love.graphics.setLineWidth(1)
+    love.graphics.line(ox, top + 30, ox + w, top + 30)
+    local pages
+    if #look.results == 0 then
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        local msg = #(look.dict.list or {}) == 0
+            and "No dictionary found. Put StarDict dictionaries in Ebook/Dictionaries."
+            or ("No entry for “" .. look.word .. "”.")
+        love.graphics.printf(msg, ox, top + 60, w, "left")
+    else
+        pages = look.layout()
+        look.page = math.max(1, math.min(look.page, #pages))
+        draw_page(pages[look.page], side, top + 50)
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local hint = "‹ ›  word      up/down  line      B  close"
+    if pages and #pages > 1 then hint = "A  more (" .. look.page .. "/" .. #pages .. ")     " .. hint end
     love.graphics.print(hint, ox, PAGE_H - 26 - ui.small:getHeight())
 end
 
@@ -2128,6 +2319,7 @@ local CREDITS = {
         .. "Institute), Inter (Rasmus Andersson), Lexend (Lexend Project) and "
         .. "OpenDyslexic (Abbie Gonzalez). SIL Open Font License 1.1." },
     { "Hyphenation", "US English patterns from TeX's hyph-utf8, by Gerard D.C. Kuiken." },
+    { "Dictionary", "WordNet 3.1, © 2011 Princeton University (WordNet license)." },
     { "Engine", "LÖVE 11.5 (zlib license), from the PortMaster runtime." },
 }
 
@@ -2201,6 +2393,12 @@ local function render_canvases()
             if side == "left" then reader("left") else draw_jump_panel() end
         end
     elseif app.mode == "shop" then painter = shop.draw
+    elseif app.mode == "lookup" then
+        local reader = draw_reader_pages()
+        local wd = look.words[look.sel]
+        painter = function(side)
+            if side == wd.side then reader(side); note.highlight(wd) else look.draw_panel(side) end
+        end
     elseif app.mode == "note" then
         local reader = draw_reader_pages()
         local r = note.refs[note.sel]
@@ -2442,6 +2640,8 @@ local function touch_event(kind, sx, sy)
             if app.mode == "reader" and math.abs(du) > 60 and now - gesture.t0 < 1.0 then
                 if du < 0 then turn(1, next_spread) else turn(-1, prev_spread) end
             end
+        elseif gesture.held then
+            -- Already handled while the finger was down.
         elseif gesture.moved < 30 and now - gesture.t0 < 0.5 and app.on_tap then
             app.on_tap(gesture.side, gesture.u0, gesture.v0)
         end
@@ -2655,8 +2855,7 @@ function handle_action(a)
         elseif a == "prev_section" then jump_section(-1)
         elseif a == "back" and go_back() then -- B: back to where you were
         elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil
-        elseif a == "toc" and #book.toc > 0 then
-            toc.sel = current_section() or 1; toc.top = nil; app.mode = "toc"
+        elseif a == "toc" then look.open()          -- Y: look up a word
         elseif a == "confirm" then note.open()
         end
         redraw()
@@ -2755,6 +2954,18 @@ function handle_action(a)
         return
     end
 
+    if mode == "lookup" then
+        if a == "left" or a == "right" or a == "up" or a == "down" then look.move(a)
+        elseif a == "confirm" then look.page = look.page + 1
+            if look.pages and look.page > #look.pages then look.page = 1 end
+        elseif a == "back" or a == "menu" or a == "toc" or a == "bookmark" then
+            app.mode = "reader"
+            reading.since = love.timer.getTime()
+        end
+        redraw()
+        return
+    end
+
     if mode == "note" then
         if a == "left" or a == "right" then
             note.sel = (note.sel - 1 + (a == "right" and 1 or -1)) % #note.refs + 1
@@ -2806,6 +3017,14 @@ function handle_action(a)
     end
 end
 
+-- Pressing and holding on the touchscreen: look up the word under the finger.
+function app.on_hold(side, u, v)
+    if app.mode ~= "reader" and app.mode ~= "lookup" then return end
+    look.words = look.collect()
+    local w = look.hit(side, u, v)
+    if w then look.open(w) end
+end
+
 -- A quick tap on the touchscreen (page coordinates of the touched side).
 function app.on_tap(side, u, v)
     local mode = app.mode
@@ -2846,6 +3065,10 @@ function app.on_tap(side, u, v)
         if side == "right" and u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then
             shop.start()
         end
+    elseif mode == "lookup" then
+        -- Another word on this page: look that up. Anywhere else: close.
+        local _, i = look.hit(side, u, v)
+        if i then look.sel = i; look.find(); redraw() else action("back") end
     elseif mode == "note" then
         -- Another note number on this page: show that one. Anywhere else: close.
         local _, i = note.hit(note.refs, side, u, v)
@@ -3148,6 +3371,11 @@ function love.run()
         end
         if Touch.enabled and Touch.poll(lid.closed and function() end or touch_event) then got = true end
         if KeyProbe.enabled and KeyProbe.poll() then got = true end
+        if gesture and not gesture.mode and not gesture.held and gesture.moved < 30
+            and love.timer.getTime() - gesture.t0 > 0.6 then
+            gesture.held = true                -- press and hold
+            app.on_hold(gesture.side, gesture.u0, gesture.v0)
+        end
         if shop.net_poll() then got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
         if save_due and love.timer.getTime() >= save_due then save_progress() end

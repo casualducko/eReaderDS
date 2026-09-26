@@ -1,0 +1,9 @@
+StarDict's dict ifo file
+version=2.4.2
+bookname=WordNet (English)
+wordcount=147478
+synwordcount=4073
+idxfilesize=3021180
+sametypesequence=h
+website=https://wordnet.princeton.edu
+description=WordNet 3.1 Copyright 2011 by Princeton University. See WordNet-LICENSE.txt.
