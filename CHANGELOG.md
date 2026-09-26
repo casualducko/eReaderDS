@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Dimmer: 1% brightness now uses the backlight's true minimum, and three
+  **Extra dim** levels below 1% darken the page further (press left past 1% in
+  Settings → Brightness, or keep sliding down on the touchscreen).
+
 ## v0.2.8
 
 - **Clock** in the top left of the right page (Settings → Status bar → Clock:

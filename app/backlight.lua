@@ -49,7 +49,8 @@ end
 
 function M.set(pct)
     for _, d in ipairs(devices or scan()) do
-        local v = math.max(1, math.floor(d.max * pct / 100 + 0.5))
+        -- 1% is the panel's real minimum (raw 1), 100% its maximum.
+        local v = math.floor(1 + (d.max - 1) * (math.max(1, pct) - 1) / 99 + 0.5)
         local f = io.open(d.dir .. "/brightness", "w")
         if f then
             f:write(tostring(v))

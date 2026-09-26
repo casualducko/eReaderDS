@@ -42,6 +42,10 @@ local MARGINS = { { name = "Narrow", outer = 36, inner = 28 }, { name = "Normal"
 -- Space above and below the text (the header/footer sit inside it).
 local VMARGINS = { { name = "Narrow", size = 60 }, { name = "Normal", size = 76 }, { name = "Wide", size = 110 }, { name = "Extra wide", size = 150 } }
 
+-- Extra dim: a dark layer over both screens for going below the backlight's
+-- minimum. Levels 1-3 (reached by going past 1%).
+local EXTRA_DIM = { 0.35, 0.55, 0.72 }
+
 local S                      -- settings (persisted)
 local app = {
     mode = "library",        -- library | reader | menu | toc | about | message
@@ -463,13 +467,23 @@ local function menu_items()
         { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
             S.justify = not S.justify; pages_cache = {}; goto_pos(pos.ch, pos.off)
         end },
-        { label = "Brightness", value = Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a",
-            adjust = function(d)
-                if not Backlight.available() then return end
-                local cur = S.brightness >= 0 and S.brightness or Backlight.get() or 50
-                S.brightness = Backlight.step(cur, d)
-                Backlight.set(S.brightness)
-            end },
+        { label = "Brightness",
+          value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
+              or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
+          adjust = function(d)
+              local avail = Backlight.available()
+              local cur = S.brightness >= 0 and S.brightness or (avail and Backlight.get()) or 50
+              if d < 0 and (S.extra_dim > 0 or not avail or cur <= 1) then
+                  -- Past the backlight's minimum: extra dim levels.
+                  S.extra_dim = math.min(#EXTRA_DIM, S.extra_dim + 1)
+                  if avail and cur > 1 then S.brightness = 1; Backlight.set(1) end
+              elseif d > 0 and S.extra_dim > 0 then
+                  S.extra_dim = S.extra_dim - 1
+              elseif avail then
+                  S.brightness = Backlight.step(cur, d)
+                  Backlight.set(S.brightness)
+              end
+          end },
         { label = "Theme", value = th.name, adjust = function(d)
             S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
         end },
@@ -1140,16 +1154,23 @@ local function touch_event(kind, sx, sy)
             -- dim end gets finer control.
             gesture.mode = "brightness"
             gesture.v0 = v
-            gesture.p0 = math.sqrt(current_brightness() / 100)
+            gesture.p0 = S.extra_dim > 0 and (0.1 - S.extra_dim * 0.05) or math.sqrt(current_brightness() / 100)
         end
         if gesture.mode == "brightness" then
             local p = gesture.p0 + (gesture.v0 - v) / (PAGE_H * 0.8)
-            local pct = math.max(1, math.min(100, math.floor(p * p * 100 + 0.5)))
+            -- Below 1% (p < 0.1) the slide continues into the extra dim levels.
+            local pct, extra = 1, 0
+            if p < 0.1 then
+                extra = math.max(1, math.min(#EXTRA_DIM, math.ceil((0.1 - p) / 0.05)))
+            else
+                pct = math.max(1, math.min(100, math.floor(p * p * 100 + 0.5)))
+            end
+            S.extra_dim = extra
             if Backlight.available() and pct ~= S.brightness then
                 S.brightness = pct
                 Backlight.set(pct)
             end
-            overlay = { side = gesture.side, pct = Backlight.available() and pct or nil, hide_at = now + 1e9 }
+            overlay = { side = gesture.side, pct = Backlight.available() and pct or nil, extra = extra, hide_at = now + 1e9 }
             redraw()
         end
     elseif kind == "up" and gesture then
@@ -1179,7 +1200,16 @@ local function draw_overlay()
     love.graphics.rectangle("fill", x, y, w, h, 22, 22)
     love.graphics.setColor(1, 1, 1, 0.95)
     love.graphics.setFont(ui.font)
-    if overlay.pct then
+    if overlay.extra and overlay.extra > 0 then
+        love.graphics.print("Extra dim", x + 28, y + 14)
+        love.graphics.printf(overlay.extra .. " of " .. #EXTRA_DIM, x, y + 14, w - 28, "right")
+        local bx, by, bw = x + 28, y + 76, w - 56
+        for k = 1, #EXTRA_DIM do
+            love.graphics.setColor(1, 1, 1, k <= overlay.extra and 0.95 or 0.25)
+            local sw = (bw - 16) / #EXTRA_DIM
+            love.graphics.rectangle("fill", bx + (k - 1) * (sw + 8), by, sw, 12, 6, 6)
+        end
+    elseif overlay.pct then
         love.graphics.print("Brightness", x + 28, y + 14)
         love.graphics.printf(overlay.pct .. "%", x, y + 14, w - 28, "right")
         local bx, by, bw = x + 28, y + 76, w - 56
@@ -1205,10 +1235,19 @@ local function frame()
     compose()
 end
 
+local function draw_extra_dim()
+    local a = EXTRA_DIM[S.extra_dim]
+    if a then
+        love.graphics.setColor(0, 0, 0, a)
+        love.graphics.rectangle("fill", 0, 0, SCREEN_W * 2, SCREEN_H)
+    end
+end
+
 function love.draw()
     love.graphics.push()
     love.graphics.scale(app.scale)
     frame()
+    draw_extra_dim()
     draw_overlay()
     love.graphics.pop()
 end
@@ -1571,6 +1610,7 @@ local function run_test_script()
             love.graphics.setCanvas(shot)
             compose()
         end
+        draw_extra_dim()
         draw_overlay()
         love.graphics.setCanvas()
         local png = shot:newImageData():encode("png"):getString()

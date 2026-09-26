@@ -48,7 +48,7 @@ buttons are under your right hand. Directions below are as you hold it.
 The **analog stick** works like the D-pad.
 
 **Touch** (bottom screen): swipe left/right to turn pages, and slide up/down
-for brightness. Tapping the right or left half turns pages forward or back.
+for brightness (keep sliding below 1% for Extra dim). Tapping the right or left half turns pages forward or back.
 To make a tap open Settings instead, use **Settings → Tap**.
 
 ## Features
