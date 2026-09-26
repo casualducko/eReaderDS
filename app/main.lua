@@ -690,12 +690,8 @@ local function menu_items()
             end },
             { label = "Bookmarks", value = tostring(#Store.get_bookmarks(book.path)),
               act = function() open_bookmarks("menu") end },
-            { label = "Jump to % (" .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. ")", value = "", adjust = function(d)
-                local f = book:fraction(pos.ch, pos.off) + d * 0.01
-                remember_jump()
-                goto_pos(book:locate(math.max(0, math.min(1, f))))
-                save_progress()
-            end },
+            { label = "Jump to %", value = math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
+              act = function() app.open_jump() end },
             { label = "Library", act = go_library },
         }),
         section("Text", {
@@ -1276,6 +1272,100 @@ local function draw_toc(side)
     end)
 end
 
+---------------------------------------------------------------- jump picker
+
+-- Choose a percentage first, then jump once. Left/right: 1%, L/R and up/down:
+-- 10%, or drag the bar on the touchscreen.
+local jp = { pct = 0 }
+local JP_BAR_Y = 560
+local function jp_bar()
+    local m = MARGINS[2]
+    return m.inner + 12, PAGE_W - m.outer - m.inner - 24     -- x, width on the right page
+end
+
+function app.open_jump()
+    jp.pct = math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5)
+    jp.here = jp.pct
+    app.mode = "jump"
+    redraw()
+end
+
+-- Chapter title near a whole-book fraction, without laying anything out:
+-- find the chapter file by size, then the closest Contents entry.
+local function section_title_at(frac)
+    local target = frac * book.total
+    local i = #book.chapters
+    for k, c in ipairs(book.chapters) do
+        if target < c.start + c.weight then i = k; break end
+    end
+    local c = book.chapters[i]
+    local within = math.max(0, math.min(1, (target - c.start) / math.max(1, c.weight)))
+    local best, in_file = nil, {}
+    for idx, t in ipairs(book.toc) do
+        if t.chapter < i then best = idx
+        elseif t.chapter == i then in_file[#in_file + 1] = idx end
+    end
+    if #in_file > 0 then
+        if c.length then
+            -- Chapter already opened: use real offsets.
+            local off = within * c.length
+            for _, idx in ipairs(in_file) do
+                local _, toff = toc_pos(book.toc[idx])
+                if toff <= off then best = idx end
+            end
+        else
+            -- Otherwise assume the entries are spread evenly through the file.
+            local k = math.floor(within * #in_file) + 1
+            if within > 0 or not best then best = in_file[math.min(k, #in_file)] end
+        end
+    end
+    return best and book.toc[best].title or book.title
+end
+
+local function draw_jump_panel()
+    local th = theme()
+    local m = MARGINS[2]
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print("Jump to", x, 60)
+    love.graphics.setFont(ui.big)
+    love.graphics.printf(jp.pct .. "%", x, 250, w, "center")
+    love.graphics.setFont(ui.font)
+    color(th.dim)
+    love.graphics.printf(fit_text(ui.font, section_title_at(jp.pct / 100), w), x, 400, w, "center")
+
+    -- The bar: 10% ticks, a marker for where you are now, and the handle.
+    local bx, bw = jp_bar()
+    local by = JP_BAR_Y
+    color(th.dim, 0.3)
+    love.graphics.rectangle("fill", bx, by - 4, bw, 8, 4, 4)
+    color(th.fg)
+    love.graphics.rectangle("fill", bx, by - 4, bw * jp.pct / 100, 8, 4, 4)
+    color(th.dim)
+    for t = 0, 100, 10 do
+        local tx = bx + bw * t / 100
+        love.graphics.rectangle("fill", tx - 1, by + 14, 2, t % 50 == 0 and 14 or 8)
+    end
+    love.graphics.setFont(ui.small)
+    love.graphics.print("0%", bx - 6, by + 34)
+    love.graphics.printf("100%", bx, by + 34, bw + 12, "right")
+    local hx = bx + bw * jp.here / 100
+    love.graphics.polygon("fill", hx, by - 18, hx - 9, by - 32, hx + 9, by - 32)
+    local lx = math.max(bx - 12, math.min(bx + bw + 12 - 200, hx - 100))   -- keep the label on the page
+    love.graphics.printf("you are here", lx, by - 62, 200, "center")
+    color(th.fg)
+    love.graphics.circle("fill", bx + bw * jp.pct / 100, by, 16)
+    color(th.bg)
+    love.graphics.circle("fill", bx + bw * jp.pct / 100, by, 7)
+
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.printf("‹ ›  1%      L R  10%      Drag the bar to move",
+        x, by + 110, w, "center")
+    love.graphics.printf("A jump    B cancel", x, PAGE_H - 70, w, "left")
+end
+
 local function bookmark_entries()
     local entries = { { action = true } }
     for _, b in ipairs(Store.get_bookmarks(book.path)) do entries[#entries + 1] = b end
@@ -1404,6 +1494,11 @@ local function render_canvases()
         end
     elseif app.mode == "toc" then painter = draw_toc
     elseif app.mode == "bookmarks" then painter = draw_bookmarks
+    elseif app.mode == "jump" then
+        local reader = draw_reader_pages()
+        painter = function(side)
+            if side == "left" then reader("left") else draw_jump_panel() end
+        end
     elseif app.mode == "about" then painter = draw_about
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
@@ -1413,7 +1508,7 @@ local function render_canvases()
         love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
         love.graphics.origin()
         painter(side)
-        if app.mode == "menu" and side == "left" and menu.page ~= "status" then
+        if (app.mode == "menu" and menu.page ~= "status" or app.mode == "jump") and side == "left" then
             love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
             love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
         end
@@ -1589,6 +1684,14 @@ end
 local function touch_event(kind, sx, sy)
     local side, u, v = touch_to_page(sx, sy)
     local now = love.timer.getTime()
+    if app.mode == "jump" and side == "right" and kind ~= "up" and math.abs(v - JP_BAR_Y) < 140 then
+        -- Dragging along the picker's bar sets the percentage directly.
+        local bx, bw = jp_bar()
+        jp.pct = math.max(0, math.min(100, math.floor((u - bx) / bw * 100 + 0.5)))
+        gesture = nil
+        redraw()
+        return
+    end
     if kind == "down" then
         gesture = { side = side, u0 = u, v0 = v, u = u, t0 = now, moved = 0 }
     elseif kind == "move" and gesture then
@@ -1875,6 +1978,25 @@ function handle_action(a)
         return
     end
 
+    if mode == "jump" then
+        local step = ({ left = -1, right = 1, prev = -10, next = 10, up = -10, down = 10,
+            prev_section = -10, next_section = 10 })[a]
+        if step then
+            jp.pct = math.max(0, math.min(100, jp.pct + step))
+        elseif a == "confirm" then
+            if jp.pct ~= jp.here then
+                remember_jump()
+                goto_pos(book:locate(jp.pct / 100))
+                save_progress()
+            end
+            app.mode = "reader"
+        elseif a == "back" or a == "menu" then
+            app.mode = "menu"
+        end
+        redraw()
+        return
+    end
+
     if mode == "bookmarks" then
         local entries = bookmark_entries()
         local n = #entries
@@ -2137,6 +2259,7 @@ function love.load()
     ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
     ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
+    ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
     build_fonts()
 
     scan_library()
