@@ -15,7 +15,8 @@
 - **Delete books** from the library: Y on a book, then A to confirm. Its
   progress and bookmarks are forgotten too.
 - **Get books over Wi-Fi** from Calibre, Calibre-Web or any OPDS catalog,
-  set up in `Ebook/.ereaderds/opds.txt`. Browse with covers and
+  set up in `Ebook/.ereaderds/opds.txt`. Open it from the library with
+  Select or the Get books button on the touchscreen. Browse with covers and
   descriptions, and download EPUBs to the SD card with a progress bar
   (B cancels). Works over HTTPS, with Basic or Digest logins.
 - **Jump to %** opens a picker: choose the percentage first (left/right 1%,

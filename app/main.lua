@@ -576,12 +576,11 @@ local function scan_library()
         end
     end
     library.sort(items)
-    -- Online catalogs from opds.txt come first, as "Get books" rows.
+    -- Online catalogs from opds.txt, for "Get books" (Select, or the button
+    -- on the right page).
     local ok, catalogs = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
     if not ok then print("[opds] " .. tostring(catalogs)); catalogs = {} end
-    for i, c in ipairs(catalogs) do
-        table.insert(items, i, { catalog = c, title = "Get books", author = c.name })
-    end
+    library.catalogs = catalogs
     library.items = items
     library.sel = math.max(1, math.min(library.sel, #items))
 end
@@ -606,7 +605,6 @@ local previews, preview_order = {}, {}
 local function library_preview()
     local it = library.items[library.sel]
     if not it then return nil end
-    if it.catalog then return { catalog = it.catalog } end
     if previews[it.path] then return previews[it.path] end
     local pv = { path = it.path }
     local ok, b = pcall(Book.open, it.path)
@@ -647,6 +645,12 @@ function library.delete(path)
     Store.flush()
     scan_library()
     app.toast("Book deleted")
+end
+
+-- The "Get books" button on the library's right page: x, y, w, h.
+function library.get_books_button()
+    local w, h = 340, 60
+    return math.floor((PAGE_W - w) / 2), PAGE_H - 96, w, h
 end
 
 local function go_library()
@@ -751,6 +755,27 @@ function shop.open(catalog)
     shop.push_page(catalog.name, catalog.url)
 end
 
+-- "Get books" from the library: straight into the only catalog, a list to
+-- choose from when there are several, or how to set one up.
+function shop.start()
+    local cats = library.catalogs or {}
+    if #cats == 1 then shop.open(cats[1]) return end
+    if #cats == 0 then
+        app.message_back = "library"
+        show_message("Get books downloads books over Wi-Fi from Calibre or another OPDS catalog.\n\n"
+            .. "To set one up, edit Ebook/.ereaderds/opds.txt on the SD card.")
+        return
+    end
+    local entries = {}
+    for _, c in ipairs(cats) do
+        local u = Opds.parse_url(c.url)
+        entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = "", formats = {}, catalog = c }
+    end
+    shop.stack = { { title = "Get books", entries = entries, sel = 1, top = 1 } }
+    app.mode = "shop"
+    redraw()
+end
+
 -- Is this book already in the library (same file name, or same title)?
 function shop.have(it)
     if not it.book then return nil end
@@ -831,6 +856,9 @@ function shop.confirm()
         if shop.dl then return end
         local have = it.have or shop.have(it)
         if have then open_book(have) else it.failed = nil; shop.start_download(it) end
+    elseif it.catalog then
+        shop.catalog = it.catalog
+        shop.push_page(it.catalog.name, it.catalog.url)
     elseif it.href then
         shop.push_page(it.title, it.href)
     end
@@ -1355,7 +1383,6 @@ local function draw_library(side)
             local bottom = 40 + ui.small:getBaseline()
             local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
             love.graphics.print(fit_text(ui.font, it.title, rw - 90), rx, ty)
-            if it.catalog then love.graphics.printf("›", rx, ty, rw, "right") end
             local pr = it.path and Store.get_progress(it.path)
             love.graphics.setFont(ui.small)
             color(th.dim)
@@ -1370,28 +1397,27 @@ local function draw_library(side)
         love.graphics.print("A  open      Y  delete      ‹ ›  sort" .. (book and "      B  back" or ""), x, PAGE_H - 70)
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
     else
+        local x, w = MARGINS[2].inner, PAGE_W - MARGINS[2].outer - MARGINS[2].inner
+        -- "Get books" button at the bottom of the touchscreen (also Select).
+        local bx, by, bw, bh = library.get_books_button()
+        color(th.sel)
+        love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+        love.graphics.setFont(ui.font)
+        local label, hint = "Get books", "   Select"
+        local lx = bx + (bw - ui.font:getWidth(label) - ui.small:getWidth(hint)) / 2
+        local ly = centered_y(ui.font, UI_SIZE, by, bh)
+        color(th.fg)
+        love.graphics.print(label, lx, ly)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print(hint, lx + ui.font:getWidth(label), ly + ui.font:getBaseline() - ui.small:getBaseline())
         local pv = library_preview()
         if not pv then return end
-        local x, w = MARGINS[2].inner, PAGE_W - MARGINS[2].outer - MARGINS[2].inner
-        if pv.catalog then
-            local u = Opds.parse_url(pv.catalog.url)
-            love.graphics.setFont(ui.title)
-            color(th.fg)
-            love.graphics.printf("Get books", x, 300, w, "center")
-            love.graphics.setFont(ui.font)
-            color(th.dim)
-            love.graphics.printf(pv.catalog.name .. (u and u.host ~= pv.catalog.name and ("\n" .. u.host) or ""),
-                x, 370, w, "center")
-            love.graphics.setFont(ui.small)
-            love.graphics.printf("Browse this catalog over Wi-Fi and download books to your SD card.\n\n"
-                .. "Catalogs are set up in Ebook/.ereaderds/opds.txt.", x, 520, w, "center")
-            return
-        end
         local y = 80
         local confirming = library.confirm == pv.path
         if pv.cover and not confirming then
             local iw, ih = pv.cover:getDimensions()
-            local s = math.min(w / iw, 620 / ih)
+            local s = math.min(w / iw, 520 / ih)
             love.graphics.setColor(1, 1, 1)
             love.graphics.draw(pv.cover, x + (w - iw * s) / 2, y, 0, s, s)
             y = y + ih * s + 40
@@ -1485,11 +1511,11 @@ function shop.draw(side)
                 if e.book then
                     mark = (shop.dl and shop.dl.item == e) and "…"
                         or (e.have or shop.have(e)) and "✓" or nil
-                elseif e.href then
+                elseif e.href or e.catalog then
                     mark = "›"
                 end
                 love.graphics.setFont(ui.font)
-                color((e.book or e.href) and th.fg or th.dim)
+                color((e.book or e.href or e.catalog) and th.fg or th.dim)
                 love.graphics.print(fit_text(ui.font, e.title, rw - 60), rx, ty)
                 if mark then love.graphics.printf(mark, rx, ty, rw, "right") end
                 if sub ~= "" then
@@ -1560,7 +1586,7 @@ function shop.draw(side)
         end
     elseif #it.formats > 0 then
         status = "Only as " .. table.concat(it.formats, ", ") .. ".\nThis reader needs EPUB or TXT."
-    elseif it.href then
+    elseif it.href or it.catalog then
         action_text = "A open"
     end
 
@@ -2406,13 +2432,17 @@ function handle_action(a)
     if lid.closed then return end         -- pocket presses while the lid is shut
     local mode = app.mode
     -- Select bookmarks while reading; elsewhere it behaves like the menu button.
-    if a == "bookmark" and mode ~= "reader" then a = "menu" end
+    if a == "bookmark" and mode ~= "reader" and mode ~= "library" then a = "menu" end
     -- Pressing the stick in opens Settings while reading, and selects elsewhere.
     if a == "stick" then a = mode == "reader" and "menu" or "confirm" end
     if a == "quit" then love.event.quit() return end
 
     if mode == "message" then
-        if a == "confirm" or a == "back" then app.mode = book and "reader" or "library"; redraw() end
+        if a == "confirm" or a == "back" then
+            app.mode = app.message_back or (book and "reader" or "library")
+            app.message_back = nil
+            redraw()
+        end
         return
     end
 
@@ -2548,12 +2578,12 @@ function handle_action(a)
             elseif a == "down" then library.sel = math.min(n, library.sel + 1)
             elseif a == "left" or a == "right" then library.cycle_sort(a == "right" and 1 or -1)
             elseif a == "confirm" then
-                local it = library.items[library.sel]
-                if it.catalog then shop.open(it.catalog) else open_book(it.path) end
-            elseif a == "toc" and library.items[library.sel].path then
+                open_book(library.items[library.sel].path)
+            elseif a == "toc" then
                 library.confirm = library.items[library.sel].path
             end
         end
+        if a == "bookmark" then shop.start() end
         if a == "menu" and book then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil end
         if a == "back" and book then app.mode = "reader" end
         redraw()
@@ -2587,6 +2617,11 @@ function app.on_tap(side, u, v)
             action("confirm")
         elseif side == "left" then
             action("back")            -- tapped the dimmed book page: close
+        end
+    elseif mode == "library" then
+        local bx, by, bw, bh = library.get_books_button()
+        if side == "right" and u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then
+            shop.start()
         end
     elseif mode == "shop" then
         -- Tap a row to open it; tap the right page to download or read.

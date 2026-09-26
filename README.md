@@ -41,7 +41,7 @@ buttons are under your right hand. Directions below are as you hold it.
 | A | | Select |
 | Press the stick in | Settings | Select |
 | B | Settings (or go back after a jump) | Back |
-| Select | Bookmark this page (again to remove) | Close |
+| Select | Bookmark this page (again to remove) | Close (in the library: Get books) |
 | Start, X, or the ↩ button | Settings | Close |
 | Y | Contents | Delete the book (library) |
 | Menu (Anbernic button) | Quit | Quit |
@@ -114,8 +114,9 @@ Leave out `user` and `password` if the server doesn't need them. Add
 another block for each extra catalog. For a server with a self-signed
 certificate, add `verify = no`.
 
-Each catalog shows up as **Get books** at the top of the library. Browse
-with the D-pad or by tapping, then press A on a book to download it. EPUB is
+In the library, press **Select** or tap the **Get books** button at the
+bottom of the touchscreen. With more than one catalog you choose one first.
+Browse with the D-pad or by tapping, then press A on a book to download it. EPUB is
 preferred, and books you already have are marked ✓. There's no search,
 because there's no keyboard.
 

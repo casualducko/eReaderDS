@@ -15,7 +15,8 @@ CONTROLS (hold it turned counter-clockwise; directions as held)
   A ..................... select
   Press stick in ........ settings while reading; select in menus
   B ..................... settings / back (after a jump: go back)
-  Select ................ bookmark this page (press again to remove)
+  Select ................ bookmark this page (press again to remove);
+                          in the library: get books over Wi-Fi
   Start, X, ↩ ........... open / close settings
   Y ..................... contents
   Menu (Anbernic) ....... quit
