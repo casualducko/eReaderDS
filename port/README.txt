@@ -18,7 +18,7 @@ CONTROLS (hold it turned counter-clockwise; directions as held)
   Start, X, Select, ↩ ... open / close settings
   Y ..................... contents
   Menu (Anbernic) ....... quit
-  Analog stick .......... like the D-pad (reading: left/right turn pages)
+  Analog stick .......... like the D-pad
 
 TOUCH (bottom screen)
   Swipe left/right ...... turn pages

@@ -45,8 +45,7 @@ buttons are under your right hand. Directions below are as you hold it.
 | Y | Contents | |
 | Menu (Anbernic button) | Quit | Quit |
 
-The **analog stick** works like the D-pad. While reading, only its left/right
-turn pages.
+The **analog stick** works like the D-pad.
 
 **Touch** (bottom screen): swipe left/right to turn pages, and slide up/down
 for brightness. Tapping the right or left half turns pages forward or back.

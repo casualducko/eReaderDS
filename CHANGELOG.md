@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The analog stick turns pages in all four directions again, like the D-pad
+  (down/right forward, up/left back).
 - New **About** page in Settings: version, "Created by casualducko", and
   credits for the fonts and engine.
 
