@@ -49,6 +49,7 @@ and the Library are at the top of **Settings**.
   open Settings instead: **Settings → Page turns & device → Tap**.)
 - Slide up/down to change brightness; keep going below 1% for Extra dim.
 - Tap the top-right corner to bookmark the page.
+- Tap the top edge (left of that corner) to show or hide all the status bars.
 - Press and hold a word to look it up.
 - Tap a note number, or the **Notes** button, to show footnotes.
 
@@ -56,7 +57,7 @@ and the Library are at the top of **Settings**.
 
 - **Reading:** EPUB and plain text with italics, headings, images and covers;
   justified text with optional hyphenation (English); 10 built-in fonts plus
-  your own; 11 themes, including E-ink, Night and Amber; page-flip or fade
+  your own; 11 themes (E-ink by default, plus Paper, Night, Amber and more); page-flip or fade
   animation.
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.

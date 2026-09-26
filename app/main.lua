@@ -98,8 +98,12 @@ local message = nil
 ---------------------------------------------------------------- utilities
 
 local function theme_index()
-    for i, t in ipairs(THEMES) do if t.name == S.theme then return i end end
-    return 1
+    local default = 1
+    for i, t in ipairs(THEMES) do
+        if t.name == S.theme then return i end
+        if t.name == "E-ink" then default = i end
+    end
+    return default
 end
 local function theme() return THEMES[theme_index()] end
 local function color(c, a) love.graphics.setColor(c[1], c[2], c[3], a or 1) end
@@ -3170,6 +3174,12 @@ function app.on_tap(side, u, v)
             go_back()                         -- the "Back to ..." line
         elseif side == "right" and u > PAGE_W - 150 and v < 150 then
             toggle_bookmark()                 -- top-right corner, like a Kindle
+        elseif side == "right" and v < 90 then
+            -- The top edge (left of the bookmark corner): show or hide all
+            -- the status bars.
+            S.sb_show = not S.sb_show
+            relayout()
+            Store.save_settings(S)
         elseif S.tap == "next" then
             -- Turn pages: right half of the page goes forward, left half back.
             if u >= PAGE_W / 2 then turn(1, next_spread) else turn(-1, prev_spread) end

@@ -7,7 +7,7 @@ local DEFAULTS = {
     hyphenate = false, -- English books only (the patterns are US English)
     lib_sort = "recent", -- library order: "recent" | "title" | "author" | "progress"
     dict = "all",      -- dictionary for look-ups: "all" or a dictionary's name
-    theme = "Paper", chrome = true, orient = "left", anim = "flip",
+    theme = "E-ink", chrome = true, orient = "left", anim = "flip",
     tap = "next",      -- what a tap on the touchscreen does while reading: "menu" | "next"
     -- status bar
     sb_title = "both", sb_pages = "left", sb_percent = true,

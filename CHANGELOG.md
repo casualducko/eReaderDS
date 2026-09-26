@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **E-ink** is the default theme for new installs (your chosen theme is kept).
+- **Tap the top edge** of the bottom screen (left of the bookmark corner) to
+  show or hide all the status bars at once.
+
 ## v0.3.0
 
 ### New
