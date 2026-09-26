@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- **Library sorting**: L/R (or tap the order at the top) switches between
+- **Library sorting**: left/right on the D-pad or stick (or a tap on the
+  order at the top) switches between
   Recent (last opened first, the default), Title, Author (by last name) and
   Progress (books you're reading first, then unread, then finished).
 - **Hyphenation** for English books (Settings → Hyphenation, off by default).

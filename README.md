@@ -61,7 +61,7 @@ To make a tap open Settings instead, use **Settings → Tap**.
 - Justified text, optional hyphenation (English books), indents, and each
   chapter starting on a new page
 - Library with covers and progress, sorted by recent, title, author or
-  progress (L/R); your place in every book is saved
+  progress (D-pad left/right); your place in every book is saved
 - Delete books from the library (Y, then A to confirm)
 - Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
   from Settings → Bookmarks

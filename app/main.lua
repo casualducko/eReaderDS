@@ -509,7 +509,7 @@ local function open_book(path)
     save_progress()
 end
 
--- Library order, chosen with L/R in the library.
+-- Library order, chosen with left/right in the library.
 local SORTS = { "recent", "title", "author", "progress" }
 local SORT_NAMES = { recent = "Recent", title = "Title", author = "Author", progress = "Progress" }
 
@@ -1329,7 +1329,7 @@ local function draw_library(side)
         color(th.fg)
         love.graphics.print("Library", x, 60)
         if #library.items > 0 then
-            -- The sort order, changed with L/R (or a tap), like a settings value.
+            -- The sort order, changed with left/right (or a tap), like a settings value.
             love.graphics.setFont(ui.font)
             color(th.dim)
             love.graphics.printf("‹ " .. SORT_NAMES[S.lib_sort] .. " ›", x,
@@ -1367,7 +1367,7 @@ local function draw_library(side)
         end)
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.print("A  open      Y  delete      L R  sort" .. (book and "      B  back" or ""), x, PAGE_H - 70)
+        love.graphics.print("A  open      Y  delete      ‹ ›  sort" .. (book and "      B  back" or ""), x, PAGE_H - 70)
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
     else
         local pv = library_preview()
@@ -2524,10 +2524,8 @@ function handle_action(a)
     end
 
     if mode == "shop" then
-        if a == "up" or a == "left" then shop.move(-1)
-        elseif a == "down" or a == "right" then shop.move(1)
-        elseif a == "prev" then shop.move(-list_rows(96))
-        elseif a == "next" then shop.move(list_rows(96))
+        if a == "up" then shop.move(-1)
+        elseif a == "down" then shop.move(1)
         elseif a == "confirm" then shop.confirm()
         elseif a == "back" then shop.back()
         elseif a == "menu" and not shop.dl then shop.stack = {}; shop.back() end
@@ -2546,9 +2544,9 @@ function handle_action(a)
             return
         end
         if n > 0 then
-            if a == "up" or a == "left" then library.sel = math.max(1, library.sel - 1)
-            elseif a == "down" or a == "right" then library.sel = math.min(n, library.sel + 1)
-            elseif a == "prev" or a == "next" then library.cycle_sort(a == "next" and 1 or -1)
+            if a == "up" then library.sel = math.max(1, library.sel - 1)
+            elseif a == "down" then library.sel = math.min(n, library.sel + 1)
+            elseif a == "left" or a == "right" then library.cycle_sort(a == "right" and 1 or -1)
             elseif a == "confirm" then
                 local it = library.items[library.sel]
                 if it.catalog then shop.open(it.catalog) else open_book(it.path) end
@@ -2591,7 +2589,7 @@ function app.on_tap(side, u, v)
             action("back")            -- tapped the dimmed book page: close
         end
     elseif mode == "library" then
-        if side == "left" and v < 150 and u > PAGE_W / 2 then action("next") end    -- the sort order
+        if side == "left" and v < 150 and u > PAGE_W / 2 then action("right") end   -- the sort order
     elseif mode == "shop" then
         -- Tap a row to open it; tap the right page to download or read.
         local pg = shop.page()
