@@ -12,7 +12,7 @@ local DEFAULTS = {
     -- status bar
     sb_title = "both", sb_pages = "left", sb_percent = true,
     sb_bar = "chapter", sb_bar_size = 2, sb_battery = true,
-    sb_show = true, sb_clock = "off", tz = "UTC",
+    sb_show = true, sb_clock = "off", tz = "Device clock",
     sb_time = "chapter", -- time left in the chapter: "chapter" | "off"
     read_cps = 20,     -- learned reading speed, characters per second (~250 words/min to start)
     brightness = -1,   -- percent; -1 = leave the system setting alone
@@ -115,6 +115,8 @@ function M.load_settings()
         if allowed and not allowed[s[k]] then s[k] = DEFAULTS[k] end
     end
     s.read_cps = math.max(3, math.min(80, s.read_cps))
+    -- The old default "UTC" meant "the device's time as it is".
+    if s.tz == "UTC" then s.tz = "Device clock" end
     -- The flipped grip was removed (the buttons end up under the wrong hand), so
     -- anyone who had it set goes back to the normal one.
     s.orient = "left"

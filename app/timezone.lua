@@ -1,11 +1,14 @@
--- Time zones for the status bar clock. The device clock runs on UTC with no
--- time zone configured, so the chosen zone is applied by setting TZ to a POSIX
--- rule string (which carries its own daylight-saving rules, no tz database
--- needed) and calling tzset(); os.date() then returns local time.
+-- Time zones for the status bar clock. A chosen zone is applied by setting TZ
+-- to a POSIX rule string (which carries its own daylight-saving rules, no tz
+-- database needed) and calling tzset(); os.date() then returns local time.
 local M = {}
 
--- Named zones with daylight saving, then fixed UTC offsets for everywhere else.
+-- "Device clock" shows the device's time as it is. The stock firmware keeps
+-- the clock on local time (set in its own settings) while calling it UTC, so
+-- that's the right choice there; the named zones are for a clock that really
+-- runs on UTC. Then zones with daylight saving, then fixed UTC offsets.
 M.ZONES = {
+    { "Device clock", "UTC0" },
     { "UTC", "UTC0" },
     { "US Eastern", "EST5EDT,M3.2.0,M11.1.0" },
     { "US Central", "CST6CDT,M3.2.0,M11.1.0" },

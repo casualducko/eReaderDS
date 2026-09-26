@@ -5,6 +5,10 @@
 - The status bar no longer estimates **time left in the book**, which was
   often well off (it had to guess at chapters not yet opened). It shows the
   percentage read instead; time left in the chapter stays.
+- **Clock fix:** the stock firmware keeps the device clock on local time, so
+  applying a time zone on top shifted it by hours. The new default time zone,
+  **Device clock**, shows the time as set in the device's own settings (the
+  old "UTC" default becomes this); pick a named zone only if the clock is on UTC.
 
 ## v0.3.1
 
