@@ -1,88 +1,78 @@
 # eReaderDS for the RG DS Plus
 
 A two-page ebook reader for the **Anbernic RG DS Plus**. Hold the device
-sideways like an open book, and each screen shows one page.
+sideways like an open book: each screen shows one page.
 
 Created by **casualducko**.
 
 ![Reading, held sideways](docs/screenshots/reading.png)
 
-> **For the RG DS Plus on its stock firmware only.** It isn't for the original
-> RG DS or for custom firmware such as ROCKNIX or KNULLI.
->
-> **This is a test release.** If something goes wrong, please
-> [report it](#reporting-problems).
+> **RG DS Plus on its stock firmware only** (not the original RG DS, and not
+> custom firmware such as ROCKNIX or KNULLI). **This is a test release**:
+> please [report problems](#reporting-problems).
 
 ## Install
 
 1. Download `eReaderDS-vX.Y.Z.zip` from the
    [latest release](https://github.com/casualducko/eReaderDS-beta/releases/latest)
-   (or use the zip you were sent) and unzip it on your computer.
-2. Open the unzipped `Ports` folder and copy **`eReaderDS.sh`** and the
+   and unzip it on your computer.
+2. From the unzipped `Ports` folder, copy **`eReaderDS.sh`** and the
    **`eReaderDS`** folder into the `Ports` folder on the SD card.
-3. Copy `.epub` or `.txt` books into the card's `Ebook` folder.
+3. Put `.epub` or `.txt` books in the card's `Ebook` folder.
 4. On the device, open **Ports → eReaderDS**.
 
-**Updating:** copy the two items from a newer zip the same way, replacing the
-old ones. Your settings, reading positions and fonts are kept.
-
-> Copy the two items, not the whole `Ports` folder: on a Mac, replacing
-> `Ports` would delete your other ports.
+To update, copy the same two items from a newer zip over the old ones. Your
+settings, reading positions, bookmarks and fonts are kept. (Copy the two
+items, not the whole `Ports` folder: on a Mac, replacing `Ports` deletes your
+other ports.)
 
 ## Controls
 
-Hold it turned counter-clockwise: the top screen is the left page, and the
-buttons are under your right hand. Directions below are as you hold it.
+Hold the device turned counter-clockwise, buttons under your right hand.
+Directions are as you hold it.
 
-| Button | Reading | Menus |
+| Button | While reading | In lists and menus |
 |---|---|---|
-| D-pad | Turn pages (right/down forward, left/up back) | Up/down move; left/right change a value (or move, on rows without one) |
+| D-pad or stick | Turn pages (right/down forward) | Up/down move; left/right change a value, page through a list, or change the library's sort order |
 | A | Show the notes on these pages | Select |
-| Press the stick in | Settings | Select |
-| B | Settings (or go back after a jump) | Back |
-| Select | Bookmark this page (again to remove) | Close (in the library: Get books) |
-| Start, X, or the ↩ button | Settings | Close |
-| Y | Look up a word | Delete the book (library) |
+| B | Settings, or go back after a jump | Back |
+| Y | Look up a word | Delete (a book in the library, a bookmark in Bookmarks) |
+| Select | Bookmark the page (again to remove) | Close; in the library: Get books |
+| Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
 | Menu (Anbernic button) | Quit | Quit |
 
-The **analog stick** works like the D-pad.
+The L/R and L2/R2 shoulder buttons aren't used. Contents, Bookmarks, Jump to %
+and the Library are at the top of **Settings**.
 
-**Touch** (bottom screen): swipe left/right to turn pages, and slide up/down
-for brightness (keep sliding below 1% for Extra dim). Tapping the right or left half turns pages forward or back, and tapping the
-top-right corner bookmarks the page. Press and hold a word to look it up. Tapping a note number shows the note on
-the left page, and a **Notes** button appears at the bottom of the page
-whenever there are notes on the spread (including on the top screen).
-To make a tap open Settings instead, use **Settings → Page turns & device → Tap**.
+**Touch (bottom screen only):**
+- Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
+  open Settings instead: **Settings → Page turns & device → Tap**.)
+- Slide up/down to change brightness; keep going below 1% for Extra dim.
+- Tap the top-right corner to bookmark the page.
+- Press and hold a word to look it up.
+- Tap a note number, or the **Notes** button, to show footnotes.
 
 ## Features
 
-- Two-page spreads with a page-flip animation (or fade, or none)
-- EPUB and plain text, with italics, headings, images, covers and contents
-- Justified text, optional hyphenation (English books), indents, and each
-  chapter starting on a new page
-- Library with covers and progress, sorted by recent, title, author or
-  progress (D-pad left/right); your place in every book is saved
-- Delete books from the library (Y, then A to confirm)
-- Footnotes on the facing page: press A (or tap a note number) and the note
-  appears on the other page while the text stays put; left/right steps
-  through the notes on the spread
-- Dictionary on the facing page: press Y (or hold a word on the touchscreen)
-  and move a cursor word by word; the definition shows on the other page.
-  English (WordNet) is built in, and you can add StarDict dictionaries (see
-  below)
-- Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
-  from Settings → Bookmarks
-- Text size, line spacing, margins and brightness settings
-- Time left in the chapter and book, learned from your reading speed
-- "Back to …" after a jump (Contents, bookmarks, Jump to %)
-- Customizable status bar: titles, chapter pages ("12 pages left" or "Page 3
-  of 15"), percent read, a progress bar across both pages, battery and a
-  clock with time zones
-- 11 themes, including E-ink (grayscale, with paper grain), Night and Amber
-- 10 built-in fonts, plus your own
-- Get books over Wi-Fi: Project Gutenberg built in, plus Calibre or any
-  OPDS catalog (see below)
-- Only redraws when something changes, to save battery
+- **Reading:** EPUB and plain text with italics, headings, images and covers;
+  justified text with optional hyphenation (English); 10 built-in fonts plus
+  your own; 11 themes, including E-ink, Night and Amber; page-flip or fade
+  animation.
+- **Footnotes on the facing page:** press A and the note appears on the other
+  page while the text stays put.
+- **Dictionary on the facing page:** press Y and move a cursor over the words;
+  English is built in, and you can add your own ([below](#dictionaries)).
+- **Get books over Wi-Fi:** Project Gutenberg built in, plus Calibre or any
+  OPDS catalog ([below](#getting-books-over-wi-fi)).
+- **Library:** covers and progress, sorted by recent, title, author or
+  progress; delete books from it.
+- **Finding your place:** bookmarks, Contents, Jump to %, and "Back to …"
+  after any jump. Your place in every book is saved.
+- **Status bar:** book and chapter titles, pages left, time left (learned
+  from your reading speed), percent read, a progress bar, battery and a clock.
+  Choose what shows in **Settings → Status bar**.
+- **Battery-friendly:** the screen only redraws when something changes, and
+  closing the lid puts the device to sleep.
 
 | Library | Contents |
 |---|---|
@@ -94,40 +84,18 @@ To make a tap open Settings instead, use **Settings → Page turns & device → 
 
 *Screenshots use public-domain books from Project Gutenberg.*
 
-## Fonts
-
-**Built in:** Gentium Book Plus (default), Literata, Charis SIL, Source Serif
-4, Crimson Text and Bitter (serif); Atkinson Hyperlegible Next, Inter and
-Lexend (sans-serif); and OpenDyslexic.
-
-**Your own:** copy `.ttf` or `.otf` files into `Ebook/Fonts` on the SD card,
-then choose them in **Settings → Font**. Regular, italic and bold files of a
-family are grouped automatically. Use static fonts: variable fonts (with
-`[wght]` in the name) only show one weight.
-
-## Dictionaries
-
-Press **Y** while reading to look up words: a cursor appears on the first
-word, left/right move it word by word and up/down line by line, across both
-pages, and the definition shows on the facing page (A shows more of a long
-entry, B closes). On the touchscreen, press and hold a word. Contents is in
-**Settings**.
-
-An English dictionary (WordNet) is built in. To add others (other languages,
-bigger dictionaries), copy **StarDict** dictionaries into `Ebook/Dictionaries`
-on the SD card, each as its `.ifo`, `.idx` and `.dict` or `.dict.dz` files
-(plus `.syn` if there is one). They're the same files KOReader uses.
-Definitions from every dictionary that has the word are shown, yours first;
-to use just one, pick it in **Settings → Page turns & device → Dictionary**.
-
 ## Getting books over Wi-Fi
 
-eReaderDS can browse OPDS catalogs and download books straight to the SD
-card. **Project Gutenberg** (over 70,000 free books) is built in, so this
-works with no setup. To add your own library, such as Calibre's content
-server or Calibre-Web, open
-`Ebook/.ereaderds/opds.txt` (it's created the first time eReaderDS runs) and
-add your server:
+Turn on Wi-Fi in the device's settings, then in the library press **Select**
+(or tap **Get books** on the touchscreen) and choose a catalog. Browse with
+the D-pad or by tapping, and press A on a book to download it to the `Ebook`
+folder. Books you already have are marked ✓. Without Wi-Fi the button is
+greyed out. There's no search, since there's no keyboard.
+
+**Project Gutenberg** (70,000+ free books) works with no setup. To add your
+own catalog, such as a Calibre content server or Calibre-Web, edit
+`Ebook/.ereaderds/opds.txt` on the SD card (it's created the first time
+eReaderDS runs):
 
 ```
 name = Calibre
@@ -136,17 +104,32 @@ user = me
 password = secret
 ```
 
-Leave out `user` and `password` if the server doesn't need them. Add
-another block for each extra catalog. For a server with a self-signed
-certificate, add `verify = no`. To hide Project Gutenberg, add
-`gutenberg = off`.
+Leave out `user` and `password` if the server doesn't need them, and add a
+block for each extra catalog. Add `verify = no` for a server with a
+self-signed certificate, and `gutenberg = off` to hide Project Gutenberg.
 
-In the library, press **Select** or tap the **Get books** button at the
-bottom of the touchscreen, then choose a catalog. (Turn on Wi-Fi first in the
-device's settings; the button is greyed out until it's connected.)
-Browse with the D-pad or by tapping, then press A on a book to download it. EPUB is
-preferred, and books you already have are marked ✓. There's no search,
-because there's no keyboard.
+## Dictionaries
+
+While reading, press **Y**: a cursor appears on a word. Left/right move it
+word by word and up/down line by line, across both pages, and the definition
+shows on the facing page (A for more of a long entry, B to close).
+
+English (WordNet) is built in. To add others, copy **StarDict** dictionaries
+(the files KOReader uses: `.ifo`, `.idx`, `.dict` or `.dict.dz`, and `.syn`
+if there is one) into `Ebook/Dictionaries`. By default every dictionary with
+the word is shown, yours first; pick a single one in
+**Settings → Page turns & device → Dictionary**.
+
+## Fonts
+
+**Built in:** Gentium Book Plus (default), Literata, Charis SIL, Source Serif
+4, Crimson Text, Bitter, Atkinson Hyperlegible Next, Inter, Lexend and
+OpenDyslexic.
+
+**Your own:** copy `.ttf` or `.otf` files into `Ebook/Fonts`, then choose
+them in **Settings → Font**. Regular, italic and bold files of a family are
+grouped automatically. Use static fonts: a variable font (`[wght]` in the
+name) only shows one weight.
 
 ## Troubleshooting
 
@@ -155,28 +138,26 @@ because there's no keyboard.
 | Not in the Ports menu | `eReaderDS.sh` and the `eReaderDS` folder must be directly inside `Ports`. |
 | Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems). |
 | "No books found" | Put `.epub` or `.txt` files in the `Ebook` folder at the top of the card. |
-| A book won't open or looks wrong | Unusual EPUBs may not display well. DRM-protected books, PDF and MOBI aren't supported. |
+| A book won't open or looks wrong | Unusual EPUBs may not display well; DRM-protected books, PDF and MOBI aren't supported. |
+| Get books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
 | Pages upside down | Turn the device the other way, with the buttons on your right. |
-| Screen stays dim after quitting | Normal brightness comes back when the app quits. After a crash, set it in the system menu. |
+| Screen stays dim after quitting | Brightness is restored when the app quits; after a crash, set it in the system menu. |
 
 ## Reporting problems
 
 Tell whoever sent you eReaderDS, or
-[open a bug report](https://github.com/casualducko/eReaderDS-beta/issues/new?template=bug_report.yml)
-if you have access to this repository. Include:
-
-- The **version**, shown at the top of Settings (for example `v0.2.4`)
-- **What happened**, with a photo of the screens if you can
-- **`Ports/eReaderDS/log.txt`** from the SD card, copied right after the
-  problem
+[open a bug report](https://github.com/casualducko/eReaderDS-beta/issues/new?template=bug_report.yml).
+Include the **version** (top of Settings), **what happened** (a photo of the
+screens helps), and **`Ports/eReaderDS/log.txt`**, copied right after the
+problem.
 
 ## Known limitations
 
 - Touch works only on the bottom screen.
-- "Pages left in chapter" can be too low when a chapter spans several files
-  in the EPUB.
+- "Pages left in chapter" can be too low when a chapter spans several files in
+  the EPUB.
 - No tables, fixed-layout EPUBs, PDF, MOBI or DRM-protected books.
-- RG DS Plus on stock firmware only.
+- Hyphenation and the built-in dictionary are English only.
 
 ## For developers
 
@@ -184,10 +165,11 @@ See [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## Credits
 
-eReaderDS is created by **casualducko**. It also appears in **Settings → About**.
+eReaderDS is created by **casualducko** (also in **Settings → Page turns &
+device → About**).
 
-- Fonts, all under the SIL Open Font License 1.1 (license files are in
-  `app/fonts/` and in the download's `LICENSES` folder):
+- **Fonts**, all under the SIL Open Font License 1.1 (license files in
+  `app/fonts/` and the download's `LICENSES` folder):
   [Gentium Book Plus](https://software.sil.org/gentium/) and
   [Charis SIL](https://software.sil.org/charis/) (SIL International),
   [Literata](https://github.com/googlefonts/literata) (TypeTogether),
@@ -200,12 +182,11 @@ eReaderDS is created by **casualducko**. It also appears in **Settings → About
   [OpenDyslexic](https://github.com/antijingoist/opendyslexic) (Abbie Gonzalez).
   Bitter and Atkinson Hyperlegible Next are static instances generated from
   their variable fonts.
-- Hyphenation patterns: US English from TeX's
-  [hyph-utf8](https://www.hyphenation.org/tex) package, © Gerard D.C.
-  Kuiken, free to copy and modify with the notice kept (see
-  `app/hyph/en-us.txt`).
-- Dictionary: [WordNet](https://wordnet.princeton.edu) 3.1, © 2011
-  Princeton University, used under the WordNet license (see
-  `app/dict/WordNet-LICENSE.txt`), converted by `tools/build-wordnet.py`.
-- Engine: [LÖVE](https://love2d.org) 11.5 (zlib license), from the PortMaster
-  aarch64 runtime. See [runtime/NOTICES.md](runtime/NOTICES.md).
+- **Hyphenation:** US English patterns from TeX's
+  [hyph-utf8](https://www.hyphenation.org/tex), © Gerard D.C. Kuiken (notice
+  in `app/hyph/en-us.txt`).
+- **Dictionary:** [WordNet](https://wordnet.princeton.edu) 3.1, © 2011
+  Princeton University, under the WordNet license
+  (`app/dict/WordNet-LICENSE.txt`); converted by `tools/build-wordnet.py`.
+- **Engine:** [LÖVE](https://love2d.org) 11.5 (zlib license), from the
+  PortMaster aarch64 runtime. See [runtime/NOTICES.md](runtime/NOTICES.md).
