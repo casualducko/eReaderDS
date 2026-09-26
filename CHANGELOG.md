@@ -1,78 +1,49 @@
 # Changelog
 
-## Unreleased
+## v0.3.0
 
-- **Get books knows when you're offline.** Without Wi-Fi the Get books button
-  is greyed out and says "No Wi-Fi" (it updates within a couple of seconds of
-  connecting or disconnecting), and Select or a tap just says "Not connected
-  to Wi-Fi". If the connection drops while browsing or downloading, the error
-  says so instead of a network error.
-- **Dictionary on the facing page.** Press Y while reading (or press and hold a
-  word on the touchscreen): a cursor goes on a word, left/right move it word
-  by word and up/down line by line across both pages, and the definition shows
-  on the other page. Finds base forms ("ran" → run, "mice" → mouse) and joins
-  words split by hyphenation. An English dictionary (WordNet 3.1) is built in;
-  add StarDict dictionaries to `Ebook/Dictionaries`, and pick one (or All) in
-  Settings → Page turns & device → Dictionary. **Y no longer opens
-  Contents**; it's in Settings.
-- **Settings fits on one screen.** Contents, Bookmarks, Jump to % and
-  Library, then **Text** (font, size, spacing, justify, hyphenation) and
-  **Page** (margins, top/bottom margins, theme, brightness). Set-once options
-  (page-turn animation, tap, closing the lid) and About moved to **Page turns
-  & device**. "Resume reading" is gone: B (or tapping the book page) closes
-  Settings.
-- **Footnotes on the facing page.** Press A while reading, tap a note number
-  on the bottom screen, or tap the **Notes** button that appears at the
-  bottom of the right page when the spread has notes: the note number is outlined and its note
-  appears on the other page, so the text never moves. Left/right steps through
-  the notes on the spread, up/down pages through a long note, and B closes.
-  Works with EPUB 3 footnotes and endnotes and the numbered notes in older
-  books (e.g. Project Gutenberg). EPUB 3 pop-up footnotes no longer appear in
-  the middle of the text, and note numbers are drawn as small superscripts.
-- The L/R and L2/R2 shoulder buttons no longer do anything. Pages turn with the
-  D-pad, stick or touch; values change with left/right; chapters are
-  reached from Contents.
-- **Library sorting**: left/right on the D-pad or stick switches between
-  Recent (last opened first, the default), Title, Author (by last name) and
-  Progress (books you're reading first, then unread, then finished).
+### New
+- **Get books over Wi-Fi.** Press Select in the library (or tap Get books on
+  the touchscreen) to browse Project Gutenberg, which is built in, or your own
+  Calibre, Calibre-Web or other OPDS catalog (set up in
+  `Ebook/.ereaderds/opds.txt`). See covers and descriptions, then download
+  EPUBs straight to the SD card; B cancels. Works over HTTPS, with Basic or
+  Digest logins. The button is greyed out when there's no Wi-Fi.
+- **Dictionary on the facing page.** Press Y while reading, or press and hold
+  a word on the touchscreen. Left/right move word by word, up/down line by
+  line, and the definition shows on the other page. It finds base forms
+  ("ran" → run, "mice" → mouse). English (WordNet 3.1) is built in; add
+  StarDict dictionaries to `Ebook/Dictionaries` and choose one or all in
+  Settings → Page turns & device → Dictionary.
+- **Footnotes on the facing page.** Press A, tap a note number, or tap the
+  Notes button: the note appears on the other page and the text stays put.
+  Left/right step through the notes on the spread. Works with EPUB 3 notes and
+  the numbered notes in older books; note numbers are drawn as superscripts.
+- **Bookmarks.** Select (or a tap on the top-right corner) bookmarks the page,
+  marked with a ribbon. Settings → Bookmarks lists them; A opens, Y deletes.
+- **Time left** in the chapter and book, learned from your reading speed
+  ("12 pages left in chapter (9m)", "45% read (4h 10m left in book)"). Show or
+  hide each in Settings → Status bar.
+- **Jump to %** picker: left/right 1%, up/down 10%, or drag the bar; it shows
+  the chapter you'd land in.
+- **Go back after a jump:** after Contents, Bookmarks or Jump to %, "‹ Back to
+  34% (B)" returns you once. It's forgotten after 5 spreads.
+- **Library:** sort by Recent, Title, Author or Progress (left/right), and
+  delete books (Y, then A).
 - **Hyphenation** for English books (Settings → Hyphenation, off by default).
-  Long words break at the line end when the line would otherwise be
-  stretched, using TeX's US English patterns, and never more than two lines
-  in a row.
-- Pressing the stick in opens Settings while reading (it still selects in menus).
-- **Delete books** from the library: Y on a book, then A to confirm. Its
-  progress and bookmarks are forgotten too.
-- **Get books over Wi-Fi**: Project Gutenberg is built in, and Calibre,
-  Calibre-Web or any OPDS catalog can be added in
-  `Ebook/.ereaderds/opds.txt`. Open it from the library with
-  Select or the Get books button on the touchscreen. Browse with covers and
-  descriptions, and download EPUBs to the SD card with a progress bar
-  (B cancels). Works over HTTPS, with Basic or Digest logins.
-- **Jump to %** opens a picker: choose the percentage first (left/right 1%,
-  up/down 10%, or drag the bar on the touchscreen), see the chapter
-  you'd land in, then A jumps once (B cancels).
-- **Go back after a jump.** After jumping with Contents, Bookmarks, Jump to %
-  or the chapter buttons, the bottom right shows "‹ Back to 34% (B)": press B
-  or tap it to return there. It goes away once used, or after you read on
-  5 spreads.
-- **Time left** in the chapter and book ("12 pages left in chapter (9m)",
-  "45% read (4h 10m left in book)"), learned from how fast you actually read.
-  Quick flips, long pauses, jumps and time in menus are ignored; it starts at
-  about 250 words a minute. Show or hide each in Settings → Status bar →
-  Chapter time left / Book time left.
-- **Bookmarks.** Press Select (or tap the top-right corner of the page) to
-  bookmark a page; press again to remove it. Bookmarked pages show a ribbon
-  in that top-right corner, so tapping the ribbon removes it. The battery
-  indicator moves to the top of the left page, by the hinge. Settings → Bookmarks lists them with chapter, percentage and
-  opening words: A opens one, Y deletes it. Bookmarks follow the text, so they
-  survive font and size changes.
-- Uses much less memory on long reading sessions: only the last few chapters'
-  layouts and the most recently shown illustrations are kept (about half the
-  memory in testing), and layout reads image sizes from file headers instead
-  of decoding every illustration.
-- Fewer SD card writes: settings and progress are only written when they
-  change (not on every menu move).
-- Input diagnostics stop reading devices other than the lid once logging ends.
+
+### Changed
+- **Settings fits on one screen:** places to go, then Text and Page settings.
+  Page-turn animation, tap, the lid, the dictionary and About are under
+  **Page turns & device**. B closes Settings ("Resume reading" is gone).
+- **Buttons:** Y looks up words (Contents is in Settings); A shows footnotes;
+  pressing the stick in opens Settings while reading. The L/R and L2/R2
+  shoulder buttons are no longer used.
+- Uses about half the memory on long reading sessions, and writes to the SD
+  card only when something changed.
+
+### Fixed
+- Settings and progress files can't be lost to a power cut during a save.
 - A broken EPUB no longer leaves its file open.
 
 ## v0.2.10
