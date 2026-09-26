@@ -24,7 +24,7 @@ CONTROLS (hold it turned counter-clockwise; directions as held)
 TOUCH (bottom screen)
   Swipe left/right ...... turn pages
   Slide up/down ......... brightness
-  Tap right/left half ... next/previous page (change in Settings > Tap)
+  Tap right/left half ... next/previous page (Settings > More settings > Tap)
   Tap top-right corner .. bookmark this page
 
 YOUR OWN FONTS

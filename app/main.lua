@@ -1099,17 +1099,58 @@ local function status_items()
                 S.sb_bar_size = cycle(SB.bar_size, S.sb_bar_size, d) end },
         }),
         section("", {
-            { label = "Back", act = function() menu.page = "main"; menu.sel = menu.status_row or 1; menu.top = nil end },
+            { label = "Back", act = function() menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil end },
+        })
+    )
+end
+
+-- Open a sub-page of Settings (and come back to the same row with B).
+local function open_sub(page)
+    menu.parent_row = menu.sel; menu.page = page; menu.sel = 1; menu.top = nil
+end
+
+local function close_sub()
+    menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
+end
+
+-- Settings you change now and then, off the main page.
+local function more_items()
+    return join(
+        section("Text", {
+            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
+                S.justify = not S.justify; relayout()
+            end },
+            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
+                S.hyphenate = not S.hyphenate; relayout()
+            end },
+            { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
+                S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
+            end },
+        }),
+        section("Page turns", {
+            { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
+              adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
+            { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
+                S.tap = S.tap == "next" and "menu" or "next"
+            end },
+        }),
+        section("Device", {
+            { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
+                S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
+            end },
+        }),
+        section("", {
+            { label = "Back", act = close_sub },
         })
     )
 end
 
 local function menu_items()
     if menu.page == "status" then return status_items() end
+    if menu.page == "more" then return more_items() end
     local th = theme()
     return join(
         section(nil, {
-            { label = "Resume reading", act = function() app.mode = "reader" end },
             { label = "Contents", act = function()
                 if #book.toc == 0 then return end
                 toc.sel = current_section() or 1
@@ -1122,7 +1163,7 @@ local function menu_items()
               act = function() app.open_jump() end },
             { label = "Library", act = go_library },
         }),
-        section("Text", {
+        section("Reading", {
             -- The font's name is drawn in the font itself: a preview, and the only way
             -- names in other scripts (e.g. Chinese firmware fonts) can display.
             { label = "Font", value = fonts.name or S.font,
@@ -1140,25 +1181,9 @@ local function menu_items()
                 S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
                 relayout()
             end },
-            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
-                S.justify = not S.justify; relayout()
-            end },
-            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
-                S.hyphenate = not S.hyphenate; relayout()
-            end },
-        }),
-        section("Layout", {
-            { label = "Side margins", value = margins().name, adjust = function(d)
+            { label = "Margins", value = margins().name, adjust = function(d)
                 S.margins = (S.margins - 1 + d) % #MARGINS + 1; relayout()
             end },
-            { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
-                S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
-            end },
-            { label = "Status bar", value = "›", act = function()
-                menu.status_row = menu.sel; menu.page = "status"; menu.sel = 1; menu.top = nil
-            end },
-        }),
-        section("Display", {
             { label = "Theme", value = th.name, adjust = function(d)
                 S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
             end },
@@ -1179,18 +1204,10 @@ local function menu_items()
                       Backlight.set(S.brightness)
                   end
               end },
-            { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
-                S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
-            end },
-        }),
-        section("Page turns", {
-            { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
-              adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
-            { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
-                S.tap = S.tap == "next" and "menu" or "next"
-            end },
         }),
         section("", {
+            { label = "Status bar", value = "›", act = function() open_sub("status") end },
+            { label = "More settings", value = "›", act = function() open_sub("more") end },
             { label = "About", act = function() app.mode = "about" end },
             { label = "Quit", act = function() love.event.quit() end },
         })
@@ -1759,7 +1776,7 @@ end
 -- Settings list geometry. Items are grouped under small section headers;
 -- item rows shrink (down to a minimum) so everything fits, and if it still
 -- doesn't, the list scrolls with the selection.
-local MENU_TOP, MENU_BOTTOM = 120, PAGE_H - 78
+local MENU_TOP, MENU_BOTTOM = 140, PAGE_H - 78
 local MENU_ROW_MAX, MENU_ROW_MIN = 52, 36
 local MENU_HEADER_H, MENU_GAP_H = 27, 10
 
@@ -1821,7 +1838,7 @@ local function draw_menu_panel(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(menu.page == "status" and "Status bar" or "Settings", x, 60)
+    love.graphics.print(({ status = "Status bar", more = "More settings" })[menu.page] or "Settings", x, 60)
     love.graphics.setFont(ui.small)
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, 78, w, "right")
@@ -2659,8 +2676,8 @@ function handle_action(a)
         elseif a == "confirm" then
             local it = items[menu.sel]
             if it.act then it.act() elseif it.adjust then it.adjust(1) end
-        elseif a == "back" and menu.page == "status" then
-            menu.page = "main"; menu.sel = menu.status_row or 1; menu.top = nil
+        elseif a == "back" and menu.page ~= "main" then
+            menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
         elseif a == "back" or a == "menu" then app.mode = "reader"; menu.page = "main" end
         Store.save_settings(S)
         redraw()
