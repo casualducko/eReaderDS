@@ -17,7 +17,6 @@
 - Holding the curved-arrow button no longer flips Settings open and closed.
 - Small fixes: status bar footer position with narrow margins, a leaked file
   handle, and code tidy-ups.
-
 - **Status bar settings** (Settings → Status bar, replacing Page info), with a
   live preview: title (none, book, chapter or both); chapter pages (hide,
   pages left, or page X of Y); book percentage; a progress bar for the chapter
