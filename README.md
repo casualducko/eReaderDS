@@ -71,7 +71,8 @@ To make a tap open Settings instead, use **Settings → Tap**.
   clock with time zones
 - 11 themes, including E-ink (grayscale, with paper grain), Night and Amber
 - 10 built-in fonts, plus your own
-- Get books over Wi-Fi from Calibre or any OPDS catalog (see below)
+- Get books over Wi-Fi: Project Gutenberg built in, plus Calibre or any
+  OPDS catalog (see below)
 - Only redraws when something changes, to save battery
 
 | Library | Contents |
@@ -97,8 +98,10 @@ family are grouped automatically. Use static fonts: variable fonts (with
 
 ## Getting books over Wi-Fi
 
-eReaderDS can browse an OPDS catalog, such as Calibre's content server or
-Calibre-Web, and download books straight to the SD card. Open
+eReaderDS can browse OPDS catalogs and download books straight to the SD
+card. **Project Gutenberg** (over 70,000 free books) is built in, so this
+works with no setup. To add your own library, such as Calibre's content
+server or Calibre-Web, open
 `Ebook/.ereaderds/opds.txt` (it's created the first time eReaderDS runs) and
 add your server:
 
@@ -111,10 +114,11 @@ password = secret
 
 Leave out `user` and `password` if the server doesn't need them. Add
 another block for each extra catalog. For a server with a self-signed
-certificate, add `verify = no`.
+certificate, add `verify = no`. To hide Project Gutenberg, add
+`gutenberg = off`.
 
 In the library, press **Select** or tap the **Get books** button at the
-bottom of the touchscreen. With more than one catalog you choose one first.
+bottom of the touchscreen, then choose a catalog.
 Browse with the D-pad or by tapping, then press A on a book to download it. EPUB is
 preferred, and books you already have are marked ✓. There's no search,
 because there's no keyboard.

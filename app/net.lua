@@ -29,7 +29,7 @@ end
 -- Resolve an href found in a page at `base` (absolute, root-relative or relative).
 function M.resolve(base, href)
     if not href or href == "" then return base end
-    if href:match("^%a[%w+.-]*://") then return href end
+    if href:match("^%a[%w+.-]*:") and not href:match("^%a:[\\/]") then return href end   -- has a scheme (http:, data:)
     local scheme, authority, path = base:match("^(%a[%w+.-]*://)([^/?#]*)([^?#]*)")
     if not scheme then return href end
     if href:sub(1, 2) == "//" then return scheme:match("^(.-:)") .. href end

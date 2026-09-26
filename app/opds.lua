@@ -18,22 +18,27 @@ local SAMPLE = [[
 # password = secret
 #
 # For a server with a self-signed certificate, add:  verify = no
+#
+# Project Gutenberg is always listed. To hide it, add:  gutenberg = off
 ]]
 
--- Catalogs from opds.txt: { name, url, user, password, verify }. Writes a
--- commented example the first time so there's something to edit.
+-- Catalogs from opds.txt: { name, url, user, password, verify }, plus
+-- options ({ gutenberg = true|false }). Writes a commented example the first
+-- time so there's something to edit.
 function M.load_catalogs(file)
     local f = io.open(file, "rb")
     if not f then
         local w = io.open(file, "wb")
         if w then w:write(SAMPLE); w:close() end
-        return {}
+        return {}, { gutenberg = true }
     end
-    local list, cur = {}, nil
+    local list, cur, opts = {}, nil, { gutenberg = true }
     for line in f:lines() do
         line = line:gsub("\r$", "")
         local k, v = line:match("^%s*([%a_]+)%s*=%s*(.-)%s*$")
-        if k and not line:match("^%s*#") then
+        if k and not line:match("^%s*#") and k:lower() == "gutenberg" then
+            opts.gutenberg = not (v:lower():match("^no") or v:lower():match("^off") or v == "0" or v:lower() == "false")
+        elseif k and not line:match("^%s*#") then
             k = k:lower()
             -- A new name or a second url starts another catalog.
             if not cur or (k == "name" and cur.name) or (k == "url" and cur.url) then
@@ -55,8 +60,14 @@ function M.load_catalogs(file)
             out[#out + 1] = c
         end
     end
-    return out
+    return out, opts
 end
+
+-- Free catalogs offered without any setup.
+M.BUILT_IN = {
+    { name = "Project Gutenberg", url = "https://m.gutenberg.org/ebooks.opds/", verify = true,
+      about = "Over 70,000 free public-domain books." },
+}
 
 ---------------------------------------------------------------- XML
 
@@ -159,6 +170,10 @@ function M.parse_feed(xml, base)
         local authors = {}
         for _, a in ipairs(children(e, "author")) do
             local n = text_of(child(a, "name"))
+            -- "Austen, Jane, 1775-1817" (library style) -> "Jane Austen".
+            n = n:gsub(",%s*[%d%-%?%s]+$", "")
+            local last, first = n:match("^([^,]+),%s*([^,]+)$")
+            if last then n = first .. " " .. last end
             if n ~= "" then authors[#authors + 1] = n end
         end
         it.author = table.concat(authors, ", ")

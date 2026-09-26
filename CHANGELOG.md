@@ -15,8 +15,9 @@
 - Pressing the stick in opens Settings while reading (it still selects in menus).
 - **Delete books** from the library: Y on a book, then A to confirm. Its
   progress and bookmarks are forgotten too.
-- **Get books over Wi-Fi** from Calibre, Calibre-Web or any OPDS catalog,
-  set up in `Ebook/.ereaderds/opds.txt`. Open it from the library with
+- **Get books over Wi-Fi**: Project Gutenberg is built in, and Calibre,
+  Calibre-Web or any OPDS catalog can be added in
+  `Ebook/.ereaderds/opds.txt`. Open it from the library with
   Select or the Get books button on the touchscreen. Browse with covers and
   descriptions, and download EPUBs to the SD card with a progress bar
   (B cancels). Works over HTTPS, with Basic or Digest logins.

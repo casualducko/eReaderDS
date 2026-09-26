@@ -578,8 +578,11 @@ local function scan_library()
     library.sort(items)
     -- Online catalogs from opds.txt, for "Get books" (Select, or the button
     -- on the right page).
-    local ok, catalogs = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
-    if not ok then print("[opds] " .. tostring(catalogs)); catalogs = {} end
+    local ok, catalogs, opts = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
+    if not ok then print("[opds] " .. tostring(catalogs)); catalogs, opts = {}, {} end
+    if opts.gutenberg ~= false then
+        for _, c in ipairs(Opds.BUILT_IN) do catalogs[#catalogs + 1] = c end
+    end
     library.catalogs = catalogs
     library.items = items
     library.sel = math.max(1, math.min(library.sel, #items))
@@ -755,22 +758,19 @@ function shop.open(catalog)
     shop.push_page(catalog.name, catalog.url)
 end
 
--- "Get books" from the library: straight into the only catalog, a list to
--- choose from when there are several, or how to set one up.
+-- "Get books" from the library: a list of catalogs (yours from opds.txt,
+-- then the free built-in ones), and how to add your own.
 function shop.start()
-    local cats = library.catalogs or {}
-    if #cats == 1 then shop.open(cats[1]) return end
-    if #cats == 0 then
-        app.message_back = "library"
-        show_message("Get books downloads books over Wi-Fi from Calibre or another OPDS catalog.\n\n"
-            .. "To set one up, edit Ebook/.ereaderds/opds.txt on the SD card.")
-        return
-    end
     local entries = {}
-    for _, c in ipairs(cats) do
+    for _, c in ipairs(library.catalogs or {}) do
         local u = Opds.parse_url(c.url)
-        entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = "", formats = {}, catalog = c }
+        entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = c.about or "",
+            formats = {}, catalog = c }
     end
+    entries[#entries + 1] = { title = "Add a catalog", author = "Calibre, Calibre-Web or any OPDS server",
+        formats = {}, info = true, summary = "Get books from your own library over Wi-Fi. Edit "
+            .. "Ebook/.ereaderds/opds.txt on the SD card (it has examples), for example:\n\n"
+            .. "name = Calibre\nurl = http://192.168.1.20:8080/opds\nuser = me\npassword = secret" }
     shop.stack = { { title = "Get books", entries = entries, sel = 1, top = 1 } }
     app.mode = "shop"
     redraw()
@@ -794,6 +794,15 @@ function shop.cover(it)
     if not url then return nil end
     local c = shop.covers[url]
     if c ~= nil then return c or nil end
+    if url:match("^data:") then
+        -- Small images embedded in the feed itself (base64).
+        local ok, img = pcall(function()
+            local data = love.data.decode("string", "base64", url:match("^data:[^,]*;base64,(.*)$"))
+            return love.graphics.newImage(love.filesystem.newFileData(data, "cover"))
+        end)
+        shop.covers[url] = ok and img or false
+        return ok and img or nil
+    end
     if net.count == 0 then
         shop.covers[url] = false
         shop.net_job(shop.catalog_opts({ kind = "fetch", url = url }), function(msg)
@@ -1504,6 +1513,8 @@ function shop.draw(side)
             if pg.sel >= pg.top + rows then pg.top = pg.sel - rows + 1 end
             draw_list(side, pg.entries, pg.sel, pg.top, rows, x, 160, w, row_h, function(e, _, rx, ry, rw)
                 local sub = e.author ~= "" and e.author or e.summary
+                local size = e.book and shop.format_size(e.book.size)
+                if size then sub = (sub ~= "" and (sub .. "  ·  ") or "") .. size end
                 local top = ui.font:getBaseline() - UI_SIZE * 0.68
                 local bottom = (sub ~= "" and 40 + ui.small:getBaseline()) or ui.font:getBaseline()
                 local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
@@ -1544,6 +1555,7 @@ function shop.draw(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     local y = 70
     local cover = shop.cover(it)
+    if cover and cover:getWidth() < 64 then cover = nil end    -- a menu icon, not a cover
     if cover then
         local iw, ih = cover:getDimensions()
         local s = math.min(w / iw, 440 / ih)
@@ -1618,7 +1630,7 @@ function shop.draw(side)
     if it.summary ~= "" and it.summary ~= it.title then
         love.graphics.setFont(ui.small)
         color(th.fg)
-        shop.print_clipped(ui.small, it.summary, x, y + 16, w, foot_y - y - 40, it.book and "left" or "center")
+        shop.print_clipped(ui.small, it.summary, x, y + 16, w, foot_y - y - 40, (it.book or it.info) and "left" or "center")
     end
 end
 
