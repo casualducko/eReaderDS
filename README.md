@@ -52,7 +52,7 @@ for brightness (keep sliding below 1% for Extra dim). Tapping the right or left 
 top-right corner bookmarks the page. Tapping a note number shows the note on
 the left page, and a **Notes** button appears at the bottom of the page
 whenever there are notes on the spread (including on the top screen).
-To make a tap open Settings instead, use **Settings → More settings → Tap**.
+To make a tap open Settings instead, use **Settings → Tap**.
 
 ## Features
 

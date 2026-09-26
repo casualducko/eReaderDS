@@ -1112,109 +1112,87 @@ local function open_sub(page)
     menu.parent_row = menu.sel; menu.page = page; menu.sel = 1; menu.top = nil
 end
 
-local function close_sub()
-    menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
-end
-
--- Settings you change now and then, off the main page.
-local function more_items()
-    return join(
-        section("Text", {
-            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
-                S.justify = not S.justify; relayout()
-            end },
-            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
-                S.hyphenate = not S.hyphenate; relayout()
-            end },
-            { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
-                S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
-            end },
-        }),
-        section("Page turns", {
-            { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
-              adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
-            { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
-                S.tap = S.tap == "next" and "menu" or "next"
-            end },
-        }),
-        section("Device", {
-            { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
-                S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
-            end },
-        }),
-        section("", {
-            { label = "Back", act = close_sub },
-        })
-    )
-end
-
+-- Settings: one page of tiles in two columns (filled top to bottom, left
+-- column first). Up/down go through them in order; left/right change a value.
 local function menu_items()
     if menu.page == "status" then return status_items() end
-    if menu.page == "more" then return more_items() end
     local th = theme()
-    return join(
-        section(nil, {
-            { label = "Contents", act = function()
-                if #book.toc == 0 then return end
-                toc.sel = current_section() or 1
-                toc.top = nil
-                app.mode = "toc"
-            end },
-            { label = "Bookmarks", value = tostring(#Store.get_bookmarks(book.path)),
-              act = function() open_bookmarks("menu") end },
-            { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
-              act = function() app.open_jump() end },
-            { label = "Library", act = go_library },
-        }),
-        section("Reading", {
-            -- The font's name is drawn in the font itself: a preview, and the only way
-            -- names in other scripts (e.g. Chinese firmware fonts) can display.
-            { label = "Font", value = fonts.name or S.font,
-              value_font = Fonts.preview(fonts.name or S.font, UI_SIZE), adjust = function(d)
-                local list = Fonts.list()
-                local idx = 1
-                for k, f in ipairs(list) do if f.name == fonts.name then idx = k end end
-                S.font = list[(idx - 1 + d) % #list + 1].name
-                build_fonts(); goto_pos(pos.ch, pos.off)
-            end },
-            { label = "Text size", value = tostring(S.font_size), adjust = function(d)
-                S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
-            end },
-            { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
-                S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
-                relayout()
-            end },
-            { label = "Margins", value = margins().name, adjust = function(d)
-                S.margins = (S.margins - 1 + d) % #MARGINS + 1; relayout()
-            end },
-            { label = "Theme", value = th.name, adjust = function(d)
-                S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
-            end },
-            { label = "Brightness",
-              value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
-                  or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
-              adjust = function(d)
-                  local avail = Backlight.available()
-                  local cur = S.brightness >= 0 and S.brightness or (avail and Backlight.get()) or 50
-                  if d < 0 and (S.extra_dim > 0 or not avail or cur <= 1) then
-                      -- Past the backlight's minimum: extra dim levels.
-                      S.extra_dim = math.min(#EXTRA_DIM, S.extra_dim + 1)
-                      if avail and cur > 1 then S.brightness = 1; Backlight.set(1) end
-                  elseif d > 0 and S.extra_dim > 0 then
-                      S.extra_dim = S.extra_dim - 1
-                  elseif avail then
-                      S.brightness = Backlight.step(cur, d)
-                      Backlight.set(S.brightness)
-                  end
-              end },
-        }),
-        section("", {
-            { label = "Status bar", value = "›", act = function() open_sub("status") end },
-            { label = "More settings", value = "›", act = function() open_sub("more") end },
-            { label = "About", act = function() app.mode = "about" end },
-            { label = "Quit", act = function() love.event.quit() end },
-        })
-    )
+    local n_bm = #Store.get_bookmarks(book.path)
+    return {
+        -- Left column: going places, then how the page looks.
+        { label = "Contents", act = function()
+            if #book.toc == 0 then return end
+            toc.sel = current_section() or 1
+            toc.top = nil
+            app.mode = "toc"
+        end },
+        { label = "Bookmarks", value = n_bm == 1 and "1 saved" or (n_bm .. " saved"),
+          act = function() open_bookmarks("menu") end },
+        { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
+          act = function() app.open_jump() end },
+        { label = "Library", act = go_library },
+        { label = "Theme", value = th.name, adjust = function(d)
+            S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
+        end },
+        { label = "Brightness",
+          value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
+              or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
+          adjust = function(d)
+              local avail = Backlight.available()
+              local cur = S.brightness >= 0 and S.brightness or (avail and Backlight.get()) or 50
+              if d < 0 and (S.extra_dim > 0 or not avail or cur <= 1) then
+                  -- Past the backlight's minimum: extra dim levels.
+                  S.extra_dim = math.min(#EXTRA_DIM, S.extra_dim + 1)
+                  if avail and cur > 1 then S.brightness = 1; Backlight.set(1) end
+              elseif d > 0 and S.extra_dim > 0 then
+                  S.extra_dim = S.extra_dim - 1
+              elseif avail then
+                  S.brightness = Backlight.step(cur, d)
+                  Backlight.set(S.brightness)
+              end
+          end },
+        -- The font's name is drawn in the font itself: a preview, and the only way
+        -- names in other scripts (e.g. Chinese firmware fonts) can display.
+        { label = "Font", value = fonts.name or S.font,
+          value_font = Fonts.preview(fonts.name or S.font, UI_SIZE), adjust = function(d)
+            local list = Fonts.list()
+            local idx = 1
+            for k, f in ipairs(list) do if f.name == fonts.name then idx = k end end
+            S.font = list[(idx - 1 + d) % #list + 1].name
+            build_fonts(); goto_pos(pos.ch, pos.off)
+        end },
+        { label = "Text size", value = tostring(S.font_size), adjust = function(d)
+            S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
+        end },
+        { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
+            S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
+            relayout()
+        end },
+        { label = "Margins", value = margins().name, adjust = function(d)
+            S.margins = (S.margins - 1 + d) % #MARGINS + 1; relayout()
+        end },
+        -- Right column: text and behavior, then the rest.
+        { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
+            S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
+        end },
+        { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
+            S.justify = not S.justify; relayout()
+        end },
+        { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
+            S.hyphenate = not S.hyphenate; relayout()
+        end },
+        { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
+          adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
+        { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
+            S.tap = S.tap == "next" and "menu" or "next"
+        end },
+        { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
+            S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
+        end },
+        { label = "Status bar", value = "Choose what it shows", sub = true, act = function() open_sub("status") end },
+        { label = "About", act = function() app.mode = "about" end },
+        { label = "Quit", act = function() love.event.quit() end },
+    }
 end
 
 ---------------------------------------------------------------- drawing
@@ -1829,6 +1807,24 @@ local function menu_layout(items)
     return visible, top > 1, last < #rows
 end
 
+-- Tile geometry for the main Settings page, two columns filled top to
+-- bottom: per item { idx, x, y, w, h, col }, plus the rows per column.
+local MENU_COL_GAP = 24
+local function menu_grid(items)
+    local m = MARGINS[2]
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    local rows = math.ceil(#items / 2)
+    local cw = math.floor((w - MENU_COL_GAP) / 2)
+    local h = math.min(88, math.floor((MENU_BOTTOM - MENU_TOP) / rows))
+    local out = {}
+    for i = 1, #items do
+        local col = i <= rows and 0 or 1
+        local r = col == 0 and i - 1 or i - rows - 1
+        out[i] = { idx = i, x = x + col * (cw + MENU_COL_GAP), y = MENU_TOP + r * h, w = cw, h = h, col = col }
+    end
+    return out, rows
+end
+
 local function scroll_arrow(x, y, up)
     local s = 9
     if up then love.graphics.polygon("fill", x - s, y + s, x + s, y + s, x, y - s + 2)
@@ -1846,6 +1842,49 @@ local function draw_menu_panel(side)
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, 78, w, "right")
     local items = menu_items()
+    if menu.page == "main" then
+        -- Tiles: a setting shows its name small and its value large between
+        -- ‹ ›; a place to go shows its name large with a detail under it.
+        for i, t in ipairs((menu_grid(items))) do
+            local it = items[i]
+            if i == menu.sel then
+                color(th.sel)
+                love.graphics.rectangle("fill", t.x - 10, t.y + 2, t.w + 20, t.h - 6, 10, 10)
+            end
+            if it.adjust then
+                love.graphics.setFont(ui.small)
+                color(th.dim)
+                love.graphics.print(it.label, t.x, t.y + 8)
+                local vy = t.y + 8 + ui.small:getHeight()
+                love.graphics.setFont(ui.font)
+                color(i == menu.sel and th.fg or th.dim, i == menu.sel and 1 or 0.6)
+                local aw = ui.font:getWidth("‹")
+                love.graphics.print("‹", t.x, vy)
+                love.graphics.print("›", t.x + t.w - aw, vy)
+                color(th.fg)
+                local vf = it.value_font
+                if not (vf and vf:hasGlyphs(it.value or "")) then vf = ui.font end
+                love.graphics.setFont(vf)
+                local v = fit_text(vf, it.value or "", t.w - aw * 2 - 16)
+                love.graphics.printf(v, t.x, vy + ui.font:getBaseline() - vf:getBaseline(), t.w, "center")
+            else
+                love.graphics.setFont(ui.font)
+                color(th.fg)
+                local ly = it.value and t.y + 8 or centered_y(ui.font, UI_SIZE, t.y, t.h - 4)
+                love.graphics.print(fit_text(ui.font, it.label, t.w - 30), t.x, ly)
+                if it.sub then love.graphics.printf("›", t.x, ly, t.w, "right") end
+                if it.value then
+                    love.graphics.setFont(ui.small)
+                    color(th.dim)
+                    love.graphics.print(fit_text(ui.small, it.value, t.w), t.x, ly + ui.font:getHeight() - 2)
+                end
+            end
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("A select    ‹ › change    B back", x, PAGE_H - 70, w, "left")
+        return
+    end
     local visible, more_up, more_down = menu_layout(items)
     if more_up then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP - 14, true) end
     if more_down then
@@ -2672,6 +2711,11 @@ function handle_action(a)
             local back = a == "left" or a == "prev"
             if it.adjust then
                 it.adjust(back and -1 or 1)
+            elseif (a == "left" or a == "right") and menu.page == "main" then
+                -- Tiles with nothing to change: left/right go to the other column.
+                local rows = math.ceil(#items / 2)
+                if menu.sel <= rows then menu.sel = math.min(#items, menu.sel + rows)
+                else menu.sel = menu.sel - rows end
             elseif a == "left" or a == "right" then
                 -- Rows with nothing to change: left/right move the selection.
                 menu.sel = back and (menu.sel - 2) % #items + 1 or menu.sel % #items + 1
@@ -2831,6 +2875,24 @@ function app.on_tap(side, u, v)
         -- The settings panel is drawn on the right page.
         local m = MARGINS[2]
         local items = menu_items()
+        if menu.page == "main" then
+            -- A tile: settings step down on their left third and up elsewhere.
+            for i, t in ipairs((menu_grid(items))) do
+                if side == "right" and u >= t.x - 12 and u < t.x + t.w + 12 and v >= t.y and v < t.y + t.h then
+                    menu.sel = i
+                    local it = items[i]
+                    if it.adjust then
+                        it.adjust(u < t.x + t.w * 0.33 and -1 or 1)
+                        Store.save_settings(S)
+                        redraw()
+                    else
+                        action("confirm")
+                    end
+                    return
+                end
+            end
+            return
+        end
         local idx
         for _, row in ipairs((menu_layout(items))) do
             if row.kind == "item" and v >= row.y and v < row.y + row.h then idx = row.idx end
