@@ -16,4 +16,14 @@ function love.conf(t)
     t.modules.physics = false
     t.modules.video = false
     t.modules.mouse = true
+    if love._os == "Android" then
+        -- Surface Duo: a normal resizable window that the user spans across
+        -- both screens; it goes full screen once spanned (see love.resize).
+        t.window.width, t.window.height = 0, 0
+        t.window.borderless = false
+        t.window.resizable = true
+        t.window.fullscreen = false
+        t.window.highdpi = true        -- real pixels, not scaled-down "dp" units
+        t.window.usedpiscale = false
+    end
 end

@@ -696,7 +696,21 @@ function look.scan()
     if look.dict.list then return look.dict.list end
     local dirs = {}
     for _, d in ipairs(Store.book_dirs()) do dirs[#dirs + 1] = d .. "/Dictionaries" end
-    dirs[#dirs + 1] = love.filesystem.getSource() .. "/dict"
+    if app.duo then
+        -- On Android the built-in dictionary is packed inside the app, where
+        -- plain file reads can't reach it: copy it out once.
+        if not love.filesystem.getInfo("dict/wordnet.ifo", "file") or
+            love.filesystem.getRealDirectory("dict/wordnet.ifo") ~= love.filesystem.getSaveDirectory() then
+            love.filesystem.createDirectory("dict")
+            for _, f in ipairs(love.filesystem.getDirectoryItems("dict")) do
+                local data = love.filesystem.read("dict/" .. f)
+                if data then love.filesystem.write("dict/" .. f, data) end
+            end
+        end
+        dirs[#dirs + 1] = love.filesystem.getSaveDirectory() .. "/dict"
+    else
+        dirs[#dirs + 1] = love.filesystem.getSource() .. "/dict"
+    end
     return look.dict.scan(dirs)
 end
 
@@ -2553,6 +2567,15 @@ end
 -- Transform so drawing happens in page coordinates (0..PAGE_W, 0..PAGE_H)
 -- on the screen that shows the given side of the spread.
 local function page_transform(side)
+    if app.duo then
+        -- Surface Duo: two portrait screens side by side, each exactly the
+        -- page's shape; the right page sits past the hinge gap.
+        local sc = love.graphics.getHeight() / PAGE_H
+        local x = side == "left" and 0 or love.graphics.getWidth() - PAGE_W * sc
+        love.graphics.translate(x, 0)
+        love.graphics.scale(sc)
+        return
+    end
     if S.orient == "left" then
         -- Device turned counter-clockwise: top screen on the left.
         love.graphics.translate(side == "left" and SCREEN_W or SCREEN_W * 2, 0)
@@ -2706,6 +2729,12 @@ local gesture = nil        -- current touch: { side, u0, v0, mode, p0 }
 
 -- Bottom-screen native coordinates (0..1024 x 0..768) -> page side + page coords.
 local function touch_to_page(sx, sy)
+    if app.duo then
+        -- Window coordinates; both screens take touch.
+        local w, sc = love.graphics.getWidth(), love.graphics.getHeight() / PAGE_H
+        if sx < w / 2 then return "left", sx / sc, sy / sc end
+        return "right", (sx - (w - PAGE_W * sc)) / sc, sy / sc
+    end
     if S.orient == "left" then return "right", sy, SCREEN_W - sx end
     return "left", SCREEN_H - sy, sx
 end
@@ -2905,17 +2934,36 @@ function love.draw()
     love.graphics.pop()
 end
 
+-- Surface Duo (Android): real touch on both screens, in window coordinates.
+function love.touchpressed(id, x, y)
+    if app.duo and not app.touch_id then app.touch_id = id; touch_event("down", x, y) end
+end
+function love.touchmoved(id, x, y)
+    if app.duo and id == app.touch_id then touch_event("move", x, y) end
+end
+function love.touchreleased(id, x, y)
+    if app.duo and id == app.touch_id then app.touch_id = nil; touch_event("up", x, y) end
+end
+function love.resize(w, h)
+    -- Spanned across both screens: hide the system bars over the whole area.
+    if app.duo and h and w > h * 1.3 and not love.window.getFullscreen() then love.window.setFullscreen(true) end
+    redraw()
+end
+
 -- Desktop testing: the mouse on the bottom-screen half acts as a finger.
-function love.mousepressed(x, y)
+function love.mousepressed(x, y, _, istouch)
+    if app.duo or istouch then return end
     x, y = x / app.scale, y / app.scale
     if x >= SCREEN_W and not Touch.enabled then touch_event("down", x - SCREEN_W, y) end
 end
-function love.mousemoved(x, y)
+function love.mousemoved(x, y, _, _, istouch)
+    if app.duo or istouch then return end
     if gesture and not Touch.enabled and love.mouse.isDown(1) then
         touch_event("move", math.max(0, x / app.scale - SCREEN_W), y / app.scale)
     end
 end
-function love.mousereleased(x, y)
+function love.mousereleased(x, y, _, istouch)
+    if app.duo or istouch then return end
     if gesture and not Touch.enabled then touch_event("up", x / app.scale - SCREEN_W, y / app.scale) end
 end
 
@@ -3397,7 +3445,8 @@ end
 ---------------------------------------------------------------- main loop
 
 function love.load()
-    app.scale = love.graphics.getWidth() / 2048
+    app.duo = love.system.getOS() == "Android"
+    app.scale = app.duo and 1 or love.graphics.getWidth() / 2048
     if os.getenv("READER_SCALE") == nil then pcall(love.window.setPosition, 0, 0, 1) end
     love.graphics.setDefaultFilter("linear", "linear")
     love.keyboard.setKeyRepeat(true)
@@ -3603,7 +3652,7 @@ function love.run()
         end
         if app.anim then
             love.timer.sleep(0.001)            -- animating: next frame (vsync paces it)
-        elseif Touch.enabled or overlay or net.count > 0 then
+        elseif Touch.enabled or overlay or net.count > 0 or gesture then
             -- Touch events don't wake love.event.wait(), so poll at a gentle rate.
             if not got and not app.dirty then love.timer.sleep(gesture and 0.008 or 0.025) end
         elseif not got then

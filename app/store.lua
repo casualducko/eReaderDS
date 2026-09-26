@@ -20,8 +20,14 @@ local DEFAULTS = {
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)     -- 0-3: dark layer over the page, dimmer than the backlight allows
 }
 
+-- On Android (Surface Duo) books and data live in the app's own folder.
+local function android() return love.system and love.system.getOS() == "Android" end
+-- The app's private folder (for this demo; a real build would use Android's
+-- shared storage or file picker).
+M.ANDROID_ROOT = android() and love.filesystem.getSaveDirectory() or ""
+
 local function data_dir()
-    local d = os.getenv("READER_DATA")
+    local d = os.getenv("READER_DATA") or (android() and M.ANDROID_ROOT .. "/Ebook/.ereaderds")
     if not d then d = love.filesystem.getSource() .. "/data" end
     os.execute('mkdir -p "' .. d .. '"')
     return d
@@ -74,6 +80,8 @@ function M.book_dirs()
     local dirs = {}
     if env then
         for d in env:gmatch("[^:]+") do dirs[#dirs + 1] = d end
+    elseif android() then
+        dirs = { M.ANDROID_ROOT .. "/Ebook" }
     else
         dirs = { "/mnt/mmc/Ebook", "/mnt/sdcard/Ebook", "/mnt/mmc/Books" }
     end
