@@ -29,8 +29,8 @@ Play Books, Moon+ Reader, ReadEra, PocketBook and CrossPoint (researched
 7. **Dictionary on the other page.** An offline StarDict dictionary copied to
    the SD card; tapping a word shows its definition on the facing page.
    CrossPoint does this on far weaker hardware.
-8. **Sleep screen.** Show the book's cover (or the current page, dimmed)
-   briefly when the lid closes, then turn the screens off.
+8. ~~**Sleep screen.**~~ Tried and dropped: the lid sensor fires when the lid
+   is nearly shut, so a cover shown on closing can't really be seen.
 9. **Button remapping.** Choose what Y, Select and the stick do.
 10. **Reading statistics.** Time read today and this week, and pages per
     session, shown on the About page or in the library. No charts.
