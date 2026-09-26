@@ -123,11 +123,13 @@ Ports/eReaderDS/
 | `app/main.lua` | App states (library, reader, settings, contents), drawing, input, main loop |
 | `app/book.lua` | EPUB/TXT loading: OPF, spine, NCX/nav TOC, basic CSS, HTML to blocks |
 | `app/layout.lua` | Line breaking, justification and pagination |
-| `app/zip.lua` | Minimal ZIP reader (stored and deflate) |
+| `app/zip.lua` | Minimal ZIP reader (stored and deflate); reads entries on demand |
 | `app/store.lua` | Settings and progress files |
 | `app/backlight.lua` | Screen brightness through sysfs |
 | `app/touch.lua` | Raw evdev touchscreen reader (LuaJIT FFI) |
 | `app/fonts.lua` | Font discovery, family/style grouping from the font name table, loading |
+| `app/battery.lua` | Battery level for the status bar (sysfs, cached) |
+| `app/keyprobe.lua` | Input diagnostics: logs input devices and the first raw key presses |
 | `app/conf.lua` | LÖVE window configuration |
 | `port/` | Device launch scripts |
 | `tools/` | Desktop testing helpers |
