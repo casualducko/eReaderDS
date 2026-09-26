@@ -119,7 +119,12 @@ local function build_fonts()
 end
 
 local function margins() return MARGINS[S.margins] or MARGINS[2] end
-local function vmargin() return (VMARGINS[S.vmargins] or VMARGINS[2]).size end
+-- With the status bar off, its rows' space goes to the text.
+local STATUS_ROW_SPACE = 36
+local function vmargin()
+    local m = (VMARGINS[S.vmargins] or VMARGINS[2]).size
+    return S.sb_show and m or m - STATUS_ROW_SPACE
+end
 local function content_size()
     local m = margins()
     return PAGE_W - m.outer - m.inner, PAGE_H - vmargin() * 2
@@ -408,7 +413,9 @@ end
 local function status_items()
     return {
         { label = "Show status bar", value = S.sb_show and "On" or "Off", adjust = function()
-            S.sb_show = not S.sb_show end },
+            S.sb_show = not S.sb_show
+            pages_cache = {}; goto_pos(pos.ch, pos.off)   -- text area changes size
+        end },
         { label = "Title", value = SB_NAMES.title[S.sb_title], adjust = function(d)
             S.sb_title = cycle(SB.title, S.sb_title, d) end },
         { label = "Chapter pages", value = SB_NAMES.pages[S.sb_pages], adjust = function(d)

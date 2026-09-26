@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- With **Show status bar** off, the text uses the space the status bar took at
+  the top and bottom (the book re-flows and keeps your place).
 - Dimmer: 1% brightness now uses the backlight's true minimum, and three
   **Extra dim** levels below 1% darken the page further (press left past 1% in
   Settings → Brightness, or keep sliding down on the touchscreen).
