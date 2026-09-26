@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.6
 
 - The analog stick turns pages in all four directions again, like the D-pad
   (down/right forward, up/left back).
