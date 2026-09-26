@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.1
 
 - **E-ink** is the default theme for new installs (your chosen theme is kept).
 - **Tap the top edge** of the bottom screen (left of the bookmark corner) to
