@@ -690,7 +690,7 @@ local function menu_items()
             end },
             { label = "Bookmarks", value = tostring(#Store.get_bookmarks(book.path)),
               act = function() open_bookmarks("menu") end },
-            { label = "Jump to %", value = math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
+            { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
               act = function() app.open_jump() end },
             { label = "Library", act = go_library },
         }),
