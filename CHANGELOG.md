@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.10
 
 - **Closing the lid** now sleeps the device while eReaderDS is open: it saves
   your place, turns the screens off and suspends; opening the lid wakes it on
