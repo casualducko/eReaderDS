@@ -323,7 +323,7 @@ local function save_progress_soon()
 end
 
 -- "Go back": where you were before the latest jump (Contents, Bookmarks,
--- Jump to %, chapter buttons). Jumping again before reading keeps the original
+-- Jump to %). Jumping again before reading keeps the original
 -- spot. Going back uses it up; it's also forgotten once you've read on a few
 -- spreads.
 local jump = nil                     -- { ch, off, turns }
@@ -2645,7 +2645,6 @@ end
 local BUTTON = {
     a = "confirm", b = "back", x = "menu", y = "toc",
     start = "menu", back = "bookmark", guide = "quit",
-    righttrigger = "next_section", lefttrigger = "prev_section",
 }
 
 local function dpad(dir)
@@ -2660,9 +2659,9 @@ function love.gamepadpressed(_, button)
 end
 
 -- Fallback when the controller has no gamepad mapping.
--- The L and R shoulder buttons (4 and 5) are deliberately left unused.
+-- The L/R shoulder buttons (4, 5) and L2/R2 (10, 11) are deliberately unused.
 local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x",
-    [6] = "back", [7] = "start", [8] = "guide", [10] = "lefttrigger", [11] = "righttrigger" }
+    [6] = "back", [7] = "start", [8] = "guide" }
 -- Analog stick acts like the D-pad: pushing past PRESS counts as one press in
 -- that direction; it must come back inside RELEASE before it can fire again,
 -- so one push is one press and stick drift never turns pages.

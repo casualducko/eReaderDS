@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- The L and R shoulder buttons no longer do anything. Pages turn with the
-  D-pad, stick or touch; values change with left/right.
+- The L/R and L2/R2 shoulder buttons no longer do anything. Pages turn with the
+  D-pad, stick or touch; values change with left/right; chapters are
+  reached from Contents.
 - **Library sorting**: left/right on the D-pad or stick switches between
   Recent (last opened first, the default), Title, Author (by last name) and
   Progress (books you're reading first, then unread, then finished).

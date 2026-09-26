@@ -11,7 +11,6 @@ INSTALL / UPDATE
 
 CONTROLS (hold it turned counter-clockwise; directions as held)
   D-pad ................. turn pages; in menus up/down move, left/right change
-  R2 / L2 ............... next / previous chapter
   A ..................... select
   Press stick in ........ settings while reading; select in menus
   B ..................... settings / back (after a jump: go back)

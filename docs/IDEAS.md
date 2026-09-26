@@ -31,8 +31,7 @@ Play Books, Moon+ Reader, ReadEra, PocketBook and CrossPoint (researched
    CrossPoint does this on far weaker hardware.
 8. **Sleep screen.** Show the book's cover (or the current page, dimmed)
    briefly when the lid closes, then turn the screens off.
-9. **Button remapping.** Choose what L2/R2, Y and the stick do (for
-   example, L2/R2 turning pages instead of jumping chapters).
+9. **Button remapping.** Choose what Y, Select and the stick do.
 10. **Reading statistics.** Time read today and this week, and pages per
     session, shown on the About page or in the library. No charts.
 
