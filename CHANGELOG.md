@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- **Footnotes on the facing page.** Press A while reading (or tap a note
-  number on the bottom screen): the note number is outlined and its note
+- **Footnotes on the facing page.** Press A while reading, tap a note number
+  on the bottom screen, or tap the **Notes** button that appears at the
+  bottom of the right page when the spread has notes: the note number is outlined and its note
   appears on the other page, so the text never moves. Left/right steps through
   the notes on the spread, up/down pages through a long note, and B closes.
   Works with EPUB 3 footnotes and endnotes and the numbered notes in older

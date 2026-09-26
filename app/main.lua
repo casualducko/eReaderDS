@@ -481,6 +481,22 @@ function note.collect()
     return out
 end
 
+-- Note references on the spread on screen, worked out once per spread.
+function note.on_spread()
+    local key = tostring(spread.pages) .. "|" .. spread.pi
+    if note.spread_key ~= key then
+        note.spread_key, note.spread_refs = key, note.collect()
+    end
+    return note.spread_refs
+end
+
+-- The "Notes" button at the bottom left of the right page (the touchscreen):
+-- x, y, w, h.
+function note.button()
+    local w = ui.small:getWidth("Notes") + 40
+    return margins().inner - 14, PAGE_H - 26 - ui.small:getHeight() - 10, w, ui.small:getHeight() + 20
+end
+
 -- The selected note laid out as pages (cached per target).
 function note.pages(r)
     local key = r.link.target .. "|" .. S.font_size .. "|" .. S.font .. "|" .. S.spacing .. "|" .. S.margins
@@ -1411,6 +1427,16 @@ local function draw_reader_pages()
             draw_page(left, "left")
         else
             draw_page(right, "right")
+            if app.mode == "reader" and #note.on_spread() > 0 then
+                -- Notes on this spread: a button to show them (same as A).
+                local bx, by, bw, bh = note.button()
+                local th = theme()
+                color(th.sel)
+                love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+                love.graphics.setFont(ui.small)
+                color(th.fg)
+                love.graphics.printf("Notes", bx, centered_y(ui.small, SMALL_SIZE, by, bh), bw, "center")
+            end
             if info.marked then
                 -- A ribbon hanging in the top-right corner, where a tap removes it.
                 local w, h = 24, 66
@@ -2764,9 +2790,13 @@ end
 function app.on_tap(side, u, v)
     local mode = app.mode
     if mode == "reader" then
-        local ref = side == "right" and note.hit(note.collect(), side, u, v)
+        local ref = side == "right" and note.hit(note.on_spread(), side, u, v)
+        local bx, by, bw, bh = note.button()
         if ref then
             note.open(ref)                    -- a note number: show the note on the left page
+        elseif side == "right" and #note.on_spread() > 0 and u >= bx - 16 and u <= bx + bw + 16
+            and v >= by - 16 and v <= by + bh + 16 then
+            note.open()                       -- the Notes button
         elseif jump and side == "right" and v > PAGE_H - 90 then
             go_back()                         -- the "Back to ..." line
         elseif side == "right" and u > PAGE_W - 150 and v < 150 then
