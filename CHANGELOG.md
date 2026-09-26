@@ -4,7 +4,8 @@
 
 - **Bookmarks.** Press Select (or tap the top-right corner of the page) to
   bookmark a page; press again to remove it. Bookmarked pages show a ribbon
-  by the hinge. Settings → Bookmarks lists them with chapter, percentage and
+  in that top-right corner, so tapping the ribbon removes it. The battery
+  indicator moves to the top of the left page, by the hinge. Settings → Bookmarks lists them with chapter, percentage and
   opening words: A opens one, Y deletes it. Bookmarks follow the text, so they
   survive font and size changes.
 - Uses much less memory on long reading sessions: only the last few chapters'

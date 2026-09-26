@@ -722,6 +722,8 @@ local function centered_y(font, size, top, height)
     return math.floor(top + height / 2 - mid + 0.5)
 end
 
+local RIBBON_ROOM = 60        -- title space kept clear for the bookmark ribbon
+
 -- Small battery icon with the percentage; returns its width. x is the left edge.
 local function draw_battery(x, y, b, measure)
     local label = b.pct .. "%"
@@ -758,21 +760,22 @@ local function draw_status(side, info)
     local head_y, foot_y = 26, PAGE_H - 26 - ui.small:getHeight()
     love.graphics.setFont(ui.small)
 
-    -- Right page top: clock at the left (by the hinge), battery in the outer
-    -- corner. The title fits between them: [title_x, title_x + title_w].
+    -- Top row. Left page: title, battery by the hinge. Right page: clock by
+    -- the hinge, title, and the outer corner kept clear for the bookmark
+    -- ribbon when there is one. The title fits in [title_x, title_x + title_w].
     local title_x, title_w = outer_x, w
-    if side == "right" then
+    if side == "left" and info.battery then
+        local bw = draw_battery(0, 0, info.battery, true)
+        draw_battery(outer_x + w - bw, head_y, info.battery)
+        title_w = title_w - bw - 24
+    elseif side == "right" then
         if info.clock then
             color(th.dim)
             love.graphics.print(info.clock, outer_x, head_y)
             local cw = ui.small:getWidth(info.clock) + 24
             title_x, title_w = title_x + cw, title_w - cw
         end
-        if info.battery then
-            local bw = draw_battery(0, 0, info.battery, true)
-            draw_battery(outer_x + w - bw, head_y, info.battery)
-            title_w = title_w - bw - 24
-        end
+        if info.marked then title_w = title_w - RIBBON_ROOM end
     end
 
     -- Titles: the left page shows the book title (or the chapter title when
@@ -862,18 +865,19 @@ local function draw_reader_pages()
         info.bar_frac = math.max(0, math.min(1, (shown - first + 1) / math.max(1, last - first + 1)))
     end
 
-    local marked = bookmark_here() ~= nil
+    info.marked = bookmark_here() ~= nil
     return function(side)
         if side == "left" then
             draw_page(left, "left")
-            if marked then
-                -- A ribbon marker hanging from the top, next to the hinge.
-                local x, w, h = PAGE_W - 40, 22, 64
+        else
+            draw_page(right, "right")
+            if info.marked then
+                -- A ribbon hanging in the top-right corner, where a tap removes it.
+                local w, h = 24, 66
+                local x = PAGE_W - 30 - w
                 love.graphics.setColor(0.72, 0.22, 0.20, 0.95)
                 love.graphics.polygon("fill", x, 0, x + w, 0, x + w, h, x + w / 2, h - 10, x, h)
             end
-        else
-            draw_page(right, "right")
         end
         draw_status(side, info)
     end

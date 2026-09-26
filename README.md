@@ -59,7 +59,8 @@ To make a tap open Settings instead, use **Settings → Tap**.
 - EPUB and plain text, with italics, headings, images, covers and contents
 - Justified text, indents, and each chapter starting on a new page
 - Library with covers and progress; your place in every book is saved
-- Bookmarks: a ribbon marks bookmarked pages; list them from Settings → Bookmarks
+- Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
+  from Settings → Bookmarks
 - Text size, line spacing, margins and brightness settings
 - Customizable status bar: titles, chapter pages ("12 pages left" or "Page 3
   of 15"), percent read, a progress bar across both pages, battery and a
