@@ -16,6 +16,7 @@ local Touch = require("touch")
 local KeyProbe = require("keyprobe")
 local Battery = require("battery")
 local Timezone = require("timezone")
+local Opds = require("opds")
 local VERSION = require("version")
 
 local SCREEN_W, SCREEN_H = 1024, 768
@@ -527,6 +528,12 @@ local function scan_library()
         end
     end
     table.sort(items, function(a, b) return a.title:lower() < b.title:lower() end)
+    -- Online catalogs from opds.txt come first, as "Get books" rows.
+    local ok, catalogs = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
+    if not ok then print("[opds] " .. tostring(catalogs)); catalogs = {} end
+    for i, c in ipairs(catalogs) do
+        table.insert(items, i, { catalog = c, title = "Get books", author = c.name })
+    end
     library.items = items
     library.sel = math.max(1, math.min(library.sel, #items))
 end
@@ -537,6 +544,7 @@ local previews, preview_order = {}, {}
 local function library_preview()
     local it = library.items[library.sel]
     if not it then return nil end
+    if it.catalog then return { catalog = it.catalog } end
     if previews[it.path] then return previews[it.path] end
     local pv = { path = it.path }
     local ok, b = pcall(Book.open, it.path)
@@ -568,6 +576,195 @@ local function go_library()
     end
     app.mode = "library"
     redraw()
+end
+
+---------------------------------------------------------------- get books (OPDS)
+
+-- Network jobs run on a thread (networker.lua); replies are dispatched here
+-- from the main loop by job id.
+local net = { thread = nil, next_id = 0, handlers = {}, count = 0 }
+-- The "Get books" screen. Its functions live on the table to stay under
+-- Lua's limit on local variables.
+local shop = { catalog = nil, stack = {}, covers = {}, cover_order = {}, dl = nil }
+
+function shop.net_job(job, handler)
+    if not net.thread then
+        net.thread = love.thread.newThread("networker.lua")
+        net.thread:start()
+    end
+    net.next_id = net.next_id + 1
+    job.id = net.next_id
+    net.handlers[job.id] = handler
+    net.count = net.count + 1
+    love.thread.getChannel("net_jobs"):push(job)
+    return job.id
+end
+
+function shop.net_poll()
+    if net.count == 0 then return false end
+    local got = false
+    local out = love.thread.getChannel("net_out")
+    while true do
+        local msg = out:pop()
+        if not msg then break end
+        got = true
+        local h = net.handlers[msg.id]
+        if msg.kind ~= "progress" then
+            net.handlers[msg.id] = nil
+            net.count = net.count - 1
+        end
+        if h then h(msg) end
+    end
+    if net.thread and not net.thread:isRunning() and net.count > 0 then
+        -- The thread died (a bug): fail whatever was waiting.
+        local err = net.thread:getError() or "network thread stopped"
+        print("[net] " .. err)
+        net.thread = nil
+        for id, h in pairs(net.handlers) do h({ id = id, kind = "error", message = err }) end
+        net.handlers, net.count = {}, 0
+        got = true
+    end
+    if got then redraw() end
+    return got
+end
+
+-- Catalog pages browsed into: { title, url, entries, next, sel, top,
+-- loading, error, more }. The last one is on screen.
+
+function shop.page() return shop.stack[#shop.stack] end
+
+function shop.catalog_opts(job)
+    local c = shop.catalog
+    job.user, job.password, job.verify = c.user, c.password, c.verify
+    return job
+end
+
+function shop.load_page(pg, url, append)
+    pg.loading, pg.error = true, nil
+    shop.net_job(shop.catalog_opts({ kind = "fetch", url = url }), function(msg)
+        pg.loading = false
+        if msg.kind == "error" then pg.error = msg.message; return end
+        local ok, feed = pcall(Opds.parse_feed, msg.body, msg.url or url)
+        if not ok then pg.error = tostring(feed):gsub("^[^:]*:%d+: ", ""); return end
+        if append then
+            for _, e in ipairs(feed.entries) do pg.entries[#pg.entries + 1] = e end
+        else
+            pg.entries = feed.entries
+        end
+        pg.next = feed.next
+    end)
+end
+
+function shop.push_page(title, url)
+    local pg = { title = title, url = url, entries = {}, sel = 1, top = 1 }
+    shop.stack[#shop.stack + 1] = pg
+    shop.load_page(pg, url)
+    redraw()
+end
+
+function shop.open(catalog)
+    shop.catalog = catalog
+    shop.stack = {}
+    app.mode = "shop"
+    shop.push_page(catalog.name, catalog.url)
+end
+
+-- Is this book already in the library (same file name, or same title)?
+function shop.have(it)
+    if not it.book then return nil end
+    local path = Store.download_dir() .. "/" .. Opds.file_name(it)
+    local f = io.open(path, "rb")
+    if f then f:close(); return path end
+    local t = it.title:lower()
+    for _, b in ipairs(library.items) do
+        if b.path and b.title:lower() == t then return b.path end
+    end
+end
+
+-- Cover for the selected entry, fetched when the network is idle.
+function shop.cover(it)
+    local url = it and it.cover
+    if not url then return nil end
+    local c = shop.covers[url]
+    if c ~= nil then return c or nil end
+    if net.count == 0 then
+        shop.covers[url] = false
+        shop.net_job(shop.catalog_opts({ kind = "fetch", url = url }), function(msg)
+            if msg.kind ~= "done" then return end
+            local ok, img = pcall(function()
+                return love.graphics.newImage(love.filesystem.newFileData(msg.body, "cover"))
+            end)
+            if not ok then return end
+            shop.covers[url] = img
+            shop.cover_order[#shop.cover_order + 1] = url
+            if #shop.cover_order > 12 then shop.covers[table.remove(shop.cover_order, 1)] = nil end
+        end)
+    end
+end
+
+function shop.start_download(it)
+    local dir = Store.download_dir()
+    local dest = dir .. "/" .. Opds.file_name(it)
+    local dl = { item = it, got = 0, total = it.book.size or 0, dest = dest }
+    shop.dl = dl
+    shop.net_job(shop.catalog_opts({ kind = "download", url = it.book.href, dest = dest, size = it.book.size }), function(msg)
+        if msg.kind == "progress" then
+            dl.got, dl.total = msg.got, msg.total
+        elseif msg.kind == "done" then
+            shop.dl = nil
+            it.have = dest
+            Store.flush()
+            scan_library()
+        else
+            shop.dl = nil
+            if msg.message ~= "cancelled" then
+                it.failed = msg.message
+            end
+        end
+    end)
+end
+
+function shop.back()
+    if shop.dl then
+        love.thread.getChannel("net_cancel"):push(true)
+        return
+    end
+    table.remove(shop.stack)
+    if #shop.stack == 0 then
+        scan_library()
+        app.mode = "library"
+    end
+end
+
+function shop.confirm()
+    local pg = shop.page()
+    if not pg then return end
+    if pg.error then
+        if #pg.entries > 0 and pg.next then shop.load_page(pg, pg.next, true) else shop.load_page(pg, pg.url) end
+        return
+    end
+    local it = pg.entries[pg.sel]
+    if not it then return end
+    if it.book then
+        if shop.dl then return end
+        local have = it.have or shop.have(it)
+        if have then open_book(have) else it.failed = nil; shop.start_download(it) end
+    elseif it.href then
+        shop.push_page(it.title, it.href)
+    end
+end
+
+function shop.move(d)
+    local pg = shop.page()
+    if not pg or #pg.entries == 0 then return end
+    pg.sel = math.max(1, math.min(#pg.entries, pg.sel + d))
+    -- Reaching the end of a long list loads the next part.
+    if pg.sel >= #pg.entries - 2 and pg.next and not pg.loading and not pg.error then
+        local url = pg.next
+        pg.next = nil
+        pg.more = true
+        shop.load_page(pg, url, true)
+    end
 end
 
 ---------------------------------------------------------------- menu
@@ -1066,7 +1263,8 @@ local function draw_library(side)
             local bottom = 40 + ui.small:getBaseline()
             local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
             love.graphics.print(fit_text(ui.font, it.title, rw - 90), rx, ty)
-            local pr = Store.get_progress(it.path)
+            if it.catalog then love.graphics.printf("›", rx, ty, rw, "right") end
+            local pr = it.path and Store.get_progress(it.path)
             love.graphics.setFont(ui.small)
             color(th.dim)
             love.graphics.print(fit_text(ui.small, it.author, rw - 90), rx, ty + 40)
@@ -1083,6 +1281,20 @@ local function draw_library(side)
         local pv = library_preview()
         if not pv then return end
         local x, w = MARGINS[2].inner, PAGE_W - MARGINS[2].outer - MARGINS[2].inner
+        if pv.catalog then
+            local u = Opds.parse_url(pv.catalog.url)
+            love.graphics.setFont(ui.title)
+            color(th.fg)
+            love.graphics.printf("Get books", x, 300, w, "center")
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.printf(pv.catalog.name .. (u and u.host ~= pv.catalog.name and ("\n" .. u.host) or ""),
+                x, 370, w, "center")
+            love.graphics.setFont(ui.small)
+            love.graphics.printf("Browse this catalog over Wi-Fi and download books to your SD card.\n\n"
+                .. "Catalogs are set up in Ebook/.ereaderds/opds.txt.", x, 520, w, "center")
+            return
+        end
         local y = 80
         if pv.cover then
             local iw, ih = pv.cover:getDimensions()
@@ -1114,6 +1326,170 @@ local function draw_library(side)
             color(th.dim)
             love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "% read", x, y + 20, w, "center")
         end
+    end
+end
+
+function shop.format_size(n)
+    if not n or n <= 0 then return nil end
+    if n >= 1048576 then return string.format("%.1f MB", n / 1048576) end
+    return math.max(1, math.floor(n / 1024 + 0.5)) .. " KB"
+end
+
+-- Print wrapped text into at most max_h pixels, ending with "…" if cut.
+function shop.print_clipped(font, text, x, y, w, max_h, align)
+    local _, lines = font:getWrap(text, w)
+    local n = math.max(0, math.floor(max_h / font:getHeight()))
+    if #lines > n then
+        lines = { unpack(lines, 1, n) }
+        if n > 0 then lines[n] = fit_text(font, lines[n] .. "…", w) end
+    end
+    love.graphics.printf(table.concat(lines, "\n"), x, y, w, align or "left")
+    return #lines * font:getHeight()
+end
+
+function shop.draw(side)
+    local th = theme()
+    local m = MARGINS[2]
+    local pg = shop.page()
+    if not pg then return end
+    local it = pg.entries[pg.sel]
+    if side == "left" then
+        local x, w = m.outer, PAGE_W - m.outer - m.inner
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print(fit_text(ui.title, pg.title, w), x, 60)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        local footer = "A open      B back"
+        if #pg.entries == 0 then
+            love.graphics.setFont(ui.font)
+            local text = pg.loading and "Loading…"
+                or pg.error and ("Couldn't load this page:\n" .. pg.error)
+                or "Nothing here."
+            love.graphics.printf(text, x, 180, w, "left")
+            if pg.error then footer = "A try again      B back" end
+        else
+            local row_h = 96
+            local rows = list_rows(row_h)
+            if pg.sel < pg.top then pg.top = pg.sel end
+            if pg.sel >= pg.top + rows then pg.top = pg.sel - rows + 1 end
+            draw_list(side, pg.entries, pg.sel, pg.top, rows, x, 160, w, row_h, function(e, _, rx, ry, rw)
+                local sub = e.author ~= "" and e.author or e.summary
+                local top = ui.font:getBaseline() - UI_SIZE * 0.68
+                local bottom = (sub ~= "" and 40 + ui.small:getBaseline()) or ui.font:getBaseline()
+                local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
+                local mark
+                if e.book then
+                    mark = (shop.dl and shop.dl.item == e) and "…"
+                        or (e.have or shop.have(e)) and "✓" or nil
+                elseif e.href then
+                    mark = "›"
+                end
+                love.graphics.setFont(ui.font)
+                color((e.book or e.href) and th.fg or th.dim)
+                love.graphics.print(fit_text(ui.font, e.title, rw - 60), rx, ty)
+                if mark then love.graphics.printf(mark, rx, ty, rw, "right") end
+                if sub ~= "" then
+                    love.graphics.setFont(ui.small)
+                    color(th.dim)
+                    love.graphics.print(fit_text(ui.small, sub, rw - 60), rx, ty + 40)
+                end
+            end)
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            if pg.loading then footer = "Loading more…"
+            elseif pg.error then footer = "Couldn't load more. A try again"
+            elseif shop.dl then footer = "B cancel download" end
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print(footer, x, PAGE_H - 70)
+        if #pg.entries > 0 then
+            love.graphics.printf(pg.sel .. " / " .. #pg.entries .. (pg.next and "+" or ""), x, PAGE_H - 70, w, "right")
+        end
+        return
+    end
+
+    -- Right page: the selected entry.
+    if not it then return end
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    local y = 70
+    local cover = shop.cover(it)
+    if cover then
+        local iw, ih = cover:getDimensions()
+        local s = math.min(w / iw, 440 / ih)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(cover, x + (w - iw * s) / 2, y, 0, s, s)
+        y = y + ih * s + 30
+    elseif it.book then
+        y = 160
+    else
+        y = 260
+    end
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    y = y + shop.print_clipped(ui.title, it.title, x, y, w, ui.title:getHeight() * 2, "center") + 6
+    if it.author ~= "" then
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        y = y + shop.print_clipped(ui.font, it.author, x, y, w, ui.font:getHeight(), "center") + 10
+    end
+
+    -- Status and action, pinned near the bottom; the summary fills the gap.
+    local status, action_text, frac
+    if it.book then
+        local dl = shop.dl
+        if dl and dl.item == it then
+            frac = dl.total > 0 and math.min(1, dl.got / dl.total) or nil
+            status = "Downloading…  " .. (shop.format_size(dl.got) or "0 KB")
+                .. (dl.total > 0 and (" of " .. shop.format_size(dl.total)) or "")
+            action_text = "B cancel"
+        elseif it.have or shop.have(it) then
+            status = "On your SD card"
+            action_text = "A read now"
+        elseif it.failed then
+            status = "Download failed: " .. it.failed
+            action_text = "A try again"
+        else
+            local size = shop.format_size(it.book.size)
+            status = it.book.ext:upper() .. (size and ("  ·  " .. size) or "")
+            action_text = dl and "Another download is running" or "A download"
+        end
+    elseif #it.formats > 0 then
+        status = "Only as " .. table.concat(it.formats, ", ") .. ".\nThis reader needs EPUB or TXT."
+    elseif it.href then
+        action_text = "A open"
+    end
+
+    local bottom = PAGE_H - 70
+    local foot_y = bottom
+    love.graphics.setFont(ui.small)
+    if action_text then
+        color(th.fg)
+        love.graphics.printf(action_text, x, foot_y, w, "center")
+        foot_y = foot_y - 50
+    end
+    if frac then
+        local bw = w * 0.7
+        local bx = x + (w - bw) / 2
+        color(th.sel)
+        love.graphics.rectangle("fill", bx, foot_y + 20, bw, 8, 4, 4)
+        color(th.fg)
+        if bw * frac >= 8 then love.graphics.rectangle("fill", bx, foot_y + 20, bw * frac, 8, 4, 4) end
+        foot_y = foot_y - 30
+    end
+    if status then
+        color(th.dim)
+        local _, lines = ui.small:getWrap(status, w)
+        local h = math.min(3, #lines) * ui.small:getHeight()
+        foot_y = foot_y - h + ui.small:getHeight()
+        shop.print_clipped(ui.small, status, x, foot_y, w, h, "center")
+        foot_y = foot_y - 20
+    end
+    if it.summary ~= "" and it.summary ~= it.title then
+        love.graphics.setFont(ui.small)
+        color(th.fg)
+        shop.print_clipped(ui.small, it.summary, x, y + 16, w, foot_y - y - 40, it.book and "left" or "center")
     end
 end
 
@@ -1499,6 +1875,7 @@ local function render_canvases()
         painter = function(side)
             if side == "left" then reader("left") else draw_jump_panel() end
         end
+    elseif app.mode == "shop" then painter = shop.draw
     elseif app.mode == "about" then painter = draw_about
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
@@ -2040,12 +2417,27 @@ function handle_action(a)
         return
     end
 
+    if mode == "shop" then
+        if a == "up" or a == "left" then shop.move(-1)
+        elseif a == "down" or a == "right" then shop.move(1)
+        elseif a == "prev" then shop.move(-list_rows(96))
+        elseif a == "next" then shop.move(list_rows(96))
+        elseif a == "confirm" then shop.confirm()
+        elseif a == "back" then shop.back()
+        elseif a == "menu" and not shop.dl then shop.stack = {}; shop.back() end
+        redraw()
+        return
+    end
+
     if mode == "library" then
         local n = #library.items
         if n > 0 then
             if a == "up" or a == "left" or a == "prev" then library.sel = math.max(1, library.sel - 1)
             elseif a == "down" or a == "right" or a == "next" then library.sel = math.min(n, library.sel + 1)
-            elseif a == "confirm" then open_book(library.items[library.sel].path) end
+            elseif a == "confirm" then
+                local it = library.items[library.sel]
+                if it.catalog then shop.open(it.catalog) else open_book(it.path) end
+            end
         end
         if a == "menu" and book then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil end
         if a == "back" and book then app.mode = "reader" end
@@ -2080,6 +2472,18 @@ function app.on_tap(side, u, v)
             action("confirm")
         elseif side == "left" then
             action("back")            -- tapped the dimmed book page: close
+        end
+    elseif mode == "shop" then
+        -- Tap a row to open it; tap the right page to download or read.
+        local pg = shop.page()
+        if side == "left" and pg and v >= 160 then
+            local idx = pg.top + math.floor((v - 160) / 96)
+            if pg.entries[idx] and idx < pg.top + list_rows(96) then
+                pg.sel = idx
+                action("confirm")
+            end
+        elseif side == "right" and v > PAGE_H - 200 then
+            action("confirm")
         end
     elseif mode == "about" then
         action("back")
@@ -2286,6 +2690,17 @@ local function run_test_script()
                 love.timer.sleep(wait)           -- simulate time spent reading
             elseif a == "lid:close" or a == "lid:open" then
                 app.on_raw_key(LID_DEVICE, a == "lid:close" and LID_CLOSE or LID_OPEN)
+            elseif a == "poll" then shop.net_poll()
+            elseif a == "net" then               -- wait for network jobs (and the cover)
+                for _ = 1, 2 do
+                    local t = love.timer.getTime()
+                    while net.count > 0 and love.timer.getTime() - t < 30 do
+                        shop.net_poll()
+                        love.timer.sleep(0.05)
+                    end
+                    local pg = shop.page()
+                    if app.mode == "shop" and pg then shop.cover(pg.entries[pg.sel]) end
+                end
             elseif dir then dpad(dir)
             elseif sa then stick_axis(sa, tonumber(sv))
             else action(a) end
@@ -2357,6 +2772,7 @@ function love.run()
         end
         if Touch.enabled and Touch.poll(lid.closed and function() end or touch_event) then got = true end
         if KeyProbe.enabled and KeyProbe.poll() then got = true end
+        if shop.net_poll() then got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
         if save_due and love.timer.getTime() >= save_due then save_progress() end
         if lid.closed then
@@ -2369,7 +2785,7 @@ function love.run()
         end
         if app.anim then
             love.timer.sleep(0.001)            -- animating: next frame (vsync paces it)
-        elseif Touch.enabled or overlay then
+        elseif Touch.enabled or overlay or net.count > 0 then
             -- Touch events don't wake love.event.wait(), so poll at a gentle rate.
             if not got and not app.dirty then love.timer.sleep(gesture and 0.008 or 0.025) end
         elseif not got then

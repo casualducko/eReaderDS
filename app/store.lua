@@ -67,6 +67,19 @@ function M.book_dirs()
     return dirs
 end
 
+function M.data_path(name) return path(name) end
+
+-- Where downloaded books go: the first book folder that exists.
+function M.download_dir()
+    local dirs = M.book_dirs()
+    for _, d in ipairs(dirs) do
+        local r = os.execute('[ -d "' .. d .. '" ]')
+        if r == 0 or r == true then return d end
+    end
+    os.execute('mkdir -p "' .. dirs[1] .. '"')
+    return dirs[1]
+end
+
 function M.load_settings()
     local raw = read_kv(path("settings.txt"))
     local s = {}

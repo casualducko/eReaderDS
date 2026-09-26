@@ -69,6 +69,7 @@ To make a tap open Settings instead, use **Settings → Tap**.
   clock with time zones
 - 11 themes, including E-ink (grayscale, with paper grain), Night and Amber
 - 10 built-in fonts, plus your own
+- Get books over Wi-Fi from Calibre or any OPDS catalog (see below)
 - Only redraws when something changes, to save battery
 
 | Library | Contents |
@@ -91,6 +92,29 @@ Lexend (sans-serif); and OpenDyslexic.
 then choose them in **Settings → Font**. Regular, italic and bold files of a
 family are grouped automatically. Use static fonts: variable fonts (with
 `[wght]` in the name) only show one weight.
+
+## Getting books over Wi-Fi
+
+eReaderDS can browse an OPDS catalog, such as Calibre's content server or
+Calibre-Web, and download books straight to the SD card. Open
+`Ebook/.ereaderds/opds.txt` (it's created the first time eReaderDS runs) and
+add your server:
+
+```
+name = Calibre
+url = http://192.168.1.20:8080/opds
+user = me
+password = secret
+```
+
+Leave out `user` and `password` if the server doesn't need them. Add
+another block for each extra catalog. For a server with a self-signed
+certificate, add `verify = no`.
+
+Each catalog shows up as **Get books** at the top of the library. Browse
+with the D-pad or by tapping, then press A on a book to download it. EPUB is
+preferred, and books you already have are marked ✓. There's no search,
+because there's no keyboard.
 
 ## Troubleshooting
 

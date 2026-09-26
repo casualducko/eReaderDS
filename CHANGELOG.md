@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Get books over Wi-Fi** from Calibre, Calibre-Web or any OPDS catalog,
+  set up in `Ebook/.ereaderds/opds.txt`. Browse with covers and
+  descriptions, and download EPUBs to the SD card with a progress bar
+  (B cancels). Works over HTTPS, with Basic or Digest logins.
 - **Jump to %** opens a picker: choose the percentage first (left/right 1%,
   up/down 10%, or drag the bar on the touchscreen), see the chapter
   you'd land in, then A jumps once (B cancels).

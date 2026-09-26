@@ -50,5 +50,5 @@ Play Books, Moon+ Reader, ReadEra, PocketBook and CrossPoint (researched
 ## Skip (bloat or needs internet)
 
 Text-to-speech, X-Ray / Word Wise, translation and Wikipedia lookup, cloud
-sync and OPDS catalogs, reading goals and charts, and page-thumbnail browsing.
+sync, reading goals and charts, and page-thumbnail browsing.
 Each is heavy for 1 GB of RAM, needs a network, or is rarely used.
