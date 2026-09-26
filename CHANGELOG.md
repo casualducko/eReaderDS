@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Status bar layout: the battery sits in the top outer corner of the right
+  page, and with Title set to Chapter the chapter name shows at the top of the
+  left page (with Both: book title left, chapter title right).
 - Faster: books and library covers load without reading the whole EPUB into
   memory (large, illustrated books open much faster), and library previews are
   cached.

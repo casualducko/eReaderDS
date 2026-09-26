@@ -542,22 +542,30 @@ local function draw_status(side, info)
     local head_y, foot_y = 26, PAGE_H - 26 - ui.small:getHeight()
     love.graphics.setFont(ui.small)
 
-    -- Battery sits by the hinge at the top of the right page.
+    -- Battery sits in the top outer corner of the right page.
     local reserve = 0
     if side == "right" and info.battery then
-        reserve = draw_battery(m.inner, head_y, info.battery) + 24
+        local bw = draw_battery(0, 0, info.battery, true)
+        draw_battery(outer_x + w - bw, head_y, info.battery)
+        reserve = bw + 24
     end
 
+    -- Titles: the left page shows the book title (or the chapter title when
+    -- only the chapter is chosen); with both, the chapter goes on the right.
     local t = S.sb_title
     local title
-    if side == "left" and (t == "book" or t == "both") then title = info.book_title
-    elseif side == "right" and (t == "chapter" or t == "both") then title = info.chapter_title end
+    if side == "left" then
+        if t == "book" or t == "both" then title = info.book_title
+        elseif t == "chapter" then title = info.chapter_title end
+    elseif t == "both" then
+        title = info.chapter_title
+    end
     if title and title ~= "" then
         love.graphics.setFont(ui.small)
         color(th.dim)
         local tw = w - reserve
-        love.graphics.printf(fit_text(ui.small, title, tw), outer_x + (side == "right" and reserve or 0), head_y,
-            tw, side == "left" and "left" or "right")
+        love.graphics.printf(fit_text(ui.small, title, tw), outer_x, head_y, tw,
+            side == "left" and "left" or "right")
     end
 
     color(th.dim)
