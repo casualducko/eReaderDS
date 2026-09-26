@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Even top and bottom margins: the space left under the last line is now split
+  between top and bottom instead of all landing at the bottom.
 - Settings are reordered into sections (Text, Layout, Display, Page turns)
   with small headers; the Status bar page is split into Top of page and
   Bottom of page. "Page turn" is now "Animation" under Page turns.

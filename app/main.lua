@@ -130,6 +130,15 @@ local function content_size()
     return PAGE_W - m.outer - m.inner, PAGE_H - vmargin() * 2
 end
 
+-- Pages hold whole lines, so the space left under the last line would all end
+-- up at the bottom. Shift the text down by half of it so the top and bottom
+-- margins match. (Must use the same line height as layout.lua.)
+local function text_top()
+    local _, h = content_size()
+    local lh = math.floor(math.max(fonts.r:getHeight(), S.font_size * 1.4) * S.spacing + 0.5)
+    return vmargin() + math.floor((h % lh) / 2)
+end
+
 ---------------------------------------------------------------- images
 
 local function get_image(src)
@@ -557,7 +566,7 @@ local function draw_page(page, side)
     local th = theme()
     local m = margins()
     local ox = side == "left" and m.outer or m.inner
-    local oy = vmargin()
+    local oy = text_top()
     if not page then return end
     for _, it in ipairs(page.items) do
         if it.kind == "text" then
