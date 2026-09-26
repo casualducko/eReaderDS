@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Shorter, up-to-date README and in-download README.txt; problem reports can
+  go to whoever sent you the zip.
+
 ## v0.2.4
 
 - **Font previews:** the Font setting shows each font's name in that font.

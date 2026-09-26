@@ -2,6 +2,8 @@
 -- the device it came from. SDL merges all keyboards, so two buttons that send
 -- the same key (e.g. Back) can only be told apart here.
 local M = { enabled = false }
+-- Stubs for systems without evdev (e.g. testing on a computer).
+function M.open() return false end
 function M.poll() return false end
 
 local ok_ffi, ffi = pcall(require, "ffi")
