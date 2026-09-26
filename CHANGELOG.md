@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The book percentage shows what's left, like the chapter count: "55% left in
+  book".
 - Status bar layout: the battery sits in the top outer corner of the right
   page, and with Title set to Chapter the chapter name shows at the top of the
   left page (with Both: book title left, chapter title right).
