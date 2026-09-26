@@ -1329,7 +1329,7 @@ local function draw_library(side)
         color(th.fg)
         love.graphics.print("Library", x, 60)
         if #library.items > 0 then
-            -- The sort order, changed with left/right (or a tap), like a settings value.
+            -- The sort order, changed with left/right, like a settings value.
             love.graphics.setFont(ui.font)
             color(th.dim)
             love.graphics.printf("‹ " .. SORT_NAMES[S.lib_sort] .. " ›", x,
@@ -2588,8 +2588,6 @@ function app.on_tap(side, u, v)
         elseif side == "left" then
             action("back")            -- tapped the dimmed book page: close
         end
-    elseif mode == "library" then
-        if side == "left" and v < 150 and u > PAGE_W / 2 then action("right") end   -- the sort order
     elseif mode == "shop" then
         -- Tap a row to open it; tap the right page to download or read.
         local pg = shop.page()
@@ -2612,7 +2610,6 @@ end
 local BUTTON = {
     a = "confirm", b = "back", x = "menu", y = "toc",
     start = "menu", back = "bookmark", guide = "quit",
-    rightshoulder = "next", leftshoulder = "prev",
     righttrigger = "next_section", lefttrigger = "prev_section",
 }
 
@@ -2628,7 +2625,8 @@ function love.gamepadpressed(_, button)
 end
 
 -- Fallback when the controller has no gamepad mapping.
-local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x", [4] = "leftshoulder", [5] = "rightshoulder",
+-- The L and R shoulder buttons (4 and 5) are deliberately left unused.
+local RAW = { [0] = "a", [1] = "b", [2] = "y", [3] = "x",
     [6] = "back", [7] = "start", [8] = "guide", [10] = "lefttrigger", [11] = "righttrigger" }
 -- Analog stick acts like the D-pad: pushing past PRESS counts as one press in
 -- that direction; it must come back inside RELEASE before it can fire again,

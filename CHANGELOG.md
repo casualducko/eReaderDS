@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- **Library sorting**: left/right on the D-pad or stick (or a tap on the
-  order at the top) switches between
+- The L and R shoulder buttons no longer do anything. Pages turn with the
+  D-pad, stick or touch; values change with left/right.
+- **Library sorting**: left/right on the D-pad or stick switches between
   Recent (last opened first, the default), Title, Author (by last name) and
   Progress (books you're reading first, then unread, then finished).
 - **Hyphenation** for English books (Settings → Hyphenation, off by default).
