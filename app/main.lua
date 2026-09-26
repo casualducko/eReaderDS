@@ -321,8 +321,8 @@ end
 
 -- "Go back": where you were before the latest jump (Contents, Bookmarks,
 -- Jump to %, chapter buttons). Jumping again before reading keeps the original
--- spot. Going back swaps, so you can flip between the two. It's forgotten
--- once you've read on a few spreads.
+-- spot. Going back uses it up; it's also forgotten once you've read on a few
+-- spreads.
 local jump = nil                     -- { ch, off, turns }
 local JUMP_FORGET_AFTER = 5          -- spreads
 
@@ -341,9 +341,9 @@ end
 
 local function go_back()
     if not jump then return false end
-    local ch, off = pos.ch, pos.off
-    goto_pos(jump.ch, jump.off)
-    jump = { ch = ch, off = off, turns = 0 }
+    local ch, off = jump.ch, jump.off
+    jump = nil
+    goto_pos(ch, off)
     save_progress()
     return true
 end
