@@ -950,8 +950,8 @@ local function draw_reader_pages()
         end
     end
     if S.sb_time == "book" or S.sb_time == "both" then
-        local t = format_time(book_chars_left(spread.ch, end_off) / S.read_cps)
-        info.percent_text = info.percent_text and (info.percent_text .. " · " .. t .. " left")
+        local t = format_time(book_chars_left(spread.ch, end_off) / S.read_cps, true)
+        info.percent_text = info.percent_text and (info.percent_text .. " (" .. t .. " left in book)")
             or (t .. " left in book")
     end
     if S.sb_bar == "book" then
