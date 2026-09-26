@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- New **About** page in Settings: version, "Created by casualducko", and
+  credits for the fonts and engine.
+
 ## v0.2.5
 
 - Shorter, up-to-date README and in-download README.txt; problem reports can

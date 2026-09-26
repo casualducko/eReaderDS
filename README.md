@@ -3,6 +3,8 @@
 A two-page ebook reader for the **Anbernic RG DS Plus**. Hold the device
 sideways like an open book, and each screen shows one page.
 
+Created by **casualducko**.
+
 ![Reading, held sideways](docs/screenshots/reading.png)
 
 > **For the RG DS Plus on its stock firmware only.** It isn't for the original
@@ -117,6 +119,8 @@ if you have access to this repository. Include:
 See [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## Credits
+
+eReaderDS is created by **casualducko**. It also appears in **Settings → About**.
 
 - Fonts, all under the SIL Open Font License 1.1 (license files are in
   `app/fonts/` and in the download's `LICENSES` folder):

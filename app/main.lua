@@ -412,6 +412,7 @@ local function menu_items()
             goto_pos(book:locate(math.max(0, math.min(1, f))))
             save_progress()
         end },
+        { label = "About", act = function() app.mode = "about" end },
         { label = "Library", act = go_library },
         { label = "Quit", act = function() love.event.quit() end },
     }
@@ -695,6 +696,54 @@ local function draw_toc(side)
     end)
 end
 
+local CREDITS = {
+    { "Fonts", "Gentium Book Plus and Charis SIL (SIL International), Literata "
+        .. "(TypeTogether), Source Serif 4 (Adobe), Crimson Text (Sebastian Kosch), "
+        .. "Bitter (Huerta Tipográfica), Atkinson Hyperlegible Next (Braille "
+        .. "Institute), Inter (Rasmus Andersson), Lexend (Lexend Project) and "
+        .. "OpenDyslexic (Abbie Gonzalez). SIL Open Font License 1.1." },
+    { "Engine", "LÖVE 11.5 (zlib license), from the PortMaster runtime." },
+}
+
+local function draw_about(side)
+    local th = theme()
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    if side == "left" then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.printf("eReaderDS", x, 300, w, "center")
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.printf("v" .. VERSION, x, 370, w, "center")
+        color(th.fg)
+        love.graphics.printf("Created by casualducko", x, 470, w, "center")
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("A two-page ebook reader for the Anbernic RG DS Plus", x, 530, w, "center")
+    else
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Credits", x, 60)
+        local y = 150
+        for _, c in ipairs(CREDITS) do
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.print(c[1], x, y)
+            y = y + ui.font:getHeight() + 4
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.printf(c[2], x, y, w, "left")
+            local _, lines = ui.small:getWrap(c[2], w)
+            y = y + #lines * ui.small:getHeight() + 30
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print("B back", x, PAGE_H - 70)
+    end
+end
+
 local function draw_message(side)
     local th = theme()
     if side == "left" then
@@ -719,6 +768,7 @@ local function render_canvases()
             if side == "left" then reader("left") else draw_menu_panel(side) end
         end
     elseif app.mode == "toc" then painter = draw_toc
+    elseif app.mode == "about" then painter = draw_about
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
 
@@ -1055,6 +1105,12 @@ local function action(a)
         return
     end
 
+    if mode == "about" then
+        if a == "back" or a == "confirm" or a == "menu" then app.mode = "menu" end
+        redraw()
+        return
+    end
+
     if mode == "toc" then
         local n = #book.toc
         local rows = list_rows(58)
@@ -1105,6 +1161,8 @@ function app.on_tap(side, u, v)
         elseif side == "left" then
             action("back")            -- tapped the dimmed book page: close
         end
+    elseif mode == "about" then
+        action("back")
     elseif mode == "toc" or mode == "message" then
         action("back")
     end
