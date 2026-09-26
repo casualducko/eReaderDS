@@ -1328,13 +1328,14 @@ local function relayout() clear_pages(); goto_pos(pos.ch, pos.off) end
 
 -- Time left is stored as one setting (off / chapter / book / both) but shown
 -- as two Show/Hide rows.
+-- Time left is only shown for the chapter: it's worked out from the text on
+-- the pages, while a whole-book estimate had to guess at chapters not yet
+-- opened and was often well off. The book shows its percentage instead.
 local function time_shown(which)
-    return S.sb_time == which or S.sb_time == "both"
+    return which == "chapter" and (S.sb_time == "chapter" or S.sb_time == "both")
 end
 local function set_time_shown(which, on)
-    local ch = which == "chapter" and on or which ~= "chapter" and time_shown("chapter")
-    local bk = which == "book" and on or which ~= "book" and time_shown("book")
-    S.sb_time = ch and bk and "both" or ch and "chapter" or bk and "book" or "off"
+    if which == "chapter" then S.sb_time = on and "chapter" or "off" end
 end
 
 local function status_items()
@@ -1364,9 +1365,6 @@ local function status_items()
                 set_time_shown("chapter", not time_shown("chapter")) end },
             { label = "Book percentage", value = S.sb_percent and "Show" or "Hide", adjust = function()
                 S.sb_percent = not S.sb_percent end },
-            { label = "Book time left", value = time_shown("book") and "Show" or "Hide", adjust = function()
-                set_time_shown("book", not time_shown("book")) end },
-
             { label = "Progress bar", value = SB_NAMES.bar[S.sb_bar], adjust = function(d)
                 S.sb_bar = cycle(SB.bar, S.sb_bar, d) end },
             { label = "Bar thickness", value = SB_NAMES.bar_size[S.sb_bar_size], adjust = function(d)
@@ -1645,20 +1643,6 @@ end
 -- Characters left in the book after offset `off` of chapter `ch`. Chapters
 -- not opened yet are estimated from their file size, scaled by how much of the
 -- file turned out to be text in the chapters already opened.
-local function book_chars_left(ch, off)
-    local text, bytes = 0, 0
-    for _, c in ipairs(book.chapters) do
-        if c.length and c.weight then text, bytes = text + c.length, bytes + c.weight end
-    end
-    local ratio = bytes > 0 and text / bytes or 0.5
-    local left = math.max(0, (book.chapters[ch].length or 0) - off)
-    for i = ch + 1, #book.chapters do
-        local c = book.chapters[i]
-        left = left + (c.length or c.weight * ratio)
-    end
-    return left
-end
-
 local function draw_reader_pages()
     local sec = current_section()
     local frac = book:fraction(pos.ch, pos.off)
@@ -1707,11 +1691,6 @@ local function draw_reader_pages()
             local t = format_time(left / S.read_cps, true)
             info.pages_text = info.pages_text and (info.pages_text .. " (" .. t .. ")") or (t .. " left in chapter")
         end
-    end
-    if S.sb_time == "book" or S.sb_time == "both" then
-        local t = format_time(book_chars_left(spread.ch, end_off) / S.read_cps, true)
-        info.percent_text = info.percent_text and (info.percent_text .. " (" .. t .. " left in book)")
-            or (t .. " left in book")
     end
     if S.sb_bar == "book" then
         info.bar_frac = frac

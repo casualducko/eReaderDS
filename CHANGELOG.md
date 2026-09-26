@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The status bar no longer estimates **time left in the book**, which was
+  often well off (it had to guess at chapters not yet opened). It shows the
+  percentage read instead; time left in the chapter stays.
+
 ## v0.3.1
 
 - **E-ink** is the default theme for new installs (your chosen theme is kept).

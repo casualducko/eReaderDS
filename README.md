@@ -70,8 +70,8 @@ and the Library are at the top of **Settings**.
   progress; delete books from it.
 - **Finding your place:** bookmarks, Contents, Jump to %, and "Back to …"
   after any jump. Your place in every book is saved.
-- **Status bar:** book and chapter titles, pages left, time left (learned
-  from your reading speed), percent read, a progress bar, battery and a clock.
+- **Status bar:** book and chapter titles, pages left, time left in the chapter
+  (learned from your reading speed), percent read, a progress bar, battery and a clock.
   Choose what shows in **Settings → Status bar**.
 - **Battery-friendly:** the screen only redraws when something changes, and
   closing the lid puts the device to sleep.
