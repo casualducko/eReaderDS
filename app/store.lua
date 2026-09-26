@@ -9,6 +9,7 @@ local DEFAULTS = {
     -- status bar
     sb_title = "both", sb_pages = "left", sb_percent = true,
     sb_bar = "chapter", sb_bar_size = 2, sb_battery = true,
+    sb_show = true, sb_clock = "off", tz = "UTC",
     brightness = -1,   -- percent; -1 = leave the system setting alone
 }
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Clock** in the top left of the right page (Settings → Status bar → Clock:
+  12-hour or 24-hour), with a **Time zone** setting. Named zones follow
+  daylight saving automatically.
+- **Show status bar** switch to hide or show all status bar items at once.
+
 ## v0.2.7
 
 - The chapter progress bar is on by default (Settings → Status bar →

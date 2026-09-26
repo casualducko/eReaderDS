@@ -15,6 +15,7 @@ local Fonts = require("fonts")
 local Touch = require("touch")
 local KeyProbe = require("keyprobe")
 local Battery = require("battery")
+local Timezone = require("timezone")
 local VERSION = require("version")
 
 local SCREEN_W, SCREEN_H = 1024, 768
@@ -373,13 +374,25 @@ local SB = {
     pages = { "hide", "left", "of" },
     bar = { "none", "chapter", "book" },
     bar_size = { 1, 2, 3 },
+    clock = { "off", "12", "24" },
 }
 local SB_NAMES = {
     title = { none = "None", book = "Book", chapter = "Chapter", both = "Both" },
     pages = { hide = "Hide", left = "Pages left", of = "Page X of Y" },
     bar = { none = "None", chapter = "Chapter", book = "Book" },
     bar_size = { [1] = "Thin", [2] = "Medium", [3] = "Thick" },
+    clock = { off = "Off", ["12"] = "12-hour", ["24"] = "24-hour" },
 }
+
+-- Current time for the status bar, or nil when the clock is off.
+local function clock_text()
+    if S.sb_clock == "12" then
+        local h = tonumber(os.date("%I"))
+        return string.format("%d:%s %s", h, os.date("%M"), os.date("%p"))
+    elseif S.sb_clock == "24" then
+        return os.date("%H:%M")
+    end
+end
 local BAR_PX = { 3, 6, 10 }
 
 local function cycle(list, cur, d)
@@ -390,6 +403,8 @@ end
 
 local function status_items()
     return {
+        { label = "Show status bar", value = S.sb_show and "On" or "Off", adjust = function()
+            S.sb_show = not S.sb_show end },
         { label = "Title", value = SB_NAMES.title[S.sb_title], adjust = function(d)
             S.sb_title = cycle(SB.title, S.sb_title, d) end },
         { label = "Chapter pages", value = SB_NAMES.pages[S.sb_pages], adjust = function(d)
@@ -402,6 +417,12 @@ local function status_items()
             S.sb_bar_size = cycle(SB.bar_size, S.sb_bar_size, d) end },
         { label = "Battery", value = Battery.get() and (S.sb_battery and "Show" or "Hide") or "n/a",
           adjust = function() S.sb_battery = not S.sb_battery end },
+        { label = "Clock", value = SB_NAMES.clock[S.sb_clock], adjust = function(d)
+            S.sb_clock = cycle(SB.clock, S.sb_clock, d) end },
+        { label = "Time zone", value = S.tz, adjust = function(d)
+            S.tz = cycle(Timezone.NAMES, S.tz, d)
+            Timezone.apply(S.tz)
+        end },
         { label = "Back", act = function() menu.page = "main"; menu.sel = menu.status_row or 1; menu.top = nil end },
     }
 end
@@ -535,6 +556,7 @@ end
 -- Status bar for one page. info: { book_title, chapter_title, pages_text,
 -- percent_text, bar_frac, battery }
 local function draw_status(side, info)
+    if not S.sb_show then return end
     local th = theme()
     local m = margins()
     local outer_x = side == "left" and m.outer or m.inner
@@ -542,12 +564,21 @@ local function draw_status(side, info)
     local head_y, foot_y = 26, PAGE_H - 26 - ui.small:getHeight()
     love.graphics.setFont(ui.small)
 
-    -- Battery sits in the top outer corner of the right page.
-    local reserve = 0
-    if side == "right" and info.battery then
-        local bw = draw_battery(0, 0, info.battery, true)
-        draw_battery(outer_x + w - bw, head_y, info.battery)
-        reserve = bw + 24
+    -- Right page top: clock at the left (by the hinge), battery in the outer
+    -- corner. The title fits between them: [title_x, title_x + title_w].
+    local title_x, title_w = outer_x, w
+    if side == "right" then
+        if info.clock then
+            color(th.dim)
+            love.graphics.print(info.clock, outer_x, head_y)
+            local cw = ui.small:getWidth(info.clock) + 24
+            title_x, title_w = title_x + cw, title_w - cw
+        end
+        if info.battery then
+            local bw = draw_battery(0, 0, info.battery, true)
+            draw_battery(outer_x + w - bw, head_y, info.battery)
+            title_w = title_w - bw - 24
+        end
     end
 
     -- Titles: the left page shows the book title (or the chapter title when
@@ -563,8 +594,7 @@ local function draw_status(side, info)
     if title and title ~= "" then
         love.graphics.setFont(ui.small)
         color(th.dim)
-        local tw = w - reserve
-        love.graphics.printf(fit_text(ui.small, title, tw), outer_x, head_y, tw,
+        love.graphics.printf(fit_text(ui.small, title, title_w), title_x, head_y, title_w,
             side == "left" and "left" or "right")
     end
 
@@ -619,6 +649,7 @@ local function draw_reader_pages()
         book_title = book.title,
         chapter_title = cur and cur.title or "",
         battery = S.sb_battery and Battery.get() or nil,
+        clock = clock_text(),
     }
     if S.sb_pages == "left" then
         local remaining = last - shown
@@ -1456,6 +1487,7 @@ function love.load()
     end
     local n = tonumber(S.theme)
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
+    Timezone.apply(S.tz)
     Touch.open("gt9xx-0")
     KeyProbe.open(nil, "gt9xx-0")
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
@@ -1580,6 +1612,10 @@ function love.run()
         if KeyProbe.enabled and KeyProbe.poll() then got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
         if save_due and love.timer.getTime() >= save_due then save_progress() end
+        if S.sb_show and S.sb_clock ~= "off" and (app.mode == "reader" or app.mode == "menu") then
+            local minute = os.date("%H%M")
+            if minute ~= app.clock_minute then app.clock_minute = minute; redraw() end
+        end
         if app.anim then
             love.timer.sleep(0.001)            -- animating: next frame (vsync paces it)
         elseif Touch.enabled or overlay then
