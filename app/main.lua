@@ -410,107 +410,145 @@ local function cycle(list, cur, d)
     return list[(idx - 1 + d) % #list + 1]
 end
 
+-- Tags each item with its section; the menu draws a header where the section
+-- changes ("" = a small gap with no header, nil = no header at the top).
+local function section(name, items)
+    for _, it in ipairs(items) do it.section = name end
+    return items
+end
+
+local function join(...)
+    local out = {}
+    for _, list in ipairs({ ... }) do
+        for _, it in ipairs(list) do out[#out + 1] = it end
+    end
+    return out
+end
+
+local function relayout() pages_cache = {}; goto_pos(pos.ch, pos.off) end
+
 local function status_items()
-    return {
-        { label = "Show status bar", value = S.sb_show and "On" or "Off", adjust = function()
-            S.sb_show = not S.sb_show
-            pages_cache = {}; goto_pos(pos.ch, pos.off)   -- text area changes size
-        end },
-        { label = "Title", value = SB_NAMES.title[S.sb_title], adjust = function(d)
-            S.sb_title = cycle(SB.title, S.sb_title, d) end },
-        { label = "Chapter pages", value = SB_NAMES.pages[S.sb_pages], adjust = function(d)
-            S.sb_pages = cycle(SB.pages, S.sb_pages, d) end },
-        { label = "Book percentage", value = S.sb_percent and "Show" or "Hide", adjust = function()
-            S.sb_percent = not S.sb_percent end },
-        { label = "Progress bar", value = SB_NAMES.bar[S.sb_bar], adjust = function(d)
-            S.sb_bar = cycle(SB.bar, S.sb_bar, d) end },
-        { label = "Bar thickness", value = SB_NAMES.bar_size[S.sb_bar_size], adjust = function(d)
-            S.sb_bar_size = cycle(SB.bar_size, S.sb_bar_size, d) end },
-        { label = "Battery", value = Battery.get() and (S.sb_battery and "Show" or "Hide") or "n/a",
-          adjust = function() S.sb_battery = not S.sb_battery end },
-        { label = "Clock", value = SB_NAMES.clock[S.sb_clock], adjust = function(d)
-            S.sb_clock = cycle(SB.clock, S.sb_clock, d) end },
-        { label = "Time zone", value = S.tz, adjust = function(d)
-            S.tz = cycle(Timezone.NAMES, S.tz, d)
-            Timezone.apply(S.tz)
-        end },
-        { label = "Back", act = function() menu.page = "main"; menu.sel = menu.status_row or 1; menu.top = nil end },
-    }
+    return join(
+        section(nil, {
+            { label = "Show status bar", value = S.sb_show and "On" or "Off", adjust = function()
+                S.sb_show = not S.sb_show
+                relayout()                          -- the text area changes size
+            end },
+        }),
+        section("Top of page", {
+            { label = "Title", value = SB_NAMES.title[S.sb_title], adjust = function(d)
+                S.sb_title = cycle(SB.title, S.sb_title, d) end },
+            { label = "Clock", value = SB_NAMES.clock[S.sb_clock], adjust = function(d)
+                S.sb_clock = cycle(SB.clock, S.sb_clock, d) end },
+            { label = "Time zone", value = S.tz, adjust = function(d)
+                S.tz = cycle(Timezone.NAMES, S.tz, d)
+                Timezone.apply(S.tz)
+            end },
+            { label = "Battery", value = Battery.get() and (S.sb_battery and "Show" or "Hide") or "n/a",
+              adjust = function() S.sb_battery = not S.sb_battery end },
+        }),
+        section("Bottom of page", {
+            { label = "Chapter pages", value = SB_NAMES.pages[S.sb_pages], adjust = function(d)
+                S.sb_pages = cycle(SB.pages, S.sb_pages, d) end },
+            { label = "Book percentage", value = S.sb_percent and "Show" or "Hide", adjust = function()
+                S.sb_percent = not S.sb_percent end },
+            { label = "Progress bar", value = SB_NAMES.bar[S.sb_bar], adjust = function(d)
+                S.sb_bar = cycle(SB.bar, S.sb_bar, d) end },
+            { label = "Bar thickness", value = SB_NAMES.bar_size[S.sb_bar_size], adjust = function(d)
+                S.sb_bar_size = cycle(SB.bar_size, S.sb_bar_size, d) end },
+        }),
+        section("", {
+            { label = "Back", act = function() menu.page = "main"; menu.sel = menu.status_row or 1; menu.top = nil end },
+        })
+    )
 end
 
 local function menu_items()
     if menu.page == "status" then return status_items() end
     local th = theme()
-    return {
-        { label = "Resume reading", act = function() app.mode = "reader" end },
-        { label = "Contents", act = function()
-            if #book.toc == 0 then return end
-            toc.sel = current_section() or 1
-            toc.top = nil
-            app.mode = "toc"
-        end },
-        { label = "Text size", value = tostring(S.font_size), adjust = function(d)
-            S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
-        end },
-        -- The font's name is drawn in the font itself: a preview, and the only way
-        -- names in other scripts (e.g. Chinese firmware fonts) can display.
-        { label = "Font", value = fonts.name or S.font,
-          value_font = Fonts.preview(fonts.name or S.font, UI_SIZE), adjust = function(d)
-            local list = Fonts.list()
-            local idx = 1
-            for k, f in ipairs(list) do if f.name == fonts.name then idx = k end end
-            S.font = list[(idx - 1 + d) % #list + 1].name
-            build_fonts(); goto_pos(pos.ch, pos.off)
-        end },
-        { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
-            S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100; pages_cache = {}; goto_pos(pos.ch, pos.off)
-        end },
-        { label = "Side margins", value = margins().name, adjust = function(d)
-            S.margins = (S.margins - 1 + d) % #MARGINS + 1; pages_cache = {}; goto_pos(pos.ch, pos.off)
-        end },
-        { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
-            S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; pages_cache = {}; goto_pos(pos.ch, pos.off)
-        end },
-        { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
-            S.justify = not S.justify; pages_cache = {}; goto_pos(pos.ch, pos.off)
-        end },
-        { label = "Brightness",
-          value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
-              or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
-          adjust = function(d)
-              local avail = Backlight.available()
-              local cur = S.brightness >= 0 and S.brightness or (avail and Backlight.get()) or 50
-              if d < 0 and (S.extra_dim > 0 or not avail or cur <= 1) then
-                  -- Past the backlight's minimum: extra dim levels.
-                  S.extra_dim = math.min(#EXTRA_DIM, S.extra_dim + 1)
-                  if avail and cur > 1 then S.brightness = 1; Backlight.set(1) end
-              elseif d > 0 and S.extra_dim > 0 then
-                  S.extra_dim = S.extra_dim - 1
-              elseif avail then
-                  S.brightness = Backlight.step(cur, d)
-                  Backlight.set(S.brightness)
-              end
-          end },
-        { label = "Theme", value = th.name, adjust = function(d)
-            S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
-        end },
-        { label = "Page turn", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
-            adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
-        { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
-            S.tap = S.tap == "next" and "menu" or "next"
-        end },
-        { label = "Status bar", value = "›", act = function()
-            menu.status_row = menu.sel; menu.page = "status"; menu.sel = 1; menu.top = nil
-        end },
-        { label = "Jump to % (" .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. ")", value = "", adjust = function(d)
-            local f = book:fraction(pos.ch, pos.off) + d * 0.01
-            goto_pos(book:locate(math.max(0, math.min(1, f))))
-            save_progress()
-        end },
-        { label = "About", act = function() app.mode = "about" end },
-        { label = "Library", act = go_library },
-        { label = "Quit", act = function() love.event.quit() end },
-    }
+    return join(
+        section(nil, {
+            { label = "Resume reading", act = function() app.mode = "reader" end },
+            { label = "Contents", act = function()
+                if #book.toc == 0 then return end
+                toc.sel = current_section() or 1
+                toc.top = nil
+                app.mode = "toc"
+            end },
+            { label = "Jump to % (" .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. ")", value = "", adjust = function(d)
+                local f = book:fraction(pos.ch, pos.off) + d * 0.01
+                goto_pos(book:locate(math.max(0, math.min(1, f))))
+                save_progress()
+            end },
+            { label = "Library", act = go_library },
+        }),
+        section("Text", {
+            -- The font's name is drawn in the font itself: a preview, and the only way
+            -- names in other scripts (e.g. Chinese firmware fonts) can display.
+            { label = "Font", value = fonts.name or S.font,
+              value_font = Fonts.preview(fonts.name or S.font, UI_SIZE), adjust = function(d)
+                local list = Fonts.list()
+                local idx = 1
+                for k, f in ipairs(list) do if f.name == fonts.name then idx = k end end
+                S.font = list[(idx - 1 + d) % #list + 1].name
+                build_fonts(); goto_pos(pos.ch, pos.off)
+            end },
+            { label = "Text size", value = tostring(S.font_size), adjust = function(d)
+                S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
+            end },
+            { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
+                S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
+                relayout()
+            end },
+            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
+                S.justify = not S.justify; relayout()
+            end },
+        }),
+        section("Layout", {
+            { label = "Side margins", value = margins().name, adjust = function(d)
+                S.margins = (S.margins - 1 + d) % #MARGINS + 1; relayout()
+            end },
+            { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
+                S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
+            end },
+            { label = "Status bar", value = "›", act = function()
+                menu.status_row = menu.sel; menu.page = "status"; menu.sel = 1; menu.top = nil
+            end },
+        }),
+        section("Display", {
+            { label = "Theme", value = th.name, adjust = function(d)
+                S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
+            end },
+            { label = "Brightness",
+              value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
+                  or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
+              adjust = function(d)
+                  local avail = Backlight.available()
+                  local cur = S.brightness >= 0 and S.brightness or (avail and Backlight.get()) or 50
+                  if d < 0 and (S.extra_dim > 0 or not avail or cur <= 1) then
+                      -- Past the backlight's minimum: extra dim levels.
+                      S.extra_dim = math.min(#EXTRA_DIM, S.extra_dim + 1)
+                      if avail and cur > 1 then S.brightness = 1; Backlight.set(1) end
+                  elseif d > 0 and S.extra_dim > 0 then
+                      S.extra_dim = S.extra_dim - 1
+                  elseif avail then
+                      S.brightness = Backlight.step(cur, d)
+                      Backlight.set(S.brightness)
+                  end
+              end },
+        }),
+        section("Page turns", {
+            { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
+              adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
+            { label = "Tap", value = S.tap == "next" and "Turn pages" or "Open menu", adjust = function()
+                S.tap = S.tap == "next" and "menu" or "next"
+            end },
+        }),
+        section("", {
+            { label = "About", act = function() app.mode = "about" end },
+            { label = "Quit", act = function() love.event.quit() end },
+        })
+    )
 end
 
 ---------------------------------------------------------------- drawing
@@ -795,21 +833,57 @@ local function draw_library(side)
     end
 end
 
--- Settings list geometry. Rows shrink (down to a minimum) to fit every item;
--- if there are still too many, the list scrolls with the selection.
-local MENU_TOP, MENU_BOTTOM = 140, PAGE_H - 90
-local MENU_ROW_MAX, MENU_ROW_MIN = 52, 44
+-- Settings list geometry. Items are grouped under small section headers;
+-- item rows shrink (down to a minimum) so everything fits, and if it still
+-- doesn't, the list scrolls with the selection.
+local MENU_TOP, MENU_BOTTOM = 124, PAGE_H - 78
+local MENU_ROW_MAX, MENU_ROW_MIN = 52, 40
+local MENU_HEADER_H, MENU_GAP_H = 30, 10
 
-local function menu_layout(n)
+-- Returns the visible rows ({ kind = "item"|"header"|"gap", y, h, idx, text })
+-- plus whether there is more above / below.
+local function menu_layout(items)
+    local rows, extra = {}, 0
+    for i, it in ipairs(items) do
+        if i > 1 and it.section ~= items[i - 1].section or (i == 1 and it.section and it.section ~= "") then
+            if it.section and it.section ~= "" then
+                rows[#rows + 1] = { kind = "header", text = it.section, h = MENU_HEADER_H }
+            else
+                rows[#rows + 1] = { kind = "gap", h = MENU_GAP_H }
+            end
+            extra = extra + rows[#rows].h
+        end
+        rows[#rows + 1] = { kind = "item", idx = i }
+    end
     local avail = MENU_BOTTOM - MENU_TOP
-    local row_h = math.max(MENU_ROW_MIN, math.min(MENU_ROW_MAX, math.floor(avail / n)))
-    local rows = math.min(n, math.floor(avail / row_h))
-    -- keep the selection visible
-    menu.top = menu.top or 1
-    if menu.sel < menu.top then menu.top = menu.sel end
-    if menu.sel > menu.top + rows - 1 then menu.top = menu.sel - rows + 1 end
-    menu.top = math.max(1, math.min(menu.top, n - rows + 1))
-    return row_h, rows, menu.top
+    local row_h = math.max(MENU_ROW_MIN, math.min(MENU_ROW_MAX, math.floor((avail - extra) / #items)))
+    local sel_r = 1
+    for r, row in ipairs(rows) do
+        if row.kind == "item" then row.h = row_h end
+        if row.idx == menu.sel then sel_r = r end
+    end
+    -- Scroll so the selection (with its header, if any) stays in view.
+    local top = menu.top or 1
+    if sel_r < top then top = sel_r end
+    if top > 1 and rows[top - 1].kind ~= "item" and top - 1 == sel_r - 1 then top = top - 1 end
+    local function height(from, to)
+        local h = 0
+        for r = from, to do h = h + rows[r].h end
+        return h
+    end
+    while height(top, sel_r) > avail do top = top + 1 end
+    menu.top = top
+    local visible, y = {}, MENU_TOP
+    local last = top - 1
+    for r = top, #rows do
+        if y + rows[r].h > MENU_TOP + avail then break end
+        local row = rows[r]
+        row.y = y
+        visible[#visible + 1] = row
+        y = y + row.h
+        last = r
+    end
+    return visible, top > 1, last < #rows
 end
 
 local function scroll_arrow(x, y, up)
@@ -829,37 +903,60 @@ local function draw_menu_panel(side)
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, 78, w, "right")
     local items = menu_items()
-    local row_h, rows, top = menu_layout(#items)
-    if top > 1 then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP - 16, true) end
-    if top + rows - 1 < #items then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP + rows * row_h + 6, false) end
-    draw_list(side, items, menu.sel, top, rows, x, MENU_TOP, w, row_h, function(it, _, rx, ry, rw, selected)
-        love.graphics.setFont(ui.font)
-        color(th.fg)
-        local ty = centered_y(ui.font, UI_SIZE, ry, row_h - 4)
-        love.graphics.print(it.label, rx, ty)
-        local vf = it.value_font
-        if vf and it.value and it.value ~= "" and vf:hasGlyphs(it.value) then
-            local room = rw - ui.font:getWidth(it.label) - 40
-            local open, close = "‹  ", "  ›"
-            local name = fit_text(vf, it.value, room - ui.font:getWidth(open .. close))
-            local right = rx + rw
-            local cw, nw = ui.font:getWidth(close), vf:getWidth(name)
-            love.graphics.print(close, right - cw, ty)
-            love.graphics.print(open, right - cw - nw - ui.font:getWidth(open), ty)
-            love.graphics.setFont(vf)
-            love.graphics.print(name, right - cw - nw, centered_y(vf, UI_SIZE, ry, row_h - 4))
-            love.graphics.setFont(ui.font)
-        elseif it.value and it.value ~= "" then
-            local room = rw - ui.font:getWidth(it.label) - 40
-            local v = it.value
-            if it.adjust then
-                v = "‹  " .. fit_text(ui.font, v, room - ui.font:getWidth("‹    ›")) .. "  ›"
+    local visible, more_up, more_down = menu_layout(items)
+    if more_up then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP - 14, true) end
+    if more_down then
+        local last = visible[#visible]
+        color(th.dim); scroll_arrow(x + w / 2, last.y + last.h + 8, false)
+    end
+    for _, row in ipairs(visible) do
+        if row.kind == "header" then
+            -- Section header: small dimmed capitals and a hairline.
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            local label = row.text:upper()
+            local ty = row.y + row.h - ui.small:getHeight() - 2
+            love.graphics.print(label, x, ty)
+            local lx = x + ui.small:getWidth(label) + 14
+            local ly = ty + math.floor(ui.small:getHeight() * 0.55)
+            color(th.dim, 0.45)
+            love.graphics.setLineWidth(1)
+            love.graphics.line(lx, ly, x + w, ly)
+        elseif row.kind == "item" then
+            local it = items[row.idx]
+            local ry, row_h, rx, rw = row.y, row.h, x, w
+            if row.idx == menu.sel then
+                color(th.sel)
+                love.graphics.rectangle("fill", x - 14, ry, w + 28, row_h - 4, 10, 10)
             end
-            love.graphics.printf(v, rx, ty, rw, "right")
-        elseif it.adjust then
-            love.graphics.printf("‹  ›", rx, ty, rw, "right")
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            local ty = centered_y(ui.font, UI_SIZE, ry, row_h - 4)
+            love.graphics.print(it.label, rx, ty)
+            local vf = it.value_font
+            if vf and it.value and it.value ~= "" and vf:hasGlyphs(it.value) then
+                local room = rw - ui.font:getWidth(it.label) - 40
+                local open, close = "‹  ", "  ›"
+                local name = fit_text(vf, it.value, room - ui.font:getWidth(open .. close))
+                local right = rx + rw
+                local cw, nw = ui.font:getWidth(close), vf:getWidth(name)
+                love.graphics.print(close, right - cw, ty)
+                love.graphics.print(open, right - cw - nw - ui.font:getWidth(open), ty)
+                love.graphics.setFont(vf)
+                love.graphics.print(name, right - cw - nw, centered_y(vf, UI_SIZE, ry, row_h - 4))
+                love.graphics.setFont(ui.font)
+            elseif it.value and it.value ~= "" then
+                local room = rw - ui.font:getWidth(it.label) - 40
+                local v = it.value
+                if it.adjust then
+                    v = "‹  " .. fit_text(ui.font, v, room - ui.font:getWidth("‹    ›")) .. "  ›"
+                end
+                love.graphics.printf(v, rx, ty, rw, "right")
+            elseif it.adjust then
+                love.graphics.printf("‹  ›", rx, ty, rw, "right")
+            end
         end
-    end)
+    end
     love.graphics.setFont(ui.small)
     color(th.dim)
     love.graphics.printf("A select    ‹ › change    B back", x, PAGE_H - 70, w, "left")
@@ -1385,10 +1482,11 @@ function app.on_tap(side, u, v)
         -- The settings panel is drawn on the right page.
         local m = MARGINS[2]
         local items = menu_items()
-        local row_h, rows, top = menu_layout(#items)
-        local r = math.floor((v - MENU_TOP) / row_h)
-        local idx = (r >= 0 and r < rows) and top + r or nil
-        if side == "right" and u >= m.inner - 14 and u <= PAGE_W - m.outer + 14 and items[idx] then
+        local idx
+        for _, row in ipairs((menu_layout(items))) do
+            if row.kind == "item" and v >= row.y and v < row.y + row.h then idx = row.idx end
+        end
+        if side == "right" and u >= m.inner - 14 and u <= PAGE_W - m.outer + 14 and idx then
             menu.sel = idx
             action("confirm")
         elseif side == "left" then

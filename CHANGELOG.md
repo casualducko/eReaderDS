@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Settings are reordered into sections (Text, Layout, Display, Page turns)
+  with small headers; the Status bar page is split into Top of page and
+  Bottom of page. "Page turn" is now "Animation" under Page turns.
 - With **Show status bar** off, the text uses the space the status bar took at
   the top and bottom (the book re-flows and keeps your place).
 - Dimmer: 1% brightness now uses the backlight's true minimum, and three
