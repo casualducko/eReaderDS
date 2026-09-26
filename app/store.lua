@@ -123,9 +123,8 @@ end
 
 function M.get_progress(p) return load_progress()[p] end
 
-function M.set_progress(p, ch, off, pct)
+local function write_progress()
     local all = load_progress()
-    all[p] = { ch = ch, off = off, pct = pct }
     local keys = {}
     for k in pairs(all) do keys[#keys + 1] = k end
     table.sort(keys)
@@ -135,6 +134,11 @@ function M.set_progress(p, ch, off, pct)
         out[#out + 1] = string.format("%s\t%d\t%d\t%.4f", k, v.ch, v.off, v.pct)
     end
     write_atomic(path("progress.txt"), table.concat(out, "\n") .. "\n")
+end
+
+function M.set_progress(p, ch, off, pct)
+    load_progress()[p] = { ch = ch, off = off, pct = pct }
+    write_progress()
 end
 
 -- bookmarks.txt: one line per bookmark:
@@ -191,6 +195,17 @@ function M.get_last()
 end
 
 function M.set_last(p) write_atomic(path("last.txt"), p .. "\n") end
+
+-- Forget a deleted book: its progress, bookmarks and "last opened".
+function M.forget(p)
+    load_progress()[p] = nil
+    write_progress()
+    M.set_bookmarks(p, {})
+    if M.get_last() == p then
+        os.remove(path("last.txt"))
+        last_written[path("last.txt")] = nil
+    end
+end
 
 function M.flush() os.execute("sync") end
 

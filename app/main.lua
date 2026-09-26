@@ -567,6 +567,26 @@ local function library_preview()
     return pv
 end
 
+-- Delete a book file (Y in the library, then A to confirm).
+function library.delete(path)
+    if book and book.path == path then
+        save_progress()
+        book:close()
+        book, jump = nil, nil
+        clear_book_caches()
+    end
+    local ok, err = os.remove(path)
+    if not ok then
+        show_message("Could not delete this book.\n\n" .. tostring(err))
+        return
+    end
+    previews[path] = nil
+    Store.forget(path)
+    Store.flush()
+    scan_library()
+    app.toast("Book deleted")
+end
+
 local function go_library()
     save_progress()
     Store.flush()
@@ -1275,7 +1295,7 @@ local function draw_library(side)
         end)
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.print("A  open      B  back to book      Menu  quit", x, PAGE_H - 70)
+        love.graphics.print("A  open      Y  delete" .. (book and "      B  back to book" or ""), x, PAGE_H - 70)
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
     else
         local pv = library_preview()
@@ -1296,7 +1316,8 @@ local function draw_library(side)
             return
         end
         local y = 80
-        if pv.cover then
+        local confirming = library.confirm == pv.path
+        if pv.cover and not confirming then
             local iw, ih = pv.cover:getDimensions()
             local s = math.min(w / iw, 620 / ih)
             love.graphics.setColor(1, 1, 1)
@@ -1325,6 +1346,16 @@ local function draw_library(side)
             love.graphics.setFont(ui.small)
             color(th.dim)
             love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "% read", x, y + 20, w, "center")
+        end
+        if confirming then
+            local by = PAGE_H - 330
+            color(th.sel)
+            love.graphics.rectangle("fill", x - 14, by, w + 28, 150, 12, 12)
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.printf("Delete this book from the SD card?", x, by + 28, w, "center")
+            love.graphics.setFont(ui.small)
+            love.graphics.printf("A  delete      B  keep", x, by + 90, w, "center")
         end
     end
 end
@@ -2431,12 +2462,22 @@ function handle_action(a)
 
     if mode == "library" then
         local n = #library.items
+        if library.confirm then
+            -- "Delete this book?" is showing: A deletes, anything else keeps it.
+            local path = library.confirm
+            library.confirm = nil
+            if a == "confirm" then library.delete(path) end
+            redraw()
+            return
+        end
         if n > 0 then
             if a == "up" or a == "left" or a == "prev" then library.sel = math.max(1, library.sel - 1)
             elseif a == "down" or a == "right" or a == "next" then library.sel = math.min(n, library.sel + 1)
             elseif a == "confirm" then
                 local it = library.items[library.sel]
                 if it.catalog then shop.open(it.catalog) else open_book(it.path) end
+            elseif a == "toc" and library.items[library.sel].path then
+                library.confirm = library.items[library.sel].path
             end
         end
         if a == "menu" and book then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil end

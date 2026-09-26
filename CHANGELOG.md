@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Delete books** from the library: Y on a book, then A to confirm. Its
+  progress and bookmarks are forgotten too.
 - **Get books over Wi-Fi** from Calibre, Calibre-Web or any OPDS catalog,
   set up in `Ebook/.ereaderds/opds.txt`. Browse with covers and
   descriptions, and download EPUBs to the SD card with a progress bar

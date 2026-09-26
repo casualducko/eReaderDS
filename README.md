@@ -43,7 +43,7 @@ buttons are under your right hand. Directions below are as you hold it.
 | B | Settings (or go back after a jump) | Back |
 | Select | Bookmark this page (again to remove) | Close |
 | Start, X, or the ↩ button | Settings | Close |
-| Y | Contents | |
+| Y | Contents | Delete the book (library) |
 | Menu (Anbernic button) | Quit | Quit |
 
 The **analog stick** works like the D-pad.
@@ -59,6 +59,7 @@ To make a tap open Settings instead, use **Settings → Tap**.
 - EPUB and plain text, with italics, headings, images, covers and contents
 - Justified text, indents, and each chapter starting on a new page
 - Library with covers and progress; your place in every book is saved
+- Delete books from the library (Y, then A to confirm)
 - Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
   from Settings → Bookmarks
 - Text size, line spacing, margins and brightness settings
