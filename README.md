@@ -142,7 +142,8 @@ certificate, add `verify = no`. To hide Project Gutenberg, add
 `gutenberg = off`.
 
 In the library, press **Select** or tap the **Get books** button at the
-bottom of the touchscreen, then choose a catalog.
+bottom of the touchscreen, then choose a catalog. (Turn on Wi-Fi first in the
+device's settings; the button is greyed out until it's connected.)
 Browse with the D-pad or by tapping, then press A on a book to download it. EPUB is
 preferred, and books you already have are marked ✓. There's no search,
 because there's no keyboard.

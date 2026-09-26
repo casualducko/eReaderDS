@@ -880,6 +880,30 @@ local net = { thread = nil, next_id = 0, handlers = {}, count = 0 }
 -- Lua's limit on local variables.
 local shop = { catalog = nil, stack = {}, covers = {}, cover_order = {}, dl = nil }
 
+-- Is the device on a network? Connected Wi-Fi gives the system a default
+-- route, so this reads /proc/net/route (checked at most every 2 seconds).
+-- Where that file doesn't exist (a computer), assume yes.
+function shop.online(fresh)
+    local now = love.timer.getTime()
+    if not fresh and shop.online_at and now - shop.online_at < 2 then return shop.online_v end
+    local v = true
+    if os.getenv("READER_OFFLINE") then
+        v = false
+    else
+        local f = io.open("/proc/net/route", "rb")
+        if f then
+            v = false
+            for line in f:lines() do
+                local iface, dest = line:match("^(%S+)%s+(%x+)")
+                if dest == "00000000" and iface ~= "lo" then v = true end
+            end
+            f:close()
+        end
+    end
+    shop.online_at, shop.online_v = now, v
+    return v
+end
+
 local function scan_library()
     local items = {}
     local seen = {}
@@ -1061,7 +1085,10 @@ function shop.load_page(pg, url, append)
     pg.retry = { url = url, append = append }      -- what A retries if this fails
     shop.net_job(shop.catalog_opts({ kind = "fetch", url = url }), function(msg)
         pg.loading = false
-        if msg.kind == "error" then pg.error = msg.message; return end
+        if msg.kind == "error" then
+            pg.error = shop.online(true) and msg.message or "Not connected to Wi-Fi."
+            return
+        end
         local ok, feed = pcall(Opds.parse_feed, msg.body, msg.url or url)
         if not ok then pg.error = tostring(feed):gsub("^[^:]*:%d+: ", ""); return end
         if append then
@@ -1093,6 +1120,10 @@ end
 -- then the free built-in ones), and how to add your own.
 function shop.start()
     library.confirm = nil
+    if not shop.online(true) then
+        app.toast("Not connected to Wi-Fi")
+        return
+    end
     shop.dir = nil
     for url, c in pairs(shop.covers) do if c == false then shop.covers[url] = nil end end
     local entries = {}
@@ -1182,7 +1213,7 @@ function shop.start_download(it)
         else
             shop.dl = nil
             if msg.message ~= "cancelled" then
-                it.failed = msg.message
+                it.failed = shop.online(true) and msg.message or "not connected to Wi-Fi"
             end
         end
     end)
@@ -1792,13 +1823,21 @@ local function draw_library(side)
         local x, w = MARGINS[2].inner, PAGE_W - MARGINS[2].outer - MARGINS[2].inner
         -- "Get books" button at the bottom of the touchscreen (also Select).
         local bx, by, bw, bh = library.get_books_button()
-        color(th.sel)
-        love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+        local online = shop.online()
+        if online then
+            color(th.sel)
+            love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+        else
+            -- Offline: an outline only, greyed out, saying why.
+            color(th.dim, 0.5)
+            love.graphics.setLineWidth(2)
+            love.graphics.rectangle("line", bx, by, bw, bh, bh / 2, bh / 2)
+        end
         love.graphics.setFont(ui.font)
-        local label, hint = "Get books", "   Select"
+        local label, hint = "Get books", online and "   Select" or "   No Wi-Fi"
         local lx = bx + (bw - ui.font:getWidth(label) - ui.small:getWidth(hint)) / 2
         local ly = centered_y(ui.font, UI_SIZE, by, bh)
-        color(th.fg)
+        color(online and th.fg or th.dim, online and 1 or 0.6)
         love.graphics.print(label, lx, ly)
         love.graphics.setFont(ui.small)
         color(th.dim)
@@ -3482,6 +3521,11 @@ function love.run()
         if shop.net_poll() then got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
         if save_due and love.timer.getTime() >= save_due then save_progress() end
+        if app.mode == "library" and not lid.closed then
+            -- Wi-Fi coming or going changes the Get books button.
+            local was = shop.online_v
+            if shop.online() ~= was and was ~= nil then redraw() end
+        end
         if lid.closed then
             lid_tick()
             love.timer.sleep(0.25)              -- screens are off: check rarely

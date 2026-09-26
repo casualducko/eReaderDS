@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Get books knows when you're offline.** Without Wi-Fi the Get books button
+  is greyed out and says "No Wi-Fi" (it updates within a couple of seconds of
+  connecting or disconnecting), and Select or a tap just says "Not connected
+  to Wi-Fi". If the connection drops while browsing or downloading, the error
+  says so instead of a network error.
 - **Dictionary on the facing page.** Press Y while reading (or press and hold a
   word on the touchscreen): a cursor goes on a word, left/right move it word
   by word and up/down line by line across both pages, and the definition shows
