@@ -41,14 +41,16 @@ buttons are under your right hand. Directions below are as you hold it.
 | R2 / L2 | Next / previous chapter | |
 | A, or press the stick in | | Select |
 | B | Settings | Back |
-| Start, Select, X, or the ↩ button | Settings | Close |
+| Select | Bookmark this page (again to remove) | Close |
+| Start, X, or the ↩ button | Settings | Close |
 | Y | Contents | |
 | Menu (Anbernic button) | Quit | Quit |
 
 The **analog stick** works like the D-pad.
 
 **Touch** (bottom screen): swipe left/right to turn pages, and slide up/down
-for brightness (keep sliding below 1% for Extra dim). Tapping the right or left half turns pages forward or back.
+for brightness (keep sliding below 1% for Extra dim). Tapping the right or left half turns pages forward or back, and tapping the
+top-right corner bookmarks the page.
 To make a tap open Settings instead, use **Settings → Tap**.
 
 ## Features
@@ -57,6 +59,7 @@ To make a tap open Settings instead, use **Settings → Tap**.
 - EPUB and plain text, with italics, headings, images, covers and contents
 - Justified text, indents, and each chapter starting on a new page
 - Library with covers and progress; your place in every book is saved
+- Bookmarks: a ribbon marks bookmarked pages; list them from Settings → Bookmarks
 - Text size, line spacing, margins and brightness settings
 - Customizable status bar: titles, chapter pages ("12 pages left" or "Page 3
   of 15"), percent read, a progress bar across both pages, battery and a

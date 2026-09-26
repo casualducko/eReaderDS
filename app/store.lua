@@ -122,6 +122,51 @@ function M.set_progress(p, ch, off, pct)
     write_atomic(path("progress.txt"), table.concat(out, "\n") .. "\n")
 end
 
+-- bookmarks.txt: one line per bookmark:
+-- path \t chapter \t offset \t fraction \t chapter title \t first words of the page
+local bookmarks
+local function load_bookmarks()
+    if bookmarks then return bookmarks end
+    bookmarks = {}
+    local f = io.open(path("bookmarks.txt"), "rb")
+    if f then
+        for line in f:lines() do
+            local p, ch, off, pct, title, snippet = line:match("^(.-)\t(%d+)\t(%d+)\t([%d%.]+)\t(.-)\t(.*)$")
+            if p then
+                local list = bookmarks[p] or {}
+                list[#list + 1] = { ch = tonumber(ch), off = tonumber(off), pct = tonumber(pct),
+                    title = title, snippet = snippet }
+                bookmarks[p] = list
+            end
+        end
+        f:close()
+    end
+    return bookmarks
+end
+
+-- The book's bookmarks, in reading order.
+function M.get_bookmarks(p)
+    return load_bookmarks()[p] or {}
+end
+
+function M.set_bookmarks(p, list)
+    local all = load_bookmarks()
+    table.sort(list, function(a, b) return a.ch < b.ch or (a.ch == b.ch and a.off < b.off) end)
+    all[p] = #list > 0 and list or nil
+    local keys = {}
+    for k in pairs(all) do keys[#keys + 1] = k end
+    table.sort(keys)
+    local out = {}
+    local function clean(t) return ((t or ""):gsub("[\t\r\n]", " ")) end
+    for _, k in ipairs(keys) do
+        for _, b in ipairs(all[k]) do
+            out[#out + 1] = string.format("%s\t%d\t%d\t%.4f\t%s\t%s", k, b.ch, b.off, b.pct,
+                clean(b.title), clean(b.snippet))
+        end
+    end
+    write_atomic(path("bookmarks.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
+end
+
 function M.get_last()
     local f = io.open(path("last.txt"), "rb")
     if not f then return nil end

@@ -363,6 +363,59 @@ local function jump_section(dir)
     end
 end
 
+---------------------------------------------------------------- bookmarks
+
+-- A bookmark is a position in the text (chapter + offset), so it survives
+-- changes to the font or layout. A spread counts as bookmarked when a bookmark
+-- falls anywhere on it.
+local bm = { sel = 1, top = nil, from = "reader" }   -- Bookmarks screen state
+
+local function bookmark_here()
+    if not book or not spread then return nil end
+    local first = spread.pages[spread.pi].off
+    local nxt = spread.pages[spread.pi + 2]
+    local last = nxt and nxt.off or math.huge
+    for i, b in ipairs(Store.get_bookmarks(book.path)) do
+        if b.ch == spread.ch and b.off >= first and b.off < last then return i end
+    end
+end
+
+-- The first words on the left page, to recognise the bookmark by.
+local function page_snippet()
+    local words, n = {}, 0
+    for _, it in ipairs(spread.pages[spread.pi].items) do
+        if it.kind == "text" then
+            words[#words + 1] = it.text
+            n = n + #it.text
+            if n > 80 then break end
+        end
+    end
+    return table.concat(words, " ")
+end
+
+local function toggle_bookmark()
+    if not book or not spread then return end
+    local list = {}
+    for _, b in ipairs(Store.get_bookmarks(book.path)) do list[#list + 1] = b end
+    local here = bookmark_here()
+    if here then
+        table.remove(list, here)
+    else
+        local sec = current_section()
+        list[#list + 1] = { ch = pos.ch, off = pos.off, pct = book:fraction(pos.ch, pos.off),
+            title = sec and book.toc[sec].title or book.title, snippet = page_snippet() }
+    end
+    Store.set_bookmarks(book.path, list)
+    if app.toast then app.toast(here and "Bookmark removed" or "Bookmark added") end
+    redraw()
+end
+
+local function open_bookmarks(from)
+    bm.sel, bm.top, bm.from = 1, nil, from
+    app.mode = "bookmarks"
+    redraw()
+end
+
 ---------------------------------------------------------------- opening books
 
 local function show_message(text)
@@ -552,6 +605,8 @@ local function menu_items()
                 toc.top = nil
                 app.mode = "toc"
             end },
+            { label = "Bookmarks", value = tostring(#Store.get_bookmarks(book.path)),
+              act = function() open_bookmarks("menu") end },
             { label = "Jump to % (" .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. ")", value = "", adjust = function(d)
                 local f = book:fraction(pos.ch, pos.off) + d * 0.01
                 goto_pos(book:locate(math.max(0, math.min(1, f))))
@@ -807,9 +862,16 @@ local function draw_reader_pages()
         info.bar_frac = math.max(0, math.min(1, (shown - first + 1) / math.max(1, last - first + 1)))
     end
 
+    local marked = bookmark_here() ~= nil
     return function(side)
         if side == "left" then
             draw_page(left, "left")
+            if marked then
+                -- A ribbon marker hanging from the top, next to the hinge.
+                local x, w, h = PAGE_W - 40, 22, 64
+                love.graphics.setColor(0.72, 0.22, 0.20, 0.95)
+                love.graphics.polygon("fill", x, 0, x + w, 0, x + w, h, x + w / 2, h - 10, x, h)
+            end
         else
             draw_page(right, "right")
         end
@@ -917,8 +979,8 @@ end
 -- item rows shrink (down to a minimum) so everything fits, and if it still
 -- doesn't, the list scrolls with the selection.
 local MENU_TOP, MENU_BOTTOM = 120, PAGE_H - 78
-local MENU_ROW_MAX, MENU_ROW_MIN = 52, 38
-local MENU_HEADER_H, MENU_GAP_H = 30, 10
+local MENU_ROW_MAX, MENU_ROW_MIN = 52, 36
+local MENU_HEADER_H, MENU_GAP_H = 27, 10
 
 -- Returns the visible rows ({ kind = "item"|"header"|"gap", y, h, idx, text })
 -- plus whether there is more above / below.
@@ -1068,6 +1130,61 @@ local function draw_toc(side)
     end)
 end
 
+local function bookmark_entries()
+    local entries = { { action = true } }
+    for _, b in ipairs(Store.get_bookmarks(book.path)) do entries[#entries + 1] = b end
+    return entries
+end
+
+local function draw_bookmarks(side)
+    local th = theme()
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    local row_h = 96
+    local rows = list_rows(row_h)
+    local entries = bookmark_entries()
+    -- two columns: left page then right page
+    if not bm.top then bm.top = 1 end
+    if bm.sel < bm.top then bm.top = bm.sel end
+    if bm.sel >= bm.top + rows * 2 then bm.top = bm.sel - rows * 2 + 1 end
+    local first = side == "left" and bm.top or bm.top + rows
+    if side == "left" then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Bookmarks", x, 60)
+    end
+    draw_list(side, entries, bm.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
+        if it.action then
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.print(bookmark_here() and "Remove bookmark here" or "+  Bookmark this page", rx,
+                centered_y(ui.font, UI_SIZE, ry, row_h - 4))
+            return
+        end
+        local top = ui.font:getBaseline() - UI_SIZE * 0.68
+        local bottom = 40 + ui.small:getBaseline()
+        local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
+        local pct = math.floor(it.pct * 100 + 0.5) .. "%"
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.print(fit_text(ui.font, it.title ~= "" and it.title or book.title, rw - 90), rx, ty)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf(pct, rx, ty + ui.font:getBaseline() - ui.small:getBaseline(), rw, "right")
+        love.graphics.print(fit_text(ui.small, it.snippet, rw), rx, ty + 40)
+    end)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    if side == "left" and #entries == 1 then
+        love.graphics.printf("No bookmarks yet. While reading, press Select or tap the top-right "
+            .. "corner of the page to bookmark it.", x, 160 + row_h + 20, w, "left")
+    end
+    if side == "right" then
+        love.graphics.print("A open    Y delete    B back", x, PAGE_H - 70)
+    end
+end
+
 local CREDITS = {
     { "Fonts", "Gentium Book Plus and Charis SIL (SIL International), Literata "
         .. "(TypeTogether), Source Serif 4 (Adobe), Crimson Text (Sebastian Kosch), "
@@ -1140,6 +1257,7 @@ local function render_canvases()
             if side == "left" then reader("left") else draw_menu_panel(side) end
         end
     elseif app.mode == "toc" then painter = draw_toc
+    elseif app.mode == "bookmarks" then painter = draw_bookmarks
     elseif app.mode == "about" then painter = draw_about
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
@@ -1374,10 +1492,27 @@ local function touch_event(kind, sx, sy)
     end
 end
 
+-- A short message popup (e.g. "Bookmark added").
+function app.toast(text)
+    overlay = { side = "right", text = text, hide_at = love.timer.getTime() + 1.2 }
+    redraw()
+end
+
 local function draw_overlay()
     if not overlay then return end
     love.graphics.push()
     page_transform(overlay.side)
+    if overlay.text then
+        local w, h = 460, 80
+        local x, y = (PAGE_W - w) / 2, 120
+        love.graphics.setColor(0.08, 0.08, 0.08, 0.94)
+        love.graphics.rectangle("fill", x, y, w, h, 22, 22)
+        love.graphics.setColor(1, 1, 1, 0.95)
+        love.graphics.setFont(ui.font)
+        love.graphics.printf(overlay.text, x, centered_y(ui.font, UI_SIZE, y, h), w, "center")
+        love.graphics.pop()
+        return
+    end
     local w, h = 460, 118
     local x, y = (PAGE_W - w) / 2, 120
     love.graphics.setColor(0.08, 0.08, 0.08, 0.94)
@@ -1532,6 +1667,8 @@ local ROTATE = {
 local function action(a)
     if lid.closed then return end         -- pocket presses while the lid is shut
     local mode = app.mode
+    -- Select bookmarks while reading; elsewhere it behaves like the menu button.
+    if a == "bookmark" and mode ~= "reader" then a = "menu" end
     if a == "quit" then love.event.quit() return end
 
     if mode == "message" then
@@ -1542,6 +1679,7 @@ local function action(a)
     if mode == "reader" then
         if a == "next" or a == "right" or a == "down" then turn(1, next_spread)
         elseif a == "prev" or a == "left" or a == "up" then turn(-1, prev_spread)
+        elseif a == "bookmark" then toggle_bookmark()
         elseif a == "next_section" then jump_section(1)
         elseif a == "prev_section" then jump_section(-1)
         elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil
@@ -1582,6 +1720,36 @@ local function action(a)
         return
     end
 
+    if mode == "bookmarks" then
+        local entries = bookmark_entries()
+        local n = #entries
+        local rows = list_rows(96)
+        if a == "up" then bm.sel = math.max(1, bm.sel - 1)
+        elseif a == "down" then bm.sel = math.min(n, bm.sel + 1)
+        elseif a == "left" or a == "prev" then bm.sel = math.max(1, bm.sel - rows)
+        elseif a == "right" or a == "next" then bm.sel = math.min(n, bm.sel + rows)
+        elseif a == "confirm" then
+            local e = entries[bm.sel]
+            if e.action then
+                toggle_bookmark()
+            else
+                goto_pos(e.ch, e.off); save_progress(); app.mode = "reader"
+            end
+        elseif a == "toc" and bm.sel > 1 then              -- Y deletes
+            local list = {}
+            for i, b in ipairs(Store.get_bookmarks(book.path)) do
+                if i ~= bm.sel - 1 then list[#list + 1] = b end
+            end
+            Store.set_bookmarks(book.path, list)
+            bm.sel = math.min(bm.sel, #list + 1)
+            if app.toast then app.toast("Bookmark deleted") end
+        elseif a == "back" or a == "menu" then
+            app.mode = bm.from == "menu" and "menu" or "reader"
+        end
+        redraw()
+        return
+    end
+
     if mode == "toc" then
         local n = #book.toc
         local rows = list_rows(58)
@@ -1613,7 +1781,9 @@ end
 function app.on_tap(side, u, v)
     local mode = app.mode
     if mode == "reader" then
-        if S.tap == "next" then
+        if side == "right" and u > PAGE_W - 150 and v < 150 then
+            toggle_bookmark()                 -- top-right corner, like a Kindle
+        elseif S.tap == "next" then
             -- Turn pages: right half of the page goes forward, left half back.
             if u >= PAGE_W / 2 then turn(1, next_spread) else turn(-1, prev_spread) end
         else
@@ -1635,14 +1805,14 @@ function app.on_tap(side, u, v)
         end
     elseif mode == "about" then
         action("back")
-    elseif mode == "toc" or mode == "message" then
+    elseif mode == "toc" or mode == "message" or mode == "bookmarks" then
         action("back")
     end
 end
 
 local BUTTON = {
     a = "confirm", b = "back", x = "menu", y = "toc",
-    start = "menu", back = "menu", guide = "quit",
+    start = "menu", back = "bookmark", guide = "quit",
     rightshoulder = "next", leftshoulder = "prev",
     righttrigger = "next_section", lefttrigger = "prev_section",
 }
@@ -1730,6 +1900,7 @@ local KEYS = {
     right = "right", left = "left", up = "up", down = "down",
     space = "next", pagedown = "next", pageup = "prev", ["return"] = "confirm",
     escape = "back", m = "menu", t = "toc", q = "quit", n = "next_section", p = "prev_section",
+    b = "bookmark",
     -- The curved-arrow button sends Back (adc-keys, KEY_BACK): toggle Settings.
     appback = "menu", apphome = "menu", menu = "menu", application = "menu",
 }

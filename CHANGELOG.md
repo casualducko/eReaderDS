@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Bookmarks.** Press Select (or tap the top-right corner of the page) to
+  bookmark a page; press again to remove it. Bookmarked pages show a ribbon
+  by the hinge. Settings → Bookmarks lists them with chapter, percentage and
+  opening words: A opens one, Y deletes it. Bookmarks follow the text, so they
+  survive font and size changes.
 - Uses much less memory on long reading sessions: only the last few chapters'
   layouts and the most recently shown illustrations are kept (about half the
   memory in testing), and layout reads image sizes from file headers instead

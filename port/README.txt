@@ -15,7 +15,8 @@ CONTROLS (hold it turned counter-clockwise; directions as held)
   R2 / L2 ............... next / previous chapter
   A or press stick in ... select
   B ..................... settings / back
-  Start, X, Select, ↩ ... open / close settings
+  Select ................ bookmark this page (press again to remove)
+  Start, X, ↩ ........... open / close settings
   Y ..................... contents
   Menu (Anbernic) ....... quit
   Analog stick .......... like the D-pad
@@ -24,6 +25,7 @@ TOUCH (bottom screen)
   Swipe left/right ...... turn pages
   Slide up/down ......... brightness
   Tap right/left half ... next/previous page (change in Settings > Tap)
+  Tap top-right corner .. bookmark this page
 
 YOUR OWN FONTS
   Copy .ttf/.otf files into Ebook/Fonts, then pick them in Settings > Font.
