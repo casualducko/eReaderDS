@@ -58,7 +58,8 @@ To make a tap open Settings instead, use **Settings → Tap**.
 
 - Two-page spreads with a page-flip animation (or fade, or none)
 - EPUB and plain text, with italics, headings, images, covers and contents
-- Justified text, indents, and each chapter starting on a new page
+- Justified text with hyphenation (English books), indents, and each
+  chapter starting on a new page
 - Library with covers and progress; your place in every book is saved
 - Delete books from the library (Y, then A to confirm)
 - Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
@@ -170,5 +171,9 @@ eReaderDS is created by **casualducko**. It also appears in **Settings → About
   [OpenDyslexic](https://github.com/antijingoist/opendyslexic) (Abbie Gonzalez).
   Bitter and Atkinson Hyperlegible Next are static instances generated from
   their variable fonts.
+- Hyphenation patterns: US English from TeX's
+  [hyph-utf8](https://www.hyphenation.org/tex) package, © Gerard D.C.
+  Kuiken, free to copy and modify with the notice kept (see
+  `app/hyph/en-us.txt`).
 - Engine: [LÖVE](https://love2d.org) 11.5 (zlib license), from the PortMaster
   aarch64 runtime. See [runtime/NOTICES.md](runtime/NOTICES.md).

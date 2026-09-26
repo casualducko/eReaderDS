@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Hyphenation** for English books (Settings → Hyphenation, on by default).
+  Long words break at the line end when the line would otherwise be
+  stretched, using TeX's US English patterns, and never more than two lines
+  in a row.
 - Pressing the stick in opens Settings while reading (it still selects in menus).
 - **Delete books** from the library: Y on a book, then A to confirm. Its
   progress and bookmarks are forgotten too.

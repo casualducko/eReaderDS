@@ -5,6 +5,7 @@
 --      | { kind = "image", x, y, w, h, src }
 --      | { kind = "rule", x, y, w }
 local utf8 = require("utf8")
+local Hyphen = require("hyphen")
 
 local M = {}
 
@@ -17,7 +18,8 @@ local function sanitize(s)
     end))
 end
 
--- ctx: { fonts = {r,i,b,bi,h}, w, h, spacing, justify, indent, image_size = fn(src) -> w,h }
+-- ctx: { fonts = {r,i,b,bi,h}, w, h, spacing, justify, indent, hyphenate,
+--        image_size = fn(src) -> w,h }
 function M.paginate(chapter, ctx)
     local F = ctx.fonts
     local W, H = ctx.w, ctx.h
@@ -168,18 +170,63 @@ function M.paginate(chapter, ctx)
                     line, lw, first = {}, 0, false
                 end
 
+                -- Split a word so its first part (plus a hyphen) fits in
+                -- `room`; returns the two parts, or nil.
+                local function split(wd, room)
+                    if #wd.frags ~= 1 then return nil end    -- mixed styles: keep whole
+                    local fr = wd.frags[1]
+                    local best
+                    for _, b in ipairs(Hyphen.breaks(fr.text)) do
+                        local head = fr.text:sub(1, b.at) .. (b.hyphen and "-" or "")
+                        local hw = fr.font:getWidth(head)
+                        if hw > room then break end
+                        best = { text = head, w = hw, at = b.at }
+                    end
+                    if not best then return nil end
+                    local rest = fr.text:sub(best.at + 1)
+                    local rw = fr.font:getWidth(rest)
+                    return { frags = { { text = best.text, font = fr.font, w = best.w } }, w = best.w, off = wd.off },
+                        { frags = { { text = rest, font = fr.font, w = rw } }, w = rw, off = wd.off + best.at }
+                end
+
+                local hyphen_run = 0      -- consecutive lines ending in a hyphen
                 for _, wd in ipairs(words) do
                     if wd.br then
                         emit(true)
                     else
-                        local avail = W - (first and indent or 0) - (prefix and prefix.w or 0)
-                        local need = (#line > 0) and (lw + space_w + wd.w) or wd.w
-                        if #line > 0 and need > avail then
-                            emit(false)
-                            need = wd.w
+                        while wd do
+                            local avail = W - (first and indent or 0) - (prefix and prefix.w or 0)
+                            local need = (#line > 0) and (lw + space_w + wd.w) or wd.w
+                            if need <= avail then
+                                line[#line + 1] = wd
+                                lw = need
+                                wd = nil
+                            else
+                                -- Hyphenate when the line would otherwise be
+                                -- noticeably loose, or the word is wider than a line.
+                                local head, tail
+                                local slack = avail - lw
+                                if ctx.hyphenate and not center and hyphen_run < 2
+                                    and (#line == 0 or slack > space_w * 0.4 * math.max(1, #line - 1)
+                                        or (not ctx.justify and slack > space_w * 3)) then
+                                    head, tail = split(wd, avail - (#line > 0 and lw + space_w or 0))
+                                end
+                                if head then
+                                    line[#line + 1] = head
+                                    lw = lw + (#line > 1 and space_w or 0) + head.w
+                                    hyphen_run = hyphen_run + 1
+                                    emit(false)
+                                    wd = tail
+                                elseif #line == 0 then
+                                    line[1] = wd              -- too wide for a line: let it overflow
+                                    lw = wd.w
+                                    wd = nil
+                                else
+                                    hyphen_run = 0
+                                    emit(false)
+                                end
+                            end
                         end
-                        line[#line + 1] = wd
-                        lw = need
                     end
                 end
                 emit(true)

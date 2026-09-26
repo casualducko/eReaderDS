@@ -239,6 +239,8 @@ local function pages_for(ch)
             breaks = breaks,
             fonts = fonts, size = S.font_size, w = w, h = h, spacing = S.spacing, justify = S.justify,
             indent = true,
+            -- The patterns are English: skip books that say they're in another language.
+            hyphenate = S.hyphenate and (not book.language or book.language == "" or book.language:match("^en") ~= nil),
             image_size = get_image_size,
         })
         pages_cache[ch] = p
@@ -931,6 +933,9 @@ local function menu_items()
             end },
             { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
                 S.justify = not S.justify; relayout()
+            end },
+            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
+                S.hyphenate = not S.hyphenate; relayout()
             end },
         }),
         section("Layout", {
@@ -1834,6 +1839,7 @@ local CREDITS = {
         .. "Bitter (Huerta Tipográfica), Atkinson Hyperlegible Next (Braille "
         .. "Institute), Inter (Rasmus Andersson), Lexend (Lexend Project) and "
         .. "OpenDyslexic (Abbie Gonzalez). SIL Open Font License 1.1." },
+    { "Hyphenation", "US English patterns from TeX's hyph-utf8, by Gerard D.C. Kuiken." },
     { "Engine", "LÖVE 11.5 (zlib license), from the PortMaster runtime." },
 }
 

@@ -17,8 +17,9 @@ if [ "${1:-}" = "--ssh" ]; then
     VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$HERE/app/version.lua")
     STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
     P="$STAGE/Ports/eReaderDS"
-    mkdir -p "$P/app/fonts"
+    mkdir -p "$P/app/fonts" "$P/app/hyph"
     cp "$HERE"/app/*.lua "$P/app/"
+    cp "$HERE"/app/hyph/* "$P/app/hyph/"
     cp "$HERE"/app/fonts/* "$P/app/fonts/"
     cp "$HERE/port/launch.sh" "$P/"
     cp "$HERE/port/eReaderDS.sh" "$STAGE/Ports/"
@@ -48,8 +49,9 @@ D="$SD/Ports/eReaderDS"
 
 # Replace the app folder wholesale; settings and progress live in Ebook/.ereaderds.
 rm -rf "$D/app"
-mkdir -p "$D/app/fonts" "$D/runtime/libs.aarch64" "$SD/Ebook/Fonts"
+mkdir -p "$D/app/fonts" "$D/app/hyph" "$D/runtime/libs.aarch64" "$SD/Ebook/Fonts"
 cp "$HERE"/app/*.lua "$D/app/"
+cp "$HERE"/app/hyph/* "$D/app/hyph/"
 cp "$HERE"/app/fonts/* "$D/app/fonts/"
 cp "$HERE/port/launch.sh" "$D/"
 cp "$HERE/port/eReaderDS.sh" "$SD/Ports/"

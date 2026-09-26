@@ -359,6 +359,7 @@ local function open_epub_zip(path, z)
     book.title = decode((opf:match("<dc:title[^>]*>(.-)</dc:title>") or basename_title(path)):gsub("<[^>]+>", ""))
     book.author = opf:match("<dc:creator[^>]*>(.-)</dc:creator>")
     book.author = book.author and decode(book.author:gsub("<[^>]+>", "")) or ""
+    book.language = (opf:match("<dc:language[^>]*>%s*(.-)%s*</dc:language>") or ""):lower()
 
     local manifest, ncx, nav = {}, nil, nil
     for item in opf:gmatch("<item%s[^>]*>") do
