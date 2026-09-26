@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.8
 
 - **Clock** in the top left of the right page (Settings → Status bar → Clock:
   12-hour or 24-hour), with a **Time zone** setting. Named zones follow
