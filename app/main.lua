@@ -266,7 +266,37 @@ local function set_spread(ch, pi)
     redraw()
 end
 
+-- Reading speed, learned from page turns: characters on the spread you just
+-- read divided by the time you spent on it. Characters (not pages) keep it
+-- valid across fonts and sizes. Quick flips and long pauses are ignored, and
+-- anything other than reading forward (jumps, menus, the lid) pauses it.
+local SPEED_MIN_S, SPEED_MAX_S = 3, 600
+local reading = { since = nil }
+
+local function reading_pause() reading.since = nil end
+
+-- Text offset just past the visible spread.
+local function spread_end_off(sp)
+    local nxt = sp.pages[sp.pi + 2]
+    if nxt then return nxt.off end
+    return book.chapters[sp.ch].length or sp.pages[#sp.pages].off
+end
+
+local function learn_speed()
+    local now = love.timer.getTime()
+    if reading.since and app.mode == "reader" then
+        local dt = now - reading.since
+        local chars = spread_end_off(spread) - spread.pages[spread.pi].off
+        if dt >= SPEED_MIN_S and dt <= SPEED_MAX_S and chars > 50 then
+            local cps = chars / dt
+            S.read_cps = math.max(3, math.min(80, S.read_cps * 0.85 + cps * 0.15))
+        end
+    end
+    reading.since = now
+end
+
 local function goto_pos(ch, off)
+    reading_pause()                      -- a jump: don't count it as reading
     ch = math.max(1, math.min(ch, #book.chapters))
     local pages = pages_for(ch)
     set_spread(ch, Layout.find_page(pages, off))
@@ -291,6 +321,7 @@ end
 
 local function next_spread()
     if not spread then return end
+    learn_speed()
     if spread.pi + 2 <= #spread.pages then
         set_spread(spread.ch, spread.pi + 2)
     elseif spread.ch < #book.chapters then
@@ -303,6 +334,7 @@ end
 
 local function prev_spread()
     if not spread then return end
+    reading_pause()
     if spread.pi - 2 >= 1 then
         set_spread(spread.ch, spread.pi - 2)
     elseif spread.ch > 1 then
@@ -514,6 +546,7 @@ local SB = {
     bar = { "none", "chapter", "book" },
     bar_size = { 1, 2, 3 },
     clock = { "off", "12", "24" },
+    time = { "off", "chapter", "book", "both" },
 }
 local SB_NAMES = {
     title = { none = "None", book = "Book", chapter = "Chapter", both = "Both" },
@@ -521,6 +554,7 @@ local SB_NAMES = {
     bar = { none = "None", chapter = "Chapter", book = "Book" },
     bar_size = { [1] = "Thin", [2] = "Medium", [3] = "Thick" },
     clock = { off = "Off", ["12"] = "12-hour", ["24"] = "24-hour" },
+    time = { off = "Off", chapter = "Chapter", book = "Book", both = "Both" },
 }
 
 -- Current time for the status bar, or nil when the clock is off.
@@ -582,6 +616,8 @@ local function status_items()
                 S.sb_pages = cycle(SB.pages, S.sb_pages, d) end },
             { label = "Book percentage", value = S.sb_percent and "Show" or "Hide", adjust = function()
                 S.sb_percent = not S.sb_percent end },
+            { label = "Time left", value = SB_NAMES.time[S.sb_time], adjust = function(d)
+                S.sb_time = cycle(SB.time, S.sb_time, d) end },
             { label = "Progress bar", value = SB_NAMES.bar[S.sb_bar], adjust = function(d)
                 S.sb_bar = cycle(SB.bar, S.sb_bar, d) end },
             { label = "Bar thickness", value = SB_NAMES.bar_size[S.sb_bar_size], adjust = function(d)
@@ -821,6 +857,33 @@ local function draw_status(side, info)
     end
 end
 
+local function format_time(seconds)
+    local m = seconds / 60
+    if m < 1 then return "<1 min" end
+    if m < 60 then return string.format("%d min", math.floor(m + 0.5)) end
+    local h = math.floor(m / 60)
+    local mm = math.floor(m - h * 60 + 0.5)
+    if mm == 60 then h, mm = h + 1, 0 end
+    return mm > 0 and string.format("%d h %d min", h, mm) or string.format("%d h", h)
+end
+
+-- Characters left in the book after offset `off` of chapter `ch`. Chapters
+-- not opened yet are estimated from their file size, scaled by how much of the
+-- file turned out to be text in the chapters already opened.
+local function book_chars_left(ch, off)
+    local text, bytes = 0, 0
+    for _, c in ipairs(book.chapters) do
+        if c.length and c.weight then text, bytes = text + c.length, bytes + c.weight end
+    end
+    local ratio = bytes > 0 and text / bytes or 0.5
+    local left = math.max(0, (book.chapters[ch].length or 0) - off)
+    for i = ch + 1, #book.chapters do
+        local c = book.chapters[i]
+        left = left + (c.length or c.weight * ratio)
+    end
+    return left
+end
+
 local function draw_reader_pages()
     local sec = current_section()
     local frac = book:fraction(pos.ch, pos.off)
@@ -858,6 +921,22 @@ local function draw_reader_pages()
     end
     if S.sb_percent then
         info.percent_text = string.format("%d%% read", math.floor(frac * 100 + 0.5))
+    end
+    -- Time left, from the learned reading speed.
+    local end_off = spread_end_off(spread)
+    if S.sb_time == "chapter" or S.sb_time == "both" then
+        local section_end = book.chapters[spread.ch].length or end_off
+        if nxt and nxt.chapter == spread.ch then section_end = select(2, toc_pos(nxt)) end
+        local left = section_end - end_off
+        if left > 0 then
+            local t = format_time(left / S.read_cps)
+            info.pages_text = info.pages_text and (info.pages_text .. " · " .. t) or (t .. " left in chapter")
+        end
+    end
+    if S.sb_time == "book" or S.sb_time == "both" then
+        local t = format_time(book_chars_left(spread.ch, end_off) / S.read_cps)
+        info.percent_text = info.percent_text and (info.percent_text .. " · " .. t .. " left")
+            or (t .. " left in book")
     end
     if S.sb_bar == "book" then
         info.bar_frac = frac
@@ -1616,6 +1695,7 @@ end
 local function lid_closed()
     if lid.closed then return end
     lid.closed = true
+    reading_pause()
     save_progress()
     Store.save_settings(S)
     Store.flush()
@@ -1668,7 +1748,14 @@ local ROTATE = {
     right = { up = "right", right = "down", down = "left", left = "up" },
 }
 
+local handle_action
 local function action(a)
+    handle_action(a)
+    -- Time outside the pages (menus, lists) doesn't count as reading.
+    if app.mode ~= "reader" then reading_pause() end
+end
+
+function handle_action(a)
     if lid.closed then return end         -- pocket presses while the lid is shut
     local mode = app.mode
     -- Select bookmarks while reading; elsewhere it behaves like the menu button.
@@ -2006,7 +2093,10 @@ local function run_test_script()
         for a in script:gmatch("[^,]+") do
             local dir = a:match("^dp(%a+)$")
             local sa, sv = a:match("^stick:(%a):([%-%d.]+)$")
-            if a == "lid:close" or a == "lid:open" then
+            local wait = tonumber(a:match("^wait:([%d.]+)$") or "")
+            if wait then
+                love.timer.sleep(wait)           -- simulate time spent reading
+            elseif a == "lid:close" or a == "lid:open" then
                 app.on_raw_key(LID_DEVICE, a == "lid:close" and LID_CLOSE or LID_OPEN)
             elseif dir then dpad(dir)
             elseif sa then stick_axis(sa, tonumber(sv))

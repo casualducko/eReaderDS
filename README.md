@@ -62,6 +62,7 @@ To make a tap open Settings instead, use **Settings → Tap**.
 - Bookmarks: a ribbon in the top-right corner marks bookmarked pages; list them
   from Settings → Bookmarks
 - Text size, line spacing, margins and brightness settings
+- Time left in the chapter and book, learned from your reading speed
 - Customizable status bar: titles, chapter pages ("12 pages left" or "Page 3
   of 15"), percent read, a progress bar across both pages, battery and a
   clock with time zones

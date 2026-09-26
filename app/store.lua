@@ -10,6 +10,8 @@ local DEFAULTS = {
     sb_title = "both", sb_pages = "left", sb_percent = true,
     sb_bar = "chapter", sb_bar_size = 2, sb_battery = true,
     sb_show = true, sb_clock = "off", tz = "UTC",
+    sb_time = "both",
+    read_cps = 20,     -- learned reading speed, characters per second (~250 words/min to start)
     brightness = -1,   -- percent; -1 = leave the system setting alone
     extra_dim = 0,
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)     -- 0-3: dark layer over the page, dimmer than the backlight allows
