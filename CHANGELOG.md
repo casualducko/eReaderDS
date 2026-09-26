@@ -3,7 +3,7 @@
 ## Unreleased
 
 - **Jump to %** opens a picker: choose the percentage first (left/right 1%,
-  L/R or up/down 10%, or drag the bar on the touchscreen), see the chapter
+  up/down 10%, or drag the bar on the touchscreen), see the chapter
   you'd land in, then A jumps once (B cancels).
 - **Go back after a jump.** After jumping with Contents, Bookmarks, Jump to %
   or the chapter buttons, the bottom right shows "‹ Back to 34% (B)": press B

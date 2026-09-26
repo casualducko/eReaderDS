@@ -1274,8 +1274,8 @@ end
 
 ---------------------------------------------------------------- jump picker
 
--- Choose a percentage first, then jump once. Left/right: 1%, L/R and up/down:
--- 10%, or drag the bar on the touchscreen.
+-- Choose a percentage first, then jump once. Left/right: 1%, up/down: 10%, or
+-- drag the bar on the touchscreen.
 local jp = { pct = 0 }
 local JP_BAR_Y = 560
 local function jp_bar()
@@ -1361,7 +1361,7 @@ local function draw_jump_panel()
 
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.printf("‹ ›  1%      L R  10%      Drag the bar to move",
+    love.graphics.printf("Left/Right  1%      Up/Down  10%      Drag the bar",
         x, by + 110, w, "center")
     love.graphics.printf("A jump    B cancel", x, PAGE_H - 70, w, "left")
 end
@@ -1979,8 +1979,7 @@ function handle_action(a)
     end
 
     if mode == "jump" then
-        local step = ({ left = -1, right = 1, prev = -10, next = 10, up = -10, down = 10,
-            prev_section = -10, next_section = 10 })[a]
+        local step = ({ left = -1, right = 1, up = -10, down = 10 })[a]
         if step then
             jp.pct = math.max(0, math.min(100, jp.pct + step))
         elseif a == "confirm" then
