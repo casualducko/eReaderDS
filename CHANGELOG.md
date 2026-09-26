@@ -2,11 +2,12 @@
 
 ## Unreleased
 
-- **Settings is shorter and fits on one screen.** The main page has Contents,
-  Bookmarks, Jump to % and Library, then the reading settings (font, size,
-  spacing, margins, theme, brightness). Justify, hyphenation, top/bottom
-  margins, page-turn animation, tap and the lid moved to **More settings**.
-  "Resume reading" is gone: B (or tapping the book page) closes Settings.
+- **Settings fits on one screen.** Contents, Bookmarks, Jump to % and
+  Library, then **Text** (font, size, spacing, justify, hyphenation) and
+  **Page** (margins, top/bottom margins, theme, brightness). Set-once options
+  (page-turn animation, tap, closing the lid) and About moved to **Page turns
+  & device**. "Resume reading" is gone: B (or tapping the book page) closes
+  Settings.
 - **Footnotes on the facing page.** Press A while reading, tap a note number
   on the bottom screen, or tap the **Notes** button that appears at the
   bottom of the right page when the spread has notes: the note number is outlined and its note
@@ -21,7 +22,7 @@
 - **Library sorting**: left/right on the D-pad or stick switches between
   Recent (last opened first, the default), Title, Author (by last name) and
   Progress (books you're reading first, then unread, then finished).
-- **Hyphenation** for English books (Settings → More settings → Hyphenation, off by default).
+- **Hyphenation** for English books (Settings → Hyphenation, off by default).
   Long words break at the line end when the line would otherwise be
   stretched, using TeX's US English patterns, and never more than two lines
   in a row.
@@ -65,7 +66,7 @@
 
 - **Closing the lid** now sleeps the device while eReaderDS is open: it saves
   your place, turns the screens off and suspends; opening the lid wakes it on
-  the same page. Settings → More settings → Closing the lid can switch to "Screen off" (screens
+  the same page. Settings → Page turns & device → Closing the lid can switch to "Screen off" (screens
   off without suspending) if sleep misbehaves. Buttons and touches are
   ignored while the lid is closed.
 

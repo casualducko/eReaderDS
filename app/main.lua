@@ -1116,20 +1116,9 @@ local function close_sub()
     menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
 end
 
--- Settings you change now and then, off the main page.
+-- Settings you set once: page turns, the lid, and About.
 local function more_items()
     return join(
-        section("Text", {
-            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
-                S.justify = not S.justify; relayout()
-            end },
-            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
-                S.hyphenate = not S.hyphenate; relayout()
-            end },
-            { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
-                S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
-            end },
-        }),
         section("Page turns", {
             { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
               adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
@@ -1143,6 +1132,7 @@ local function more_items()
             end },
         }),
         section("", {
+            { label = "About", act = function() app.mode = "about" end },
             { label = "Back", act = close_sub },
         })
     )
@@ -1166,7 +1156,7 @@ local function menu_items()
               act = function() app.open_jump() end },
             { label = "Library", act = go_library },
         }),
-        section("Reading", {
+        section("Text", {
             -- The font's name is drawn in the font itself: a preview, and the only way
             -- names in other scripts (e.g. Chinese firmware fonts) can display.
             { label = "Font", value = fonts.name or S.font,
@@ -1184,8 +1174,19 @@ local function menu_items()
                 S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
                 relayout()
             end },
+            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
+                S.justify = not S.justify; relayout()
+            end },
+            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
+                S.hyphenate = not S.hyphenate; relayout()
+            end },
+        }),
+        section("Page", {
             { label = "Margins", value = margins().name, adjust = function(d)
                 S.margins = (S.margins - 1 + d) % #MARGINS + 1; relayout()
+            end },
+            { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
+                S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
             end },
             { label = "Theme", value = th.name, adjust = function(d)
                 S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
@@ -1210,8 +1211,7 @@ local function menu_items()
         }),
         section("", {
             { label = "Status bar", value = "›", act = function() open_sub("status") end },
-            { label = "More settings", value = "›", act = function() open_sub("more") end },
-            { label = "About", act = function() app.mode = "about" end },
+            { label = "Page turns & device", value = "›", act = function() open_sub("more") end },
             { label = "Quit", act = function() love.event.quit() end },
         })
     )
@@ -1841,7 +1841,7 @@ local function draw_menu_panel(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(({ status = "Status bar", more = "More settings" })[menu.page] or "Settings", x, 60)
+    love.graphics.print(({ status = "Status bar", more = "Page turns & device" })[menu.page] or "Settings", x, 60)
     love.graphics.setFont(ui.small)
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, 78, w, "right")
