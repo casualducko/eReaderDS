@@ -319,9 +319,39 @@ local function save_progress_soon()
     if Touch.enabled then save_due = love.timer.getTime() + SAVE_DELAY else save_progress() end
 end
 
+-- "Go back": where you were before the latest jump (Contents, Bookmarks,
+-- Jump to %, chapter buttons). Jumping again before reading keeps the original
+-- spot. Going back swaps, so you can flip between the two. It's forgotten
+-- once you've read on a few spreads.
+local jump = nil                     -- { ch, off, turns }
+local JUMP_FORGET_AFTER = 5          -- spreads
+
+local function remember_jump()
+    if not spread then return end
+    if jump and jump.turns == 0 then return end
+    jump = { ch = pos.ch, off = pos.off, turns = 0 }
+end
+
+local function jump_turned()
+    if jump then
+        jump.turns = jump.turns + 1
+        if jump.turns >= JUMP_FORGET_AFTER then jump = nil end
+    end
+end
+
+local function go_back()
+    if not jump then return false end
+    local ch, off = pos.ch, pos.off
+    goto_pos(jump.ch, jump.off)
+    jump = { ch = ch, off = off, turns = 0 }
+    save_progress()
+    return true
+end
+
 local function next_spread()
     if not spread then return end
     learn_speed()
+    jump_turned()
     if spread.pi + 2 <= #spread.pages then
         set_spread(spread.ch, spread.pi + 2)
     elseif spread.ch < #book.chapters then
@@ -335,6 +365,7 @@ end
 local function prev_spread()
     if not spread then return end
     reading_pause()
+    jump_turned()
     if spread.pi - 2 >= 1 then
         set_spread(spread.ch, spread.pi - 2)
     elseif spread.ch > 1 then
@@ -370,6 +401,7 @@ local function current_section()
 end
 
 local function jump_section(dir)
+    remember_jump()
     if #book.toc == 0 then
         if dir > 0 and pos.ch < #book.chapters then set_spread(pos.ch + 1, 1)
         elseif dir < 0 then set_spread(math.max(1, spread.pi > 1 and pos.ch or pos.ch - 1), 1) end
@@ -463,6 +495,7 @@ local function open_book(path)
         return
     end
     if book and book ~= b then book:close() end
+    jump = nil
     book = b
     clear_book_caches()
     local pr = Store.get_progress(path)
@@ -659,6 +692,7 @@ local function menu_items()
               act = function() open_bookmarks("menu") end },
             { label = "Jump to % (" .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. ")", value = "", adjust = function(d)
                 local f = book:fraction(pos.ch, pos.off) + d * 0.01
+                remember_jump()
                 goto_pos(book:locate(math.max(0, math.min(1, f))))
                 save_progress()
             end },
@@ -975,6 +1009,19 @@ local function draw_reader_pages()
             end
         end
         draw_status(side, info)
+        if side == "right" and jump then
+            -- Replaces the bottom-right status text while a jump can be undone.
+            local m = margins()
+            local w = PAGE_W - m.outer - m.inner
+            local y = PAGE_H - 26 - ui.small:getHeight()
+            local th = theme()
+            love.graphics.setFont(ui.small)
+            color(th.bg)
+            love.graphics.rectangle("fill", m.inner + w * 0.35, y - 2, w * 0.65, ui.small:getHeight() + 4)
+            color(th.fg)
+            love.graphics.printf(string.format("‹ Back to %d%%  (B)", math.floor(book:fraction(jump.ch, jump.off) * 100 + 0.5)),
+                m.inner, y, w, "right")
+        end
     end
 end
 
@@ -1789,6 +1836,7 @@ function handle_action(a)
         elseif a == "bookmark" then toggle_bookmark()
         elseif a == "next_section" then jump_section(1)
         elseif a == "prev_section" then jump_section(-1)
+        elseif a == "back" and go_back() then -- B: back to where you were
         elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil
         elseif a == "toc" and #book.toc > 0 then
             toc.sel = current_section() or 1; toc.top = nil; app.mode = "toc"
@@ -1840,7 +1888,7 @@ function handle_action(a)
             if e.action then
                 toggle_bookmark()
             else
-                goto_pos(e.ch, e.off); save_progress(); app.mode = "reader"
+                remember_jump(); goto_pos(e.ch, e.off); save_progress(); app.mode = "reader"
             end
         elseif a == "toc" and bm.sel > 1 then              -- Y deletes
             local list = {}
@@ -1865,7 +1913,7 @@ function handle_action(a)
         elseif a == "left" or a == "prev" then toc.sel = math.max(1, toc.sel - rows)
         elseif a == "right" or a == "next" then toc.sel = math.min(n, toc.sel + rows)
         elseif a == "confirm" then
-            goto_pos(toc_pos(book.toc[toc.sel])); save_progress(); app.mode = "reader"
+            remember_jump(); goto_pos(toc_pos(book.toc[toc.sel])); save_progress(); app.mode = "reader"
         elseif a == "back" or a == "toc" or a == "menu" then app.mode = "reader" end
         redraw()
         return
@@ -1888,7 +1936,9 @@ end
 function app.on_tap(side, u, v)
     local mode = app.mode
     if mode == "reader" then
-        if side == "right" and u > PAGE_W - 150 and v < 150 then
+        if jump and side == "right" and v > PAGE_H - 90 then
+            go_back()                         -- the "Back to ..." line
+        elseif side == "right" and u > PAGE_W - 150 and v < 150 then
             toggle_bookmark()                 -- top-right corner, like a Kindle
         elseif S.tap == "next" then
             -- Turn pages: right half of the page goes forward, left half back.
@@ -2132,7 +2182,8 @@ local function run_test_script()
         touch_event("up", x1, y1)
     end
     local freeze = tonumber(os.getenv("READER_ANIM_T") or "")
-    if freeze and app.anim then app.anim.fixed = freeze end
+    if freeze and app.anim then app.anim.fixed = freeze
+    elseif app.anim then app.anim = nil end      -- screenshot the finished page
     local out = os.getenv("READER_SHOT")
     if out then
         local shot = love.graphics.newCanvas(2048, 768)

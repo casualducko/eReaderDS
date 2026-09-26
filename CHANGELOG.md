@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Go back after a jump.** After jumping with Contents, Bookmarks, Jump to %
+  or the chapter buttons, the bottom right shows "‹ Back to 34% (B)": press B
+  or tap it to return, and again to go forward. It goes away after you read on
+  5 spreads.
 - **Time left** in the chapter and book ("12 pages left in chapter (9m)",
   "45% read (4h 10m left in book)"), learned from how fast you actually read.
   Quick flips, long pauses, jumps and time in menus are ignored; it starts at

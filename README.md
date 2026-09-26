@@ -40,7 +40,7 @@ buttons are under your right hand. Directions below are as you hold it.
 | R / L | Next / previous pages | Change a value |
 | R2 / L2 | Next / previous chapter | |
 | A, or press the stick in | | Select |
-| B | Settings | Back |
+| B | Settings (or go back after a jump) | Back |
 | Select | Bookmark this page (again to remove) | Close |
 | Start, X, or the ↩ button | Settings | Close |
 | Y | Contents | |
@@ -63,6 +63,7 @@ To make a tap open Settings instead, use **Settings → Tap**.
   from Settings → Bookmarks
 - Text size, line spacing, margins and brightness settings
 - Time left in the chapter and book, learned from your reading speed
+- "Back to …" after a jump (Contents, bookmarks, Jump to %, chapter buttons)
 - Customizable status bar: titles, chapter pages ("12 pages left" or "Page 3
   of 15"), percent read, a progress bar across both pages, battery and a
   clock with time zones

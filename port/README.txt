@@ -14,7 +14,7 @@ CONTROLS (hold it turned counter-clockwise; directions as held)
   R / L ................. next / previous pages
   R2 / L2 ............... next / previous chapter
   A or press stick in ... select
-  B ..................... settings / back
+  B ..................... settings / back (after a jump: go back)
   Select ................ bookmark this page (press again to remove)
   Start, X, ↩ ........... open / close settings
   Y ..................... contents
