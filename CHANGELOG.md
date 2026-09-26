@@ -5,8 +5,8 @@
 - **Time left** in the chapter and book ("12 pages left in chapter · 9 min",
   "45% read · 4 h 10 min left"), learned from how fast you actually read.
   Quick flips, long pauses, jumps and time in menus are ignored; it starts at
-  about 250 words a minute. Settings → Status bar → Time left: Off, Chapter,
-  Book or Both.
+  about 250 words a minute. Show or hide each in Settings → Status bar →
+  Chapter time left / Book time left.
 - **Bookmarks.** Press Select (or tap the top-right corner of the page) to
   bookmark a page; press again to remove it. Bookmarked pages show a ribbon
   in that top-right corner, so tapping the ribbon removes it. The battery

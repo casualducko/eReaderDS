@@ -591,6 +591,17 @@ end
 
 local function relayout() clear_pages(); goto_pos(pos.ch, pos.off) end
 
+-- Time left is stored as one setting (off / chapter / book / both) but shown
+-- as two Show/Hide rows.
+local function time_shown(which)
+    return S.sb_time == which or S.sb_time == "both"
+end
+local function set_time_shown(which, on)
+    local ch = which == "chapter" and on or which ~= "chapter" and time_shown("chapter")
+    local bk = which == "book" and on or which ~= "book" and time_shown("book")
+    S.sb_time = ch and bk and "both" or ch and "chapter" or bk and "book" or "off"
+end
+
 local function status_items()
     return join(
         section(nil, {
@@ -614,10 +625,13 @@ local function status_items()
         section("Bottom of page", {
             { label = "Chapter pages", value = SB_NAMES.pages[S.sb_pages], adjust = function(d)
                 S.sb_pages = cycle(SB.pages, S.sb_pages, d) end },
+            { label = "Chapter time left", value = time_shown("chapter") and "Show" or "Hide", adjust = function()
+                set_time_shown("chapter", not time_shown("chapter")) end },
             { label = "Book percentage", value = S.sb_percent and "Show" or "Hide", adjust = function()
                 S.sb_percent = not S.sb_percent end },
-            { label = "Time left", value = SB_NAMES.time[S.sb_time], adjust = function(d)
-                S.sb_time = cycle(SB.time, S.sb_time, d) end },
+            { label = "Book time left", value = time_shown("book") and "Show" or "Hide", adjust = function()
+                set_time_shown("book", not time_shown("book")) end },
+
             { label = "Progress bar", value = SB_NAMES.bar[S.sb_bar], adjust = function(d)
                 S.sb_bar = cycle(SB.bar, S.sb_bar, d) end },
             { label = "Bar thickness", value = SB_NAMES.bar_size[S.sb_bar_size], adjust = function(d)
