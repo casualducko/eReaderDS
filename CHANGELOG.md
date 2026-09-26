@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.9
 
 - Even top and bottom margins: the space left under the last line is now split
   between top and bottom instead of all landing at the bottom.
