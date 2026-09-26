@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Pressing the stick in opens Settings while reading (it still selects in menus).
 - **Delete books** from the library: Y on a book, then A to confirm. Its
   progress and bookmarks are forgotten too.
 - **Get books over Wi-Fi** from Calibre, Calibre-Web or any OPDS catalog,

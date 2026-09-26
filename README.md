@@ -39,7 +39,8 @@ buttons are under your right hand. Directions below are as you hold it.
 | D-pad | Turn pages (right/down forward, left/up back) | Up/down move; left/right change a value (or move, on rows without one) |
 | R / L | Next / previous pages | Change a value |
 | R2 / L2 | Next / previous chapter | |
-| A, or press the stick in | | Select |
+| A | | Select |
+| Press the stick in | Settings | Select |
 | B | Settings (or go back after a jump) | Back |
 | Select | Bookmark this page (again to remove) | Close |
 | Start, X, or the ↩ button | Settings | Close |

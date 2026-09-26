@@ -2334,6 +2334,8 @@ function handle_action(a)
     local mode = app.mode
     -- Select bookmarks while reading; elsewhere it behaves like the menu button.
     if a == "bookmark" and mode ~= "reader" then a = "menu" end
+    -- Pressing the stick in opens Settings while reading, and selects elsewhere.
+    if a == "stick" then a = mode == "reader" and "menu" or "confirm" end
     if a == "quit" then love.event.quit() return end
 
     if mode == "message" then
@@ -2589,7 +2591,7 @@ end
 -- is pressing the analog stick in: it acts as OK (A). (The curved-arrow button
 -- next to the Anbernic button is a separate "adc-keys" device that sends the
 -- Back key; see KEYS below, where it toggles Settings.)
-local EXTRA = { [9] = "confirm" }
+local EXTRA = { [9] = "stick" }        -- pressing the stick in
 function love.joystickpressed(joystick, b)
     -- Every press goes to log.txt, so unknown buttons can be identified.
     log_input("joystick %q button %d", joystick:getName(), b - 1)
