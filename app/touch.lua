@@ -4,6 +4,10 @@
 -- Reports one finger (the first slot) in the bottom screen's native landscape
 -- coordinates, 0..1024 x 0..768:
 --   M.poll(handler)   handler(kind, x, y) with kind = "down" | "move" | "up"
+-- and two-finger pinches, as the distance between the fingers (same units):
+--   handler("pinch_start", d), handler("pinch", d), handler("pinch_end")
+-- While two fingers are down (and until all are lifted) no single-finger
+-- events are sent, so a pinch never becomes a tap or a swipe.
 local M = { enabled = false }
 
 -- Stubs for systems without evdev (e.g. testing on a computer).
@@ -35,8 +39,16 @@ local SCREEN_W, SCREEN_H = 1024, 768
 local fd, buf
 local range = { x = { 0, SCREEN_W }, y = { 0, SCREEN_H } }
 local slot = 0
-local st = { x = 0, y = 0, down = false }       -- slot 0 state
+local slots = {}                                -- per slot: { x, y, down }
 local was_down = false
+local pinching = false
+
+local function slot_state(i)
+    local s = slots[i]
+    if not s then s = { x = 0, y = 0, down = false }; slots[i] = s end
+    return s
+end
+local st = slot_state(0)                        -- the first finger
 local logged = 0
 
 local function find_device(name)
@@ -88,23 +100,41 @@ function M.poll(handler)
             local t, c, v = e.type, e.code, e.value
             if t == EV_ABS then
                 if c == ABS_MT_SLOT then slot = v
-                elseif slot == 0 then
-                    if c == ABS_MT_X or c == ABS_X then st.x = v
-                    elseif c == ABS_MT_Y or c == ABS_Y then st.y = v
-                    elseif c == ABS_MT_ID then st.down = v >= 0 end
-                end
+                elseif c == ABS_MT_X then slot_state(slot).x = v
+                elseif c == ABS_MT_Y then slot_state(slot).y = v
+                elseif c == ABS_MT_ID then slot_state(slot).down = v >= 0
+                elseif slot == 0 and c == ABS_X then st.x = v
+                elseif slot == 0 and c == ABS_Y then st.y = v end
             elseif t == EV_KEY and c == BTN_TOUCH then
-                if v == 0 then st.down = false end
+                if v == 0 then for _, s in pairs(slots) do s.down = false end end
             elseif t == EV_SYN and c == 0 then
                 local x, y = scale(st.x, range.x, SCREEN_W), scale(st.y, range.y, SCREEN_H)
-                if st.down and not was_down then handler("down", x, y); any = true
+                local a, b, n_down = nil, nil, 0
+                for i = 0, 9 do
+                    local s = slots[i]
+                    if s and s.down then
+                        n_down = n_down + 1
+                        if not a then a = s elseif not b then b = s end
+                    end
+                end
+                if n_down >= 2 then
+                    local dx = scale(a.x, range.x, SCREEN_W) - scale(b.x, range.x, SCREEN_W)
+                    local dy = scale(a.y, range.y, SCREEN_H) - scale(b.y, range.y, SCREEN_H)
+                    local d = math.sqrt(dx * dx + dy * dy)
+                    handler(pinching and "pinch" or "pinch_start", d)
+                    pinching, any = true, true
+                elseif pinching then
+                    -- Wait for every finger to lift before single touches again.
+                    if n_down == 0 then pinching = false; handler("pinch_end"); any = true end
+                    was_down = false
+                elseif st.down and not was_down then handler("down", x, y); any = true
                 elseif st.down then handler("move", x, y); any = true
                 elseif was_down then handler("up", x, y); any = true end
                 if logged < 6 and (st.down ~= was_down) then
                     logged = logged + 1
                     print(string.format("[touch] %s raw=%d,%d -> %.0f,%.0f", st.down and "down" or "up", st.x, st.y, x, y))
                 end
-                was_down = st.down
+                if not pinching and n_down < 2 then was_down = st.down end
             end
         end
     end

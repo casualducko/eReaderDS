@@ -2716,8 +2716,35 @@ local function current_brightness()
 end
 
 local function touch_event(kind, sx, sy)
-    local side, u, v = touch_to_page(sx, sy)
     local now = love.timer.getTime()
+    -- Two-finger pinch while reading: text size, one step (2) for every 15%
+    -- the fingers spread or close. (sx is the distance between them.)
+    if kind == "pinch_start" then
+        gesture = app.mode == "reader" and { mode = "pinch", d0 = math.max(40, sx), size0 = S.font_size }
+            or { mode = "ignore" }
+        return
+    elseif kind == "pinch" then
+        if gesture and gesture.mode == "pinch" then
+            local steps = math.floor(math.log(math.max(1, sx) / gesture.d0) / math.log(1.15) + 0.5)
+            local size = math.max(18, math.min(64, gesture.size0 + steps * 2))
+            if size ~= S.font_size then
+                S.font_size = size
+                build_fonts()
+                goto_pos(pos.ch, pos.off)
+            end
+            overlay = { side = "right", text = "Text size " .. S.font_size, hide_at = now + 1e9 }
+            redraw()
+        end
+        return
+    elseif kind == "pinch_end" then
+        if gesture and gesture.mode == "pinch" then
+            if overlay then overlay.hide_at = now + 0.9 end
+            Store.save_settings(S)
+        end
+        gesture = nil
+        return
+    end
+    local side, u, v = touch_to_page(sx, sy)
     if app.mode == "jump" and side == "right" and kind ~= "up" and math.abs(v - JP_BAR_Y) < 140 then
         -- Dragging along the picker's bar sets the percentage directly.
         local bx, bw = jp_bar()
@@ -3446,6 +3473,11 @@ local function run_test_script()
                 love.timer.sleep(wait)           -- simulate time spent reading
             elseif a == "lid:close" or a == "lid:open" then
                 app.on_raw_key(LID_DEVICE, a == "lid:close" and LID_CLOSE or LID_OPEN)
+            elseif a:match("^pinch") then                -- pinch:start:200, pinch:300, pinch:end
+                local what, d = a:match("^pinch:(%a*):?([%d.]*)$")
+                if what == "start" then touch_event("pinch_start", tonumber(d))
+                elseif what == "end" then touch_event("pinch_end")
+                else touch_event("pinch", tonumber(a:match("([%d.]+)$"))) end
             elseif a == "poll" then shop.net_poll()
             elseif a == "net" then               -- wait for network jobs (and the cover)
                 for _ = 1, 2 do

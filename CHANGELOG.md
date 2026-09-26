@@ -6,6 +6,8 @@
 - **Tap the top edge** of the bottom screen (left of the bookmark corner) to
   show or hide all the status bars at once.
 - Themes are listed alphabetically in Settings.
+- **Pinch to change the text size** on the touchscreen: spread two fingers
+  for bigger text, pinch for smaller, one step at a time with the size shown.
 
 ## v0.3.0
 

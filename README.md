@@ -48,6 +48,7 @@ and the Library are at the top of **Settings**.
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
   open Settings instead: **Settings → Page turns & device → Tap**.)
 - Slide up/down to change brightness; keep going below 1% for Extra dim.
+- Pinch with two fingers to make the text bigger or smaller.
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.
 - Press and hold a word to look it up.
