@@ -42,6 +42,9 @@ for d in /sys/class/backlight/*; do
     BL_SAVED="$BL_SAVED $d=$(cat "$d/brightness")"
 done
 printf '[launch] backlight:%s\n' "${BL_SAVED:- none}"
+# Diagnostics for sleep/lid handling: kernel sleep modes and running programs.
+printf '[launch] power state: %s; mem_sleep: %s\n' "$(cat /sys/power/state 2>/dev/null)" "$(cat /sys/power/mem_sleep 2>/dev/null)"
+echo '[launch] processes:'; ps 2>/dev/null | head -80
 # Route the bottom touchscreen to the app (the firmware's app mode), as other
 # dual-screen ports do; the previous mode is restored on exit.
 TP=/sys/class/anbernic_misc/tpctrl

@@ -15,7 +15,7 @@ pcall(ffi.cdef, [[
     struct rgds_input_event { long tv_sec; long tv_usec; unsigned short type; unsigned short code; int value; };
 ]])
 local C = ffi.C
-local O_NONBLOCK, EV_KEY = 2048, 1
+local O_NONBLOCK, EV_KEY, EV_SW = 2048, 1, 5
 
 local devices = {}     -- { fd, name }
 local buf
@@ -34,9 +34,10 @@ local function list_devices()
         local name = block:match('N: Name="([^"]*)"')
         local ev = block:match("H: Handlers=[^\n]-(event%d+)")
         local keys = block:match("B: KEY=([%x ]+)")
+        local sw = block:match("B: SW=([%x ]+)")
         if name and ev then
-            print(string.format("[inputdev] %s %s keys=%s", ev, name, keys or "-"))
-            out[#out + 1] = { name = name, event = ev, has_keys = keys ~= nil }
+            print(string.format("[inputdev] %s %s keys=%s sw=%s", ev, name, keys or "-", sw or "-"))
+            out[#out + 1] = { name = name, event = ev, has_keys = keys ~= nil or sw ~= nil }
         end
     end
     return out
@@ -65,7 +66,11 @@ function M.poll()
             if not n or n <= 0 then break end
             for k = 0, math.floor(n / ffi.sizeof("struct rgds_input_event")) - 1 do
                 local e = buf[k]
-                if e.type == EV_KEY and e.value == 1 then
+                if e.type == EV_SW then
+                    -- Switches (e.g. a lid sensor): always logged, both directions.
+                    print(string.format("[evdev] %q switch %d = %d", d.name, e.code, e.value))
+                    any = true
+                elseif e.type == EV_KEY and e.value == 1 then
                     print(string.format("[evdev] %q key %d", d.name, e.code))
                     if M.handler then M.handler(d.name, e.code) end
                     logged = logged + 1
