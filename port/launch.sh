@@ -73,6 +73,13 @@ if [ ! -f "$READER_DATA/settings.txt" ]; then
 fi
 # First run: make the folders people put books and fonts in.
 [ -d /mnt/mmc ] && mkdir -p /mnt/mmc/Ebook/Fonts 2>/dev/null
+# Stock firmware: the menu shows Ports/Imgs/<name>.png next to a port. Put the
+# icon there if it's missing (e.g. only eReaderDS.sh and the folder were
+# copied). The menu restarts when a port exits, so it shows on the way out.
+if [ -z "$ROCKNIX" ] && [ -f "$APP_DIR/icon.png" ]; then
+    IMGS="$(dirname "$APP_DIR")/Imgs"
+    [ -f "$IMGS/eReaderDS.png" ] || { mkdir -p "$IMGS" && cp "$APP_DIR/icon.png" "$IMGS/eReaderDS.png"; } 2>/dev/null
+fi
 exec > "$APP_DIR/log.txt" 2>&1
 printf '[launch] %s\n' "$(date -Iseconds 2>/dev/null || date)"
 printf '[launch] data=%s%s\n' "$READER_DATA" "${MIGRATED:+ (copied from $MIGRATED)}"

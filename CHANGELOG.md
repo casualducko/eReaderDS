@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Stock firmware: if the menu icon wasn't copied to `Ports/Imgs`, eReaderDS
+  puts it there itself, so it appears when you quit.
+
 ## v0.3.4
 
 - Messages name the right folder on each system: `Ebook` on the stock
