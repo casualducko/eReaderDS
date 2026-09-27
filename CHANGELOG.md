@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.4
 
 - Messages name the right folder on each system: `Ebook` on the stock
   firmware's SD card, `roms/ebook` on ROCKNIX (for books, dictionaries and
