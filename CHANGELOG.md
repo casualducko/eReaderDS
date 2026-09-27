@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.2
 
 - **Runs on ROCKNIX** as well as the stock firmware: install to `roms/ports`,
   books in `roms/ebook`. The launcher turns the bottom screen on and spreads
