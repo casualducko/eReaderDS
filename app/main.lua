@@ -3329,7 +3329,20 @@ function app.on_tap(side, u, v)
         end
     elseif mode == "about" or mode == "help" then
         action("back")
-    elseif mode == "toc" or mode == "message" or mode == "bookmarks" then
+    elseif mode == "toc" or mode == "bookmarks" then
+        -- A tap on a row (the bottom screen shows the list's second column)
+        -- opens it, like A. Anywhere else does nothing: closing on a tap
+        -- looked like the chapter had been chosen.
+        local st, row_h, n = toc, 58, book and #book.toc or 0
+        if mode == "bookmarks" then st, row_h, n = bm, 96, #bookmark_entries() end
+        local rows = list_rows(row_h)
+        local first = (st.top or 1) + rows
+        local idx = first + math.floor((v - 160) / row_h)
+        if side == "right" and v >= 160 and idx < first + rows and idx <= n then
+            st.sel = idx
+            action("confirm")
+        end
+    elseif mode == "message" then
         action("back")
     end
 end

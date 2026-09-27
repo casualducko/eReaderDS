@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Contents** and **Bookmarks**: tapping an entry on the touchscreen opens
+  it (it used to close the list, as if B had been pressed). Taps elsewhere do
+  nothing.
 - New installs start at **20% brightness** on the stock firmware and **40%**
   on ROCKNIX, whose screens are dimmer at the same level (your own setting is
   kept, and the system brightness comes back when you quit).
