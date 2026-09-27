@@ -164,6 +164,16 @@ function M.parse_feed(xml, base)
     for _, l in ipairs(children(feed, "link")) do
         local rel = l.attrs.rel
         if rel == "next" and l.attrs.href then out.next = Net.resolve(base, l.attrs.href) end
+        -- Search: an address with {searchTerms} in it, or an OpenSearch
+        -- description that has one (fetched when a search is made).
+        if rel == "search" and l.attrs.href then
+            local t = (l.attrs.type or ""):lower()
+            if l.attrs.href:find("{searchTerms}", 1, true) and not t:find("html") then
+                out.search = Net.resolve(base, l.attrs.href)
+            elseif t:find("opensearchdescription") then
+                out.search_osd = Net.resolve(base, l.attrs.href)
+            end
+        end
     end
     for _, e in ipairs(children(feed, "entry")) do
         local it = { title = text_of(child(e, "title")), formats = {} }
@@ -218,6 +228,31 @@ end
 
 -- A file name for a downloaded book: "Title - Author.epub", matching how the
 -- library splits titles and authors, without characters FAT/exFAT reject.
+-- The catalog-search address in an OpenSearch description (the Url for Atom
+-- results), resolved against the description's own address; or nil.
+function M.search_template(osd, base)
+    for tag in osd:gmatch("<[%w:]*Url%s[^>]*>") do
+        local t, tpl = tag:match('type%s*=%s*"([^"]*)"'), tag:match('template%s*=%s*"([^"]*)"')
+        if tpl and t and t:find("atom") then
+            return Net.resolve(base, (tpl:gsub("&amp;", "&")))
+        end
+    end
+end
+
+-- Fill in a search address: the words for {searchTerms}, the first page for
+-- {startPage}/{startIndex}, and nothing for other (optional) parameters.
+function M.search_url(template, words)
+    -- Spaces are "+" in a query string, "%20" in a path.
+    local in_query = (template:find("?", 1, true) or math.huge) < (template:find("{searchTerms}", 1, true) or 0)
+    local q = words:gsub("[^%w%-%._~ ]", function(c) return string.format("%%%02X", c:byte()) end)
+        :gsub(" ", in_query and "+" or "%%20")
+    return (template:gsub("{([%w:]+)(%??)}", function(name, _)
+        if name == "searchTerms" then return q end
+        if name == "startPage" or name == "startIndex" then return "1" end
+        return ""
+    end))
+end
+
 function M.file_name(it)
     local function clean(s)
         s = (s or ""):gsub('[%c\\/:%*%?"<>|]', " "):gsub("%s+", " "):gsub("^[%s%.]+", ""):gsub("[%s%.]+$", "")

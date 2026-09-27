@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Find in book** (Settings): type a word or phrase on an on-screen keyboard
+  and every match is listed with its chapter and the words around it. Opening
+  one marks the words on the page, and B goes back to where you were.
+- **Search** in Get books, for catalogs that support it (Gutenberg and
+  Calibre do): the same keyboard, then the results as a catalog page.
+- The keyboard is on the touchscreen: tap the keys, or use the D-pad and A.
+  B deletes, Y types a space, Start or X searches.
+- A catalog that's briefly busy (Gutenberg's search sometimes is) is tried
+  once more before showing an error.
 - Stock firmware: the launcher also puts the device back (brightness,
   touchscreen mode) straight away if it's stopped from outside.
 

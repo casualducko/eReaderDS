@@ -429,7 +429,7 @@ function M.get(url, opts)
         parts = {}
         sink = function(d) parts[#parts + 1] = d end
     end
-    local tried_auth = false
+    local tried_auth, retried = false, false
     local start = M.parse_url(url)
     for _ = 1, 8 do
         local u = M.parse_url(url)
@@ -460,6 +460,11 @@ function M.get(url, opts)
             if not chosen then error("the server asked for a login this reader doesn't support") end
             chosen.stale = chosen.params.stale and chosen.params.stale:lower() == "true"
             auth_cache[host] = chosen
+        elseif (status == 502 or status == 503 or status == 504) and not retried then
+            -- A busy or slow server (e.g. Gutenberg's search on a new query):
+            -- one more try after a moment usually works.
+            retried = true
+            socket.sleep(2)
         elseif status == 403 then error("the server refused access (403)")
         elseif status == 404 then error("not found on the server (404)")
         else error("the server answered " .. status) end

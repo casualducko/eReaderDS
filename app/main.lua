@@ -1101,6 +1101,11 @@ function shop.load_page(pg, url, append)
             for _, e in ipairs(feed.entries) do pg.entries[#pg.entries + 1] = e end
         else
             pg.entries = feed.entries
+            pg.search, pg.search_osd = feed.search, feed.search_osd
+            if pg.root and (pg.search or pg.search_osd) then
+                table.insert(pg.entries, 1, { title = "Search", author = "Titles and authors", formats = {},
+                    search = true, summary = "Type a few words from a book's title or its author's name." })
+            end
         end
         pg.next = feed.next
         pg.sel = math.max(1, math.min(pg.sel, #pg.entries))
@@ -1108,8 +1113,8 @@ function shop.load_page(pg, url, append)
     end)
 end
 
-function shop.push_page(title, url)
-    local pg = { title = title, url = url, entries = {}, sel = 1, top = 1 }
+function shop.push_page(title, url, root)
+    local pg = { title = title, url = url, entries = {}, sel = 1, top = 1, root = root }
     shop.stack[#shop.stack + 1] = pg
     shop.load_page(pg, url)
     redraw()
@@ -1119,7 +1124,7 @@ function shop.open(catalog)
     shop.catalog = catalog
     shop.stack = {}
     app.mode = "shop"
-    shop.push_page(catalog.name, catalog.url)
+    shop.push_page(catalog.name, catalog.url, true)
 end
 
 -- "Get books" from the library: a list of catalogs (yours from opds.txt,
@@ -1242,8 +1247,8 @@ function shop.confirm()
     local pg = shop.page()
     if not pg then return end
     if pg.error and (#pg.entries == 0 or not (pg.entries[pg.sel] or {}).book) then
-        local r = pg.retry or { url = pg.url }
-        shop.load_page(pg, r.url, r.append)
+        local r = pg.retry or (pg.url and { url = pg.url })
+        if r then shop.load_page(pg, r.url, r.append) end
         return
     end
     local it = pg.entries[pg.sel]
@@ -1254,10 +1259,38 @@ function shop.confirm()
         if have then open_book(have) else it.failed = nil; shop.start_download(it) end
     elseif it.catalog then
         shop.catalog = it.catalog
-        shop.push_page(it.catalog.name, it.catalog.url)
+        shop.push_page(it.catalog.name, it.catalog.url, true)
+    elseif it.search then
+        app.kb_open({ title = "Search " .. shop.catalog.name, text = shop.last_query,
+            hint = "Words from a book's title or its author's name.",
+            submit = function(q) shop.search(pg, q) end })
     elseif it.href then
         shop.push_page(it.title, it.href)
     end
+end
+
+-- Search the catalog: its search address, or the one in its OpenSearch
+-- description (fetched once per catalog). The results are a catalog page.
+function shop.search(pg, q)
+    shop.last_query = q
+    local c = shop.catalog
+    local title = "“" .. q .. "”"
+    local tpl = pg.search or c.search_tpl
+    if tpl then shop.push_page(title, Opds.search_url(tpl, q)); return end
+    local res = { title = title, entries = {}, sel = 1, top = 1, loading = true }
+    shop.stack[#shop.stack + 1] = res
+    shop.net_job(shop.catalog_opts({ kind = "fetch", url = pg.search_osd }), function(msg)
+        local found = msg.kind ~= "error" and Opds.search_template(msg.body or "", msg.url or pg.search_osd)
+        if not found then
+            res.loading = false
+            res.error = msg.kind == "error" and msg.message or "This catalog's search can't be used."
+            return
+        end
+        c.search_tpl = found
+        res.url = Opds.search_url(found, q)
+        shop.load_page(res, res.url)
+    end)
+    redraw()
 end
 
 function shop.move(d)
@@ -1429,6 +1462,7 @@ local function menu_items()
             end },
             { label = "Bookmarks", value = tostring(#Store.get_bookmarks(book.path)),
               act = function() open_bookmarks("menu") end },
+            { label = "Find in book", act = function() app.find_open() end },
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
               act = function() app.open_jump() end },
             { label = "Library", act = go_library },
@@ -2013,6 +2047,8 @@ function shop.draw(side)
         status = "Only as " .. table.concat(it.formats, ", ") .. ".\nThis reader needs EPUB or TXT."
     elseif it.href or it.catalog then
         action_text = "A open"
+    elseif it.search then
+        action_text = "A search"
     end
 
     local bottom = PAGE_H - 70
@@ -2528,6 +2564,377 @@ function app.draw_help(side)
     end
 end
 
+---------------------------------------------------------------- keyboard
+
+-- On-screen keyboard: the typed text and the keys on the right page (the
+-- touchscreen), what the buttons do on the left. Tap a key, or move with the
+-- D-pad and press A. B deletes (or cancels when empty), Y types a space,
+-- Start or X searches.
+app.KB_ROWS = {}
+for _, row in ipairs({ "1234567890", "qwertyuiop", "asdfghjkl'", "zxcvbnm,.-" }) do
+    local keys = {}
+    for ch in row:gmatch(".") do keys[#keys + 1] = { key = ch, label = ch, span = 1 } end
+    app.KB_ROWS[#app.KB_ROWS + 1] = keys
+end
+app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "space", label = "Space", span = 6 }, { key = "del", label = "Delete", span = 4 } }
+app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "cancel", label = "Cancel", span = 4 }, { key = "ok", label = "Search", span = 6 } }
+app.KB_TOP, app.KB_ROW_H = 300, 104          -- keys area on the right page
+app.KB_MAX = 60                              -- characters
+
+-- Open the keyboard. opts: title, hint, text, submit(text), cancel().
+function app.kb_open(opts)
+    app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "", r = 2, c = 1,
+        submit = opts.submit, cancel = opts.cancel, back = app.mode }
+    app.mode = "keyboard"
+    redraw()
+end
+
+-- Column span [c0, c1) of key c in row r.
+function app.kb_cols(r, c)
+    local c0 = 0
+    for i = 1, c - 1 do c0 = c0 + app.KB_ROWS[r][i].span end
+    return c0, c0 + app.KB_ROWS[r][c].span
+end
+
+function app.kb_key_at(r, col)
+    local c0 = 0
+    for i, k in ipairs(app.KB_ROWS[r]) do
+        if col >= c0 and col < c0 + k.span then return i end
+        c0 = c0 + k.span
+    end
+    return #app.KB_ROWS[r]
+end
+
+function app.kb_type(t)
+    local kb = app.kb
+    if kb then kb.text = (kb.text .. t):sub(1, app.KB_MAX); redraw() end
+end
+
+function app.kb_press(key)
+    local kb = app.kb
+    if not kb then return end
+    if key == "del" then
+        kb.text = kb.text:sub(1, -2)
+    elseif key == "space" then
+        if kb.text ~= "" and kb.text:sub(-1) ~= " " then app.kb_type(" ") end
+    elseif key == "cancel" then
+        app.mode = kb.back
+        app.kb = nil
+        if kb.cancel then kb.cancel() end
+    elseif key == "ok" then
+        local q = kb.text:gsub("^%s+", ""):gsub("%s+$", "")
+        if q == "" then return end
+        app.mode = kb.back
+        app.kb = nil
+        kb.submit(q)
+    else
+        app.kb_type(key)
+    end
+    redraw()
+end
+
+function app.kb_action(a)
+    local kb = app.kb
+    local rows = app.KB_ROWS
+    if a == "left" or a == "prev" then kb.c = (kb.c - 2) % #rows[kb.r] + 1
+    elseif a == "right" or a == "next" then kb.c = kb.c % #rows[kb.r] + 1
+    elseif a == "up" or a == "down" then
+        -- Keep to the same column: the key under the middle of this one.
+        local c0, c1 = app.kb_cols(kb.r, kb.c)
+        kb.r = (kb.r - 1 + (a == "down" and 1 or -1)) % #rows + 1
+        kb.c = app.kb_key_at(kb.r, (c0 + c1) / 2 - 0.01)
+    elseif a == "confirm" then app.kb_press(rows[kb.r][kb.c].key)
+    elseif a == "back" then
+        if kb.text == "" then app.kb_press("cancel") else app.kb_press("del") end
+    elseif a == "toc" then app.kb_press("space")
+    elseif a == "menu" then app.kb_press("ok")
+    end
+    redraw()
+end
+
+-- Keys area geometry on the right page: x, width of one column.
+function app.kb_geom()
+    local m = MARGINS[2]
+    local w = PAGE_W - m.outer - m.inner
+    return m.inner, w / 10
+end
+
+function app.kb_tap(side, u, v)
+    if side ~= "right" then return end
+    local x0, unit = app.kb_geom()
+    local r = math.floor((v - app.KB_TOP) / app.KB_ROW_H) + 1
+    if r < 1 or r > #app.KB_ROWS or u < x0 - 10 or u > x0 + unit * 10 + 10 then return end
+    local col = math.max(0, math.min(9.99, (u - x0) / unit))
+    local kb = app.kb
+    kb.r, kb.c = r, app.kb_key_at(r, col)
+    app.kb_press(app.KB_ROWS[r][kb.c].key)
+end
+
+function app.kb_draw(side)
+    local th = theme()
+    local kb = app.kb
+    local m = MARGINS[2]
+    local w = PAGE_W - m.outer - m.inner
+    if side == "left" then
+        local x = m.outer
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.printf(kb.title, x, 60, w, "left")
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        local y = 60 + ui.title:getHeight() * 2 + 20
+        if kb.hint then
+            love.graphics.printf(kb.hint, x, y, w, "left")
+            local _, lines = ui.font:getWrap(kb.hint, w)
+            y = y + #lines * ui.font:getHeight() + 40
+        end
+        for _, row in ipairs({ { "Type", "Tap the keys, or D-pad and A" }, { "B", "Delete" }, { "Y", "Space" },
+                { "Start, X", "Search" } }) do
+            color(th.fg)
+            love.graphics.print(row[1], x, y)
+            color(th.dim)
+            love.graphics.print(row[2], x + 150, y)
+            y = y + ui.font:getHeight() + 14
+        end
+        return
+    end
+    -- The text field.
+    local x0, unit = app.kb_geom()
+    color(th.sel)
+    love.graphics.rectangle("fill", x0 - 8, 150, w + 16, 96, 12, 12)
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    local shown = kb.text
+    while ui.title:getWidth(shown .. "|") > w - 20 and #shown > 0 do shown = shown:sub(2) end
+    love.graphics.print(shown .. "|", x0 + 8, 150 + (96 - ui.title:getHeight()) / 2)
+    -- The keys.
+    love.graphics.setLineWidth(2)
+    for r, row in ipairs(app.KB_ROWS) do
+        for c, k in ipairs(row) do
+            local c0, c1 = app.kb_cols(r, c)
+            local kx, ky = x0 + c0 * unit + 3, app.KB_TOP + (r - 1) * app.KB_ROW_H + 3
+            local kw, kh = (c1 - c0) * unit - 6, app.KB_ROW_H - 6
+            if r == kb.r and c == kb.c then
+                color(th.fg)
+                love.graphics.rectangle("fill", kx, ky, kw, kh, 10, 10)
+                color(th.bg)
+            else
+                color(th.dim, 0.45)
+                love.graphics.rectangle("line", kx, ky, kw, kh, 10, 10)
+                color(k.key == "ok" and th.fg or th.fg)
+            end
+            local f = #k.label > 1 and ui.font or ui.title
+            love.graphics.setFont(f)
+            love.graphics.printf(k.label, kx, ky + (kh - f:getHeight()) / 2, kw, "center")
+        end
+    end
+end
+
+---------------------------------------------------------------- find in book
+
+-- Search the open book for a word or phrase (not case-sensitive). Runs a
+-- little at a time between frames (app.task) so the screen stays live; the
+-- results fill in as it goes. Chapters loaded only for the search are
+-- unloaded again. { query, book, results, sel, top, done, pct, capped }
+app.FIND_MAX = 300
+function app.find_open()
+    local f = app.find
+    if f and f.book == book and f.done then
+        app.mode = "find"                       -- last results, B to search again
+    else
+        app.find_keyboard(f and f.book == book and f.query or "")
+    end
+    redraw()
+end
+
+function app.find_keyboard(text)
+    app.mode = "reader"
+    app.kb_open({ title = "Find in book", text = text,
+        hint = "A word or phrase. Capitals don't matter.",
+        submit = function(q) app.find_start(q) end })
+end
+
+-- The Contents entry a result falls under (the last one starting before it),
+-- for labelling. Entries' offsets are worked out during the search, while
+-- their chapter is loaded (toc_pos caches them).
+function app.find_label(r)
+    if r.label then return r.label end
+    local best
+    for _, t in ipairs(book.toc) do
+        if t.chapter > r.ch or (t.chapter == r.ch and (t.off or 0) > r.off) then break end
+        best = t
+    end
+    r.label = best and best.title or (book.title or "")
+    return r.label
+end
+
+function app.find_start(query)
+    local f = { query = query, book = book, results = {}, sel = 1, top = 1, pct = 0 }
+    app.find = f
+    app.mode = "find"
+    local needle = query:lower()
+    app.task = coroutine.create(function()
+        local t0 = love.timer.getTime()
+        local n = #book.chapters
+        for i = 1, n do
+            local c = book.chapters[i]
+            local loaded = c.blocks ~= nil
+            book:chapter(i)
+            for _, t in ipairs(book.toc) do
+                if t.chapter == i then toc_pos(t) end
+            end
+            for _, b in ipairs(c.blocks) do
+                if b.kind == "text" then
+                    local parts = {}
+                    for _, r in ipairs(b.runs) do if r.text then parts[#parts + 1] = r.text end end
+                    local text = table.concat(parts)
+                    local low = text:lower()
+                    local at = 1
+                    while #f.results < app.FIND_MAX do
+                        local s0, s1 = low:find(needle, at, true)
+                        if not s0 then break end
+                        f.results[#f.results + 1] = { ch = i, off = b.off + s0 - 1,
+                            text = text, s0 = s0, s1 = s1 }
+                        at = s1 + 1
+                    end
+                end
+            end
+            -- Free what only the search needed (the open chapter stays).
+            if not loaded and i ~= pos.ch then c.blocks, c.anchors = nil, nil end
+            f.pct = i / n
+            if #f.results >= app.FIND_MAX then f.capped = true; break end
+            if love.timer.getTime() - t0 > 0.03 then
+                coroutine.yield()
+                t0 = love.timer.getTime()
+            end
+        end
+        f.done = true
+    end)
+end
+
+-- One slice of the running task (called from the main loop).
+function app.task_step()
+    local ok, err = coroutine.resume(app.task)
+    if not ok then
+        print("[task] " .. tostring(err))
+        if app.find and not app.find.done then app.find.done, app.find.error = true, true end
+    end
+    if coroutine.status(app.task) == "dead" then app.task = nil end
+    redraw()
+end
+
+-- A result's text: a little before the match, the match, the rest.
+function app.find_snippet(r)
+    local a = math.max(1, r.s0 - 40)
+    while a > 1 and a < r.s0 and r.text:byte(a) >= 0x80 and r.text:byte(a) < 0xC0 do a = a - 1 end
+    local pre = r.text:sub(a, r.s0 - 1)
+    if a > 1 then pre = "…" .. pre:gsub("^%S*%s", "") end
+    return pre, r.text:sub(r.s0, r.s1), r.text:sub(r.s1 + 1, r.s1 + 160)
+end
+
+function app.find_draw(side)
+    local th = theme()
+    local f = app.find
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    local row_h = 96
+    local rows = list_rows(row_h)
+    if f.sel < f.top then f.top = f.sel end
+    if f.sel >= f.top + rows * 2 then f.top = f.sel - rows * 2 + 1 end
+    local first = side == "left" and f.top or f.top + rows
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    if side == "left" then
+        love.graphics.print(fit_text(ui.title, "“" .. f.query .. "”", w), x, 60)
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local status = (not f.done and ("Searching… " .. math.floor(f.pct * 100) .. "%"))
+        or (f.error and "The search stopped on an error.")
+        or (#f.results == 0 and "Not found in this book.")
+        or (f.capped and ("The first " .. #f.results .. " matches"))
+        or (#f.results == 1 and "1 match" or (#f.results .. " matches"))
+    if side == "left" then love.graphics.printf(status, x, 60 + ui.title:getHeight() + 8, w, "left") end
+    draw_list(side, f.results, f.sel, first, rows, x, 160, w, row_h, function(r, _, rx, ry, rw)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print(fit_text(ui.small, app.find_label(r), rw), rx, ry + 8)
+        local pre, hit, post = app.find_snippet(r)
+        love.graphics.setFont(ui.font)
+        local y = ry + 8 + ui.small:getHeight() + 2
+        -- Keep the match in view: trim the start if the line is too long.
+        while pre ~= "…" and pre ~= "" and ui.font:getWidth(pre .. hit) > rw * 0.7 do
+            pre = "…" .. pre:gsub("^…", ""):gsub("^.[\128-\191]*", "")
+        end
+        color(th.dim)
+        love.graphics.print(pre, rx, y)
+        local px = rx + ui.font:getWidth(pre)
+        color(th.fg)
+        love.graphics.print(hit, px, y)
+        local hx = px + ui.font:getWidth(hit)
+        color(th.dim)
+        love.graphics.print(fit_text(ui.font, post, math.max(0, rx + rw - hx)), hx, y)
+    end)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    if side == "left" then
+        love.graphics.print("A go there      B search again      X close", x, PAGE_H - 70)
+    elseif #f.results > 0 then
+        love.graphics.printf(f.sel .. " / " .. #f.results, x, PAGE_H - 70, w, "right")
+    end
+end
+
+function app.find_action(a)
+    local f = app.find
+    local n = #f.results
+    local rows = list_rows(96)
+    if a == "up" then f.sel = math.max(1, f.sel - 1)
+    elseif a == "down" then f.sel = math.min(math.max(n, 1), f.sel + 1)
+    elseif a == "left" or a == "prev" then f.sel = math.max(1, f.sel - rows)
+    elseif a == "right" or a == "next" then f.sel = math.min(math.max(n, 1), f.sel + rows)
+    elseif a == "confirm" and f.results[f.sel] then
+        local r = f.results[f.sel]
+        app.task = nil
+        f.done = true
+        app.jump_to(r.ch, r.off)
+        app.mode = "reader"
+        -- Mark the words on the spread it lands on.
+        app.find_mark = { query = f.query, at = spread and (spread.ch .. ":" .. spread.pi) }
+    elseif a == "back" then
+        app.task = nil
+        if not f.done then f.done = true end
+        app.find_keyboard(f.query)
+    elseif a == "menu" or a == "toc" then
+        app.task = nil
+        if not f.done then f.done = true end
+        app.mode = "reader"
+    end
+    redraw()
+end
+
+-- The found words, outlined on the spread a result opened (until it's left).
+function app.find_highlight(side)
+    local mk = app.find_mark
+    if not mk or not spread or mk.at ~= spread.ch .. ":" .. spread.pi then app.find_mark = nil; return end
+    if not mk.words then
+        local want = {}
+        local n = 0
+        for wd in mk.query:lower():gmatch("%S+") do
+            wd = wd:gsub("^[%p]+", ""):gsub("[%p]+$", "")
+            if wd ~= "" then want[wd] = true; n = n + 1 end
+        end
+        mk.words = {}
+        for _, w in ipairs(look.collect()) do
+            local t = w.text:lower():gsub("^[%p]+", ""):gsub("[%p]+$", ""):gsub("\226\128[\152-\157]", "")
+            if want[t] and (n == 1 or #t > 2) then mk.words[#mk.words + 1] = w end
+        end
+    end
+    for _, w in ipairs(mk.words) do
+        if w.side == side then note.highlight(w) end
+    end
+end
+
 local function draw_message(side)
     local th = theme()
     if side == "left" then
@@ -2546,6 +2953,10 @@ local function render_canvases()
     local painter
     if app.mode == "reader" then
         painter = draw_reader_pages()
+        if app.find_mark then
+            local reader = painter
+            painter = function(side) reader(side); app.find_highlight(side) end
+        end
     elseif app.mode == "menu" then
         local reader = draw_reader_pages()
         painter = function(side)
@@ -2573,6 +2984,8 @@ local function render_canvases()
         end
     elseif app.mode == "about" then painter = draw_about
     elseif app.mode == "help" then painter = app.draw_help
+    elseif app.mode == "keyboard" then painter = app.kb_draw
+    elseif app.mode == "find" then painter = app.find_draw
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
 
@@ -3110,6 +3523,9 @@ function handle_action(a)
         return
     end
 
+    if mode == "keyboard" then app.kb_action(a) return end
+    if mode == "find" then app.find_action(a) return end
+
     if mode == "about" or mode == "help" then
         if a == "back" or a == "confirm" or a == "menu" then app.mode = "menu" end
         redraw()
@@ -3331,6 +3747,17 @@ function app.on_tap(side, u, v)
         end
     elseif mode == "about" or mode == "help" then
         action("back")
+    elseif mode == "keyboard" then
+        app.kb_tap(side, u, v)
+    elseif mode == "find" then
+        -- Like Contents: a tap on a result (right column) opens it.
+        local f, rows = app.find, list_rows(96)
+        local first = f.top + rows
+        local idx = first + math.floor((v - 160) / 96)
+        if side == "right" and v >= 160 and idx < first + rows and f.results[idx] then
+            f.sel = idx
+            action("confirm")
+        end
     elseif mode == "toc" or mode == "bookmarks" then
         -- A tap on a row (the bottom screen shows the list's second column)
         -- opens it, like A. Anywhere else does nothing: closing on a tap
@@ -3572,6 +3999,9 @@ local function run_test_script()
                 elseif what == "end" then touch_event("pinch_end")
                 else touch_event("pinch", tonumber(a:match("([%d.]+)$"))) end
             elseif a == "poll" then shop.net_poll()
+            elseif a:match("^type:") then app.kb_type(a:sub(6):gsub("_", " "))
+            elseif a == "work" then                -- finish a background task
+                while app.task do app.task_step() end
             elseif a == "net" then               -- wait for network jobs (and the cover)
                 for _ = 1, 2 do
                     local t = love.timer.getTime()
@@ -3659,6 +4089,7 @@ function love.run()
             app.on_hold(gesture.side, gesture.u0, gesture.v0)
         end
         if shop.net_poll() then got = true end
+        if app.task and not lid.closed then app.task_step(); got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
         if save_due and love.timer.getTime() >= save_due then save_progress() end
         if app.mode == "library" and not lid.closed then
@@ -3674,8 +4105,8 @@ function love.run()
             local minute = os.date("%H%M")
             if minute ~= app.clock_minute then app.clock_minute = minute; redraw() end
         end
-        if app.anim then
-            love.timer.sleep(0.001)            -- animating: next frame (vsync paces it)
+        if app.anim or app.task then
+            love.timer.sleep(0.001)            -- animating or working: next frame
         elseif Touch.enabled or overlay or net.count > 0 then
             -- Touch events don't wake love.event.wait(), so poll at a gentle rate.
             if not got and not app.dirty then love.timer.sleep(gesture and 0.008 or 0.025) end

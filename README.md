@@ -76,8 +76,10 @@ summary of the buttons and touchscreen) is at the bottom.
   OPDS catalog ([below](#getting-books-over-wi-fi)).
 - **Library:** covers and progress, sorted by recent, title, author or
   progress; delete books from it.
-- **Finding your place:** bookmarks, Contents, Jump to %, and "Back to …"
-  after any jump. Your place in every book is saved.
+- **Finding your place:** bookmarks, Contents, Jump to %, **Find in book**
+  (type a word or phrase on the touchscreen keyboard; every match is listed,
+  and the words are marked on the page you open), and "Back to …" after any
+  jump. Your place in every book is saved.
 - **Status bar:** book and chapter titles, pages left, time left in the chapter
   (learned from your reading speed), percent read, a progress bar, battery and a clock.
   Choose what shows in **Settings → Status bar**.
@@ -100,7 +102,9 @@ Turn on Wi-Fi in the device's settings, then in the library press **Select**
 (or tap **Get books** on the touchscreen) and choose a catalog. Browse with
 the D-pad or by tapping, and press A on a book to download it to the `Ebook`
 folder. Books you already have are marked ✓. Without Wi-Fi the button is
-greyed out. There's no search, since there's no keyboard.
+greyed out. **Search** (at the top of a catalog, when it supports searching,
+as Gutenberg and Calibre do) opens an on-screen keyboard on the touchscreen:
+tap the keys, or use the D-pad and A.
 
 **Project Gutenberg** (70,000+ free books) works with no setup. To add your
 own catalog, such as a Calibre content server or Calibre-Web, edit
