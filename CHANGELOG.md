@@ -2,10 +2,10 @@
 
 ## Unreleased
 
-- ROCKNIX: the **menu icon** now reliably appears after the first run.
-  EmulationStation saves play stats over its game list after a game ends,
-  which removed the icon; the launcher now adds it once that has happened,
-  and checks that it stuck.
+- ROCKNIX: the **menu icon** now reliably appears a few seconds after the
+  first run, without the menu redrawing: the launcher hands it to
+  EmulationStation directly instead of editing its game list, which its play
+  stats overwrote.
 
 ## v0.3.3
 

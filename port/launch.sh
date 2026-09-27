@@ -7,46 +7,24 @@ ROCKNIX=""
 grep -qs 'OS_NAME="ROCKNIX"' /etc/os-release && ROCKNIX=1
 
 # ROCKNIX: put the menu icon in the Ports list. EmulationStation only shows an
-# image listed in the folder's gamelist.xml, and it rewrites that file from
-# memory when a game ends (play stats) and when it reloads. So this runs on
-# its own after eReaderDS exits: wait until EmulationStation says no game is
-# running, reload (it saves its stats), add the entry, and reload again.
+# image listed for the game, and it keeps its game list in memory: editing
+# gamelist.xml gets overwritten by its play stats, and a reload redraws the
+# menu. Its /addgames call instead updates the game in memory and saves the
+# file, with no reload. It only takes effect once the game has ended, so this
+# runs on its own after eReaderDS exits.
 if [ "${1:-}" = "--menu-icon" ]; then
     ES=http://127.0.0.1:1234
     PORTS=$(dirname "$APP_DIR")
-    # EmulationStation says no game is running before its launcher script
-    # (runemu.sh) has finished, and saves the play stats after that.
-    for i in $(seq 1 120); do
-        pgrep -f /usr/bin/runemu.sh >/dev/null || break
+    for i in $(seq 1 60); do
+        [ "$(curl -s -m 3 -o /dev/null -w '%{http_code}' $ES/runningGame)" = 201 ] && break
         sleep 1
     done
     for attempt in 1 2 3; do
-        sleep 3
-        curl -s -m 60 $ES/reloadgames >/dev/null
-        python3 - "$PORTS" <<'EOF' | grep -q changed && curl -s -m 60 $ES/reloadgames >/dev/null
-import sys, os, xml.etree.ElementTree as ET
-g = os.path.join(sys.argv[1], 'gamelist.xml')
-if os.path.exists(g):
-    try: t = ET.parse(g)
-    except ET.ParseError: sys.exit()
-    root = t.getroot()
-else:
-    root = ET.Element('gameList'); t = ET.ElementTree(root)
-e = next((x for x in root.findall('game') if x.findtext('path') == './eReaderDS.sh'), None)
-if e is None:
-    e = ET.SubElement(root, 'game')
-    ET.SubElement(e, 'path').text = './eReaderDS.sh'
-    ET.SubElement(e, 'name').text = 'eReaderDS'
-i = e.find('image')
-if i is None: i = ET.SubElement(e, 'image')
-if i.text != './images/eReaderDS-image.png':
-    i.text = './images/eReaderDS-image.png'
-    ET.indent(t, '\t')
-    t.write(g + '.tmp', encoding='utf-8', xml_declaration=True)
-    os.replace(g + '.tmp', g)
-    print('changed')
-EOF
-        sleep 5                                 # still there once it settles?
+        sleep 2
+        curl -s -m 10 -X POST $ES/addgames/ports -d "<?xml version=\"1.0\"?><gameList><game>\
+<path>$PORTS/eReaderDS.sh</path><image>$PORTS/images/eReaderDS-image.png</image>\
+</game></gameList>" >/dev/null
+        sleep 1
         grep -qs 'eReaderDS-image.png' "$PORTS/gamelist.xml" && break
     done
     exit 0
