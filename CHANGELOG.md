@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.3
 
 - New defaults for new installs (your own settings are kept): **Sepia**
   theme, text size 40, tighter line spacing (0.85), narrow side margins, and
