@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Stock firmware: the launcher also puts the device back (brightness,
+  touchscreen mode) straight away if it's stopped from outside.
+
 ## v0.3.7
 
 - ROCKNIX: if eReaderDS takes a while to open (a first run, a big library),

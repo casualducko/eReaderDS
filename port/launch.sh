@@ -146,8 +146,12 @@ if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then
             setsid /bin/bash "$APP_DIR/launch.sh" --menu-icon </dev/null >/dev/null 2>&1 &
     fi
 else
-    "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app"
+    # In the background and waited for, so a stop signal is handled at once.
+    "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app" &
+    pid=$!
+    wait "$pid"
     rc=$?
+    pid=""
     restore
 fi
 printf '[launch] exit=%s\n' "$rc"
