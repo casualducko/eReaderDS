@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.6
 
 - **Contents** and **Bookmarks**: tapping an entry on the touchscreen opens
   it (it used to close the list, as if B had been pressed). Taps elsewhere do
