@@ -15,7 +15,7 @@ local DEFAULTS = {
     sb_show = true, sb_clock = "12", tz = "Device clock",
     sb_time = "chapter", -- time left in the chapter: "chapter" | "off"
     read_cps = 20,     -- learned reading speed, characters per second (~250 words/min to start)
-    brightness = -1,   -- percent; -1 = leave the system setting alone
+    brightness = 20,   -- percent; -1 = leave the system setting alone
     extra_dim = 0,
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)     -- 0-3: dark layer over the page, dimmer than the backlight allows
 }

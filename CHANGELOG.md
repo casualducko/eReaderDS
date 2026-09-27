@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- New installs start at **20% brightness** (easy on the eyes for reading;
+  your own setting is kept, and the system brightness comes back when you
+  quit).
+
 ## v0.3.5
 
 - Stock firmware: if the menu icon wasn't copied to `Ports/Imgs`, eReaderDS
