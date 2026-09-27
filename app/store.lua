@@ -82,6 +82,18 @@ end
 
 function M.data_path(name) return path(name) end
 
+-- The books folder as people see it, for messages: "Ebook" (on the stock
+-- firmware's SD card, /mnt/mmc/Ebook) or "roms/ebook" (ROCKNIX,
+-- /storage/roms/ebook). Returns the name and where it is (or nil).
+function M.books_folder()
+    local d = M.book_dirs()[1] or "/mnt/mmc/Ebook"
+    local rel = d:match("^/storage/(.+)$")
+    if rel then return rel, nil end
+    rel = d:match("^/mnt/mmc/(.+)$") or d:match("^/mnt/sdcard/(.+)$")
+    if rel then return rel, "on your SD card" end
+    return d, nil
+end
+
 -- Where downloaded books go: the first book folder that exists.
 function M.download_dir()
     local dirs = M.book_dirs()

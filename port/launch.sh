@@ -51,7 +51,7 @@ if [ -n "$ROCKNIX" ]; then
     export READER_DATA="${READER_DATA:-/storage/roms/ebook/.ereaderds}"
     export READER_BOOKS="${READER_BOOKS:-/storage/roms/ebook}"
     export READER_FONTS="${READER_FONTS:-/storage/roms/ebook/Fonts}"
-    mkdir -p /storage/roms/ebook/Fonts 2>/dev/null
+    mkdir -p /storage/roms/ebook/Fonts /storage/roms/ebook/Dictionaries 2>/dev/null
 elif [ -d /mnt/mmc ]; then
     export READER_DATA="${READER_DATA:-/mnt/mmc/Ebook/.ereaderds}"
 else

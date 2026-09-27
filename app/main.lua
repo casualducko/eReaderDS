@@ -1140,7 +1140,8 @@ function shop.start()
     end
     entries[#entries + 1] = { title = "Add a catalog", author = "Calibre, Calibre-Web or any OPDS server",
         formats = {}, info = true, summary = "Get books from your own library over Wi-Fi. Edit "
-            .. "Ebook/.ereaderds/opds.txt on the SD card (it has examples), for example:\n\n"
+            .. Store.books_folder() .. "/.ereaderds/opds.txt"
+            .. (select(2, Store.books_folder()) and " on the SD card" or "") .. " (it has examples), for example:\n\n"
             .. "name = Calibre\nurl = http://192.168.1.20:8080/opds\nuser = me\npassword = secret" }
     shop.stack = { { title = "Get books", entries = entries, sel = 1, top = 1 } }
     app.mode = "shop"
@@ -1777,8 +1778,9 @@ local function draw_library(side)
         if #library.items == 0 then
             love.graphics.setFont(ui.font)
             color(th.dim)
-            love.graphics.printf("No books found.\n\nCopy .epub or .txt files into the Ebook folder on your SD card.",
-                x, 180, w, "left")
+            local folder, where = Store.books_folder()
+            love.graphics.printf("No books found.\n\nCopy .epub or .txt files into the " .. folder
+                .. " folder" .. (where and (" " .. where) or "") .. ".", x, 180, w, "left")
             love.graphics.setFont(ui.small)
             love.graphics.print("Press the Anbernic button to quit", x, PAGE_H - 70)
             love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
@@ -2233,7 +2235,7 @@ function look.draw_panel(side)
         love.graphics.setFont(ui.font)
         color(th.dim)
         local msg = #(look.dict.list or {}) == 0
-            and "No dictionary found. Put StarDict dictionaries in Ebook/Dictionaries."
+            and ("No dictionary found. Put StarDict dictionaries in " .. Store.books_folder() .. "/Dictionaries.")
             or ("No entry for “" .. look.word .. "”.")
         love.graphics.printf(msg, ox, top + 60, w, "left")
     else

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Messages name the right folder on each system: `Ebook` on the stock
+  firmware's SD card, `roms/ebook` on ROCKNIX (for books, dictionaries and
+  catalogs). ROCKNIX also gets a `roms/ebook/Dictionaries` folder.
 - **Help** in Settings: the buttons and the touchscreen on one page.
 - The empty library says how to quit: **Press the Anbernic button to quit**.
 - ROCKNIX: the **menu icon** now reliably appears a few seconds after the
