@@ -49,7 +49,8 @@ Directions are as you hold it.
 | Menu (Anbernic button) | Quit | Quit |
 
 The L/R and L2/R2 shoulder buttons aren't used. Contents, Bookmarks, Jump to %
-and the Library are at the top of **Settings**.
+and the Library are at the top of **Settings**, and **Help** (a one-page
+summary of the buttons and touchscreen) is at the bottom.
 
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap

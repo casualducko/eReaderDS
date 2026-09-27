@@ -1488,6 +1488,7 @@ local function menu_items()
         section("", {
             { label = "Status bar", value = "›", act = function() open_sub("status") end },
             { label = "Page turns & device", value = "›", act = function() open_sub("more") end },
+            { label = "Help", act = function() app.mode = "help" end },
             { label = "Quit", act = function() love.event.quit() end },
         })
     )
@@ -2472,6 +2473,57 @@ local function draw_about(side)
     end
 end
 
+-- Help: the buttons on the left page, the touchscreen (the bottom screen,
+-- where this is drawn) on the right. Kept to what fits on one page each.
+app.HELP = {
+    left = { "Buttons", {
+        { "D-pad, stick", "Turn pages" },
+        { "A", "Footnotes on these pages" },
+        { "B", "Settings, or back after a jump" },
+        { "X, Start", "Settings" },
+        { "Curved arrow", "Settings (or press the stick)" },
+        { "Y", "Look up a word" },
+        { "Select", "Bookmark the page" },
+        { "Anbernic", "Quit" },
+    }, "In the library: ‹ › sort, A open, Y delete, Select get books." },
+    right = { "Touchscreen", {
+        { "Tap or swipe", "Turn pages (right half forward)" },
+        { "Slide up/down", "Brightness, down to extra dim" },
+        { "Pinch", "Text size" },
+        { "Top-right corner", "Bookmark" },
+        { "Top edge", "Show or hide the status bars" },
+        { "Hold a word", "Look it up" },
+        { "Note number", "Show the footnote" },
+    }, "B back" },
+}
+function app.draw_help(side)
+    local th = theme()
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    local page = app.HELP[side]
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print(page[1], x, 60)
+    local key_w, y = 230, 170
+    for _, row in ipairs(page[2]) do
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.print(row[1], x, y)
+        color(th.dim)
+        love.graphics.printf(row[2], x + key_w, y, w - key_w, "left")
+        local _, lines = ui.font:getWrap(row[2], w - key_w)
+        y = y + math.max(1, #lines) * ui.font:getHeight() + 26
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    if side == "left" then
+        love.graphics.printf(page[3], x, y + 20, w, "left")
+    else
+        love.graphics.print(page[3], x, PAGE_H - 70)
+    end
+end
+
 local function draw_message(side)
     local th = theme()
     if side == "left" then
@@ -2516,6 +2568,7 @@ local function render_canvases()
             if side == r.side then reader(side); note.highlight(r) else note.draw_panel(side) end
         end
     elseif app.mode == "about" then painter = draw_about
+    elseif app.mode == "help" then painter = app.draw_help
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
 
@@ -3053,7 +3106,7 @@ function handle_action(a)
         return
     end
 
-    if mode == "about" then
+    if mode == "about" or mode == "help" then
         if a == "back" or a == "confirm" or a == "menu" then app.mode = "menu" end
         redraw()
         return
@@ -3272,7 +3325,7 @@ function app.on_tap(side, u, v)
         elseif side == "right" and v > PAGE_H - 200 then
             action("confirm")
         end
-    elseif mode == "about" then
+    elseif mode == "about" or mode == "help" then
         action("back")
     elseif mode == "toc" or mode == "message" or mode == "bookmarks" then
         action("back")

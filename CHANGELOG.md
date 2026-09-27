@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Help** in Settings: the buttons and the touchscreen on one page.
 - The empty library says how to quit: **Press the Anbernic button to quit**.
 - ROCKNIX: the **menu icon** now reliably appears a few seconds after the
   first run, without the menu redrawing: the launcher hands it to
