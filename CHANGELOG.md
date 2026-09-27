@@ -5,6 +5,9 @@
 - New defaults for new installs (your own settings are kept): **Sepia**
   theme, text size 40, tighter line spacing (0.85), narrow side margins, and
   a 12-hour **clock** in the status bar.
+- A **menu icon** for Ports: the device's two screens as an open book
+  (`Ports/Imgs/eReaderDS.png` on the stock firmware; on ROCKNIX the launcher
+  adds it to the Ports list the first time it runs).
 
 ## v0.3.2
 

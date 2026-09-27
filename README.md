@@ -17,7 +17,8 @@ Created by **casualducko**.
    [latest release](https://github.com/casualducko/eReaderDS-beta/releases/latest)
    and unzip it on your computer.
 2. From the unzipped `Ports` folder, copy **`eReaderDS.sh`** and the
-   **`eReaderDS`** folder into the `Ports` folder on the SD card.
+   **`eReaderDS`** folder into the `Ports` folder on the SD card, and
+   `Imgs/eReaderDS.png` (the menu icon) into `Ports/Imgs`.
 3. Put `.epub` or `.txt` books in the card's `Ebook` folder.
 4. On the device, open **Ports → eReaderDS**.
 

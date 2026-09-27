@@ -5,7 +5,8 @@
 #
 # Unzipping it at the root of the SD card adds:
 #   Ports/eReaderDS.sh
-#   Ports/eReaderDS/{launch.sh, app/, runtime/, README.txt, LICENSES/}
+#   Ports/Imgs/eReaderDS.png  (the menu icon)
+#   Ports/eReaderDS/{launch.sh, icon.png, app/, runtime/, README.txt, LICENSES/}
 # It never contains settings, progress (Ebook/.ereaderds), books or fonts, so
 # replacing an older install with it keeps everything the reader has saved.
 set -euo pipefail
@@ -32,6 +33,10 @@ cp "$ROOT"/runtime/LICENSE-*.txt "$ROOT/runtime/NOTICES.md" "$P/LICENSES/" 2>/de
 [ -f "$ROOT/LICENSE" ] && cp "$ROOT/LICENSE" "$P/LICENSES/eReaderDS-LICENSE.txt"
 cp "$ROOT/port/launch.sh" "$P/"
 cp "$ROOT/port/eReaderDS.sh" "$STAGE/Ports/"
+# Menu icon: Ports/Imgs on the stock firmware; ROCKNIX's launcher uses icon.png.
+mkdir -p "$STAGE/Ports/Imgs"
+cp "$ROOT/port/art/eReaderDS.png" "$STAGE/Ports/Imgs/eReaderDS.png"
+cp "$ROOT/port/art/eReaderDS.png" "$P/icon.png"
 sed "s/@VERSION@/$VERSION/g" "$ROOT/port/README.txt" > "$P/README.txt"
 chmod +x "$P/launch.sh" "$STAGE/Ports/eReaderDS.sh" "$P/runtime/love.aarch64"
 

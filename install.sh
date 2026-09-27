@@ -24,6 +24,9 @@ if [ "${1:-}" = "--ssh" ]; then
     cp "$HERE"/app/fonts/* "$P/app/fonts/"
     cp "$HERE/port/launch.sh" "$P/"
     cp "$HERE/port/eReaderDS.sh" "$STAGE/Ports/"
+    mkdir -p "$STAGE/Ports/Imgs"
+    cp "$HERE/port/art/eReaderDS.png" "$STAGE/Ports/Imgs/eReaderDS.png"
+    cp "$HERE/port/art/eReaderDS.png" "$P/icon.png"
     sed "s/@VERSION@/$VERSION/g" "$HERE/port/README.txt" > "$P/README.txt"
     # The engine only goes over the first time.
     if ! $SSH test -f /mnt/mmc/Ports/eReaderDS/runtime/love.aarch64; then
@@ -57,6 +60,9 @@ cp "$HERE"/app/dict/* "$D/app/dict/"
 cp "$HERE"/app/fonts/* "$D/app/fonts/"
 cp "$HERE/port/launch.sh" "$D/"
 cp "$HERE/port/eReaderDS.sh" "$SD/Ports/"
+mkdir -p "$SD/Ports/Imgs"
+cp "$HERE/port/art/eReaderDS.png" "$SD/Ports/Imgs/eReaderDS.png"
+cp "$HERE/port/art/eReaderDS.png" "$D/icon.png"
 VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$HERE/app/version.lua")
 sed "s/@VERSION@/$VERSION/g" "$HERE/port/README.txt" > "$D/README.txt"
 
