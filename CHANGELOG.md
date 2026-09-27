@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- ROCKNIX: if eReaderDS takes a while to open (a first run, a big library),
+  it still spreads over both screens (the launcher used to give up after 10
+  seconds). If it's stopped from outside (e.g. an exit hotkey), the bottom
+  screen, the menu's focus and the brightness are still put back.
+- **Help** follows the Tap setting: with taps set to open Settings, it says so.
+- If the saved theme is ever unknown, eReaderDS falls back to Sepia (the
+  default), not E-ink.
+
 ## v0.3.6
 
 - **Contents** and **Bookmarks**: tapping an entry on the touchscreen opens

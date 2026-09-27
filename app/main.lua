@@ -103,7 +103,7 @@ local function theme_index()
     local default = 1
     for i, t in ipairs(THEMES) do
         if t.name == S.theme then return i end
-        if t.name == "E-ink" then default = i end
+        if t.name == "Sepia" then default = i end   -- the default theme (store.lua)
     end
     return default
 end
@@ -2509,12 +2509,14 @@ function app.draw_help(side)
     love.graphics.print(page[1], x, 60)
     local key_w, y = 230, 170
     for _, row in ipairs(page[2]) do
+        local desc = row[2]
+        if row[1] == "Tap or swipe" and S.tap == "menu" then desc = "Swipe: turn pages. Tap: Settings" end
         love.graphics.setFont(ui.font)
         color(th.fg)
         love.graphics.print(row[1], x, y)
         color(th.dim)
-        love.graphics.printf(row[2], x + key_w, y, w - key_w, "left")
-        local _, lines = ui.font:getWrap(row[2], w - key_w)
+        love.graphics.printf(desc, x + key_w, y, w - key_w, "left")
+        local _, lines = ui.font:getWrap(desc, w - key_w)
         y = y + math.max(1, #lines) * ui.font:getHeight() + 26
     end
     love.graphics.setFont(ui.small)
@@ -3493,7 +3495,8 @@ function love.load()
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
     Timezone.apply(S.tz)
     Touch.open("gt9xx-0")
-    KeyProbe.open(function(device, code) app.on_raw_key(device, code) end, "gt9xx-0",
+    KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
+        { ["gt9xx-0"] = true, ["Goodix Capacitive TouchScreen"] = true },  -- stock, ROCKNIX
         { [LID_DEVICE] = true, [app.BACK_DEVICE] = true })
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)

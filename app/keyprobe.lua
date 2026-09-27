@@ -44,13 +44,13 @@ local function list_devices()
     return out
 end
 
--- Open every key-capable device except the touchscreen; route presses to
+-- Open every key-capable device except the touchscreens (skip: set of names); route presses to
 -- handler(device_name, code) and log them. After the first presses are logged,
 -- only the devices named in `watch` keep being read.
 function M.open(handler, skip, watch)
     M.watch = watch or {}
     for _, d in ipairs(list_devices()) do
-        if d.has_keys and d.name ~= skip then
+        if d.has_keys and not skip[d.name] then
             local fd = C.open("/dev/input/" .. d.event, O_NONBLOCK)
             if fd >= 0 then devices[#devices + 1] = { fd = fd, name = d.name } end
         end

@@ -72,12 +72,12 @@ if [ ! -f "$READER_DATA/settings.txt" ]; then
         break
     done
 fi
-# First run: make the folders people put books and fonts in.
-[ -d /mnt/mmc ] && mkdir -p /mnt/mmc/Ebook/Fonts 2>/dev/null
+# Stock firmware, first run: make the folders people put books and fonts in.
+[ -z "$ROCKNIX" ] && [ -d /mnt/mmc ] && mkdir -p /mnt/mmc/Ebook/Fonts 2>/dev/null
 # Stock firmware: the menu shows Ports/Imgs/<name>.png next to a port. Put the
 # icon there if it's missing (e.g. only eReaderDS.sh and the folder were
 # copied). The menu restarts when a port exits, so it shows on the way out.
-if [ -z "$ROCKNIX" ] && [ -f "$APP_DIR/icon.png" ]; then
+if [ -z "$ROCKNIX" ] && [ -d /mnt/mmc ] && [ -f "$APP_DIR/icon.png" ]; then
     IMGS="$(dirname "$APP_DIR")/Imgs"
     [ -f "$IMGS/eReaderDS.png" ] || { mkdir -p "$IMGS" && cp "$APP_DIR/icon.png" "$IMGS/eReaderDS.png"; } 2>/dev/null
 fi
@@ -102,22 +102,40 @@ if [ -r "$TP" ] && [ -w "$TP" ]; then
     [ "$TP_SAVED" = 1 ] && printf '0\n' > "$TP"
     printf '[launch] tpctrl %s -> %s\n' "$TP_SAVED" "$(cat "$TP")"
 fi
+# Put the device back as it was: the touchscreen mode and the brightness, and
+# on ROCKNIX the bottom screen (off in its menu) and the menu's focus. Also run
+# if the launcher is told to stop (e.g. by a system exit hotkey).
+pid=""
+restore() {
+    if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then
+        swaymsg 'output DSI-1 power off' >/dev/null 2>&1
+        swaymsg '[app_id="emulationstation"] focus' >/dev/null 2>&1
+    fi
+    [ -n "$TP_SAVED" ] && printf '%s\n' "$TP_SAVED" > "$TP" 2>/dev/null
+    for e in $BL_SAVED; do
+        printf '%s\n' "${e##*=}" > "${e%=*}/brightness" 2>/dev/null
+    done
+}
+trap '[ -n "$pid" ] && kill "$pid" 2>/dev/null; restore; printf "[launch] stopped by a signal\n"; sync; exit 143' TERM INT HUP
+
 cd "$APP_DIR/app" || exit 1
 if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then
     # sway puts windows on one screen and keeps the bottom one off in the
-    # menu: turn it on and stretch the window over both, and afterwards turn
-    # it off and give the menu back its focus.
+    # menu: turn it on and stretch the window over both (restore() turns it
+    # off again and gives the menu back its focus).
     "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app" &
     pid=$!
     swaymsg 'output DSI-1 power on' >/dev/null
-    for i in $(seq 1 50); do
+    # Wait for its window (the first run can be slow), for as long as it runs.
+    for i in $(seq 1 300); do
         swaymsg "[pid=$pid] fullscreen enable global, focus" >/dev/null 2>&1 && break
+        kill -0 "$pid" 2>/dev/null || break
         sleep 0.2
     done
     wait "$pid"
     rc=$?
-    swaymsg 'output DSI-1 power off' >/dev/null
-    swaymsg '[app_id="emulationstation"] focus' >/dev/null
+    pid=""
+    restore
     # The menu icon (see --menu-icon above), once EmulationStation is back.
     PORTS=$(dirname "$APP_DIR")
     if [ -f "$APP_DIR/icon.png" ]; then
@@ -130,11 +148,8 @@ if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then
 else
     "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app"
     rc=$?
+    restore
 fi
-[ -n "$TP_SAVED" ] && printf '%s\n' "$TP_SAVED" > "$TP" 2>/dev/null
-for e in $BL_SAVED; do
-    printf '%s\n' "${e##*=}" > "${e%=*}/brightness" 2>/dev/null
-done
 printf '[launch] exit=%s\n' "$rc"
 sync
 exit "$rc"
