@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- ROCKNIX: the **menu icon** now reliably appears after the first run.
+  EmulationStation saves play stats over its game list after a game ends,
+  which removed the icon; the launcher now adds it once that has happened,
+  and checks that it stuck.
+
 ## v0.3.3
 
 - New defaults for new installs (your own settings are kept): **Sepia**

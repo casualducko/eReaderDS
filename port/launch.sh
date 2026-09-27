@@ -5,6 +5,52 @@ set -u
 APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 ROCKNIX=""
 grep -qs 'OS_NAME="ROCKNIX"' /etc/os-release && ROCKNIX=1
+
+# ROCKNIX: put the menu icon in the Ports list. EmulationStation only shows an
+# image listed in the folder's gamelist.xml, and it rewrites that file from
+# memory when a game ends (play stats) and when it reloads. So this runs on
+# its own after eReaderDS exits: wait until EmulationStation says no game is
+# running, reload (it saves its stats), add the entry, and reload again.
+if [ "${1:-}" = "--menu-icon" ]; then
+    ES=http://127.0.0.1:1234
+    PORTS=$(dirname "$APP_DIR")
+    # EmulationStation says no game is running before its launcher script
+    # (runemu.sh) has finished, and saves the play stats after that.
+    for i in $(seq 1 120); do
+        pgrep -f /usr/bin/runemu.sh >/dev/null || break
+        sleep 1
+    done
+    for attempt in 1 2 3; do
+        sleep 3
+        curl -s -m 60 $ES/reloadgames >/dev/null
+        python3 - "$PORTS" <<'EOF' | grep -q changed && curl -s -m 60 $ES/reloadgames >/dev/null
+import sys, os, xml.etree.ElementTree as ET
+g = os.path.join(sys.argv[1], 'gamelist.xml')
+if os.path.exists(g):
+    try: t = ET.parse(g)
+    except ET.ParseError: sys.exit()
+    root = t.getroot()
+else:
+    root = ET.Element('gameList'); t = ET.ElementTree(root)
+e = next((x for x in root.findall('game') if x.findtext('path') == './eReaderDS.sh'), None)
+if e is None:
+    e = ET.SubElement(root, 'game')
+    ET.SubElement(e, 'path').text = './eReaderDS.sh'
+    ET.SubElement(e, 'name').text = 'eReaderDS'
+i = e.find('image')
+if i is None: i = ET.SubElement(e, 'image')
+if i.text != './images/eReaderDS-image.png':
+    i.text = './images/eReaderDS-image.png'
+    ET.indent(t, '\t')
+    t.write(g + '.tmp', encoding='utf-8', xml_declaration=True)
+    os.replace(g + '.tmp', g)
+    print('changed')
+EOF
+        sleep 5                                 # still there once it settles?
+        grep -qs 'eReaderDS-image.png' "$PORTS/gamelist.xml" && break
+    done
+    exit 0
+fi
 if [ -n "$ROCKNIX" ]; then
     # Its Wayland display, sway socket and controller database (the buttons
     # are "retrogame_joypad" there); set -u off for its profile scripts.
@@ -86,43 +132,14 @@ if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then
     rc=$?
     swaymsg 'output DSI-1 power off' >/dev/null
     swaymsg '[app_id="emulationstation"] focus' >/dev/null
-    # The menu icon: EmulationStation only shows an image listed in the
-    # folder's gamelist.xml. A reload first saves its play stats over that
-    # file, so reload, add the entry if it's missing, and reload again.
+    # The menu icon (see --menu-icon above), once EmulationStation is back.
     PORTS=$(dirname "$APP_DIR")
     if [ -f "$APP_DIR/icon.png" ]; then
         mkdir -p "$PORTS/images"
         cmp -s "$APP_DIR/icon.png" "$PORTS/images/eReaderDS-image.png" ||
             cp "$APP_DIR/icon.png" "$PORTS/images/eReaderDS-image.png"
-    fi
-    if [ -f "$APP_DIR/icon.png" ] && command -v python3 >/dev/null &&
-        ! grep -qs 'eReaderDS-image.png' "$PORTS/gamelist.xml"; then
-        (
-            curl -s -m 60 http://127.0.0.1:1234/reloadgames >/dev/null
-            python3 - "$PORTS" <<'EOF' | grep -q changed && curl -s -m 60 http://127.0.0.1:1234/reloadgames >/dev/null
-import sys, os, xml.etree.ElementTree as ET
-g = os.path.join(sys.argv[1], 'gamelist.xml')
-if os.path.exists(g):
-    try: t = ET.parse(g)
-    except ET.ParseError: sys.exit()
-    root = t.getroot()
-else:
-    root = ET.Element('gameList'); t = ET.ElementTree(root)
-e = next((x for x in root.findall('game') if x.findtext('path') == './eReaderDS.sh'), None)
-if e is None:
-    e = ET.SubElement(root, 'game')
-    ET.SubElement(e, 'path').text = './eReaderDS.sh'
-    ET.SubElement(e, 'name').text = 'eReaderDS'
-i = e.find('image')
-if i is None: i = ET.SubElement(e, 'image')
-if i.text != './images/eReaderDS-image.png':
-    i.text = './images/eReaderDS-image.png'
-    ET.indent(t, '\t')
-    t.write(g + '.tmp', encoding='utf-8', xml_declaration=True)
-    os.replace(g + '.tmp', g)
-    print('changed')
-EOF
-        ) >/dev/null 2>&1
+        grep -qs 'eReaderDS-image.png' "$PORTS/gamelist.xml" ||
+            setsid /bin/bash "$APP_DIR/launch.sh" --menu-icon </dev/null >/dev/null 2>&1 &
     fi
 else
     "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app"
