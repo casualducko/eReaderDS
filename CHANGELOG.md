@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.5
 
 - Stock firmware: if the menu icon wasn't copied to `Ports/Imgs`, eReaderDS
   puts it there itself, so it appears when you quit.
