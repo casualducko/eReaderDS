@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Runs on ROCKNIX** as well as the stock firmware: install to `roms/ports`,
+  books in `roms/ebook`. The launcher turns the bottom screen on and spreads
+  the pages over both screens, then gives the screens back to ROCKNIX's menu
+  on exit. Buttons go by their printed letters, and the curved-arrow button
+  opens Settings as on the stock firmware.
 - The status bar no longer estimates **time left in the book**, which was
   often well off (it had to guess at chapters not yet opened). It shows the
   percentage read instead; time left in the chapter stays.

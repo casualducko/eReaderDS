@@ -73,7 +73,9 @@ local function absinfo(code)
 end
 
 function M.open(name)
+    -- "gt9xx-0" on the stock firmware, the mainline driver's name on ROCKNIX.
     local path = os.getenv("READER_TOUCH_DEV") or find_device(name or "gt9xx-0")
+        or find_device("Goodix Capacitive TouchScreen")
     if not path then print("[touch] no touchscreen found"); return false end
     fd = C.open(path, O_NONBLOCK)
     if fd < 0 then print("[touch] cannot open " .. path); fd = nil; return false end

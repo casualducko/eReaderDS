@@ -1,16 +1,34 @@
 #!/bin/bash
 # eReaderDS for RG DS Plus: two-page ebook reader, hold the device sideways.
+# Runs on the stock firmware (Ports/eReaderDS) and on ROCKNIX (roms/ports).
 set -u
 APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
+ROCKNIX=""
+grep -qs 'OS_NAME="ROCKNIX"' /etc/os-release && ROCKNIX=1
+if [ -n "$ROCKNIX" ]; then
+    # Its Wayland display, sway socket and controller database (the buttons
+    # are "retrogame_joypad" there); set -u off for its profile scripts.
+    set +u; . /etc/profile; set -u
+    # SDL drops controller input unless it thinks its window has keyboard
+    # focus, which it never gets under ROCKNIX's sway (there's no keyboard).
+    export SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1
+fi
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/var/run}"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
 export SDL_VIDEODRIVER=wayland
 export SDL_VIDEO_DOUBLE_BUFFER=1
 export LOVE_GRAPHICS_USE_OPENGLES=1
 export LD_LIBRARY_PATH="$APP_DIR/runtime/libs.aarch64:/usr/lib:/lib"
+# ROCKNIX lacks a library LÖVE links to (libtheoradec); only used there.
+[ -n "$ROCKNIX" ] && LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$APP_DIR/runtime/libs.rocknix"
 # Settings and reading progress live outside the app folder, so replacing
 # Ports/eReaderDS with a newer version never loses them.
-if [ -d /mnt/mmc ]; then
+if [ -n "$ROCKNIX" ]; then
+    export READER_DATA="${READER_DATA:-/storage/roms/ebook/.ereaderds}"
+    export READER_BOOKS="${READER_BOOKS:-/storage/roms/ebook}"
+    export READER_FONTS="${READER_FONTS:-/storage/roms/ebook/Fonts}"
+    mkdir -p /storage/roms/ebook/Fonts 2>/dev/null
+elif [ -d /mnt/mmc ]; then
     export READER_DATA="${READER_DATA:-/mnt/mmc/Ebook/.ereaderds}"
 else
     export READER_DATA="${READER_DATA:-$APP_DIR/data}"
@@ -53,8 +71,25 @@ if [ -r "$TP" ] && [ -w "$TP" ]; then
     printf '[launch] tpctrl %s -> %s\n' "$TP_SAVED" "$(cat "$TP")"
 fi
 cd "$APP_DIR/app" || exit 1
-"$APP_DIR/runtime/love.aarch64" "$APP_DIR/app"
-rc=$?
+if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then
+    # sway puts windows on one screen and keeps the bottom one off in the
+    # menu: turn it on and stretch the window over both, and afterwards turn
+    # it off and give the menu back its focus.
+    "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app" &
+    pid=$!
+    swaymsg 'output DSI-1 power on' >/dev/null
+    for i in $(seq 1 50); do
+        swaymsg "[pid=$pid] fullscreen enable global, focus" >/dev/null 2>&1 && break
+        sleep 0.2
+    done
+    wait "$pid"
+    rc=$?
+    swaymsg 'output DSI-1 power off' >/dev/null
+    swaymsg '[app_id="emulationstation"] focus' >/dev/null
+else
+    "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app"
+    rc=$?
+fi
 [ -n "$TP_SAVED" ] && printf '%s\n' "$TP_SAVED" > "$TP" 2>/dev/null
 for e in $BL_SAVED; do
     printf '%s\n' "${e##*=}" > "${e%=*}/brightness" 2>/dev/null

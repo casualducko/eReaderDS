@@ -7,8 +7,8 @@ Created by **casualducko**.
 
 ![Reading, held sideways](docs/screenshots/reading.png)
 
-> **RG DS Plus on its stock firmware only** (not the original RG DS, and not
-> custom firmware such as ROCKNIX or KNULLI). **This is a test release**:
+> **RG DS Plus on its stock firmware or ROCKNIX** (not the original RG DS,
+> and not other custom firmware such as KNULLI). **This is a test release**:
 > please [report problems](#reporting-problems).
 
 ## Install
@@ -20,6 +20,12 @@ Created by **casualducko**.
    **`eReaderDS`** folder into the `Ports` folder on the SD card.
 3. Put `.epub` or `.txt` books in the card's `Ebook` folder.
 4. On the device, open **Ports → eReaderDS**.
+
+**On ROCKNIX:** copy `eReaderDS.sh` and the `eReaderDS` folder into
+`roms/ports` instead (over the network, `/storage/roms/ports`), put books in
+`roms/ebook` (fonts in `roms/ebook/Fonts`), and open **Ports → eReaderDS**.
+The bottom screen turns on while it runs; closing the lid is handled by
+ROCKNIX.
 
 To update, copy the same two items from a newer zip over the old ones. Your
 settings, reading positions, bookmarks and fonts are kept. (Copy the two

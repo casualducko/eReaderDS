@@ -13,6 +13,12 @@ any other ports installed.
 | `libs.aarch64/libmodplug.so.1` | [libmodplug](https://github.com/Konstanty/libmodplug) | Public domain |
 | `libs.aarch64/libogg.so.0` | [libogg](https://xiph.org/ogg/) | BSD 3-Clause |
 
+`libs.rocknix/libtheoradec.so.1` is [libtheora](https://www.theora.org)'s
+decoder (BSD 3-Clause, © Xiph.org Foundation; see
+`libs.rocknix/COPYRIGHT-libtheora.txt`), from Debian 12's `libtheora0`
+1.1.1+dfsg.1-16.1+deb12u1 arm64 package. LÖVE links to it and ROCKNIX doesn't
+ship it; it's only loaded there.
+
 Other libraries LÖVE uses (SDL2, FreeType, OpenAL and others) come from the
 device firmware and are not included.
 

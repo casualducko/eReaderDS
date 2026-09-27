@@ -2955,7 +2955,11 @@ local function lid_tick()
     end
 end
 
+-- ROCKNIX: the curved-arrow button sends BTN_Z from its own device, which
+-- SDL doesn't see (on the stock firmware it arrives as the Back key).
+app.BACK_DEVICE, app.BACK_CODE = "adc-keys-back", 309
 function app.on_raw_key(device, code)
+    if device == app.BACK_DEVICE and code == app.BACK_CODE then app.on_back() return end
     if device ~= LID_DEVICE then return end
     if code == LID_CLOSE then lid_closed()
     elseif code == LID_OPEN then lid_opened() end
@@ -2984,6 +2988,7 @@ local function action(a)
     -- Time outside the pages (menus, lists) doesn't count as reading.
     if app.mode ~= "reader" then reading_pause() end
 end
+function app.on_back() action("menu") end   -- see app.on_raw_key
 
 function handle_action(a)
     if lid.closed then return end         -- pocket presses while the lid is shut
@@ -3271,6 +3276,7 @@ end
 local BUTTON = {
     a = "confirm", b = "back", x = "menu", y = "toc",
     start = "menu", back = "bookmark", guide = "quit",
+    leftstick = "stick",            -- pressing the stick in (ROCKNIX)
 }
 
 local function dpad(dir)
@@ -3327,7 +3333,7 @@ local EXTRA = { [9] = "stick" }        -- pressing the stick in
 function love.joystickpressed(joystick, b)
     -- Every press goes to log.txt, so unknown buttons can be identified.
     log_input("joystick %q button %d", joystick:getName(), b - 1)
-    local extra = EXTRA[b - 1]
+    local extra = joystick:getName() == "ANBERNIC-rk3568-keys" and EXTRA[b - 1]
     if extra then action(extra) return end
     if joystick:isGamepad() then return end
     local name = RAW[b - 1]
@@ -3382,7 +3388,14 @@ function love.load()
     love.keyboard.setKeyRepeat(true)
 
     for _, joystick in ipairs(love.joystick.getJoysticks()) do
-        if joystick:getName() == "ANBERNIC-rk3568-keys" then
+        if joystick:getName() == "retrogame_joypad" then
+            -- ROCKNIX: its own mapping goes by position (its "a" is the B
+            -- button); map by the printed letters like the stock firmware.
+            love.joystick.loadGamepadMappings(joystick:getGUID() ..
+                ",retrogame_joypad,a:b1,b:b0,x:b2,y:b3,back:b8,start:b9,guide:b10," ..
+                "leftstick:b11,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16," ..
+                "leftx:a0,lefty:a1,platform:Linux,")
+        elseif joystick:getName() == "ANBERNIC-rk3568-keys" then
             love.joystick.loadGamepadMappings(joystick:getGUID() ..
                 ",ANBERNIC-rk3568-keys,a:b0,b:b1,x:b3,y:b2," ..
                 "leftshoulder:b4,rightshoulder:b5,back:b6,start:b7,guide:b8," ..
@@ -3391,6 +3404,10 @@ function love.load()
         end
     end
 
+    for _, joystick in ipairs(love.joystick.getJoysticks()) do
+        print(string.format("[joystick] %q %s gamepad=%s", joystick:getName(), joystick:getGUID(),
+            tostring(joystick:isGamepad())))
+    end
     print("[reader] eReaderDS v" .. VERSION)
     S = Store.load_settings()
     if S.chrome == false then
@@ -3403,7 +3420,7 @@ function love.load()
     Timezone.apply(S.tz)
     Touch.open("gt9xx-0")
     KeyProbe.open(function(device, code) app.on_raw_key(device, code) end, "gt9xx-0",
-        { [LID_DEVICE] = true })
+        { [LID_DEVICE] = true, [app.BACK_DEVICE] = true })
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)

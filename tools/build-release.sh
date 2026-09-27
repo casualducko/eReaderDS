@@ -17,7 +17,7 @@ VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$ROOT/app/version.lua")
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 P="$STAGE/Ports/eReaderDS"
-mkdir -p "$P/app/fonts" "$P/app/hyph" "$P/app/dict" "$P/runtime/libs.aarch64" "$P/LICENSES"
+mkdir -p "$P/app/fonts" "$P/app/hyph" "$P/app/dict" "$P/runtime/libs.aarch64" "$P/runtime/libs.rocknix" "$P/LICENSES"
 
 cp "$ROOT"/app/*.lua "$P/app/"
 cp "$ROOT"/app/hyph/*.txt "$P/app/hyph/"
@@ -27,6 +27,7 @@ cp "$ROOT"/app/fonts/*.ttf "$ROOT"/app/fonts/*.otf "$P/app/fonts/"
 cp "$ROOT"/app/fonts/*-OFL.txt "$P/LICENSES/"
 cp "$ROOT/runtime/love.aarch64" "$P/runtime/"
 cp "$ROOT"/runtime/libs.aarch64/* "$P/runtime/libs.aarch64/"
+cp "$ROOT"/runtime/libs.rocknix/* "$P/runtime/libs.rocknix/"
 cp "$ROOT"/runtime/LICENSE-*.txt "$ROOT/runtime/NOTICES.md" "$P/LICENSES/" 2>/dev/null || true
 [ -f "$ROOT/LICENSE" ] && cp "$ROOT/LICENSE" "$P/LICENSES/eReaderDS-LICENSE.txt"
 cp "$ROOT/port/launch.sh" "$P/"
