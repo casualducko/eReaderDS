@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.7
 
 - ROCKNIX: if eReaderDS takes a while to open (a first run, a big library),
   it still spreads over both screens (the launcher used to give up after 10
