@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The empty library says how to quit: **Press the Anbernic button to quit**.
 - ROCKNIX: the **menu icon** now reliably appears a few seconds after the
   first run, without the menu redrawing: the launcher hands it to
   EmulationStation directly instead of editing its game list, which its play

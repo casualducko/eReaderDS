@@ -1778,6 +1778,9 @@ local function draw_library(side)
             color(th.dim)
             love.graphics.printf("No books found.\n\nCopy .epub or .txt files into the Ebook folder on your SD card.",
                 x, 180, w, "left")
+            love.graphics.setFont(ui.small)
+            love.graphics.print("Press the Anbernic button to quit", x, PAGE_H - 70)
+            love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
             return
         end
         if library.sel < library.top then library.top = library.sel end
