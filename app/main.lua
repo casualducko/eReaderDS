@@ -2610,6 +2610,9 @@ local function compose()
     local th = theme()
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
     blit_page(canvases[1], "left")
+    -- Get books: the selected book's page skips the E-ink filter, so covers
+    -- stay in color whatever the theme.
+    if app.mode == "shop" then set_theme_shader(false) end
     blit_page(canvases[2], "right")
     set_theme_shader(false)
 end
