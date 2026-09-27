@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-- New installs start at **20% brightness** (easy on the eyes for reading;
-  your own setting is kept, and the system brightness comes back when you
-  quit).
+- New installs start at **20% brightness** on the stock firmware and **40%**
+  on ROCKNIX, whose screens are dimmer at the same level (your own setting is
+  kept, and the system brightness comes back when you quit).
 
 ## v0.3.5
 

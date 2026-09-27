@@ -15,7 +15,9 @@ local DEFAULTS = {
     sb_show = true, sb_clock = "12", tz = "Device clock",
     sb_time = "chapter", -- time left in the chapter: "chapter" | "off"
     read_cps = 20,     -- learned reading speed, characters per second (~250 words/min to start)
-    brightness = 20,   -- percent; -1 = leave the system setting alone
+    -- percent; -1 = leave the system setting alone. ROCKNIX's panels are
+    -- dimmer at the same level, so its launcher asks for more.
+    brightness = tonumber(os.getenv("READER_DEFAULT_BRIGHTNESS") or "") or 20,
     extra_dim = 0,
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)     -- 0-3: dark layer over the page, dimmer than the backlight allows
 }
