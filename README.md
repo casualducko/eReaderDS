@@ -64,7 +64,7 @@ and the Library are at the top of **Settings**.
 
 - **Reading:** EPUB and plain text with italics, headings, images and covers;
   justified text with optional hyphenation (English); 10 built-in fonts plus
-  your own; 11 themes (E-ink by default, plus Paper, Night, Amber and more); page-flip or fade
+  your own; 11 themes (Sepia by default, plus E-ink, Paper, Night, Amber and more); page-flip or fade
   animation.
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.

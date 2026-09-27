@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- New defaults for new installs (your own settings are kept): **Sepia**
+  theme, text size 40, tighter line spacing (0.85), narrow side margins, and
+  a 12-hour **clock** in the status bar.
+
 ## v0.3.2
 
 - **Runs on ROCKNIX** as well as the stock firmware: install to `roms/ports`,

@@ -3,16 +3,16 @@
 local M = {}
 
 local DEFAULTS = {
-    font = "Gentium Book Plus", font_size = 32, spacing = 1.15, margins = 2, vmargins = 2, justify = true,
+    font = "Gentium Book Plus", font_size = 40, spacing = 0.85, margins = 1, vmargins = 2, justify = true,
     hyphenate = false, -- English books only (the patterns are US English)
     lib_sort = "recent", -- library order: "recent" | "title" | "author" | "progress"
     dict = "all",      -- dictionary for look-ups: "all" or a dictionary's name
-    theme = "E-ink", chrome = true, orient = "left", anim = "flip",
+    theme = "Sepia", chrome = true, orient = "left", anim = "flip",
     tap = "next",      -- what a tap on the touchscreen does while reading: "menu" | "next"
     -- status bar
     sb_title = "both", sb_pages = "left", sb_percent = true,
     sb_bar = "chapter", sb_bar_size = 2, sb_battery = true,
-    sb_show = true, sb_clock = "off", tz = "Device clock",
+    sb_show = true, sb_clock = "12", tz = "Device clock",
     sb_time = "chapter", -- time left in the chapter: "chapter" | "off"
     read_cps = 20,     -- learned reading speed, characters per second (~250 words/min to start)
     brightness = -1,   -- percent; -1 = leave the system setting alone
