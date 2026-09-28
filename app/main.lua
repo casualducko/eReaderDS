@@ -818,6 +818,7 @@ function app.hl_select()
         if i then
             table.remove(list, i)
             Store.set_highlights(book.path, list)
+            app.export_notes()
             app.toast("Highlight removed")
         else
             look.hl_start = look.sel
@@ -852,6 +853,7 @@ function app.hl_select()
     keep[#keep + 1] = { ch = spread.ch, s = span.s, e = span.e, pct = book:fraction(spread.ch, span.s),
         title = app.find_label({ ch = spread.ch, off = span.s }), text = text }
     Store.set_highlights(book.path, keep)
+    app.export_notes()
     app.mode = "reader"
     reading.since = love.timer.getTime()
     app.toast("Highlighted")
@@ -903,6 +905,7 @@ local function toggle_bookmark()
             title = sec and book.toc[sec].title or book.title, snippet = page_snippet() }
     end
     Store.set_bookmarks(book.path, list)
+    app.export_notes()
     if app.toast then app.toast(here and "Bookmark removed" or "Bookmark added") end
     redraw()
 end
@@ -939,6 +942,65 @@ local function open_book(path)
     Store.set_last(path)
     Store.set_opened(path)
     save_progress()
+    app.export_notes(true)                 -- highlights from before there were files
+end
+
+-- Highlights and bookmarks as a file to read on a computer, like a Kindle's
+-- "My Clippings": Ebook/Highlights/<Title - Author>.md, one per book, written
+-- again whenever they change (removed when there are none). Markdown, which
+-- reads as plain text too. only_if_missing: write it if it isn't there yet.
+function app.notes_path(b)
+    local name = (b.title ~= "" and b.title or "Book") .. ((b.author or "") ~= "" and (" - " .. b.author) or "")
+    name = name:gsub('[%c<>:"/\\|%?%*]', ""):gsub("%s+", " "):gsub("^[%s%.]+", ""):gsub("[%s%.]+$", "")
+    local short = ""
+    for ch in name:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        if #short + #ch > 120 then break end
+        short = short .. ch
+    end
+    return Store.download_dir() .. "/Highlights", short .. ".md"
+end
+
+function app.export_notes(only_if_missing)
+    if not book then return end
+    local dir, name = app.notes_path(book)
+    local file = dir .. "/" .. name
+    local hls, bms = Store.get_highlights(book.path), Store.get_bookmarks(book.path)
+    if #hls + #bms == 0 then os.remove(file) return end
+    if only_if_missing then
+        local f = io.open(file, "rb")
+        if f then f:close() return end
+    end
+    local all = {}
+    for _, h in ipairs(hls) do all[#all + 1] = { ch = h.ch, off = h.s, pct = h.pct, title = h.title, text = h.text, hl = true } end
+    for _, b in ipairs(bms) do all[#all + 1] = { ch = b.ch, off = b.off, pct = b.pct, title = b.title, text = b.snippet } end
+    table.sort(all, function(x, y) return x.ch < y.ch or (x.ch == y.ch and x.off < y.off) end)
+    local function n(k, one) return k .. " " .. one .. (k == 1 and "" or "s") end
+    local out = { "# " .. book.title, "" }
+    if (book.author or "") ~= "" then out[#out + 1] = "*" .. book.author .. "*"; out[#out + 1] = "" end
+    out[#out + 1] = n(#hls, "highlight") .. " and " .. n(#bms, "bookmark") .. ", in reading order, from eReaderDS. "
+        .. "This file is written again whenever they change, so anything added to it here is replaced."
+    local chapter
+    for _, e in ipairs(all) do
+        local t = (e.title or "") ~= "" and e.title or book.title
+        if t ~= chapter then
+            out[#out + 1] = ""
+            out[#out + 1] = "## " .. t
+            out[#out + 1] = ""
+            chapter = t
+        end
+        local pct = math.floor((e.pct or 0) * 100 + 0.5) .. "%"
+        if e.hl then
+            out[#out + 1] = "- “" .. (e.text or "") .. "” (" .. pct .. ")"
+        else
+            out[#out + 1] = "- Bookmark (" .. pct .. "): " .. ((e.text or "") ~= "" and (e.text .. "…") or "")
+        end
+    end
+    os.execute('mkdir -p "' .. dir .. '"')
+    local f = io.open(file .. ".tmp", "wb")
+    if not f then return end
+    local ok = f:write(table.concat(out, "\n") .. "\n")
+    f:close()
+    if ok then os.remove(file); os.rename(file .. ".tmp", file) else os.remove(file .. ".tmp") end
 end
 
 -- Library order, chosen with left/right in the library.
@@ -1046,7 +1108,8 @@ end
 
 -- The books in a folder and the folders inside it (a Calibre library is
 -- Author/Title (id)/book.epub; people arrange their own in folders too), but
--- not hidden folders or the fonts and dictionaries folders: { path, size }.
+-- not hidden folders or the fonts, dictionaries and highlights folders:
+-- { path, size }.
 function app.find_books(dir)
     local function run(cmd)
         local out = {}
@@ -1058,7 +1121,7 @@ function app.find_books(dir)
             local rel = path:sub(#dir + 2)
             local top = (rel:match("^([^/]+)/") or ""):lower()
             if path:sub(1, #dir + 1) == dir .. "/" and not rel:match("^%.") and not rel:find("/%.")
-                    and top ~= "fonts" and top ~= "dictionaries" then
+                    and top ~= "fonts" and top ~= "dictionaries" and top ~= "highlights" then
                 out[#out + 1] = { path = path, size = tonumber(size) }
             end
         end
@@ -3241,6 +3304,13 @@ end
 -- selected entry in full (a highlight's whole passage, a bookmark's words).
 function app.bm_draw_left(entries, x, w)
     local th = theme()
+    if #entries > 1 then
+        local folder, where = Store.books_folder()
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("Also saved in " .. folder .. "/Highlights" .. (where and (" " .. where) or "")
+            .. ", to read on a computer.", x, PAGE_H - 70 - ui.small:getHeight(), w, "left")
+    end
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print("Bookmarks and Highlights", x, 60)
@@ -3298,6 +3368,7 @@ function app.bm_delete(e, n)
         if it ~= e.item then list[#list + 1] = it end
     end
     if e.hl then Store.set_highlights(book.path, list) else Store.set_bookmarks(book.path, list) end
+    app.export_notes()
     bm.sel = math.max(1, math.min(bm.sel, n - 1))
     app.toast(e.hl and "Highlight deleted" or "Bookmark deleted")
 end

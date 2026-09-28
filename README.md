@@ -236,6 +236,11 @@ put when you change the font or text size, and are listed with your bookmarks
 in **Settings → Bookmarks and Highlights** (A goes there; Y deletes one after you
 confirm).
 
+Your highlights and bookmarks are also saved as a file for each book, to read
+or copy on a computer (like a Kindle's "My Clippings"):
+`Ebook/Highlights/Title - Author.md`, in reading order under each chapter.
+It's written again whenever they change, so add your own notes elsewhere.
+
 ## Dictionaries
 
 While reading, press **Y**: a cursor appears on a word. Left/right move it

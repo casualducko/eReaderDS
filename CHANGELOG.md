@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Highlights and bookmarks as a file** (like a Kindle's "My Clippings"):
+  `Ebook/Highlights/<Title - Author>.md`, one per book, in reading order under
+  each chapter heading (a highlight as "“words” (16%)", a bookmark as
+  "Bookmark (16%): first words…"). Written again whenever they change
+  (`app.export_notes`), removed when a book has none, and written on opening
+  a book that has some but no file yet (highlights made before this). My
+  Books skips the Highlights folder. The Bookmarks and Highlights page says
+  where it is.
+
 ## v1.6.0
 
 - **Finished books:** reaching the last page marks a book finished (once;
