@@ -26,7 +26,8 @@ your firmware.
 1. Put the SD card in your computer. From the unzipped `Ports` folder, copy
    **`eReaderDS.sh`** and the **`eReaderDS`** folder into the `Ports` folder on
    the card, and `Imgs/eReaderDS.png` (the menu icon) into `Ports/Imgs`.
-2. Put `.epub` or `.txt` books in the card's `Ebook` folder.
+2. Put `.epub` or `.txt` books in the card's `Ebook` folder. Folders inside it
+   are fine: you can copy a whole Calibre library, or keep your own folders.
 3. On the device, open **Ports → eReaderDS**.
 
 ### ROCKNIX
@@ -144,7 +145,10 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   plus Calibre or any OPDS catalog ([below](#getting-books-over-wi-fi)); or
   send your own books from a phone or computer's web browser
   ([below](#sending-books-from-a-phone-or-computer)).
-- **My Books** (the library): covers and progress, sorted by recent, title, author or
+- **My Books** (the library): every book in the `Ebook` folder and the folders
+  inside it (a copied Calibre library works as it is), listed by the title and
+  author inside each book (not the file name); covers and progress, sorted by
+  recent, title, author (by last name) or
   progress; delete books from it.
 - **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in Book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
@@ -272,7 +276,7 @@ name) only shows one weight.
 | Not in the Ports menu | `eReaderDS.sh` and the `eReaderDS` folder must be directly inside `Ports` (ROCKNIX: `roms/ports`, then **Start → Game settings → Update gamelists**). |
 | ROCKNIX: can't find `roms` on the SD card | It's on the card's Linux part, which Mac and Windows can't open. Copy over Wi-Fi instead ([ROCKNIX](#rocknix)); never let the computer format the card. |
 | Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems). |
-| "No books found" | Put `.epub` or `.txt` files in the `Ebook` folder at the top of the card. |
+| "No books found" | Put `.epub` or `.txt` files in the `Ebook` folder at the top of the card (or in folders inside it). |
 | A book won't open or looks wrong | Unusual EPUBs may not display well; DRM-protected books, PDF and MOBI aren't supported. |
 | Get Books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
 | Pages upside down | Turn the device the other way, with the buttons on your right. |

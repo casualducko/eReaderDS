@@ -489,6 +489,41 @@ local function open_txt(path)
     return book
 end
 
+-- Title, author and the author's sort name ("Suarez, Daniel") from an EPUB's
+-- package file, without opening the rest of the book: for the library list.
+-- nil if it can't be read.
+function M.meta(path)
+    local z = Zip.open(path)
+    if not z then return nil end
+    local ok, res = pcall(function()
+        local container = z:read("META-INF/container.xml")
+        local opf_path = container and container:match('full%-path%s*=%s*"([^"]+)"')
+        local opf = opf_path and z:read(opf_path)
+        if not opf then return nil end
+        local function text(v)
+            return v and (decode(v:gsub("<[^>]+>", "")):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")) or nil
+        end
+        local t = { title = text(opf:match("<dc:title[^>]*>(.-)</dc:title>")) }
+        -- The first author, and how it sorts: an EPUB 2 attribute, or an
+        -- EPUB 3 <meta refines="#id" property="file-as">.
+        local tag, name = opf:match("(<dc:creator[^>]*>)(.-)</dc:creator>")
+        if tag then
+            t.author = text(name)
+            t.sort = attr(tag, "opf:file-as") or attr(tag, "file-as")
+            local id = attr(tag, "id")
+            if not t.sort and id then
+                for m, v in opf:gmatch("(<meta[^>]*>)(.-)</meta>") do
+                    if attr(m, "refines") == "#" .. id and attr(m, "property") == "file-as" then t.sort = text(v) end
+                end
+            end
+        end
+        if t.title == "" then t.title = nil end
+        return t
+    end)
+    z:close()
+    return ok and res or nil
+end
+
 function M.open(path)
     local ext = (path:match("%.([^.]+)$") or ""):lower()
     if ext == "txt" then return open_txt(path) end

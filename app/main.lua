@@ -945,7 +945,9 @@ local SORT_NAMES = { recent = "Recent", title = "Title", author = "Author", prog
 
 -- "The Hobbit" sorts under H; authors sort by last name.
 local function title_key(t) return (t:lower():gsub("^the%s+", ""):gsub("^an?%s+", "")) end
-local function author_key(a)
+local function author_key(a, sort)
+    -- The book's own sort name when it has one ("Suarez, Daniel").
+    if sort and sort ~= "" then return sort:lower() end
     a = (a or ""):lower():match("^[^,&]+") or ""
     a = a:gsub("%s+$", "")
     return a:match("(%S+)$") or ""
@@ -959,7 +961,7 @@ function library.sort(items)
         if mode == "recent" then
             k.t = Store.get_opened(it.path) or 0
         elseif mode == "author" then
-            k.a = author_key(it.author)
+            k.a = author_key(it.author, it.sort)
         elseif mode == "progress" then
             -- Books you're reading (most read first), then unread, then finished.
             local pr = Store.get_progress(it.path)
@@ -1015,30 +1017,70 @@ function shop.online(fresh)
     return v
 end
 
+-- The books in a folder and the folders inside it (a Calibre library is
+-- Author/Title (id)/book.epub; people arrange their own in folders too), but
+-- not hidden folders or the fonts and dictionaries folders: { path, size }.
+function app.find_books(dir)
+    local function run(cmd)
+        local out = {}
+        local p = io.popen(cmd)
+        if not p then return out end
+        for line in p:lines() do
+            local size, path = line:match("^(%d+)|(/.+)$")
+            path = path or line
+            local rel = path:sub(#dir + 2)
+            local top = (rel:match("^([^/]+)/") or ""):lower()
+            if path:sub(1, #dir + 1) == dir .. "/" and not rel:match("^%.") and not rel:find("/%.")
+                    and top ~= "fonts" and top ~= "dictionaries" then
+                out[#out + 1] = { path = path, size = tonumber(size) }
+            end
+        end
+        p:close()
+        return out
+    end
+    local match = '-maxdepth 6 -type f \\( -iname "*.epub" -o -iname "*.txt" -o -iname "*.part" \\)'
+    local found = run('find "' .. dir .. '" ' .. match .. ' -exec stat -c "%s|%n" {} + 2>/dev/null')
+    -- No stat that way (not the device's busybox): without the sizes.
+    if #found == 0 then found = run('find "' .. dir .. '" ' .. match .. ' 2>/dev/null') end
+    return found
+end
+
 local function scan_library()
     local items = {}
     local seen = {}
+    local pending = {}
     for _, dir in ipairs(Store.book_dirs()) do
-        local p = io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
-        if p then
-            for name in p:lines() do
-                local ext = (name:match("%.([^.]+)$") or ""):lower()
+        for _, f in ipairs(app.find_books(dir)) do
+            local path = f.path
+            local name = path:match("([^/]+)$")
+            local ext = (name:match("%.([^.]+)$") or ""):lower()
+            if ext == "part" then
                 -- Left over from a download that was cut off.
-                if ext == "part" and not shop.dl and not app.recv then os.remove(dir .. "/" .. name) end
-                if (ext == "epub" or ext == "txt") and not name:match("^%._") then
-                    local path = dir .. "/" .. name
-                    if not seen[path] then
-                        seen[path] = true
-                        local base = name:gsub("%.[^.]+$", "")
-                        local title, author = base:match("^(.-)%s+%-%s+(.+)$")
-                        items[#items + 1] = { path = path, title = title or base, author = author or "" }
+                if not shop.dl and not app.recv then os.remove(path) end
+            elseif not seen[path] then
+                seen[path] = true
+                -- The file name ("Title - Author.epub") until the book's own
+                -- title and author are known (read in the background).
+                local base = name:gsub("%.[^.]+$", "")
+                local title, author = base:match("^(.-)%s+%-%s+(.+)$")
+                local it = { path = path, title = title or base, author = author or "" }
+                if ext == "epub" then
+                    local m = Store.get_meta(path, f.size)
+                    if not m then
+                        it.size = f.size
+                        pending[#pending + 1] = it
+                    elseif m.title then
+                        it.title, it.author, it.sort = m.title, m.author or "", m.sort
                     end
                 end
+                items[#items + 1] = it
             end
-            p:close()
         end
     end
     library.sort(items)
+    library.pending = #pending > 0 and pending or nil
+    library.seen = seen
+    if not library.pending then Store.save_meta(seen) end
     -- Online catalogs from opds.txt, for "Get Books" (Select, or the button
     -- on the right page).
     local ok, catalogs, opts = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
@@ -1049,6 +1091,28 @@ local function scan_library()
     library.catalogs = catalogs
     library.items = items
     library.sel = math.max(1, math.min(library.sel, #items))
+end
+
+-- Titles and authors from books not read yet, a few between frames; then
+-- the list is sorted again (keeping the selected book) and the list saved.
+function app.library_meta_step()
+    local q = library.pending
+    if not q then return end
+    local t0 = love.timer.getTime()
+    while #q > 0 and love.timer.getTime() - t0 < 0.03 do
+        local it = table.remove(q)
+        local m = Book.meta(it.path) or {}
+        Store.set_meta(it.path, it.size, m)
+        if m.title then it.title, it.author, it.sort = m.title, m.author or "", m.sort end
+    end
+    if #q == 0 then
+        library.pending = nil
+        local cur = library.items[library.sel]
+        library.sort(library.items)
+        for i, it in ipairs(library.items) do if it == cur then library.sel = i end end
+        Store.save_meta(library.seen)
+    end
+    redraw()
 end
 
 -- Change the order, keeping the same book selected.
@@ -2174,7 +2238,7 @@ local function draw_library(side)
         color(th.dim)
         local folder, where = Store.books_folder()
         love.graphics.printf("Copy .epub or .txt files into the " .. folder .. " folder"
-            .. (where and (" " .. where) or "") .. ", or tap Get Books to download some or send them from a phone or computer.", x, 180, w, "left")
+            .. (where and (" " .. where) or "") .. " (folders inside it are fine), or tap Get Books to download some or send them from a phone or computer.", x, 180, w, "left")
         love.graphics.setFont(ui.small)
         app.hints(x, nil, { "Anbernic button", "quit" })
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
@@ -6431,6 +6495,7 @@ local function run_test_script()
             elseif a == "recvpoll" then app.recv_poll()
             elseif a == "work" then                -- finish a background task
                 while app.task do app.task_step() end
+                while library.pending do app.library_meta_step() end
             elseif a == "net" then               -- wait for network jobs (and the cover)
                 for _ = 1, 2 do
                     local t = love.timer.getTime()
@@ -6529,6 +6594,7 @@ function love.run()
         if shop.net_poll() then got = true end
         if app.recv and app.recv_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
+        if library.pending and not lid.closed then app.library_meta_step(); got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then
             if os.getenv("READER_DEBUG") then print(string.format("[debug] message closed at %.2f", love.timer.getTime())) end
             overlay = nil; redraw()
@@ -6549,7 +6615,7 @@ function love.run()
             app.night_check()                  -- the night theme's hours
             if S.sb_show and S.sb_clock ~= "off" and (app.mode == "reader" or app.mode == "menu") then redraw() end
         end
-        if app.anim or app.task then
+        if app.anim or app.task or library.pending then
             love.timer.sleep(0.001)            -- animating or working: next frame
         elseif Touch.enabled or overlay or net.count > 0 or app.recv then
             -- Touch events don't wake love.event.wait(), so poll at a gentle rate.

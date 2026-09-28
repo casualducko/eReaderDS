@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Books in folders, and their real titles** (from a tester coming from
+  Calibre and CrossPoint): My Books finds books in folders inside `Ebook`
+  (6 levels; `find … -exec stat`), so a copied Calibre library
+  (`Author/Title (id)/book.epub`) or your own folders work; hidden folders,
+  `Fonts` and `Dictionaries` are skipped. The list shows each EPUB's own title
+  and author (`Book.meta`: dc:title, the first dc:creator and its file-as,
+  EPUB 2 or 3), not the file name, and sorting by author uses that sort name
+  ("Follett, Ken"). They're read in the background a few books per frame
+  (the file name shows until then), then the list is sorted again and saved
+  in `.ereaderds/library.txt` (path, size, title, author, sort name), so later
+  starts don't open the books. TXT files still use "Title - Author".
 - **A tidier, more consistent UI** (every screen checked on the device):
   - Button hints look the same everywhere (`app.hints`): the button in the text
     colour, what it does dimmed, with even spacing; "3 / 12" counts the same

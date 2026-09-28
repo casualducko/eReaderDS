@@ -326,6 +326,49 @@ function M.set_opened(p)
     write_opened()
 end
 
+-- library.txt: the title and author inside each EPUB, read once for the
+-- library list: path \t size \t title \t author \t author's sort name. An
+-- entry is used while the file keeps its size; one with no title is a book
+-- that couldn't be read (its file name is used).
+local meta
+local function load_meta()
+    if meta then return meta end
+    meta = {}
+    local f = io.open(path("library.txt"), "rb")
+    if f then
+        for line in f:lines() do
+            local p, size, t, a, so = line:match("^(.-)\t(%-?%d+)\t(.-)\t(.-)\t(.-)$")
+            if p then
+                meta[p] = { size = tonumber(size), title = t ~= "" and t or nil, author = a, sort = so ~= "" and so or nil }
+            end
+        end
+        f:close()
+    end
+    return meta
+end
+
+function M.get_meta(p, size)
+    local m = load_meta()[p]
+    if m and (not size or m.size == size) then return m end
+end
+
+function M.set_meta(p, size, m)
+    load_meta()[p] = { size = size or -1, title = m.title, author = m.author or "", sort = m.sort }
+end
+
+-- Written after a scan, keeping only the books still there (keep: path -> true).
+function M.save_meta(keep)
+    local out = {}
+    local function clean(v) return ((v or ""):gsub("[\t\r\n]", " ")) end
+    for p, m in pairs(load_meta()) do
+        if not keep or keep[p] then
+            out[#out + 1] = table.concat({ p, tostring(m.size or -1), clean(m.title), clean(m.author), clean(m.sort) }, "\t")
+        end
+    end
+    table.sort(out)
+    write_atomic(path("library.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
+end
+
 -- Forget a deleted book: its progress, bookmarks and "last opened".
 function M.forget(p)
     load_progress()[p] = nil
