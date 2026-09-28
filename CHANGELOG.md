@@ -16,6 +16,9 @@
 - On the Night theme page the touchscreen shows the menu in the chosen
   night theme (E-ink filter included), so ‹ › previews each one; the top
   screen keeps the current theme.
+- Keyboard: Cancel, Space, Delete and Search share one bottom row (2/4/2/2
+  columns, lined up with the keys above) instead of two staggered rows;
+  Search is filled as the main action, and the keys are a little taller.
 
 ## v0.3.25
 

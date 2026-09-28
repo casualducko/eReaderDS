@@ -2701,9 +2701,10 @@ for _, row in ipairs({ "1234567890", "qwertyuiop", "asdfghjkl'", "zxcvbnm,.-" })
     for ch in row:gmatch(".") do keys[#keys + 1] = { key = ch, label = ch, span = 1 } end
     app.KB_ROWS[#app.KB_ROWS + 1] = keys
 end
-app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "space", label = "Space", span = 6 }, { key = "del", label = "Delete", span = 4 } }
-app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "cancel", label = "Cancel", span = 4 }, { key = "ok", label = "Search", span = 6 } }
-app.KB_TOP, app.KB_ROW_H = 300, 104          -- keys area on the right page
+-- One bottom row, its keys lined up with the columns above.
+app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "cancel", label = "Cancel", span = 2 }, { key = "space", label = "Space", span = 4 },
+    { key = "del", label = "Delete", span = 2 }, { key = "ok", label = "Search", span = 2 } }
+app.KB_TOP, app.KB_ROW_H = 300, 112          -- keys area on the right page
 app.KB_MAX = 60                              -- characters
 
 -- Open the keyboard. opts: title, hint, text, submit(text), cancel().
@@ -2853,6 +2854,8 @@ function app.kb_draw(side)
                 love.graphics.rectangle("fill", kx, ky, kw, kh, 10, 10)
                 color(th.bg)
             else
+                -- Search, the main action, filled; the rest outlined.
+                if k.key == "ok" then color(th.sel); love.graphics.rectangle("fill", kx, ky, kw, kh, 10, 10) end
                 color(th.dim, 0.45)
                 love.graphics.rectangle("line", kx, ky, kw, kh, 10, 10)
                 color(th.fg)
