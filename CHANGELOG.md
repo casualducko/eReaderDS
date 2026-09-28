@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Jump to %** is tidier: no "you are here" label (the marker stays) and no
+  "Drag the bar" hint.
 - The **library** list is on the touchscreen too, with Get books still at the
   bottom: tap a book to see its cover on the top screen, tap it again to
   open it.

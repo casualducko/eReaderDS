@@ -2413,8 +2413,6 @@ local function draw_jump_panel()
     love.graphics.printf("100%", bx, by + 34, bw + 12, "right")
     local hx = bx + bw * jp.here / 100
     love.graphics.polygon("fill", hx, by - 18, hx - 9, by - 32, hx + 9, by - 32)
-    local lx = math.max(bx - 12, math.min(bx + bw + 12 - 200, hx - 100))   -- keep the label on the page
-    love.graphics.printf("you are here", lx, by - 62, 200, "center")
     color(th.fg)
     love.graphics.circle("fill", bx + bw * jp.pct / 100, by, 16)
     color(th.bg)
@@ -2422,7 +2420,7 @@ local function draw_jump_panel()
 
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.printf("Left/Right  1%      Up/Down  10%      Drag the bar",
+    love.graphics.printf("Left/Right  1%      Up/Down  10%",
         x, by + 110, w, "center")
     love.graphics.printf("A jump    B cancel", x, PAGE_H - 70, w, "left")
 end
