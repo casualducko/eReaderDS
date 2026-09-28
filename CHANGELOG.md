@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.3.0
 
 - **Send books from a phone or computer:** Get books → **Send from your phone
   or computer** starts a small web server (`receiver.lua`, on its own thread,
