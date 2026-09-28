@@ -2789,17 +2789,21 @@ local function draw_bookmarks(side)
     local row_h = 96
     local rows = list_rows(row_h)
     local entries = bookmark_entries()
-    -- two columns: left page then right page
+    -- The list is on the touchscreen (swipe to scroll, tap to see one, again
+    -- to go there); the selected one is shown in full on the other page.
     if not bm.top then bm.top = 1 end
     if bm.sel < bm.top then bm.top = bm.sel end
-    if bm.sel >= bm.top + rows * 2 then bm.top = bm.sel - rows * 2 + 1 end
-    local first = side == "left" and bm.top or bm.top + rows
-    if side == "left" then
-        love.graphics.setFont(ui.title)
-        color(th.fg)
-        love.graphics.print("Bookmarks and highlights", x, 60)
+    if bm.sel >= bm.top + rows then bm.top = bm.sel - rows + 1 end
+    if side == "left" then app.bm_draw_left(entries, x, w) return end
+    local nb, nh = 0, 0
+    for _, e in ipairs(entries) do
+        if e.hl then nh = nh + 1 elseif not e.action then nb = nb + 1 end
     end
-    draw_list(side, entries, bm.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw, selected)
+    love.graphics.setFont(ui.font)
+    color(th.dim)
+    love.graphics.printf(nb .. (nb == 1 and " bookmark" or " bookmarks") .. "  ·  " .. nh
+        .. (nh == 1 and " highlight" or " highlights"), x, 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
+    draw_list(side, entries, bm.sel, bm.top, rows, x, 160, w, row_h, function(it, _, rx, ry, rw, selected)
         if it.action then
             -- The page you're on (the one this bookmarks), like the rows below:
             -- where it is, and its first words.
@@ -2848,15 +2852,109 @@ local function draw_bookmarks(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    if side == "left" and #entries == 1 then
+    if #entries == 1 then
         love.graphics.printf("No bookmarks or highlights yet. While reading, press Select or tap the "
             .. "top-right corner of the page to bookmark it. To highlight, press Y, then Select at "
             .. "the first word and again at the last.", x, 160 + row_h + 20, w, "left")
     end
-    if side == "right" then
-        love.graphics.print("A open    Y delete    B back", x, PAGE_H - 70)
-        if bm.confirm then app.bm_confirm_draw(x, w) end
+    love.graphics.print("A open    Y delete    B back", x, PAGE_H - 70)
+    if #entries > 1 then love.graphics.printf(bm.sel .. " / " .. #entries, x, PAGE_H - 70, w, "right") end
+    if bm.confirm then app.bm_confirm_draw(x, w) end
+end
+
+-- The mark on Bookmarks and highlights: an open book with a ribbon, drawn in
+-- the theme's colours. (cx, cy) is the middle of the spine; s the scale.
+function app.draw_book_art(cx, cy, s)
+    local th = theme()
+    local function curve(...)
+        local pts = {}
+        local c = love.math.newBezierCurve(...)
+        for _, v in ipairs(c:render(4)) do pts[#pts + 1] = v end
+        return pts
     end
+    love.graphics.setLineWidth(3 * s)
+    love.graphics.setLineJoin("bevel")
+    for _, d in ipairs({ -1, 1 }) do
+        -- A page: its top and bottom edges bow away from the spine.
+        local top = curve(cx, cy - 46 * s, cx + d * 50 * s, cy - 72 * s, cx + d * 118 * s, cy - 60 * s)
+        local bottom = curve(cx + d * 118 * s, cy + 58 * s, cx + d * 50 * s, cy + 46 * s, cx, cy + 70 * s)
+        local shape = {}
+        for _, v in ipairs(top) do shape[#shape + 1] = v end
+        for _, v in ipairs(bottom) do shape[#shape + 1] = v end
+        local ok, tris = pcall(love.math.triangulate, shape)
+        color(th.sel)
+        if ok then for _, t in ipairs(tris) do love.graphics.polygon("fill", t) end end
+        color(th.dim)
+        love.graphics.polygon("line", shape)
+        -- Lines of text.
+        color(th.dim, 0.45)
+        for k = 0, 4 do
+            local ly = cy - 30 * s + k * 18 * s
+            love.graphics.line(cx + d * 20 * s, ly, cx + d * (k == 4 and 70 or 98) * s, ly - d * d * 3 * s)
+        end
+    end
+    -- The ribbon, hanging from the top of the right page.
+    local rx, rw = cx + 64 * s, 22 * s
+    color(th.fg, 0.85)
+    love.graphics.polygon("fill", rx, cy - 64 * s, rx + rw, cy - 66 * s, rx + rw, cy + 104 * s,
+        rx + rw / 2, cy + 90 * s, rx, cy + 104 * s)
+end
+
+-- The left page of Bookmarks and highlights: the title, the mark, and the
+-- selected entry in full (a highlight's whole passage, a bookmark's words).
+function app.bm_draw_left(entries, x, w)
+    local th = theme()
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print("Bookmarks and highlights", x, 60)
+    app.draw_book_art(x + w / 2, 250, 0.9)
+    local e = entries[bm.sel]
+    if not e then return end
+    local y, hint = 400, nil
+    local label, title, pct, body
+    if e.action then
+        local sec = current_section()
+        label = bookmark_here() and "THIS PAGE  ·  BOOKMARKED" or "THIS PAGE"
+        title = sec and book.toc[sec].title or book.title or ""
+        pct = book:fraction(pos.ch, pos.off)
+        body = page_snippet()
+        hint = bookmark_here() and "A  remove its bookmark" or "A  bookmark it"
+    else
+        local it = e.item
+        label = e.hl and "HIGHLIGHT" or "BOOKMARK"
+        title = it.title ~= "" and it.title or book.title
+        pct = it.pct
+        body = (e.hl and it.text or it.snippet) or ""
+        hint = "A  go there      Y  delete"
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print(label .. "  ·  " .. math.floor(pct * 100 + 0.5) .. "%", x, y)
+    y = y + ui.small:getHeight() + 8
+    love.graphics.setFont(ui.bold)
+    color(th.fg)
+    love.graphics.print(fit_text(ui.bold, title, w), x, y)
+    y = y + ui.bold:getHeight() + 14
+    -- The words: a highlight marked as on the page, as many lines as fit.
+    love.graphics.setFont(ui.font)
+    local text = e.hl and ("“" .. (body or "") .. "”") or ((body or "") .. (body ~= "" and "…" or ""))
+    local _, lines = ui.font:getWrap(text, w - 8)
+    local lh = ui.font:getHeight()
+    local max = math.max(1, math.floor((PAGE_H - 130 - y) / lh))
+    for k = 1, math.min(#lines, max) do
+        local line = lines[k]
+        if k == max and #lines > max then line = fit_text(ui.font, line .. " …", w - 8) end
+        if e.hl then
+            color(th.sel)
+            love.graphics.rectangle("fill", x - 3, y + 2, ui.font:getWidth(line) + 6, lh - 4, 4, 4)
+        end
+        color(th.fg)
+        love.graphics.print(line, x, y)
+        y = y + lh
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print(hint, x, PAGE_H - 70)
 end
 
 -- Deleting from the list: a card on the touchscreen asks first.
@@ -4794,7 +4892,7 @@ function app.scroll_list()
         l = shop.page()
         n, shown = l and #l.entries or 0, list_rows(96)
     elseif m == "toc" and book then l, n, row_h = toc, #book.toc, 58; shown = list_rows(58) * 2
-    elseif m == "bookmarks" and book then l, n, shown = bm, #bookmark_entries(), list_rows(96) * 2
+    elseif m == "bookmarks" and book then l, n, shown = bm, #bookmark_entries(), list_rows(96)
     elseif m == "find" and app.find then l, n, shown = app.find, #app.find.results, list_rows(96) * 2
     elseif m == "fonts" and app.font_pick then
         l, n, shown, row_h = app.font_pick, #app.font_pick.list, app.font_rows(), app.FONT_ROW_H
@@ -5404,12 +5502,18 @@ function app.on_tap(side, u, v)
         end
         bm.confirm = nil
         redraw()
-    elseif mode == "toc" or mode == "bookmarks" then
+    elseif mode == "bookmarks" then
+        -- The list: tap one to see it on the other screen, again to go there.
+        local rows = list_rows(96)
+        local idx = (bm.top or 1) + math.floor((v - 160) / 96)
+        if side == "right" and v >= 160 and idx < (bm.top or 1) + rows and idx <= #bookmark_entries() then
+            if idx == bm.sel then action("confirm") else bm.sel = idx; redraw() end
+        end
+    elseif mode == "toc" then
         -- A tap on a row (the bottom screen shows the list's second column)
         -- opens it, like A. Anywhere else does nothing: closing on a tap
         -- looked like the chapter had been chosen.
         local st, row_h, n = toc, 58, book and #book.toc or 0
-        if mode == "bookmarks" then st, row_h, n = bm, 96, #bookmark_entries() end
         local rows = list_rows(row_h)
         local first = (st.top or 1) + rows
         local idx = first + math.floor((v - 160) / row_h)
