@@ -940,7 +940,7 @@ local function toggle_bookmark()
 end
 
 local function open_bookmarks(from)
-    bm.sel, bm.top, bm.from = 1, nil, from
+    bm.sel, bm.top, bm.from, bm.confirm = 1, nil, from, nil
     app.mode = "bookmarks"
     redraw()
 end
@@ -2809,6 +2809,52 @@ local function draw_bookmarks(side)
     end
     if side == "right" then
         love.graphics.print("A open    Y delete    B back", x, PAGE_H - 70)
+        if bm.confirm then app.bm_confirm_draw(x, w) end
+    end
+end
+
+-- Deleting from the list: a card on the touchscreen asks first.
+function app.bm_delete(e, n)
+    local list = {}
+    for _, it in ipairs(e.hl and Store.get_highlights(book.path) or Store.get_bookmarks(book.path)) do
+        if it ~= e.item then list[#list + 1] = it end
+    end
+    if e.hl then Store.set_highlights(book.path, list) else Store.set_bookmarks(book.path, list) end
+    bm.sel = math.max(1, math.min(bm.sel, n - 1))
+    app.toast(e.hl and "Highlight deleted" or "Bookmark deleted")
+end
+
+-- The card's two buttons: x, y, w, h on the right page.
+function app.bm_button(which)
+    local m = MARGINS[2]
+    local w = PAGE_W - m.outer - m.inner
+    local bw, bh = math.floor((w - 24) / 2), 70
+    local y = PAGE_H - 240
+    return m.inner + (which == "delete" and 0 or bw + 24), y, bw, bh
+end
+
+function app.bm_confirm_draw(x, w)
+    local th = theme()
+    local e = bm.confirm
+    local top = PAGE_H - 440
+    color(th.bg)
+    love.graphics.rectangle("fill", x - 30, top - 20, w + 60, PAGE_H - top, 16, 16)
+    color(th.sel)
+    love.graphics.rectangle("fill", x - 14, top, w + 28, 320, 14, 14)
+    love.graphics.setFont(ui.font)
+    color(th.fg)
+    love.graphics.printf(e.hl and "Delete this highlight?" or "Delete this bookmark?", x, top + 26, w, "center")
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local what = e.hl and ("“" .. e.item.text .. "”") or (e.item.title ~= "" and e.item.title or book.title)
+    love.graphics.printf(fit_text(ui.small, what, w - 40), x + 20, top + 80, w - 40, "center")
+    for _, which in ipairs({ "delete", "keep" }) do
+        local bx, by, bw, bh = app.bm_button(which)
+        if which == "delete" then color(th.fg) else color(th.bg) end
+        love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+        love.graphics.setFont(ui.font)
+        if which == "delete" then color(th.bg) else color(th.fg) end
+        love.graphics.printf(which == "delete" and "Delete  (A)" or "Keep  (B)", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
     end
 end
 
@@ -4638,6 +4684,13 @@ function handle_action(a)
         local entries = bookmark_entries()
         local n = #entries
         local rows = list_rows(96)
+        if bm.confirm then
+            -- "Delete this …?": A deletes, anything else keeps it.
+            if a == "confirm" then app.bm_delete(bm.confirm, n) end
+            bm.confirm = nil
+            redraw()
+            return
+        end
         if a == "up" then bm.sel = math.max(1, bm.sel - 1)
         elseif a == "down" then bm.sel = math.min(n, bm.sel + 1)
         elseif a == "left" or a == "prev" then bm.sel = math.max(1, bm.sel - rows)
@@ -4649,15 +4702,8 @@ function handle_action(a)
             else
                 app.jump_to(e.ch, e.off); app.mode = "reader"
             end
-        elseif a == "toc" and bm.sel > 1 then              -- Y deletes
-            local e = entries[bm.sel]
-            local list = {}
-            for _, x in ipairs(e.hl and Store.get_highlights(book.path) or Store.get_bookmarks(book.path)) do
-                if x ~= e.item then list[#list + 1] = x end
-            end
-            if e.hl then Store.set_highlights(book.path, list) else Store.set_bookmarks(book.path, list) end
-            bm.sel = math.min(bm.sel, n - 1)
-            if app.toast then app.toast(e.hl and "Highlight deleted" or "Bookmark deleted") end
+        elseif a == "toc" and bm.sel > 1 then              -- Y: delete, once confirmed
+            bm.confirm = entries[bm.sel]
         elseif a == "back" or a == "menu" then
             app.mode = bm.from == "menu" and "menu" or "reader"
         end
@@ -4877,6 +4923,14 @@ function app.on_tap(side, u, v)
             f.sel = idx
             action("confirm")
         end
+    elseif mode == "bookmarks" and bm.confirm then
+        -- The "Delete this …?" card: Delete deletes; anywhere else keeps it.
+        local dx, dy, dw, dh = app.bm_button("delete")
+        if side == "right" and u >= dx - 12 and u <= dx + dw + 12 and v >= dy - 12 and v <= dy + dh + 12 then
+            app.bm_delete(bm.confirm, #bookmark_entries())
+        end
+        bm.confirm = nil
+        redraw()
     elseif mode == "toc" or mode == "bookmarks" then
         -- A tap on a row (the bottom screen shows the list's second column)
         -- opens it, like A. Anywhere else does nothing: closing on a tap

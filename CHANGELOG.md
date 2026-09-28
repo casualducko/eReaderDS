@@ -6,6 +6,10 @@
   52/52, Wide 77/77; were 36/28, 60/44, 90/64). The screens are apart, so a
   book-style narrow gutter pushed the left page's text toward the hinge. The
   totals are the same, so line lengths and page breaks don't change.
+- Deleting from **Bookmarks and highlights** asks first: Y opens a card on the
+  touchscreen ("Delete this highlight?" with its words, or the bookmark's
+  chapter) with **Delete (A)** and **Keep (B)** buttons; tapping Delete
+  deletes, a tap anywhere else or B keeps it.
 - Test hooks: an `untoast` script action clears a message (for screenshots);
   with READER_DEBUG the log notes when a message opens and closes.
 
