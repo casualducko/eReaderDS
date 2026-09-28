@@ -2,6 +2,12 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.5.0
+My Books finds books in folders inside the Ebook folder, so you can copy a whole Calibre library or keep your own folders.
+Books are listed by the title and author inside each book, not the file name, and sorting by author uses last names.
+Every screen is tidier: button hints look the same everywhere and sit on the touchscreen, and deleting anything asks the same way.
+My Books has its Get Books button beside the title, and shows more books at once.
+
 v1.4.0
 Lists scroll with a finger: slide up or down on My Books, Get books, Table of Contents, Bookmarks and Highlights, Find in book and Fonts. On the book page, sliding still changes the brightness.
 Table of Contents, Bookmarks and Highlights, and Find in book are now one list on the touchscreen. Tap an entry to see it in full on the top screen, and tap it again to go there.

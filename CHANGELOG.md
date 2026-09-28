@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.5.0
 
 - **Books in folders, and their real titles** (from a tester coming from
   Calibre and CrossPoint): My Books finds books in folders inside `Ebook`
