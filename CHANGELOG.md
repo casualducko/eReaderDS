@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The E-ink theme's filter (grain texture and shader) is made the first
+  time that theme is shown, so other themes don't prepare it at startup.
+
 ## v0.3.22
 
 - An opening screen ("eReaderDS / Opening…", in your theme) appears as

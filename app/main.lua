@@ -3783,7 +3783,32 @@ local function page_shadow(side, edge, dir, alpha)
     love.graphics.pop()
 end
 
+-- The E-ink theme's filter: a fixed white-noise texture (the same grain every
+-- run, like a real panel's) and the shader. Made the first time it's needed,
+-- so other themes don't wait for it at startup.
+function app.eink_setup()
+    app.eink_tried = true
+    local rng = love.math.newRandomGenerator(1234)
+    local noise = love.image.newImageData(256, 256)
+    noise:mapPixel(function()
+        local v = rng:random()
+        return v, v, v, 1
+    end)
+    eink_noise = love.graphics.newImage(noise)
+    eink_noise:setWrap("repeat", "repeat")
+    eink_noise:setFilter("nearest", "nearest")
+    local ok, sh = pcall(love.graphics.newShader, EINK_SHADER)
+    if ok then
+        eink_shader = sh
+        eink_shader:send("noise", eink_noise)
+        eink_shader:send("amount", 1.3 / 15)
+    else
+        print("[eink] shader unavailable: " .. tostring(sh))
+    end
+end
+
 local function set_theme_shader(on)
+    if on and theme().eink and not app.eink_tried then app.eink_setup() end
     if on and theme().eink and eink_shader then
         love.graphics.setShader(eink_shader)
     else
@@ -4723,25 +4748,6 @@ function love.load()
         { 1, 1, 1, 1, 1, 1, 1, 0 }, { 0, 1, 0, 1, 1, 1, 1, 1 },
     }, "fan", "static")
     turn_mesh = love.graphics.newMesh((TURN_COLS + 1) * 2, "strip", "stream")
-    -- Fixed white-noise texture for the E-ink filter (same pattern every run,
-    -- like a real panel's grain).
-    local rng = love.math.newRandomGenerator(1234)
-    local noise = love.image.newImageData(256, 256)
-    noise:mapPixel(function()
-        local v = rng:random()
-        return v, v, v, 1
-    end)
-    eink_noise = love.graphics.newImage(noise)
-    eink_noise:setWrap("repeat", "repeat")
-    eink_noise:setFilter("nearest", "nearest")
-    local ok, sh = pcall(love.graphics.newShader, EINK_SHADER)
-    if ok then
-        eink_shader = sh
-        eink_shader:send("noise", eink_noise)
-        eink_shader:send("amount", 1.3 / 15)
-    else
-        print("[eink] shader unavailable: " .. tostring(sh))
-    end
     build_fonts()
 
     scan_library()
