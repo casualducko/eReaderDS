@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+Review of the day's changes:
+- Fonts from the fonts folder (now including downloaded ones) were read into
+  memory and kept for good: only the 12 most recent font files are kept now,
+  and the caches are cleared when fonts are added or removed (a deleted font
+  was held until restart).
+- A Contents entry in a file that can't be read no longer crashes the page
+  (the chapter length across files looks at other files, so this came up
+  more often).
+- The crash screen quits by itself after 5 minutes (e.g. with the lid
+  closed) instead of keeping the screens on.
+- Get more fonts tidies away a download cut short by quitting (a hidden
+  partial zip in the fonts folder).
+
 ## v0.3.31
 
 - **Get more fonts:** a row at the end of the font list opens 14 free reading

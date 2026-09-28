@@ -191,6 +191,9 @@ end
 ---------------------------------------------------------------- scanning
 
 local families, by_name
+-- Caches of loaded font files and name previews (see below); M.scan clears
+-- them, since fonts may have been added or removed.
+local filedata, filedata_order, previews = {}, {}, {}
 
 local function add_face(path, bundled, fam, sub, kind)
     local weight, italic = classify(sub)
@@ -212,6 +215,7 @@ end
 
 function M.scan()
     families, by_name = {}, {}
+    previews, filedata, filedata_order = {}, {}, {}
     for _, file in ipairs(love.filesystem.getDirectoryItems(BUNDLED_DIR)) do
         if is_font(file) then
             local p = BUNDLED_DIR .. "/" .. file
@@ -264,7 +268,10 @@ end
 
 ---------------------------------------------------------------- loading
 
-local filedata = {}
+-- Font files from the fonts folder, read into memory: the few most recent
+-- are kept (a font made from one keeps its own reference), so browsing many
+-- fonts doesn't hold them all.
+local FILEDATA_KEEP = 12
 
 local function new_font(face, size)
     if face.bundled then return love.graphics.newFont(face.path, size) end
@@ -275,13 +282,14 @@ local function new_font(face, size)
         f:close()
         fd = love.filesystem.newFileData(data, face.path:match("[^/]+$"))
         filedata[face.path] = fd
+        filedata_order[#filedata_order + 1] = face.path
+        while #filedata_order > FILEDATA_KEEP do filedata[table.remove(filedata_order, 1)] = nil end
     end
     return love.graphics.newFont(love.font.newRasterizer(fd, size))
 end
 
 -- The regular face of a family at a size, for showing a font's name in its
 -- own typeface (menus). Cached; nil if it can't be loaded.
-local previews = {}
 function M.preview(name, size)
     local key = name .. "@" .. size
     if previews[key] == nil then

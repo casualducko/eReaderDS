@@ -376,8 +376,8 @@ end
 -- TOC entries with resolved positions (chapter, offset).
 local function toc_pos(t)
     if t.off == nil then
-        local c = book:chapter(t.chapter)
-        t.off = (t.anchor and c.anchors[t.anchor]) or 0
+        local c = book:chapter(t.chapter)      -- nil if that file couldn't be read
+        t.off = (c and t.anchor and c.anchors[t.anchor]) or 0
     end
     return t.chapter, t.off
 end
@@ -3750,6 +3750,9 @@ app.fget = { sel = 1, top = 1 }
 function app.fget_open()
     local g = app.fget
     g.sel, g.top, g.confirm = 1, 1, nil
+    -- A download cut short (the app quit) leaves a hidden zip: tidy it away.
+    local dir = not g.busy and Fonts.user_dir()
+    if dir then os.execute('rm -f "' .. dir .. '"/.*.zip "' .. dir .. '"/.*.zip.part 2>/dev/null') end
     app.mode = "fontget"
     if not g.list and not g.loading then app.fget_load() end
     redraw()
@@ -5401,6 +5404,9 @@ function love.errorhandler(msg)
     local start = love.timer.getTime()
     local pressed = false
     return function()
+        -- Left alone (maybe with the lid closed): quit rather than keep the
+        -- screens on.
+        if love.timer.getTime() - start > 300 then return 1 end
         love.event.pump()
         local ready = love.timer.getTime() - start > 1     -- ignore buttons still held from before
         for e in love.event.poll() do
