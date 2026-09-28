@@ -3834,19 +3834,35 @@ local function draw_overlay()
         return
     end
     if overlay.text then
-        -- One line in a 460-wide box; longer messages get a wider, taller one.
-        local tw, lines = ui.font:getWrap(overlay.text, 640 - 48)
-        local w = math.max(460, tw + 48)
+        -- A card in the theme's colours: one line in a 460-wide box, longer
+        -- messages wider and taller, the first line bold when there are two.
+        local th = theme()
+        local first, rest = overlay.text:match("^([^\n]*)\n(.*)$")
+        local tw, lines = ui.font:getWrap(rest or overlay.text, 640 - 56)
+        if first then tw = math.max(tw, ui.bold:getWidth(first)) end
+        local w = math.max(460, tw + 56)
         local lh = ui.font:getHeight()
-        local h = math.max(80, #lines * lh + 36)
+        local h = math.max(80, (#lines + (first and 1 or 0)) * lh + 40)
         local x, y = (PAGE_W - w) / 2, 120
         overlay.box = { x, y, w, h }                    -- for tapping it
-        love.graphics.setColor(0.08, 0.08, 0.08, 0.94)
+        love.graphics.setColor(0, 0, 0, 0.18)           -- soft shadow
+        love.graphics.rectangle("fill", x + 4, y + 7, w, h, 24, 24)
+        color(th.sel)
         love.graphics.rectangle("fill", x, y, w, h, 22, 22)
-        love.graphics.setColor(1, 1, 1, 0.95)
-        love.graphics.setFont(ui.font)
-        local ty = #lines == 1 and centered_y(ui.font, UI_SIZE, y, h) or y + 18
-        love.graphics.printf(overlay.text, x + 24, ty, w - 48, "center")
+        color(th.dim, 0.45)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", x, y, w, h, 22, 22)
+        color(th.fg)
+        if first then
+            love.graphics.setFont(ui.bold)
+            love.graphics.printf(first, x + 28, y + 20, w - 56, "center")
+            love.graphics.setFont(ui.font)
+            love.graphics.printf(rest, x + 28, y + 20 + lh, w - 56, "center")
+        else
+            love.graphics.setFont(ui.font)
+            local ty = #lines == 1 and centered_y(ui.font, UI_SIZE, y, h) or y + 20
+            love.graphics.printf(overlay.text, x + 28, ty, w - 56, "center")
+        end
         love.graphics.pop()
         return
     end

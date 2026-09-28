@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.11
+What's new: see what changed in each version, in Settings → Page turns & device.
+After an update, a note offers to show you what's new.
+Messages now match your theme instead of appearing in a black box.
+
 v0.3.10
 Tap the "Update available" message to go straight to the update.
 Settings shows Update in bold while a new version is waiting.

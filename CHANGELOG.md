@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## v0.3.11
 
 - **What's new** (Settings → Page turns & device): the changes in each
   version, in plain words. After an update, a note offers it once ("Updated
   to v…: tap here to see what's new").
+- Messages (toasts) are drawn in the theme's colours, with the first line in
+  bold, instead of a black box.
 
 ## v0.3.10
 
