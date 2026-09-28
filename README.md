@@ -86,8 +86,8 @@ Press **B** (or Start, X, ↩) while reading. One page, top to bottom:
 - **Status bar ›** what the top and bottom lines show, and the clock style
 - **Reading & device ›** page-turn animation, what a tap does, dictionary,
   closing the lid, time zone
-- **About eReaderDS ›** What's new, Check for updates, Update notices, About &
-  credits (and **Update to v…** when one is waiting; the row says **Update**)
+- **About eReaderDS ›** What's new, Check for updates, Update notices, Report
+  a problem, About & credits (and **Update to v…** when one is waiting; the row says **Update**)
 - **Help**, **Quit**
 
 ## Features
@@ -207,7 +207,14 @@ name) only shows one weight.
 
 ## Reporting problems
 
-Tell whoever sent you eReaderDS, or
+If eReaderDS runs into a problem it says so, keeps your place in the book, and
+quits when you press a button. The next time you open it, a note offers to
+report it: tap it for a QR code that opens a bug report on your phone with the
+version and what went wrong filled in (no book titles). Nothing is sent from
+the device; you read the report and send it yourself. **Settings → About
+eReaderDS → Report a problem** shows the same code any time.
+
+Or tell whoever sent you eReaderDS, or
 [open a bug report](https://github.com/casualducko/eReaderDS-beta/issues/new?template=bug_report.yml).
 Include the **version** (top of Settings), **what happened** (a photo of the
 screens helps), and **`Ports/eReaderDS/log.txt`**, copied right after the
@@ -258,5 +265,7 @@ About & credits**).
 - **Dictionary:** [WordNet](https://wordnet.princeton.edu) 3.1, © 2011
   Princeton University, under the WordNet license
   (`app/dict/WordNet-LICENSE.txt`); converted by `tools/build-wordnet.py`.
+- **QR codes:** [qrencode.lua](https://github.com/speedata/luaqrcode) by
+  Patrick Gundlach and contributors (BSD license, in `app/qrencode.lua`).
 - **Engine:** [LÖVE](https://love2d.org) 11.5 (zlib license), from the
   PortMaster aarch64 runtime. See [runtime/NOTICES.md](runtime/NOTICES.md).

@@ -16,9 +16,10 @@ body:
     id: device
     attributes:
       label: Device and firmware
-      description: eReaderDS is made for the RG DS Plus on its stock firmware.
+      description: eReaderDS is made for the RG DS Plus on its stock firmware or ROCKNIX.
       options:
         - RG DS Plus, stock firmware
+        - RG DS Plus, ROCKNIX
         - Something else (tell us below)
     validations:
       required: true
@@ -38,5 +39,5 @@ body:
     id: log
     attributes:
       label: log.txt
-      description: Contents of Ports/eReaderDS/log.txt on the SD card, copied right after the problem.
+      description: Contents of Ports/eReaderDS/log.txt on the SD card, copied right after the problem. (A report from the app's QR code fills in where it went wrong.)
       render: text

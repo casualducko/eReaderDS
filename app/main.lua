@@ -1506,6 +1506,7 @@ function app.about_items()
             { label = "Update notices", value = S.update_notices and "On" or "Off", adjust = function()
                 S.update_notices = not S.update_notices
             end },
+            { label = "Report a problem", act = app.report_open },
             { label = "About & credits", act = function() app.mode = "about" end },
         }),
         section("", { { label = "Back", act = close_sub } })
@@ -2663,6 +2664,7 @@ local CREDITS = {
     { "Hyphenation", "US English patterns from TeX's hyph-utf8, by Gerard D.C. Kuiken." },
     { "Dictionary", "WordNet 3.1, © 2011 Princeton University (WordNet license)." },
     { "Engine", "LÖVE 11.5 (zlib license), from the PortMaster runtime." },
+    { "QR codes", "qrencode.lua by Patrick Gundlach and contributors (BSD license)." },
 }
 
 local function draw_about(side)
@@ -3841,6 +3843,7 @@ local function render_canvases()
     elseif app.mode == "find" then painter = app.find_draw
     elseif app.mode == "message" then painter = draw_message
     elseif app.mode == "splash" then painter = app.splash_draw
+    elseif app.mode == "report" then painter = app.report_draw
     else painter = draw_library end
 
     for i, side in ipairs({ "left", "right" }) do
@@ -4438,6 +4441,7 @@ function handle_action(a)
     if mode == "update" then app.update_action(a) return end
     if mode == "whatsnew" then app.whatsnew_action(a) return end
     if mode == "find" then app.find_action(a) return end
+    if mode == "report" then app.report_action(a) return end
 
     if mode == "about" or mode == "help" then
         if a == "back" or a == "confirm" or a == "menu" then app.mode = "menu" end
@@ -4683,7 +4687,7 @@ function app.on_tap(side, u, v)
                 if idx == pg.sel then action("confirm") else pg.sel = idx; redraw() end
             end
         end
-    elseif mode == "about" or mode == "help" then
+    elseif mode == "about" or mode == "help" or mode == "report" then
         action("back")
     elseif mode == "keyboard" then
         app.kb_tap(side, u, v)
@@ -4828,6 +4832,242 @@ end
 
 ---------------------------------------------------------------- main loop
 
+---------------------------------------------------------------- crashes
+
+-- When something goes wrong: a plain screen instead of LÖVE's error text,
+-- the place in the book saved, and a report (version, system, error; no book
+-- titles) in crash.txt. The next start offers to report it: a QR code opens
+-- a GitHub bug report with the details filled in, on the reader's phone.
+app.REPORT_URL = "https://github.com/casualducko/eReaderDS-beta/issues/new"
+
+-- The error and where it happened, without paths or book file names.
+function app.crash_clean(text)
+    text = tostring(text or "")
+    text = text:gsub("[^\n\"']-%.[eE][pP][uU][bB]", "<book>"):gsub("[^\n\"']-%.[tT][xX][tT]", "<file>")
+    text = text:gsub("[%w%./_%-]*/app/", "")             -- /…/eReaderDS/app/main.lua -> main.lua
+    return text
+end
+
+function app.system_name()
+    local f = io.open("/etc/os-release", "rb")
+    local s = f and f:read("*a") or ""
+    if f then f:close() end
+    return s:find('ROCKNIX') and "ROCKNIX" or (s ~= "" and "stock firmware" or "computer")
+end
+
+function app.crash_save(msg, trace)
+    local lines = {}
+    for l in app.crash_clean(trace):gmatch("[^\n]+") do
+        l = l:gsub("^%s+", "")
+        -- The app's own code only: not the engine's frames or the handler's.
+        if l ~= "" and not l:find("^stack traceback") and not l:find("boot%.lua") and not l:find("^%[C%]")
+                and not l:find("^%(tail call%)") and #lines < 6 then
+            lines[#lines + 1] = l
+        end
+    end
+    local f = io.open(Store.data_path("crash.txt"), "wb")
+    if not f then return end
+    f:write("version=", VERSION, "\n", "system=", app.system_name(), "\n", "time=", os.date("%Y-%m-%d %H:%M"), "\n",
+        "error=", (app.crash_clean(msg):gsub("\n", " ")), "\n", "where=", table.concat(lines, " | "), "\n")
+    f:close()
+end
+
+function love.errorhandler(msg)
+    msg = tostring(msg)
+    local trace = debug.traceback("", 2)
+    print("[crash] " .. msg .. "\n" .. trace)
+    pcall(app.crash_save, msg, trace)
+    pcall(function() if book then save_progress() end; Store.flush() end)   -- keep the place
+    pcall(love.graphics.reset)
+    pcall(love.graphics.setCanvas)
+    local th = (pcall(theme) and theme()) or { bg = { 0.957, 0.925, 0.847 }, fg = { 0.357, 0.275, 0.212 }, dim = { 0.6, 0.52, 0.44 } }
+    local big = ui.title or love.graphics.newFont(44)
+    local body = ui.font or love.graphics.newFont(30)
+    local function page(side)
+        local x, w = 60, PAGE_W - 120
+        love.graphics.setColor(th.fg)
+        if side == "left" then
+            love.graphics.setFont(big)
+            love.graphics.printf("eReaderDS ran into a problem", x, 300, w, "center")
+            love.graphics.setFont(body)
+            love.graphics.setColor(th.dim)
+            love.graphics.printf("Your place in the book is saved.\n\nNext time you open eReaderDS, you can "
+                .. "report it from your phone in a few taps.", x, 420, w, "center")
+        else
+            love.graphics.setFont(big)
+            love.graphics.printf("Press any button to quit", x, 440, w, "center")
+        end
+    end
+    local function draw()
+        love.graphics.origin()
+        love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
+        for _, side in ipairs({ "left", "right" }) do
+            love.graphics.push()
+            love.graphics.scale(app.scale or 1)
+            if not pcall(page_transform, side) then love.graphics.translate(side == "left" and 0 or SCREEN_W, 0) end
+            pcall(page, side)
+            love.graphics.pop()
+        end
+    end
+    -- Testing: save the screen instead of waiting.
+    local shot = os.getenv("READER_SHOT")
+    if shot then
+        pcall(function()
+            local c = love.graphics.newCanvas(2048, 768)
+            love.graphics.setCanvas(c)
+            local s0 = app.scale
+            app.scale = 1
+            draw()
+            app.scale = s0
+            love.graphics.setCanvas()
+            local f = io.open(shot, "wb"); f:write(c:newImageData():encode("png"):getString()); f:close()
+        end)
+        return function() return 1 end
+    end
+    local start = love.timer.getTime()
+    local pressed = false
+    return function()
+        love.event.pump()
+        local ready = love.timer.getTime() - start > 1     -- ignore buttons still held from before
+        for e in love.event.poll() do
+            if e == "quit" then return 1 end
+            if ready and (e == "keypressed" or e == "gamepadpressed" or e == "joystickpressed"
+                    or e == "touchpressed" or e == "mousepressed") then return 1 end
+        end
+        pcall(function()
+            if Touch.enabled then Touch.poll(function(kind) if kind == "down" then pressed = true end end) end
+        end)
+        if pressed and ready then return 1 end
+        pressed = false
+        if love.graphics.isActive() then draw(); love.graphics.present() end
+        love.timer.sleep(0.05)
+    end
+end
+
+-- The last crash report ({ version, system, error, where, ... }), or nil.
+function app.crash_read(name)
+    local f = io.open(Store.data_path(name), "rb")
+    if not f then return nil end
+    local r = {}
+    for line in f:lines() do
+        local k, v = line:match("^(%w+)=(.*)$")
+        if k then r[k] = v end
+    end
+    f:close()
+    return r.error and r or nil
+end
+
+-- On start: a crash last time (in this version) offers a report, once.
+function app.crash_check()
+    local r = app.crash_read("crash.txt")
+    if not r then return end
+    os.rename(Store.data_path("crash.txt"), Store.data_path("crash-last.txt"))
+    if r.version == VERSION then
+        app.toast("eReaderDS closed unexpectedly last time\nTap here to report it", 10, app.report_open)
+    end
+end
+
+function app.url_encode(s)
+    return (s:gsub("[^%w%-%._~ ]", function(c) return string.format("%%%02X", c:byte()) end):gsub(" ", "+"))
+end
+
+-- The bug report's address, filled in with the version and (if there was
+-- one in this version) the crash.
+function app.report_url()
+    local r = app.crash_read("crash-last.txt")
+    if r and r.version ~= VERSION then r = nil end
+    local q = { "template=bug_report.yml", "version=" .. app.url_encode("v" .. VERSION) }
+    local what = "System: " .. app.system_name() .. "\n\n"
+    if r then
+        -- Short, so the QR code stays coarse enough to scan off the screen.
+        q[#q + 1] = "title=" .. app.url_encode(("Crash: " .. r.error):sub(1, 60))
+        what = what .. "eReaderDS closed unexpectedly. What I was doing: "
+        local where = {}
+        for part in (r.where or ""):gmatch("[^|]+") do
+            if #where < 2 then where[#where + 1] = part:gsub("^%s+", ""):gsub("%s+$", ""):gsub("in function ", "") end
+        end
+        q[#q + 1] = "log=" .. app.url_encode(table.concat(where, "\n"):sub(1, 120))
+    end
+    q[#q + 1] = "what=" .. app.url_encode(what)
+    return app.REPORT_URL .. "?" .. table.concat(q, "&"), r
+end
+
+function app.report_open()
+    if app.mode ~= "report" then app.report_back = app.mode end
+    local url, r = app.report_url()
+    local ok, tab = pcall(function() return select(2, require("qrencode").qrcode(url, 1)) end)
+    app.report = { url = url, crash = r, qr = ok and type(tab) == "table" and tab or nil }
+    overlay = nil                          -- the "closed unexpectedly" note, if it's up
+    app.mode = "report"
+    redraw()
+end
+
+function app.report_action(a)
+    if a == "back" or a == "menu" or a == "confirm" then
+        app.report = nil
+        app.mode = app.report_back or (book and "menu" or "library")
+        redraw()
+    end
+end
+
+function app.report_draw(side)
+    local th = theme()
+    local r = app.report
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    if side == "left" then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Report a problem", x, 60)
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        local text = "Scan the code on the other screen with your phone's camera. It opens a bug report "
+            .. "on GitHub with the version filled in"
+            .. (r.crash and " and what went wrong" or "") .. ". Add what you were doing and send it "
+            .. "(a free GitHub account is needed).\n\nNothing is sent from this device."
+        love.graphics.printf(text, x, 170, w, "left")
+        if r.crash then
+            local _, lines = ui.font:getWrap(text, w)
+            local y = 170 + #lines * ui.font:getHeight() + 40
+            love.graphics.setFont(ui.small_bold)
+            love.graphics.print("The problem (" .. (r.crash.time or "") .. ")", x, y)
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.printf(r.crash.error, x, y + ui.small:getHeight() + 6, w, "left")
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print("B back", x, PAGE_H - 70)
+        return
+    end
+    -- The QR code: dark modules on white (phones read it best), with the quiet
+    -- border around it that scanners need.
+    if not r.qr then
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.printf("Couldn't make the code. Report at\ngithub.com/casualducko/eReaderDS-beta/issues", x, 300, w, "center")
+        return
+    end
+    local n = #r.qr
+    local cell = math.floor(math.min(w, PAGE_H - 300) / (n + 8))
+    local size = cell * (n + 8)
+    local qx, qy = math.floor((PAGE_W - size) / 2), 150
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.rectangle("fill", qx, qy, size, size, 12, 12)
+    love.graphics.setColor(0, 0, 0)
+    for cx = 1, n do
+        for cy = 1, n do
+            if r.qr[cx][cy] > 0 then
+                love.graphics.rectangle("fill", qx + (cx + 3) * cell, qy + (cy + 3) * cell, cell, cell)
+            end
+        end
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.printf("github.com/casualducko/eReaderDS-beta", x, qy + size + 24, w, "center")
+end
+
 function love.load()
     app.scale = love.graphics.getWidth() / 2048
     if os.getenv("READER_SCALE") == nil then pcall(love.window.setPosition, 0, 0, 1) end
@@ -4911,6 +5151,7 @@ function love.load()
         S.seen_version = VERSION
         Store.save_settings(S)
     end
+    app.crash_check()                      -- closed unexpectedly last time?
     -- A newer version? (Only when online; quietly does nothing otherwise.)
     if S.update_notices and (not os.getenv("READER_SCRIPT") or os.getenv("READER_FAKE_VERSION")) then
         app.update_check()
@@ -4951,6 +5192,8 @@ local function run_test_script()
             elseif a == "poll" then shop.net_poll()
             elseif a:match("^type:") then app.kb_type(a:sub(6):gsub("_", " "))
             elseif a == "update" then app.update_open()
+            elseif a == "crash" then error("a test crash")       -- the crash screen
+            elseif a == "report" then app.report_open()
             elseif a == "work" then                -- finish a background task
                 while app.task do app.task_step() end
             elseif a == "net" then               -- wait for network jobs (and the cover)

@@ -11,6 +11,18 @@
   60 pages, 57 estimated from the start, exact from the files read. A
   Contents that's just a title entry (the "chapter" would be most of the
   book) keeps the per-file count.
+- **Crash handling:** an error now shows a plain screen in the theme ("eReaderDS
+  ran into a problem… Press any button to quit") instead of LÖVE's error
+  text, saves the reading position, and writes `crash.txt` (version, system,
+  time, the error and where in the app's code; paths and book file names
+  removed) to the data folder.
+- **Report a problem:** the next start (same version) offers "eReaderDS
+  closed unexpectedly last time / Tap here to report it"; the page shows a QR
+  code that opens a GitHub bug report on the reader's phone with the version,
+  system, title and code location filled in. Nothing is sent from the device.
+  Also in Settings → About eReaderDS → Report a problem (version filled in).
+  The link is kept short (~300 characters) so the code scans off the screen.
+  QR encoding: qrencode.lua (BSD). The bug form lists ROCKNIX.
 
 ## v0.3.26
 
