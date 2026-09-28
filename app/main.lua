@@ -1801,11 +1801,17 @@ end
 
 local function list_rows(row_h) return math.floor((PAGE_H - 200) / row_h) end
 
+-- Library rows that fit above the Get books button.
+function library.list_rows() return math.floor((PAGE_H - 96 - 16 - 160) / 96) end
+
 local function draw_library(side)
     local th = theme()
     local m = MARGINS[2]
-    if side == "left" then
-        local x, w = m.outer, PAGE_W - m.outer - m.inner
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    if side == "right" then
+        -- The touchscreen: the books (tap one to see it, again to open it),
+        -- and "Get books" at the bottom (also Select).
         love.graphics.setFont(ui.title)
         color(th.fg)
         love.graphics.print("Library", x, 60)
@@ -1815,47 +1821,29 @@ local function draw_library(side)
             color(th.dim)
             love.graphics.printf("‹ " .. SORT_NAMES[S.lib_sort] .. " ›", x,
                 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
+            local row_h = 96
+            local rows = library.list_rows()
+            if library.sel < library.top then library.top = library.sel end
+            if library.sel >= library.top + rows then library.top = library.sel - rows + 1 end
+            draw_list(side, library.items, library.sel, library.top, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
+                love.graphics.setFont(ui.font)
+                color(th.fg)
+                -- Center the title + author block: from the title's cap height to
+                -- the author's baseline.
+                local top = ui.font:getBaseline() - UI_SIZE * 0.68
+                local bottom = 40 + ui.small:getBaseline()
+                local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
+                love.graphics.print(fit_text(ui.font, it.title, rw - 90), rx, ty)
+                local pr = it.path and Store.get_progress(it.path)
+                love.graphics.setFont(ui.small)
+                color(th.dim)
+                love.graphics.print(fit_text(ui.small, it.author, rw - 90), rx, ty + 40)
+                if pr then
+                    love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "%", rx,
+                        ty + ui.font:getBaseline() - ui.small:getBaseline(), rw, "right")
+                end
+            end)
         end
-        local row_h = 96
-        local rows = list_rows(row_h)
-        if #library.items == 0 then
-            love.graphics.setFont(ui.font)
-            color(th.dim)
-            local folder, where = Store.books_folder()
-            love.graphics.printf("No books found.\n\nCopy .epub or .txt files into the " .. folder
-                .. " folder" .. (where and (" " .. where) or "") .. ".", x, 180, w, "left")
-            love.graphics.setFont(ui.small)
-            love.graphics.print("Press the Anbernic button to quit", x, PAGE_H - 70)
-            love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
-            return
-        end
-        if library.sel < library.top then library.top = library.sel end
-        if library.sel >= library.top + rows then library.top = library.sel - rows + 1 end
-        draw_list(side, library.items, library.sel, library.top, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
-            love.graphics.setFont(ui.font)
-            color(th.fg)
-            -- Center the title + author block: from the title's cap height to
-            -- the author's baseline.
-            local top = ui.font:getBaseline() - UI_SIZE * 0.68
-            local bottom = 40 + ui.small:getBaseline()
-            local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
-            love.graphics.print(fit_text(ui.font, it.title, rw - 90), rx, ty)
-            local pr = it.path and Store.get_progress(it.path)
-            love.graphics.setFont(ui.small)
-            color(th.dim)
-            love.graphics.print(fit_text(ui.small, it.author, rw - 90), rx, ty + 40)
-            if pr then
-                love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "%", rx,
-                    ty + ui.font:getBaseline() - ui.small:getBaseline(), rw, "right")
-            end
-        end)
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        love.graphics.print("A  open      Y  delete      ‹ ›  sort" .. (book and "      B  back" or ""), x, PAGE_H - 70)
-        love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
-    else
-        local x, w = MARGINS[2].inner, PAGE_W - MARGINS[2].outer - MARGINS[2].inner
-        -- "Get books" button at the bottom of the touchscreen (also Select).
         local bx, by, bw, bh = library.get_books_button()
         local online = shop.online()
         if online then
@@ -1876,50 +1864,71 @@ local function draw_library(side)
         love.graphics.setFont(ui.small)
         color(th.dim)
         love.graphics.print(hint, lx + ui.font:getWidth(label), ly + ui.font:getBaseline() - ui.small:getBaseline())
-        local pv = library_preview()
-        if not pv then return end
-        local y = 80
-        local confirming = library.confirm == pv.path
-        if pv.cover and not confirming then
-            local iw, ih = pv.cover:getDimensions()
-            local s = math.min(w / iw, 520 / ih)
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.draw(pv.cover, x + (w - iw * s) / 2, y, 0, s, s)
-            y = y + ih * s + 40
-        else
-            y = 260
-        end
+        return
+    end
+
+    -- The top screen: the selected book, or how to add books.
+    if #library.items == 0 then
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.printf(pv.title or "", x, y, w, "center")
-        local _, lines = ui.title:getWrap(pv.title or "", w)
-        y = y + #lines * ui.title:getHeight() + 12
+        love.graphics.print("No books yet", x, 60)
         love.graphics.setFont(ui.font)
         color(th.dim)
-        love.graphics.printf(pv.author or "", x, y, w, "center")
-        local pr = Store.get_progress(pv.path)
-        if pr then
-            y = y + 60
-            local bw = w * 0.6
-            local bx = x + (w - bw) / 2
-            color(th.sel)
-            love.graphics.rectangle("fill", bx, y, bw, 8, 4, 4)
-            color(th.fg)
-            love.graphics.rectangle("fill", bx, y, bw * pr.pct, 8, 4, 4)
-            love.graphics.setFont(ui.small)
-            color(th.dim)
-            love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "% read", x, y + 20, w, "center")
-        end
-        if confirming then
-            local by = PAGE_H - 330
-            color(th.sel)
-            love.graphics.rectangle("fill", x - 14, by, w + 28, 150, 12, 12)
-            love.graphics.setFont(ui.font)
-            color(th.fg)
-            love.graphics.printf("Delete this book from the SD card?", x, by + 28, w, "center")
-            love.graphics.setFont(ui.small)
-            love.graphics.printf("A  delete      B  keep", x, by + 90, w, "center")
-        end
+        local folder, where = Store.books_folder()
+        love.graphics.printf("Copy .epub or .txt files into the " .. folder .. " folder"
+            .. (where and (" " .. where) or "") .. ", or tap Get books to download some.", x, 180, w, "left")
+        love.graphics.setFont(ui.small)
+        love.graphics.print("Press the Anbernic button to quit", x, PAGE_H - 70)
+        love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
+        return
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print("A  open      Y  delete      ‹ ›  sort" .. (book and "      B  back" or ""), x, PAGE_H - 70)
+    love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
+    local pv = library_preview()
+    if not pv then return end
+    local y = 80
+    local confirming = library.confirm == pv.path
+    if pv.cover and not confirming then
+        local iw, ih = pv.cover:getDimensions()
+        local s = math.min(w / iw, 520 / ih)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(pv.cover, x + (w - iw * s) / 2, y, 0, s, s)
+        y = y + ih * s + 40
+    else
+        y = 260
+    end
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.printf(pv.title or "", x, y, w, "center")
+    local _, lines = ui.title:getWrap(pv.title or "", w)
+    y = y + #lines * ui.title:getHeight() + 12
+    love.graphics.setFont(ui.font)
+    color(th.dim)
+    love.graphics.printf(pv.author or "", x, y, w, "center")
+    local pr = Store.get_progress(pv.path)
+    if pr then
+        y = y + 60
+        local bw = w * 0.6
+        local bx = x + (w - bw) / 2
+        color(th.sel)
+        love.graphics.rectangle("fill", bx, y, bw, 8, 4, 4)
+        color(th.fg)
+        love.graphics.rectangle("fill", bx, y, bw * pr.pct, 8, 4, 4)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "% read", x, y + 20, w, "center")
+    end
+    if confirming then
+        local by = PAGE_H - 330
+        color(th.sel)
+        love.graphics.rectangle("fill", x - 14, by, w + 28, 150, 12, 12)
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.printf("Delete this book from the SD card?", x, by + 28, w, "center")
+        love.graphics.setFont(ui.small)
+        love.graphics.printf("A  delete      B  keep", x, by + 90, w, "center")
     end
 end
 
@@ -3934,9 +3943,18 @@ function app.on_tap(side, u, v)
             action("back")            -- tapped the dimmed book page: close
         end
     elseif mode == "library" then
+        if side ~= "right" then return end
         local bx, by, bw, bh = library.get_books_button()
-        if side == "right" and u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then
+        if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then
+            library.confirm = nil
             shop.start()
+            return
+        end
+        -- The list: tap a book to see it on the top screen, again to open it.
+        if library.confirm then library.confirm = nil; redraw(); return end   -- "Delete?" showing: keep
+        local idx = library.top + math.floor((v - 160) / 96)
+        if v >= 160 and idx < library.top + library.list_rows() and library.items[idx] then
+            if idx == library.sel then action("confirm") else library.sel = idx; redraw() end
         end
     elseif mode == "lookup" then
         -- Another word on this page: look that up. Anywhere else: close.

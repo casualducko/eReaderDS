@@ -60,6 +60,8 @@ summary of the buttons and touchscreen) is at the bottom.
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.
 - Press and hold a word to look it up.
+- In the library and Get books, tap an entry to see it on the other screen,
+  and tap it again to open (or download) it.
 - Tap a note number, or the **Notes** button, to show footnotes.
 
 ## Features

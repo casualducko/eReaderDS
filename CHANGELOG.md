@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The **library** list is on the touchscreen too, with Get books still at the
+  bottom: tap a book to see its cover on the top screen, tap it again to
+  open it.
 - **Get books** lists are on the touchscreen: tap a catalog or book to see
   it on the other screen, tap it again to open or download it. The cover
   and details are on the top screen.
