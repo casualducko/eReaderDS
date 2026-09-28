@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Get books** lists are on the touchscreen: tap a catalog or book to see
+  it on the other screen, tap it again to open or download it. The cover
+  and details are on the top screen.
 - The search keyboard starts with **no key highlighted**. The first D-pad
   press shows the highlight (on q); taps type without highlighting anything.
 - **Gutenberg is fast again:** eReaderDS now goes straight to

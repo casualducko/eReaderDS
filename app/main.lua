@@ -1941,8 +1941,10 @@ function shop.draw(side)
     local pg = shop.page()
     if not pg then return end
     local it = pg.entries[pg.sel]
-    if side == "left" then
-        local x, w = m.outer, PAGE_W - m.outer - m.inner
+    -- The list is on the right page (the touchscreen), so rows can be
+    -- tapped; the selected entry (cover, details) is on the left.
+    if side == "right" then
+        local x, w = m.inner, PAGE_W - m.outer - m.inner
         love.graphics.setFont(ui.title)
         color(th.fg)
         love.graphics.print(fit_text(ui.title, pg.title, w), x, 60)
@@ -2000,9 +2002,9 @@ function shop.draw(side)
         return
     end
 
-    -- Right page: the selected entry.
+    -- Left page: the selected entry.
     if not it then return end
-    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    local x, w = m.outer, PAGE_W - m.outer - m.inner
     local y = 70
     local cover = shop.cover(it)
     if cover and cover:getWidth() < 64 then cover = nil end    -- a menu icon, not a cover
@@ -3290,10 +3292,11 @@ local function compose()
     set_theme_shader(true)
     local th = theme()
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
-    blit_page(canvases[1], "left")
-    -- Get books: the selected book's page skips the E-ink filter, so covers
-    -- stay in color whatever the theme.
+    -- Get books: the selected book's page (the left one) skips the E-ink
+    -- filter, so covers stay in color whatever the theme.
     if app.mode == "shop" then set_theme_shader(false) end
+    blit_page(canvases[1], "left")
+    set_theme_shader(true)
     blit_page(canvases[2], "right")
     set_theme_shader(false)
 end
@@ -3943,16 +3946,19 @@ function app.on_tap(side, u, v)
         if cur and side == cur.side then _, i = note.hit(note.refs, side, u, v) end
         if i then note.sel, note.page = i, 1; redraw() else action("back") end
     elseif mode == "shop" then
-        -- Tap a row to open it; tap the right page to download or read.
+        -- The list is on the touchscreen: tap a row to see it on the other
+        -- screen, tap it again to open, download or read it.
         local pg = shop.page()
-        if side == "left" and pg and v >= 160 then
+        if not pg or side ~= "right" then return end
+        if #pg.entries == 0 then
+            if pg.error then action("confirm") end        -- try again
+            return
+        end
+        if v >= 160 then
             local idx = pg.top + math.floor((v - 160) / 96)
             if pg.entries[idx] and idx < pg.top + list_rows(96) then
-                pg.sel = idx
-                action("confirm")
+                if idx == pg.sel then action("confirm") else pg.sel = idx; redraw() end
             end
-        elseif side == "right" and v > PAGE_H - 200 then
-            action("confirm")
         end
     elseif mode == "about" or mode == "help" then
         action("back")
