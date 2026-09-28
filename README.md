@@ -232,7 +232,7 @@ Sans** at the top) narrow it. Up/down pick a font, A uses it.
 Vollkorn, Bitter, Atkinson Hyperlegible Next, Inter, Lexend, Andika and
 OpenDyslexic.
 
-**Get more fonts:** the last row of the font list downloads more over Wi-Fi:
+**Get more fonts:** the **+ Get more fonts** button at the top of the font list (or Y) downloads more over Wi-Fi:
 Alegreya, Cardo, Crimson Pro, Gelasio, IBM Plex Serif, Libre Baskerville,
 Newsreader, Noticia Text, Zilla Slab, Alegreya Sans, Fira Sans, IBM Plex Sans,
 Lato and Source Sans 3 (free, SIL Open Font License, from Google Fonts; about

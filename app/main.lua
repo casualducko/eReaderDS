@@ -3534,7 +3534,19 @@ end
 app.FONT_ROW_H = 58
 app.FONT_SAMPLE_SIZE = 38
 -- Rows that fit above the footer.
-function app.font_rows() return list_rows(app.FONT_ROW_H) - 1 end
+app.FONT_LIST_Y = 200                 -- the list, under the title and the Get more fonts button
+function app.font_rows() return math.floor((PAGE_H - 90 - app.FONT_LIST_Y) / app.FONT_ROW_H) end
+
+-- "Get more fonts" at the top of the list (always in view); Y does the same.
+function app.font_get_button()
+    local w = ui.font:getWidth("Get more fonts") + 84
+    return MARGINS[2].inner, 128, w, 54
+end
+
+function app.font_to_get()
+    app.font_close(false)
+    app.fget_open()
+end
 app.FONT_SAMPLE = {
     { "h", "Chapter One" },
     { "r", "It is a truth universally acknowledged, that a single man in possession of a good "
@@ -3567,7 +3579,6 @@ function app.font_set_filter(filter, keep)
     for _, f in ipairs(Fonts.list()) do
         if filter == "all" or f.kind == filter then fp.list[#fp.list + 1] = f end
     end
-    fp.list[#fp.list + 1] = { name = "Get more fonts", get = true }   -- downloads (see below)
     fp.sel, fp.top = 1, 1
     for i, f in ipairs(fp.list) do if f.name == keep then fp.sel = i end end
 end
@@ -3576,7 +3587,7 @@ end
 -- ones are released so scrolling through fonts doesn't pile them up.
 function app.font_sample()
     local fp = app.font_pick
-    if not fp.list[fp.sel] or fp.list[fp.sel].get then return nil end
+    if not fp.list[fp.sel] then return nil end
     local name = fp.list[fp.sel].name
     local cur = fp.sample
     if cur and cur.name == name and cur.size == fp.size then return cur.f end
@@ -3589,11 +3600,6 @@ end
 function app.font_close(apply)
     local fp = app.font_pick
     if fp.sample then for _, f in pairs(fp.sample.f) do f:release() end end
-    if apply and fp.list[fp.sel] and fp.list[fp.sel].get then
-        app.font_pick = nil
-        app.fget_open()
-        return
-    end
     if apply and fp.list[fp.sel] then
         S.font = fp.list[fp.sel].name
         build_fonts()
@@ -3617,6 +3623,7 @@ function app.font_action(a)
         idx = idx + ((a == "left" or a == "prev") and -1 or 1)
         app.font_set_filter(app.FONT_FILTERS[math.max(1, math.min(#app.FONT_FILTERS, idx))][1])
     elseif a == "confirm" then app.font_close(true) return
+    elseif a == "toc" then app.font_to_get() return               -- Y: get more fonts
     elseif a == "back" or a == "menu" then app.font_close(false) return
     end
     redraw()
@@ -3625,14 +3632,19 @@ end
 function app.font_tap(side, u, v)
     if side ~= "right" then return end
     local fp = app.font_pick
-    if v < 140 then                                 -- the All / Serif / Sans switch
+    local bx, by, bw, bh = app.font_get_button()
+    if u >= bx - 10 and u <= bx + bw + 10 and v >= by - 8 and v <= by + bh + 8 then
+        app.font_to_get()
+        return
+    end
+    if v < by then                                  -- the All / Serif / Sans switch
         for _, t in ipairs(fp.tabs or {}) do
             if u >= t.x0 - 12 and u <= t.x1 + 12 then app.font_set_filter(t.filter); redraw() end
         end
         return
     end
-    local idx = fp.top + math.floor((v - 160) / app.FONT_ROW_H)
-    if v < 160 or idx >= fp.top + app.font_rows() or not fp.list[idx] then return end
+    local idx = fp.top + math.floor((v - app.FONT_LIST_Y) / app.FONT_ROW_H)
+    if v < app.FONT_LIST_Y or idx >= fp.top + app.font_rows() or not fp.list[idx] then return end
     if idx == fp.sel then app.font_close(true) else fp.sel = idx; redraw() end
 end
 
@@ -3642,20 +3654,7 @@ function app.font_draw(side)
     if side == "left" then
         -- A sample page, laid out roughly like the reader's.
         local f = app.font_sample()
-        if not f then
-            local item = fp.list[fp.sel]
-            if item and item.get then
-                local x, w = MARGINS[2].outer, PAGE_W - MARGINS[2].outer - MARGINS[2].inner
-                love.graphics.setFont(ui.title)
-                color(th.fg)
-                love.graphics.print("Get more fonts", x, 60)
-                love.graphics.setFont(ui.font)
-                color(th.dim)
-                love.graphics.printf("Download more reading fonts over Wi-Fi: free and open-licensed, from Google "
-                    .. "Fonts. Each one takes a few seconds and appears in this list.\n\nA  see the fonts", x, 180, w, "left")
-            end
-            return
-        end
+        if not f then return end
         local m = margins()
         local x, w = m.outer, PAGE_W - m.outer - m.inner
         local lh = math.floor(math.max(f.r:getHeight(), fp.size * 1.4) * S.spacing + 0.5)
@@ -3716,14 +3715,13 @@ function app.font_draw(side)
     local rows = app.font_rows()
     if fp.sel < fp.top then fp.top = fp.sel end
     if fp.sel >= fp.top + rows then fp.top = fp.sel - rows + 1 end
-    draw_list(side, fp.list, fp.sel, fp.top, rows, x, 160, w, app.FONT_ROW_H, function(it, _, rx, ry, rw)
-        if it.get then
-            love.graphics.setFont(ui.font)
-            color(th.fg)
-            love.graphics.print("Get more fonts", rx, centered_y(ui.font, UI_SIZE, ry, app.FONT_ROW_H - 4))
-            love.graphics.printf("›", rx, centered_y(ui.font, UI_SIZE, ry, app.FONT_ROW_H - 4), rw, "right")
-            return
-        end
+    local bx, by, bw, bh = app.font_get_button()
+    color(th.sel)
+    love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+    love.graphics.setFont(ui.font)
+    color(th.fg)
+    love.graphics.printf("+  Get more fonts", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
+    draw_list(side, fp.list, fp.sel, fp.top, rows, x, app.FONT_LIST_Y, w, app.FONT_ROW_H, function(it, _, rx, ry, rw)
         local pf = Fonts.preview(it.name, UI_SIZE) or ui.font
         love.graphics.setFont(pf)
         color(th.fg)
@@ -3735,7 +3733,7 @@ function app.font_draw(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.print("A use      B back      ‹ › all / serif / sans", x, PAGE_H - 70)
+    love.graphics.print("A use    Y get more    ‹ › all / serif / sans    B back", x, PAGE_H - 70)
     love.graphics.printf(fp.sel .. " / " .. #fp.list, x, PAGE_H - 70, w, "right")
 end
 

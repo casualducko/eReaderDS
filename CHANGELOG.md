@@ -13,6 +13,8 @@
   white preview tinted to the theme); A downloads its zip into the fonts
   folder and it joins the font list; A then reads in it, Y deletes it (after
   asking). Tested on the device: list, download, reading in it, deleting.
+  A **+ Get more fonts** button at the top of the font list (always in view)
+  opens it; so does Y.
 - README and the download's README: ROCKNIX installs over Wi-Fi, step by
   step (the card's `roms` is on a Linux partition Mac and Windows can't open;
   never let the computer format it): the device's address, Connect to Server
