@@ -1,5 +1,10 @@
 # eReaderDS for the RG DS Plus
 
+Hey guys, I'm casualducko. I've been coding since the late 90's and I absolutely
+love it. I like to think that I know my stuff, but I don't know everything. With
+that being said, I have gladly been using Claude Code to help me bring this idea
+to its full potential.
+
 A two-page ebook reader for the **Anbernic RG DS Plus**. Hold the device
 sideways like an open book: each screen shows one page.
 
