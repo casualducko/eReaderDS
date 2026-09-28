@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Updates cope with trouble:** no Wi-Fi, a dropped connection, a busy
+  GitHub or a cut-off download each give a plain message and **Try again**,
+  and nothing half-downloaded is kept (leftovers from quitting mid-update are
+  cleared the next time eReaderDS starts). The check at launch stays silent
+  when it can't reach GitHub.
 - The **update** screen shows what's coming in plain words, as on What's
   new (every version since yours), in the same, larger text.
 

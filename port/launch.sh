@@ -53,6 +53,10 @@ apply_update() {
     return 0
 }
 if apply_update; then exec /bin/bash "$APP_DIR/launch.sh" "$@"; fi
+# Left over from an update that was cut short (quit while downloading or
+# unpacking): no READY marker, so it's incomplete. Free the space.
+[ -d "$APP_DIR/.update" ] && [ ! -f "$APP_DIR/.update/READY" ] && rm -rf "$APP_DIR/.update"
+rm -f "$APP_DIR/.update.zip" "$APP_DIR/.update.zip.part"
 
 if [ -n "$ROCKNIX" ]; then
     # Its Wayland display, sway socket and controller database (the buttons

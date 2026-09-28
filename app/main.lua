@@ -2807,6 +2807,22 @@ app.upd = { state = "none" }
 -- The version to compare with (READER_FAKE_VERSION pretends to be older, for testing).
 function app.update_current() return os.getenv("READER_FAKE_VERSION") or VERSION end
 
+-- Network trouble in plain words.
+function app.update_error(msg)
+    msg = tostring(msg or "")
+    if not shop.online(true) then return "Not connected to Wi-Fi." end
+    if msg:find("403") or msg:find("429") then return "GitHub is busy right now. Try again in a little while." end
+    if msg:find("stopped responding") or msg:find("timeout") or msg:find("slow to answer")
+            or msg:find("closed early") or msg:find("cut off") then
+        return "The connection dropped. Check Wi-Fi and try again."
+    end
+    if msg:find("404") then return "The update isn't on GitHub (any more). Try again later." end
+    if msg:find("couldn't find") or msg:find("couldn't connect") then
+        return "Couldn't reach GitHub. Check Wi-Fi and try again."
+    end
+    return msg ~= "" and msg or "Something went wrong."
+end
+
 function app.update_check(by_hand)
     local u = app.upd
     if u.state == "checking" or u.state == "downloading" or u.state == "unpacking" or u.state == "ready" then return end
@@ -2817,12 +2833,14 @@ function app.update_check(by_hand)
     app.upd = { state = "checking" }
     shop.net_job({ kind = "fetch", url = app.Updater.RELEASES }, function(msg)
         if msg.kind == "error" then
-            app.upd = { state = by_hand and "error" or "none", message = msg.message }
+            -- Checked on launch: stay quiet. Checked by hand: say why.
+            app.upd = { state = by_hand and "error" or "none", message = by_hand and app.update_error(msg.message) }
             return
         end
         local rel, err = app.Updater.parse(msg.body or "", app.update_current())
         if rel then
             rel.state = "available"
+            rel.url = os.getenv("READER_FAKE_UPDATE_URL") or rel.url     -- for testing failures
             app.upd = rel
             -- Its notes in plain words (the release notes are the fallback).
             shop.net_job({ kind = "fetch", url = app.Updater.whatsnew_url(rel.version) }, function(m2)
@@ -2838,7 +2856,7 @@ function app.update_check(by_hand)
                     .. "  ·  Tap here to update", 8, app.update_open)
             end
         else
-            app.upd = { state = err and "error" or "none", message = err, checked = true }
+            app.upd = { state = (by_hand and err) and "error" or "none", message = err, checked = not err }
         end
     end)
 end
@@ -2851,6 +2869,11 @@ end
 
 function app.update_start()
     local u = app.upd
+    if not shop.online(true) then
+        u.state, u.message = "error", "Not connected to Wi-Fi."
+        redraw()
+        return
+    end
     local dir = app.Updater.app_dir()
     local zip = dir .. "/.update.zip"
     u.state, u.got, u.total, u.message = "downloading", 0, u.size or 0, nil
@@ -2858,6 +2881,15 @@ function app.update_start()
         if msg.kind == "progress" then
             u.got, u.total = msg.got, msg.total
         elseif msg.kind == "done" then
+            -- A download cut short is caught here, before unpacking.
+            local f = io.open(zip, "rb")
+            local size = f and f:seek("end") or 0
+            if f then f:close() end
+            if (u.size or 0) > 0 and size ~= u.size then
+                os.remove(zip)
+                u.state, u.message = "error", "The download was incomplete. Try again."
+                return
+            end
             u.state, u.frac = "unpacking", 0
             -- Unpack a file at a time between frames (the screen stays live).
             app.task = coroutine.create(function()
@@ -2884,7 +2916,7 @@ function app.update_start()
             os.remove(zip)
             u.state = "available"
             if msg.message ~= "cancelled" then
-                u.state, u.message = "error", shop.online(true) and msg.message or "Not connected to Wi-Fi."
+                u.state, u.message = "error", app.update_error(msg.message)
             end
         end
     end)
