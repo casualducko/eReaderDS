@@ -2,6 +2,12 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.4.0
+Lists scroll with a finger: slide up or down on My Books, Get books, Table of Contents, Bookmarks and Highlights, Find in book and Fonts. On the book page, sliding still changes the brightness.
+Table of Contents, Bookmarks and Highlights, and Find in book are now one list on the touchscreen. Tap an entry to see it in full on the top screen, and tap it again to go there.
+Table of Contents shows where each chapter is in the book, and where you are.
+Find in book shows the whole paragraph around each match.
+
 v1.3.1
 Standard Ebooks now has its whole collection: browse the newest books, or by subject, collection or author, or search.
 Big catalog pages load without freezing the screen.

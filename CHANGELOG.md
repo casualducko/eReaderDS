@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.4.0
 
 - **Lists scroll with a finger:** sliding up/down on the touchscreen scrolls
   the list on screen: My Books, Get books, Table of Contents, Bookmarks and
