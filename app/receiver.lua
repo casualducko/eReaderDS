@@ -235,9 +235,9 @@ local function handle(client)
     end
 end
 
--- Port 80 gives the plainest address; if something has it, 8080.
+-- An uncommon port, so it won't clash with other servers; the next if it's taken.
 local server, port
-for _, p in ipairs({ 80, 8080, 8088 }) do
+for _, p in ipairs({ 2045, 2046, 2047 }) do
     server = socket.bind("*", p)
     if server then port = p break end
 end

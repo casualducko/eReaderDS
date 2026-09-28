@@ -4,7 +4,7 @@
 
 - **Send books from a phone or computer:** Get books → **Send from your phone
   or computer** starts a small web server (`receiver.lua`, on its own thread,
-  port 80 or else 8080) while the screen is open. It shows the address and a
+  port 2045, or 2046/2047 if taken) while the screen is open. It shows the address and a
   QR code; the page it serves uploads books (.epub, .txt) to the books folder
   and fonts (.ttf, .otf) to the fonts folder, one at a time, with progress on
   both ends. Names are cleaned (no folders or odd characters), EPUBs are checked

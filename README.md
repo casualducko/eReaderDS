@@ -177,7 +177,7 @@ theme is left alone.
 
 In the library press **Select** (or tap **Get books**) and choose **Send from
 your phone or computer**. The screens show an address (such as
-`192.168.1.50`) and a QR code. On a phone or computer on the same Wi-Fi,
+`192.168.1.50:2045`) and a QR code. On a phone or computer on the same Wi-Fi,
 scan the code or type the address into a web browser, then tap **Choose
 files** (or drop files on the page). Books (`.epub`, `.txt`) go into the
 books folder and fonts (`.ttf`, `.otf`) into the fonts folder; each is listed
