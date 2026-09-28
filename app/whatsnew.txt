@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.14
+The version number in Settings is easier to read.
+
 v0.3.13
 Tapping anywhere else closes the update message, instead of turning the page by accident.
 

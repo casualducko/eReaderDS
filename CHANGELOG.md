@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.14
 
 - The version number at the top of Settings is a little bigger.
 
