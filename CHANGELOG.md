@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.1.0
 
 - **Settings: bigger rows, in pages.** The main page is two pages of rows
   about 66–74 px tall (were 37) in a larger font (36 px): 1. Contents,
