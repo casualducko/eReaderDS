@@ -263,6 +263,10 @@ function M.find(name)
     for _, f in ipairs(M.list()) do
         if f.name == name then return f end
     end
+    -- Gone (deleted from the SD card, say): the default, else whatever there is.
+    for _, f in ipairs(M.list()) do
+        if f.name == M.DEFAULT then return f end
+    end
     return M.list()[1]
 end
 

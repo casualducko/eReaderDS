@@ -875,7 +875,8 @@ end
 -- The first words on the left page, to recognise the bookmark by.
 local function page_snippet()
     local words, n = {}, 0
-    for _, it in ipairs(spread.pages[spread.pi].items) do
+    local pg = spread and spread.pages[spread.pi]
+    for _, it in ipairs(pg and pg.items or {}) do
         -- The text, not a heading (the chapter's name is shown beside it).
         if it.kind == "text" and it.font ~= fonts.h then
             words[#words + 1] = it.text
@@ -2360,11 +2361,8 @@ end
 -- item rows shrink (down to a minimum) so everything fits, and if it still
 -- doesn't, the list scrolls with the selection.
 local MENU_TOP, MENU_BOTTOM = 140, PAGE_H - 78
-local MENU_ROW_MAX, MENU_ROW_MIN = 52, 36
 local MENU_HEADER_H, MENU_GAP_H = 27, 10
 
--- Returns the visible rows ({ kind = "item"|"header"|"gap", y, h, idx, text })
--- plus whether there is more above / below.
 -- Settings pages: the rows are big (easy to read and tap), so the items
 -- are spread over pages. The main page says which item goes on which page
 -- (app.menu_on_page); others are filled in order. The page shown is the one
@@ -2446,6 +2444,15 @@ local function menu_layout(items)
         y = y + row.h
     end
     return rows, page, pages
+end
+
+-- A row's "‹  value  ›" as drawn (the value shortened to fit beside the label);
+-- taps measure it to find the ‹ and the ›.
+function app.menu_value_text(it, w)
+    local F = ui.menu
+    if not it.value or it.value == "" then return "‹  ›" end
+    local room = w - F:getWidth(it.label) - 40
+    return "‹  " .. fit_text(F, tostring(it.value), room - F:getWidth("‹    ›")) .. "  ›"
 end
 
 -- Turn the settings page: select the first item of the next / previous one.
@@ -2540,12 +2547,11 @@ local function draw_menu_panel(side)
                 love.graphics.print(it.value_bold, rx + rw - tw - FB:getWidth(it.value_bold), ty)
                 love.graphics.setFont(F)
             elseif it.value and it.value ~= "" then
-                local room = rw - F:getWidth(it.label) - 40
                 local v = it.value
                 if it.adjust then
-                    v = "‹  " .. fit_text(F, v, room - F:getWidth("‹    ›")) .. "  ›"
-
+                    v = app.menu_value_text(it, rw)
                 elseif it.opens then
+                    local room = rw - F:getWidth(it.label) - 40
                     -- A row that opens a page, showing its setting: "Off  ›".
                     v = fit_text(F, v, room - F:getWidth("  ›")) .. "  ›"
                 end
@@ -3696,7 +3702,7 @@ function app.font_action(a)
     local fp = app.font_pick
     local n = #fp.list
     if a == "up" then fp.sel = math.max(1, fp.sel - 1)
-    elseif a == "down" then fp.sel = math.min(n, fp.sel + 1)
+    elseif a == "down" then fp.sel = math.min(math.max(1, n), fp.sel + 1)
     elseif a == "left" or a == "prev" or a == "right" or a == "next" then
         -- All / Serif / Sans, like the switch at the top of the list.
         local idx = 1
@@ -3957,6 +3963,7 @@ end
 
 function app.fget_delete(e)
     local dir = Fonts.user_dir()
+    if not dir then return end
     local stem = e.zip:gsub("%.zip$", "")
     for _, st in ipairs(e.styles or {}) do os.remove(dir .. "/" .. stem .. "-" .. st .. ".ttf") end
     os.remove(dir .. "/" .. stem .. "-OFL.txt")
@@ -5240,18 +5247,26 @@ function app.on_tap(side, u, v)
         local m = MARGINS[2]
         local items = menu_items()
         local idx
-        for _, row in ipairs((menu_layout(items))) do
+        local rows, page, pages = menu_layout(items)
+        for _, row in ipairs(rows) do
             if row.kind == "item" and v >= row.y and v < row.y + row.h then idx = row.idx end
+        end
+        -- "Swipe for more options" under page 1's last row: a tap turns the page too.
+        local last = rows[#rows]
+        if side == "right" and not idx and menu.page == "main" and page < pages and last
+                and v >= last.y + last.h and v < last.y + last.h * 2 + 20 then
+            app.menu_page(1)
+            return
         end
         if side == "right" and u >= m.inner - 14 and u <= PAGE_W - m.outer + 14 and idx then
             local it = items[idx]
             menu.sel = idx
             if it.adjust then
                 -- Where ‹ and › are drawn: "‹  value  ›", right-aligned.
-                local F = ui.menu
-                local right = m.inner + PAGE_W - m.outer - m.inner
+                local F, w = ui.menu, PAGE_W - m.outer - m.inner
+                local right = m.inner + w
                 local plus = right - F:getWidth("  ›")
-                local minus = right - F:getWidth("‹  " .. tostring(it.value or "") .. "  ›")
+                local minus = right - F:getWidth(app.menu_value_text(it, w))
                 if u >= plus - 30 then it.adjust(1)
                 elseif u >= minus - 30 and u <= minus + 50 then it.adjust(-1) end
                 Store.save_settings(S)

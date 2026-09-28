@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Settings: tapping "Swipe for more options" turns to page 2. Taps on ‹ and ›
+  find them where they're drawn, even when a long value is shortened.
+- A font that's gone from the SD card falls back to the default (Crimson Pro),
+  not the first font in the list.
+- Guards: the bookmark row's page words before the page is laid out; down on
+  an empty Fonts filter; deleting a font with no fonts folder. Old unused
+  Settings constants removed.
+
 ## v1.2.0
 
 - **Crimson Pro** is built in and is new readers' default font (40 pt, as
