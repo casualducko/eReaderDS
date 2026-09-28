@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Gutenberg search results no longer list **Authors** and **Subjects**:
+  Gutenberg refuses those lists to apps (403). A busy catalog is now tried
+  twice more (after 2 and 4 seconds) before showing an error.
 - The font list is **alphabetical** (your own fonts included), with an
   **All · Serif · Sans** switch at the top (left/right, or tap it). The sample
   page says where your own fonts go.
