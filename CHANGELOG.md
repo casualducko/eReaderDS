@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **What's new:** swipe to turn its pages, and the latest version stands out
+  (a bigger heading, a "Latest" tag and a bar beside its notes).
+
 ## v0.3.11
 
 - **What's new** (Settings → Page turns & device): the changes in each

@@ -3006,19 +3006,25 @@ function app.whatsnew_pages(w)
         y = y + h
     end
     local data = love.filesystem.read("whatsnew.txt") or ""
-    local first = true
+    local block = 0                                  -- 1 = the latest version
     for line in data:gmatch("[^\n]+") do
         if not line:match("^#") and line:match("%S") then
             local v = line:match("^v(%d[%d%.]*)%s*$")
             if v then
-                if not first then y = y + 24 end
-                if y + ui.bold:getHeight() + ui.font:getHeight() > app.WN_BOTTOM then new_page() end
-                put(ui.bold, "Version " .. v .. (v == VERSION and "  (yours)" or ""), 0, ui.bold:getHeight() + 8)
-                first = false
+                block = block + 1
+                if block > 1 then y = y + 28 end
+                -- The latest version gets a bigger heading and a "Latest" tag.
+                local hf = block == 1 and ui.title or ui.bold
+                if y + hf:getHeight() + ui.font:getHeight() > app.WN_BOTTOM then new_page() end
+                put(hf, "Version " .. v, 0, hf:getHeight() + 8)
+                page[#page].latest = block == 1
+                page[#page].heading = true
+                page[#page].yours = v == VERSION
             else
                 local _, lines = ui.font:getWrap(line, w - 34)
                 for i, l in ipairs(lines) do
                     put(ui.font, (i == 1 and "•" or "") .. "\t" .. l, 0, ui.font:getHeight())
+                    page[#page].latest = block == 1
                 end
                 y = y + 8
             end
@@ -3046,10 +3052,43 @@ function app.whatsnew_draw(side)
         love.graphics.print("You have v" .. VERSION, x, 60 + ui.title:getHeight() + 6)
     end
     local page = wn.pages[(wn.spread - 1) * 2 + (side == "left" and 1 or 2)] or {}
+    -- The latest version: a bar down the side of its notes.
+    local bar0, bar1
+    for _, it in ipairs(page) do
+        if it.latest and not it.heading then
+            bar0 = bar0 or it[4]
+            bar1 = it[4] + it[1]:getHeight()
+        end
+    end
+    if bar0 then
+        color(th.fg)
+        love.graphics.rectangle("fill", x - 22, bar0 + 4, 5, bar1 - bar0 - 4, 2, 2)
+    end
     for _, it in ipairs(page) do
         love.graphics.setFont(it[1])
         color(th.fg)
         local text = it[2]
+        if it.heading then
+            love.graphics.print(text, x, it[4])
+            -- An outlined "Latest" tag (no fill, so it works on every theme),
+            -- and which one you have.
+            local tx = x + it[1]:getWidth(text) + 18
+            local ty = it[4] + it[1]:getBaseline() - ui.small:getBaseline()
+            love.graphics.setFont(ui.small_bold)
+            if it.latest then
+                local tw, thh = ui.small_bold:getWidth("LATEST") + 22, ui.small_bold:getHeight() + 6
+                love.graphics.setLineWidth(2)
+                love.graphics.rectangle("line", tx, ty - 3, tw, thh, thh / 2, thh / 2)
+                love.graphics.print("LATEST", tx + 11, ty)
+                tx = tx + tw + 12
+            end
+            if it.yours then
+                color(th.dim)
+                love.graphics.setFont(ui.small)
+                love.graphics.print("yours", tx, ty)
+            end
+            goto continue
+        end
         local bullet, rest = text:match("^(•?)\t(.*)$")
         if bullet then
             if bullet ~= "" then color(th.dim); love.graphics.print("•", x, it[4]); color(th.fg) end
@@ -3057,11 +3096,12 @@ function app.whatsnew_draw(side)
         else
             love.graphics.print(text, x, it[4])
         end
+        ::continue::
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
     if side == "right" then
-        love.graphics.print(wn.spreads > 1 and "‹ › more      B back" or "B back", x, PAGE_H - 70)
+        love.graphics.print(wn.spreads > 1 and "Swipe or ‹ › for more      B back" or "B back", x, PAGE_H - 70)
         if wn.spreads > 1 then love.graphics.printf(wn.spread .. " / " .. wn.spreads, x, PAGE_H - 70, w, "right") end
     end
 end
@@ -3795,6 +3835,8 @@ local function touch_event(kind, sx, sy)
             local du = gesture.u - gesture.u0
             if app.mode == "reader" and math.abs(du) > 60 and now - gesture.t0 < 1.0 then
                 if du < 0 then turn(1, next_spread) else turn(-1, prev_spread) end
+            elseif app.mode == "whatsnew" and math.abs(du) > 60 then
+                app.whatsnew_action(du < 0 and "next" or "prev")
             end
         elseif gesture.held then
             -- Already handled while the finger was down.
