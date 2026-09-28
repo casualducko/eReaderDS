@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- An opening screen ("eReaderDS / Opening…", in your theme) appears as
+  soon as the window is up, instead of nothing until the book is ready.
+  On the stock firmware it shows 1.6 s after launch (the page was 3.6 s).
+- Faster start: the bundled fonts' names are read from their name tables
+  alone instead of loading every font file in full (26 MB); the book now
+  appears after 2.9 s instead of 3.6 s.
+
 ## v0.3.21
 
 - Installing an update no longer freezes on "Installing… 100%" while the

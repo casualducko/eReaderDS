@@ -3624,6 +3624,19 @@ function app.find_highlight(side)
     end
 end
 
+-- While starting up: the name on the top screen.
+function app.splash_draw(side)
+    if side ~= "left" then return end
+    local th = theme()
+    love.graphics.setFont(ui.big)
+    color(th.fg)
+    local y = PAGE_H / 2 - ui.big:getHeight()
+    love.graphics.printf("eReaderDS", 0, y, PAGE_W, "center")
+    love.graphics.setFont(ui.font)
+    color(th.dim)
+    love.graphics.printf("Opening…", 0, y + ui.big:getHeight() + 20, PAGE_W, "center")
+end
+
 local function draw_message(side)
     local th = theme()
     if side == "left" then
@@ -3679,6 +3692,7 @@ local function render_canvases()
     elseif app.mode == "whatsnew" then painter = app.whatsnew_draw
     elseif app.mode == "find" then painter = app.find_draw
     elseif app.mode == "message" then painter = draw_message
+    elseif app.mode == "splash" then painter = app.splash_draw
     else painter = draw_library end
 
     for i, side in ipairs({ "left", "right" }) do
@@ -4713,6 +4727,12 @@ function love.load()
     ui.small_bold = load_font("GentiumBookPlus-Bold.ttf", SMALL_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
     ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
+    -- Something on the screens straight away: loading the fonts and the
+    -- book takes a moment.
+    app.mode = "splash"
+    love.draw()
+    love.graphics.present()
+    app.mode = "library"
     build_fonts()
 
     scan_library()

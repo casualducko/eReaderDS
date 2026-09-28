@@ -125,10 +125,16 @@ local function names_from_path(path)
     if ok then return fam, sub, kind end
 end
 
+-- Only the few KB of tables needed, not the whole file (reading all the
+-- bundled fonts in full took over a second at startup).
 local function names_from_bundle(path)
-    local data = love.filesystem.read(path)
-    if not data then return nil end
-    local ok, fam, sub = pcall(parse_names, function(o, l) return data:sub(o + 1, o + l) end)
+    local f = love.filesystem.newFile(path)
+    if not f:open("r") then return nil end
+    local ok, fam, sub = pcall(parse_names, function(o, l)
+        if not f:seek(o) then return nil end
+        return (f:read(l))
+    end)
+    f:close()
     if ok then return fam, sub end
 end
 
