@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The **"Update available"** note can be tapped to go straight to the update
+  (it stays up a little longer, 8 seconds).
 - When an update is waiting, **Update** is in bold on the Page turns & device
   row in Settings.
 

@@ -2821,9 +2821,9 @@ function app.update_check(by_hand)
             rel.state = "available"
             app.upd = rel
             if app.mode ~= "update" then
-                -- Without a book open there's no Settings: Start opens the update.
+                -- Tapping it opens the update (so do Settings, and Start in the library).
                 app.toast("Update available: v" .. rel.version .. "\nYou have v" .. app.update_current()
-                    .. "  ·  " .. (book and "Settings → Update" or "Start to update"), 6)
+                    .. "  ·  Tap here to update", 8, app.update_open)
             end
         else
             app.upd = { state = err and "error" or "none", message = err, checked = true }
@@ -3713,8 +3713,9 @@ local function touch_event(kind, sx, sy)
 end
 
 -- A short message popup (e.g. "Bookmark added").
-function app.toast(text, secs)
-    overlay = { side = "right", text = text, hide_at = love.timer.getTime() + (secs or 1.2) }
+-- on_tap: what tapping the toast does (it's on the touchscreen), if anything.
+function app.toast(text, secs, on_tap)
+    overlay = { side = "right", text = text, hide_at = love.timer.getTime() + (secs or 1.2), on_tap = on_tap }
     redraw()
 end
 
@@ -3746,6 +3747,7 @@ local function draw_overlay()
         local lh = ui.font:getHeight()
         local h = math.max(80, #lines * lh + 36)
         local x, y = (PAGE_W - w) / 2, 120
+        overlay.box = { x, y, w, h }                    -- for tapping it
         love.graphics.setColor(0.08, 0.08, 0.08, 0.94)
         love.graphics.rectangle("fill", x, y, w, h, 22, 22)
         love.graphics.setColor(1, 1, 1, 0.95)
@@ -4128,6 +4130,15 @@ end
 
 -- A quick tap on the touchscreen (page coordinates of the touched side).
 function app.on_tap(side, u, v)
+    -- A toast that does something when tapped (e.g. "Update available").
+    local o = overlay
+    if o and o.on_tap and o.box and side == o.side and u >= o.box[1] - 10 and u <= o.box[1] + o.box[3] + 10
+            and v >= o.box[2] - 10 and v <= o.box[2] + o.box[4] + 10 then
+        overlay = nil
+        o.on_tap()
+        redraw()
+        return
+    end
     local mode = app.mode
     if mode == "reader" then
         local ref = side == "right" and note.hit(note.on_spread(), side, u, v)

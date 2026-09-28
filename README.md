@@ -29,8 +29,9 @@ The bottom screen turns on while it runs; closing the lid is handled by
 ROCKNIX.
 
 **Updates:** when it's online, eReaderDS checks for a newer version each time
-it starts and says so (with the version you have). Update from **Settings →
-Page turns & device**, or press **Start** in the library if no book is open: it
+it starts and says so (with the version you have): tap that note to update,
+or use **Settings → Page turns & device** (or **Start** in the library with no
+book open). It
 downloads the new version, installs it and restarts. Your books, settings and
 progress are kept.
 
