@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Get more fonts:** a row at the end of the font list opens 14 free reading
+  fonts to download over Wi-Fi (Alegreya, Cardo, Crimson Pro, Gelasio, IBM
+  Plex Serif, Libre Baskerville, Newsreader, Noticia Text, Zilla Slab,
+  Alegreya Sans, Fira Sans, IBM Plex Sans, Lato, Source Sans 3). The list and
+  files are in the repo's `fontpack/` (built by `tools/build-font-pack.py`
+  from a pinned Google Fonts commit; variable-only families cut into static
+  regular / italic / bold / bold-italic like the bundled ones), fetched from
+  raw.githubusercontent.com. Each row shows the family's name set in it (a
+  white preview tinted to the theme); A downloads its zip into the fonts
+  folder and it joins the font list; A then reads in it, Y deletes it (after
+  asking). Tested on the device: list, download, reading in it, deleting.
 - README and the download's README: ROCKNIX installs over Wi-Fi, step by
   step (the card's `roms` is on a Linux partition Mac and Windows can't open;
   never let the computer format it): the device's address, Connect to Server

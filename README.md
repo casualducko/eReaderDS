@@ -232,6 +232,14 @@ Sans** at the top) narrow it. Up/down pick a font, A uses it.
 Vollkorn, Bitter, Atkinson Hyperlegible Next, Inter, Lexend, Andika and
 OpenDyslexic.
 
+**Get more fonts:** the last row of the font list downloads more over Wi-Fi:
+Alegreya, Cardo, Crimson Pro, Gelasio, IBM Plex Serif, Libre Baskerville,
+Newsreader, Noticia Text, Zilla Slab, Alegreya Sans, Fira Sans, IBM Plex Sans,
+Lato and Source Sans 3 (free, SIL Open Font License, from Google Fonts; about
+200 KB–1.4 MB each). Each is shown in its own typeface; A downloads it into the
+fonts folder, then A reads in it and Y deletes it. The list lives in this
+repository's `fontpack` folder (built by `tools/build-font-pack.py`).
+
 **Your own:** copy `.ttf` or `.otf` files into `Ebook/Fonts`, then choose
 them in **Settings → Font**. Regular, italic and bold files of a family are
 grouped automatically. Use static fonts: a variable font (`[wght]` in the
