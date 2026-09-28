@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.24
+Future updates install much faster: only the parts that changed are saved to your SD card.
+
 v0.3.23
 A little quicker to start with the Sepia, Paper and other themes.
 

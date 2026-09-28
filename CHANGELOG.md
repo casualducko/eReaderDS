@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.24
 
 - **Delta updates:** the updater still downloads the release zip, but
   writes only the files that differ from the installed ones (a typical
