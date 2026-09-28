@@ -7,8 +7,9 @@ M.DEFAULT = "Gentium Book Plus"
 
 -- Bundled fonts in menu order: serifs, then sans-serifs, then accessibility.
 local ORDER = {
-    "Gentium Book Plus", "Literata", "Charis SIL", "Source Serif 4", "Crimson Text", "Bitter",
-    "Atkinson Hyperlegible Next", "Inter", "Lexend",
+    "Gentium Book Plus", "Literata", "Charis SIL", "Source Serif 4", "Crimson Text",
+    "EB Garamond", "Lora", "Merriweather", "PT Serif", "Spectral", "Vollkorn", "Bitter",
+    "Atkinson Hyperlegible Next", "Inter", "Lexend", "Andika",
     "OpenDyslexic",
 }
 local RANK = {}

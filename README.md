@@ -65,7 +65,7 @@ summary of the buttons and touchscreen) is at the bottom.
 ## Features
 
 - **Reading:** EPUB and plain text with italics, headings, images and covers;
-  justified text with optional hyphenation (English); 10 built-in fonts plus
+  justified text with optional hyphenation (English); 17 built-in fonts plus
   your own; 11 themes (Sepia by default, plus E-ink, Paper, Night, Amber and more); page-flip or fade
   animation.
 - **Footnotes on the facing page:** press A and the note appears on the other
@@ -137,7 +137,8 @@ the word is shown, yours first; pick a single one in
 ## Fonts
 
 **Built in:** Gentium Book Plus (default), Literata, Charis SIL, Source Serif
-4, Crimson Text, Bitter, Atkinson Hyperlegible Next, Inter, Lexend and
+4, Crimson Text, EB Garamond, Lora, Merriweather, PT Serif, Spectral,
+Vollkorn, Bitter, Atkinson Hyperlegible Next, Inter, Lexend, Andika and
 OpenDyslexic.
 
 **Your own:** copy `.ttf` or `.otf` files into `Ebook/Fonts`, then choose
@@ -184,18 +185,26 @@ device → About**).
 
 - **Fonts**, all under the SIL Open Font License 1.1 (license files in
   `app/fonts/` and the download's `LICENSES` folder):
-  [Gentium Book Plus](https://software.sil.org/gentium/) and
-  [Charis SIL](https://software.sil.org/charis/) (SIL International),
+  [Gentium Book Plus](https://software.sil.org/gentium/),
+  [Charis SIL](https://software.sil.org/charis/) and
+  [Andika](https://software.sil.org/andika/) (SIL International),
   [Literata](https://github.com/googlefonts/literata) (TypeTogether),
   [Source Serif 4](https://github.com/adobe-fonts/source-serif) (Adobe),
   [Crimson Text](https://github.com/googlefonts/Crimson) (Sebastian Kosch),
+  [EB Garamond](https://github.com/octaviopardo/EBGaramond12) (Georg Duffner,
+  Octavio Pardo), [Lora](https://github.com/cyrealtype/Lora-Cyrillic) (Cyreal),
+  [Merriweather](https://github.com/SorkinType/Merriweather) (Sorkin Type),
+  [PT Serif](https://fonts.google.com/specimen/PT+Serif) (ParaType),
+  [Spectral](https://github.com/productiontype/Spectral) (Production Type),
+  [Vollkorn](http://vollkorn-typeface.com) (Friedrich Althausen),
   [Bitter](https://github.com/solmatas/BitterPro) (Huerta Tipográfica),
   [Atkinson Hyperlegible Next](https://github.com/googlefonts/atkinson-hyperlegible-next)
   (Braille Institute), [Inter](https://github.com/rsms/inter) (Rasmus Andersson),
   [Lexend](https://github.com/googlefonts/lexend) (Lexend Project) and
   [OpenDyslexic](https://github.com/antijingoist/opendyslexic) (Abbie Gonzalez).
-  Bitter and Atkinson Hyperlegible Next are static instances generated from
-  their variable fonts.
+  Bitter, Atkinson Hyperlegible Next, EB Garamond, Lora, Merriweather and
+  Vollkorn are static instances generated from their variable fonts
+  (`tools/build-fonts.py` for the last four).
 - **Hyphenation:** US English patterns from TeX's
   [hyph-utf8](https://www.hyphenation.org/tex), © Gerard D.C. Kuiken (notice
   in `app/hyph/en-us.txt`).

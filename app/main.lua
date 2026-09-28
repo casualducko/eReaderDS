@@ -2462,11 +2462,13 @@ local function draw_bookmarks(side)
 end
 
 local CREDITS = {
-    { "Fonts", "Gentium Book Plus and Charis SIL (SIL International), Literata "
+    { "Fonts", "Gentium Book Plus, Charis SIL and Andika (SIL International), Literata "
         .. "(TypeTogether), Source Serif 4 (Adobe), Crimson Text (Sebastian Kosch), "
-        .. "Bitter (Huerta Tipográfica), Atkinson Hyperlegible Next (Braille "
-        .. "Institute), Inter (Rasmus Andersson), Lexend (Lexend Project) and "
-        .. "OpenDyslexic (Abbie Gonzalez). SIL Open Font License 1.1." },
+        .. "EB Garamond (Georg Duffner, Octavio Pardo), Lora (Cyreal), Merriweather "
+        .. "(Sorkin Type), PT Serif (ParaType), Spectral (Production Type), Vollkorn "
+        .. "(Friedrich Althausen), Bitter (Huerta Tipográfica), Atkinson Hyperlegible "
+        .. "Next (Braille Institute), Inter (Rasmus Andersson), Lexend (Lexend Project) "
+        .. "and OpenDyslexic (Abbie Gonzalez). SIL Open Font License 1.1." },
     { "Hyphenation", "US English patterns from TeX's hyph-utf8, by Gerard D.C. Kuiken." },
     { "Dictionary", "WordNet 3.1, © 2011 Princeton University (WordNet license)." },
     { "Engine", "LÖVE 11.5 (zlib license), from the PortMaster runtime." },

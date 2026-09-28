@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Seven more fonts:** EB Garamond, Lora, Merriweather, PT Serif, Spectral,
+  Vollkorn and Andika (all SIL Open Font License), for 17 built in.
 - **Find in book** results stand out more: each one's chapter is in bold,
   and so is the matched text.
 
