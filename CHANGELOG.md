@@ -3,10 +3,16 @@
 ## Unreleased
 
 - **Night theme:** Settings → Page turns & device → Night → Night theme: pick a
-  theme (e.g. Night or Amber) to use automatically between two hours (9 PM
+  theme (e.g. Midnight or Amber) to use automatically between two hours (9 PM
   to 7 AM to start, in the clock's 12/24-hour style), by the device's clock
   and time zone. Checked once a minute, so it switches on the hour. While
   it's on, the Theme row changes the night theme and says "(night)".
+- The "Night" theme is now called **Midnight** (so the night theme setting
+  doesn't read "Night theme: Night"); a saved "Night" becomes Midnight.
+- Clock: "Device clock" now uses the system's own time zone instead of
+  forcing UTC. ROCKNIX runs its clock on UTC with a real zone (e.g. New
+  York), so the status bar was 4 hours ahead there; the stock firmware's
+  zone is UTC, so nothing changes on stock.
 
 ## v0.3.24
 

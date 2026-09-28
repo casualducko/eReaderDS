@@ -33,14 +33,14 @@ local THEMES = {
     { name = "Stone",     bg = { 0.890, 0.882, 0.863 }, fg = { 0.17, 0.17, 0.17 }, dim = { 0.47, 0.46, 0.44 }, sel = { 0.80, 0.79, 0.76 } },
     { name = "Sage",      bg = { 0.863, 0.902, 0.831 }, fg = { 0.16, 0.22, 0.15 }, dim = { 0.42, 0.49, 0.40 }, sel = { 0.76, 0.83, 0.72 } },
     { name = "Dusk",      bg = { 0.125, 0.145, 0.192 }, fg = { 0.80, 0.83, 0.88 }, dim = { 0.49, 0.53, 0.60 }, sel = { 0.22, 0.25, 0.32 } },
-    { name = "Night",     bg = { 0.07, 0.07, 0.07 },    fg = { 0.78, 0.77, 0.74 }, dim = { 0.45, 0.44, 0.42 }, sel = { 0.22, 0.22, 0.22 } },
+    { name = "Midnight",  bg = { 0.07, 0.07, 0.07 },    fg = { 0.78, 0.77, 0.74 }, dim = { 0.45, 0.44, 0.42 }, sel = { 0.22, 0.22, 0.22 } },
     { name = "Amber",     bg = { 0.075, 0.055, 0.035 }, fg = { 0.90, 0.64, 0.33 }, dim = { 0.55, 0.40, 0.22 }, sel = { 0.20, 0.14, 0.08 } },
     { name = "Black",     bg = { 0, 0, 0 },             fg = { 0.62, 0.62, 0.62 }, dim = { 0.36, 0.36, 0.36 }, sel = { 0.16, 0.16, 0.16 } },
 }
 -- Themes used to be saved as a number (their position in the original list).
 -- Listed alphabetically in Settings.
 table.sort(THEMES, function(a, b) return a.name:lower() < b.name:lower() end)
-local OLD_THEME_NUMBERS = { "Paper", "White", "Sepia", "Night" }
+local OLD_THEME_NUMBERS = { "Paper", "White", "Sepia", "Midnight" }
 local MARGINS = { { name = "Narrow", outer = 36, inner = 28 }, { name = "Normal", outer = 60, inner = 44 }, { name = "Wide", outer = 90, inner = 64 } }
 -- Space above and below the text (the header/footer sit inside it).
 local VMARGINS = { { name = "Narrow", size = 60 }, { name = "Normal", size = 76 }, { name = "Wide", size = 110 }, { name = "Extra wide", size = 150 } }
@@ -4761,6 +4761,9 @@ function love.load()
     end
     local n = tonumber(S.theme)
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
+    -- "Night" was renamed "Midnight" (the night theme setting made it confusing).
+    if S.theme == "Night" then S.theme = "Midnight" end
+    if S.night_theme == "Night" then S.night_theme = "Midnight" end
     Timezone.apply(S.tz)
     app.night_check()
     Touch.open("gt9xx-0")

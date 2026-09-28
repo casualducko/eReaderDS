@@ -77,7 +77,7 @@ summary of the buttons and touchscreen) is at the bottom.
 
 - **Reading:** EPUB and plain text with italics, headings, images and covers;
   justified text with optional hyphenation (English); 17 built-in fonts plus
-  your own; 11 themes (Sepia by default, plus E-ink, Paper, Night, Amber and more); page-flip or fade
+  your own; 11 themes (Sepia by default, plus E-ink, Paper, Midnight, Amber and more, and a night theme that switches on automatically in the evening); page-flip or fade
   animation.
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.
@@ -101,9 +101,9 @@ summary of the buttons and touchscreen) is at the bottom.
 |---|---|
 | ![Library](docs/screenshots/library.png) | ![Contents](docs/screenshots/contents.png) |
 
-| Settings | Night theme |
+| Settings | Midnight theme |
 |---|---|
-| ![Settings](docs/screenshots/settings.png) | ![Night theme](docs/screenshots/night.png) |
+| ![Settings](docs/screenshots/settings.png) | ![Midnight theme](docs/screenshots/night.png) |
 
 *Screenshots use public-domain books from Project Gutenberg.*
 
