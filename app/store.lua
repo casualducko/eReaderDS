@@ -21,6 +21,9 @@ local DEFAULTS = {
     extra_dim = 0,     -- 0-3: dark layer over the page, dimmer than the backlight allows
     seen_version = "", -- the version last run: after an update, "what's new" is offered once
     update_notices = true, -- check for a newer version on launch and say so
+    night_theme = "off", -- a theme used automatically at night ("off" or a theme's name)
+    night_from = 21,   -- ... from this hour (0-23, the device's clock)
+    night_to = 7,      -- ... until this one
     skip_version = "", -- a version the reader chose to skip (not mentioned again)
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)
 }
@@ -135,6 +138,7 @@ function M.load_settings()
     -- older): that's an update, not a new install, so "what's new" is offered.
     if raw.seen_version == nil and next(raw) then s.seen_version = "older" end
     s.read_cps = math.max(3, math.min(80, s.read_cps))
+    s.night_from, s.night_to = math.floor(s.night_from) % 24, math.floor(s.night_to) % 24
     -- The old default "UTC" meant "the device's time as it is".
     if s.tz == "UTC" then s.tz = "Device clock" end
     -- The flipped grip was removed (the buttons end up under the wrong hand), so

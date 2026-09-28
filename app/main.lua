@@ -101,8 +101,9 @@ local message = nil
 
 local function theme_index()
     local default = 1
+    local want = app.night and S.night_theme or S.theme      -- the night theme at night
     for i, t in ipairs(THEMES) do
-        if t.name == S.theme then return i end
+        if t.name == want then return i end
         if t.name == "Sepia" then default = i end   -- the default theme (store.lua)
     end
     return default
@@ -1405,6 +1406,7 @@ local function status_items()
             { label = "Time zone", value = S.tz, adjust = function(d)
                 S.tz = cycle(Timezone.NAMES, S.tz, d)
                 Timezone.apply(S.tz)
+                app.night_check()
             end },
             { label = "Battery", value = Battery.get() and (S.sb_battery and "Show" or "Hide") or "n/a",
               adjust = function() S.sb_battery = not S.sb_battery end },
@@ -1436,7 +1438,44 @@ local function close_sub()
     menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
 end
 
--- Settings you set once: page turns, the lid, updates and About.
+-- Night theme: another theme, used automatically between two hours (by
+-- the device's clock, like the status bar). app.night says whether it's on
+-- now; checked once a minute.
+function app.night_check()
+    local was = app.night
+    local h = tonumber(os.date("%H")) or 0
+    local from, to = S.night_from, S.night_to
+    app.night = S.night_theme ~= "off" and from ~= to
+        and ((from < to and h >= from and h < to) or (from > to and (h >= from or h < to))) or false
+    if app.night ~= was then redraw() end
+end
+
+-- An hour as the clock shows it: "9 PM" or "21:00".
+function app.hour_label(h)
+    if S.sb_clock == "24" then return string.format("%02d:00", h) end
+    return ((h + 11) % 12 + 1) .. (h < 12 and " AM" or " PM")
+end
+
+function app.night_items()
+    local names = { "off" }
+    for _, t in ipairs(THEMES) do names[#names + 1] = t.name end
+    local rows = {
+        { label = "Use", value = S.night_theme == "off" and "Off" or S.night_theme, adjust = function(d)
+            S.night_theme = cycle(names, S.night_theme, d); app.night_check()
+        end },
+    }
+    if S.night_theme ~= "off" then
+        rows[#rows + 1] = { label = "From", value = app.hour_label(S.night_from), adjust = function(d)
+            S.night_from = (S.night_from + d) % 24; app.night_check()
+        end }
+        rows[#rows + 1] = { label = "Until", value = app.hour_label(S.night_to), adjust = function(d)
+            S.night_to = (S.night_to + d) % 24; app.night_check()
+        end }
+    end
+    return rows
+end
+
+-- Settings you set once: page turns, night theme, the lid, updates and About.
 local function more_items()
     local u = app.upd
     return join(
@@ -1450,6 +1489,7 @@ local function more_items()
                 S.tap = S.tap == "next" and "menu" or "next"
             end },
         }),
+        section("Night theme", app.night_items()),
         section("Look up", {
             { label = "Dictionary", value = look.only() or "All", adjust = function(d)
                 local names = { "all" }
@@ -1521,8 +1561,10 @@ local function menu_items()
             { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
                 S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
             end },
-            { label = "Theme", value = th.name, adjust = function(d)
-                S.theme = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
+            -- Changes the theme on screen: at night, the night theme.
+            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), adjust = function(d)
+                local name = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
+                if app.night then S.night_theme = name else S.theme = name end
             end },
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
@@ -4720,6 +4762,7 @@ function love.load()
     local n = tonumber(S.theme)
     if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
     Timezone.apply(S.tz)
+    app.night_check()
     Touch.open("gt9xx-0")
     KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
         { ["gt9xx-0"] = true, ["Goodix Capacitive TouchScreen"] = true },  -- stock, ROCKNIX
@@ -4912,9 +4955,11 @@ function love.run()
             lid_tick()
             love.timer.sleep(0.25)              -- screens are off: check rarely
         end
-        if S.sb_show and S.sb_clock ~= "off" and (app.mode == "reader" or app.mode == "menu") then
-            local minute = os.date("%H%M")
-            if minute ~= app.clock_minute then app.clock_minute = minute; redraw() end
+        local minute = os.date("%H%M")
+        if minute ~= app.clock_minute then
+            app.clock_minute = minute
+            app.night_check()                  -- the night theme's hours
+            if S.sb_show and S.sb_clock ~= "off" and (app.mode == "reader" or app.mode == "menu") then redraw() end
         end
         if app.anim or app.task then
             love.timer.sleep(0.001)            -- animating or working: next frame
