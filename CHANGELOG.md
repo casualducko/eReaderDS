@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.20
 
 - Updating from v0.3.10 or older (which didn't record the version last
   run) now shows the "Updated, tap to see what's new" note too, instead of

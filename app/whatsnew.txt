@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.20
+Coming from an older version? You now get the note offering to show what's new.
+
 v0.3.19
 Behind-the-scenes fixes: less memory used after searching a book, a tidier library screen when an update is waiting, and more dependable updates.
 
