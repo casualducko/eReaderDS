@@ -2,6 +2,12 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.26
+Settings are easier to find: Night theme sits next to Theme, reading options are under Reading & device, and What's new, updates and credits are under About eReaderDS.
+Picking a night theme previews it on the touchscreen.
+The search keyboard's bottom keys are tidier and easier to tap.
+A shorter Help page.
+
 v0.3.25
 Night theme: switch to a darker theme automatically in the evening. Set it up in Settings → Page turns & device.
 The Night theme is now called Midnight.

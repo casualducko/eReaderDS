@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.26
 
 - **Settings reorganised.** The main page's Page section has a **Night
   theme** row next to Theme ("Dusk · 9 PM–7 AM" or "Off") that opens its
