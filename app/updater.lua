@@ -38,7 +38,8 @@ local function plain(md)
 end
 
 -- The newest release that's newer than `current` and has the app's zip:
--- { version, url, size, notes } or nil. Pre-releases count (this is a beta).
+-- { version, url, size, notes } or nil. Tags with a suffix (v1.3.0-beta,
+-- pre-releases for testing) don't match, so they're never offered.
 function M.parse(body, current)
     local ok, list = pcall(Json.decode, body)
     if not ok or type(list) ~= "table" then return nil, "couldn't read the release list" end

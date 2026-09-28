@@ -1,11 +1,17 @@
 # Changelog
 
-## Unreleased
+## v1.0.0
+
+The first full release (no longer a pre-release).
 
 - The repository is now **casualducko/eReaderDS** (renamed from
   eReaderDS-beta; GitHub redirects the old addresses, so installed copies
   keep finding updates, fonts and What's new; checked on the device). The
   updater, Get more fonts, Report a problem and the readmes use the new name.
+- Releases are normal GitHub releases now; a tag with a suffix
+  (`v1.3.0-beta`) becomes a pre-release, which the updater never offers.
+  The README's download link goes straight to the latest release, and the
+  "test release" note is gone.
 - Requests send a fixed user agent, `eReaderDS
   (+https://github.com/casualducko/eReaderDS)` (was `eReaderDS`), which
   Standard Ebooks is allowing through to its full catalog.

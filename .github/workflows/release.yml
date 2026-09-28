@@ -37,5 +37,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes=$(awk -v v="## ${GITHUB_REF_NAME}" '$0==v{f=1;next} /^## /{f=0} f' CHANGELOG.md)
+          # v1.2.3 is a normal release; a tag with a suffix (v1.3.0-beta) is a
+          # pre-release, which the in-app updater never offers.
+          pre=""; case "${GITHUB_REF_NAME}" in *-*) pre="--prerelease";; esac
           gh release create "${GITHUB_REF_NAME}" "${{ steps.build.outputs.zip }}" \
-            --title "eReaderDS ${GITHUB_REF_NAME}" --notes "${notes:-See CHANGELOG.md}" --prerelease
+            --title "eReaderDS ${GITHUB_REF_NAME}" --notes "${notes:-See CHANGELOG.md}" $pre

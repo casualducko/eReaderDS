@@ -76,8 +76,10 @@ leaves settings and progress (`Ebook/.ereaderds`) alone.
    git tag v0.2.0 && git push origin main v0.2.0
    ```
 3. The **Release** workflow builds `eReaderDS-vX.Y.Z.zip` with
-   `tools/build-release.sh`, and publishes it as a GitHub pre-release using
-   that version's changelog section as the notes.
+   `tools/build-release.sh`, and publishes it as a GitHub release using
+   that version's changelog section as the notes. (A tag with a suffix, such
+   as `v1.3.0-beta`, becomes a pre-release, which the in-app updater never
+   offers.)
 
 To build the zip locally: `tools/build-release.sh` (writes to `dist/`).
 

@@ -10,15 +10,15 @@ device sideways like an open book: each screen shows one page.
 
 ![Reading, held sideways](docs/screenshots/reading.png)
 
-> **RG DS Plus on its stock firmware or ROCKNIX** (not the original RG DS,
-> and not other custom firmware such as KNULLI). **This is a test release**:
-> please [report problems](#reporting-problems).
+> For the **RG DS Plus on its stock firmware or ROCKNIX** (not the original RG
+> DS, and not other custom firmware such as KNULLI). Found a problem? Please
+> [report it](#reporting-problems).
 
 ## Install
 
 Download `eReaderDS-vX.Y.Z.zip` from the
-[releases page](https://github.com/casualducko/eReaderDS/releases) (the
-newest is at the top) and unzip it on your computer. Then follow the steps for
+[latest release](https://github.com/casualducko/eReaderDS/releases/latest)
+and unzip it on your computer. Then follow the steps for
 your firmware.
 
 ### Stock firmware
