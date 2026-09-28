@@ -196,8 +196,8 @@ as Gutenberg and Calibre do) opens an on-screen keyboard on the touchscreen:
 tap the keys, or use the D-pad and A.
 
 **Project Gutenberg** (70,000+ free books) and **Standard Ebooks** (classics,
-carefully proofread and beautifully typeset: the newest releases, and search
-across the whole collection) work with no setup. To add your
+carefully proofread and beautifully typeset: the whole collection, by newest,
+subject, collection or author, and search) work with no setup. To add your
 own catalog, such as a Calibre content server or Calibre-Web, edit
 `Ebook/.ereaderds/opds.txt` on the SD card (it's created the first time
 eReaderDS runs):

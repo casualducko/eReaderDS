@@ -1194,14 +1194,13 @@ end
 function shop.load_page(pg, url, append)
     pg.loading, pg.error = true, nil
     pg.retry = { url = url, append = append }      -- what A retries if this fails
-    shop.net_job(shop.catalog_opts({ kind = "fetch", url = url }), function(msg)
+    shop.net_job(shop.catalog_opts({ kind = "feed", url = url }), function(msg)
         pg.loading = false
         if msg.kind == "error" then
             pg.error = shop.online(true) and msg.message or "Not connected to Wi-Fi."
             return
         end
-        local ok, feed = pcall(Opds.parse_feed, msg.body, msg.url or url)
-        if not ok then pg.error = tostring(feed):gsub("^[^:]*:%d+: ", ""); return end
+        local feed = msg.feed
         -- Gutenberg: leave out entries that can't be opened here: the
         -- "Authors" and "Subjects" lists at the top of search results (its
         -- server refuses them to apps, 403), and links to its social media
@@ -1215,6 +1214,11 @@ function shop.load_page(pg, url, append)
                     table.remove(feed.entries, k)
                 end
             end
+        end
+        -- Standard Ebooks: its "All" list is every book at once (1,500, several MB,
+        -- slow to load and endless to scroll); search finds them instead.
+        for k = #feed.entries, 1, -1 do
+            if feed.entries[k].href == "https://standardebooks.org/feeds/opds/all" then table.remove(feed.entries, k) end
         end
         if append then
             for _, e in ipairs(feed.entries) do pg.entries[#pg.entries + 1] = e end

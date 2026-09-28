@@ -73,8 +73,10 @@ M.BUILT_IN = {
       about = "Over 70,000 free public-domain books." },
     -- Its full catalog feed is for its patrons; the newest releases and search
     -- (over every title) are open to everyone.
-    { name = "Standard Ebooks", key = "standardebooks", url = "https://standardebooks.org/feeds/atom/new-releases", verify = true,
-      about = "Classics, carefully proofread and beautifully typeset. The newest releases, and search across the whole collection." },
+    -- The full catalog is open to eReaderDS's User-Agent (net.lua), which
+    -- Standard Ebooks allows through; other apps get the new releases only.
+    { name = "Standard Ebooks", key = "standardebooks", url = "https://standardebooks.org/feeds/opds", verify = true,
+      about = "Classics, carefully proofread and beautifully typeset: the newest, by subject, collection or author, and search." },
 }
 
 ---------------------------------------------------------------- XML

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Standard Ebooks: the full catalog.** Standard Ebooks has allowed
+  eReaderDS's User-Agent through to its OPDS catalog, so Get books → Standard
+  Ebooks now opens it: Newest, by Subject, by Collection, by Author, and
+  Search. Its "All" list is left out (1,500 books in one 7 MB page; search
+  finds them instead).
+- Catalog pages are parsed on the network thread (new `feed` job in
+  networker.lua) instead of the screen's: a big page (Standard Ebooks' Fiction,
+  912 books, 4.5 MB) took 1.5 s on the device, during which the screen froze.
+- Checked on ROCKNIX: Send books works with its default firewall.
+
 ## v1.3.0
 
 - **Send books from a phone or computer:** Get books → **Send from your phone

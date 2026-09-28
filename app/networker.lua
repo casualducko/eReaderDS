@@ -1,14 +1,17 @@
 -- Network thread: runs one job at a time from the "net_jobs" channel so the
--- UI never blocks on Wi-Fi. Jobs: { id, kind = "fetch" | "download", url,
--- user, password, verify, dest }. Replies on "net_out":
+-- UI never blocks on Wi-Fi. Jobs: { id, kind = "fetch" | "feed" | "download",
+-- url, user, password, verify, dest }. Replies on "net_out":
 --   { id, kind = "progress", got, total }   (downloads, a few times a second)
 --   { id, kind = "done", body }             (fetch: the body; download: none)
+--   { id, kind = "done", feed, url }        (feed: the catalog page, parsed
+--                                            here so a big one doesn't stall the screen)
 --   { id, kind = "error", message }
 -- Pushing a download's job id to "net_cancel" stops that download.
 require("love.filesystem")
 require("love.data")
 require("love.timer")
 local Net = require("net")
+local Opds = require("opds")
 
 local jobs = love.thread.getChannel("net_jobs")
 local out = love.thread.getChannel("net_out")
@@ -19,6 +22,14 @@ local function run(job)
     if job.kind == "fetch" then
         local body, final = Net.get(job.url, opts)
         out:push({ id = job.id, kind = "done", body = body, url = final })
+        return
+    end
+    if job.kind == "feed" then
+        local body, final = Net.get(job.url, opts)
+        local ok, feed = pcall(Opds.parse_feed, body, final or job.url)
+        body = nil
+        if not ok then error(tostring(feed):gsub("^[^:]*:%d+: ", ""), 0) end
+        out:push({ id = job.id, kind = "done", feed = feed, url = final })
         return
     end
 
