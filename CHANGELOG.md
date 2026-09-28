@@ -15,6 +15,9 @@
   Library), with the screens' titles to match. Quit is the last row of page
   2; page 1 ends with a "Swipe for more options ›" note (not a row, so the
   cursor never stops on it).
+- Settings headings: **Main** above Table of Contents (so both pages start
+  with a heading in the same place) and **Other** above Status bar.
+- Help's text is larger (34 px, was 30), with the rows a little closer.
 - Tapping **‹** or **›** on a row steps its value down or up (a tap used to
   always step it up); tapping the label selects the row. Tested on the
   device: 40 → 42 (›), 40 → 38 (‹), label leaves it.

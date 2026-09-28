@@ -1646,7 +1646,7 @@ local function menu_items()
     local u = app.upd
     -- Two pages (swipe, or up/down past the end): the everyday things first.
     return join(
-        app.menu_on_page(1, section(nil, join(
+        app.menu_on_page(1, section("Main", join(
             u.state == "available" and { { label = "Update to v" .. u.version, bold = true, act = app.update_open } } or {},
             {
             { label = "Table of Contents", act = function()
@@ -1718,7 +1718,7 @@ local function menu_items()
         app.menu_on_page(2, section("Night", {
             { label = "Night theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
         })),
-        app.menu_on_page(2, section("", {
+        app.menu_on_page(2, section("Other", {
             { label = "Status bar", value = "›", act = function() open_sub("status") end },
             { label = "Reading & device", value = "›", act = function() open_sub("more") end },
             { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
@@ -2939,7 +2939,7 @@ app.HELP = {
         { "X, Start", "Settings" },
         { "Curved arrow", "Settings (or press the stick)" },
         { "Y", "Look up a word" },
-        { "Y, then Select", "Highlight: Select at the first word, move, Select at the last" },
+        { "Y, then Select", "Highlight: Select at the first and last word" },
         { "Select", "Bookmark the page" },
         { "Anbernic", "Quit" },
     } },
@@ -2963,17 +2963,17 @@ function app.draw_help(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(page[1], x, 60)
-    local key_w, y = 230, 170
+    local key_w, y = 270, 158
     for _, row in ipairs(page[2]) do
         local desc = row[2]
         if row[1] == "Tap or swipe" and S.tap == "menu" then desc = "Swipe: turn pages. Tap: Settings" end
-        love.graphics.setFont(ui.font)
+        love.graphics.setFont(ui.help)
         color(th.fg)
         love.graphics.print(row[1], x, y)
         color(th.dim)
         love.graphics.printf(desc, x + key_w, y, w - key_w, "left")
-        local _, lines = ui.font:getWrap(desc, w - key_w)
-        y = y + math.max(1, #lines) * ui.font:getHeight() + 26
+        local _, lines = ui.help:getWrap(desc, w - key_w)
+        y = y + math.max(1, #lines) * ui.help:getHeight() + 16
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
@@ -5689,6 +5689,7 @@ function love.load()
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
     ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
     ui.menu = load_font("GentiumBookPlus-Regular.ttf", app.MENU_SIZE)       -- Settings rows
+    ui.help = load_font("GentiumBookPlus-Regular.ttf", 34)                  -- the Help pages
     ui.menu_bold = load_font("GentiumBookPlus-Bold.ttf", app.MENU_SIZE)
     -- Something on the screens straight away: loading the fonts and the
     -- book takes a moment.
