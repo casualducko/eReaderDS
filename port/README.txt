@@ -1,5 +1,5 @@
 eReaderDS v@VERSION@ - two-page ebook reader for the Anbernic RG DS Plus
-Created by casualducko. For the RG DS Plus on its stock firmware only.
+Created by casualducko. For the RG DS Plus on its stock firmware or ROCKNIX.
 
 INSTALL / UPDATE
   1. Copy "eReaderDS.sh" and the "eReaderDS" folder (inside this zip's Ports
@@ -8,6 +8,10 @@ INSTALL / UPDATE
   2. Put .epub or .txt books in the card's "Ebook" folder.
   3. On the device: Ports > eReaderDS.
   Copy the two items, not the whole Ports folder, or you may lose other ports.
+  ROCKNIX: copy them into roms/ports instead, and put books in roms/ebook.
+
+  Updates install themselves over Wi-Fi: eReaderDS says when a new version
+  is out (or use Settings > About eReaderDS > Check for updates).
 
 CONTROLS (hold it turned counter-clockwise; directions as held)
   D-pad ................. turn pages; in menus up/down move, left/right change
@@ -17,7 +21,7 @@ CONTROLS (hold it turned counter-clockwise; directions as held)
   Select ................ bookmark this page (press again to remove);
                           in the library: get books over Wi-Fi
   Start, X, ↩ ........... open / close settings
-  Y ..................... look up a word (contents: in settings)
+  Y ..................... look up a word
   Menu (Anbernic) ....... quit
   Analog stick .......... like the D-pad
 
@@ -26,6 +30,8 @@ TOUCH (bottom screen)
   Slide up/down ......... brightness
   Tap right/left half ... next/previous page (Settings > Reading & device > Tap)
   Tap top-right corner .. bookmark this page
+  Pinch ................. text size
+  Hold a word ........... look it up
 
 YOUR OWN FONTS
   Copy .ttf/.otf files into Ebook/Fonts, then pick them in Settings > Font.

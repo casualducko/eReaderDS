@@ -14,7 +14,7 @@ Created by **casualducko**.
 ## Install
 
 1. Download `eReaderDS-vX.Y.Z.zip` from the
-   [latest release](https://github.com/casualducko/eReaderDS-beta/releases/latest)
+   [releases page](https://github.com/casualducko/eReaderDS-beta/releases) (the newest is at the top)
    and unzip it on your computer.
 2. From the unzipped `Ports` folder, copy **`eReaderDS.sh`** and the
    **`eReaderDS`** folder into the `Ports` folder on the SD card, and
@@ -29,12 +29,15 @@ The bottom screen turns on while it runs; closing the lid is handled by
 ROCKNIX.
 
 **Updates:** when it's online, eReaderDS checks for a newer version each time
-it starts and says so (with the version you have): tap that note to update,
-or use **Settings → About eReaderDS** (or **Start** in the library with no
-book open). It
-downloads the new version, installs it and restarts. Your books, settings and
-progress are kept. To stop the automatic check and its notes, set **Update notices** to Off
-(same page); **Check for updates** still works. To pass on just one version, choose
+it starts and says so (with the version you have). Tap that note to update, or
+use **Settings → About eReaderDS** (or **Start** in the library with no book
+open). The update screen lists what's new in plain words; **Update now**
+downloads it, saves only the files that changed, and restarts. Your books,
+settings and progress are kept. After an update, a note offers to show
+**What's new** (also in Settings → About eReaderDS).
+
+To stop the automatic check and its notes, set **Update notices** to Off (same
+page); **Check for updates** still works. To pass on just one version, choose
 **Skip this version** on the update screen; you'll still hear about the next.
 
 To update by hand, copy the same two items from a newer zip over the old ones. Your
@@ -57,9 +60,8 @@ Directions are as you hold it.
 | Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
 | Menu (Anbernic button) | Quit | Quit |
 
-The L/R and L2/R2 shoulder buttons aren't used. Contents, Bookmarks, Jump to %
-and the Library are at the top of **Settings**, and **Help** (a one-page
-summary of the buttons and touchscreen) is at the bottom.
+The L/R and L2/R2 shoulder buttons aren't used. **Help** in Settings is a
+one-page summary of the buttons and touchscreen.
 
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
@@ -70,15 +72,33 @@ summary of the buttons and touchscreen) is at the bottom.
 - Tap the top edge (left of that corner) to show or hide all the status bars.
 - Press and hold a word to look it up.
 - In the library and Get books, tap an entry to see it on the other screen,
-  and tap it again to open (or download) it.
+  and tap it again to open (or download) it. In Contents, Bookmarks and Find
+  in book, tap an entry to go there.
+- Swipe (or tap) to turn the pages of What's new.
 - Tap a note number, or the **Notes** button, to show footnotes.
+
+## Settings
+
+Press **B** (or Start, X, ↩) while reading. One page, top to bottom:
+
+- **Contents, Bookmarks, Find in book, Jump to %, Library**
+- **Text:** Font (its own page, [below](#fonts)), text size, line spacing,
+  justify, hyphenation
+- **Page:** margins, theme, **Night theme** ([below](#night-theme)), brightness
+- **Status bar ›** what the top and bottom lines show, and the clock style
+- **Reading & device ›** page-turn animation, what a tap does, dictionary,
+  closing the lid, time zone
+- **About eReaderDS ›** What's new, Check for updates, Update notices, About &
+  credits (and **Update to v…** when one is waiting; the row says **Update**)
+- **Help**, **Quit**
 
 ## Features
 
 - **Reading:** EPUB and plain text with italics, headings, images and covers;
   justified text with optional hyphenation (English); 17 built-in fonts plus
-  your own; 11 themes (Sepia by default, plus E-ink, Paper, Midnight, Amber and more, and a night theme that switches on automatically in the evening); page-flip or fade
-  animation.
+  your own; 11 themes (Sepia by default, plus E-ink, Paper, Midnight, Amber
+  and more) that the whole app follows, and a night theme that switches on by
+  itself in the evening; page-flip or fade animation.
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.
 - **Dictionary on the facing page:** press Y and move a cursor over the words;
@@ -93,7 +113,9 @@ summary of the buttons and touchscreen) is at the bottom.
   jump. Your place in every book is saved.
 - **Status bar:** book and chapter titles, pages left, time left in the chapter
   (learned from your reading speed), percent read, a progress bar, battery and a clock.
-  Choose what shows in **Settings → Status bar**.
+  Choose what shows in **Settings → Status bar**. The clock follows the
+  device's time; if it's off, pick your zone in **Settings → Reading &
+  device → Time zone**.
 - **Battery-friendly:** the screen only redraws when something changes, and
   closing the lid puts the device to sleep.
 
@@ -106,6 +128,15 @@ summary of the buttons and touchscreen) is at the bottom.
 | ![Settings](docs/screenshots/settings.png) | ![Midnight theme](docs/screenshots/night.png) |
 
 *Screenshots use public-domain books from Project Gutenberg.*
+
+## Night theme
+
+**Settings → Night theme** picks a second theme (Midnight, Amber and Dusk
+are the darker ones) and the hours to use it, 9 PM to 7 AM to start. It
+switches on the hour by the device's clock, and the whole app changes with
+it. While picking, the touchscreen previews each theme. At night, the
+**Theme** row changes the night theme (it says "(night)"), so your daytime
+theme is left alone.
 
 ## Getting books over Wi-Fi
 
@@ -173,6 +204,8 @@ name) only shows one weight.
 | Get books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
 | Pages upside down | Turn the device the other way, with the buttons on your right. |
 | Screen stays dim after quitting | Brightness is restored when the app quits; after a crash, set it in the system menu. |
+| The clock is wrong | Set **Settings → Reading & device → Time zone** (**Device clock** uses the system's own setting). |
+| An update fails | Check Wi-Fi and choose **Try again**. Nothing is changed until an update is complete; you can also [update by hand](#install). |
 
 ## Reporting problems
 
