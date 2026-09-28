@@ -3,8 +3,6 @@
 A two-page ebook reader for the **Anbernic RG DS Plus**. Hold the device
 sideways like an open book: each screen shows one page.
 
-Created by **casualducko**.
-
 ![Reading, held sideways](docs/screenshots/reading.png)
 
 > **RG DS Plus on its stock firmware or ROCKNIX** (not the original RG DS,
