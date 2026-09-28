@@ -13,6 +13,13 @@
   Settings (`app.library_layout`; the top book's group keeps its header while
   scrolling). Stored in `.ereaderds/finished.txt` (path, time);
   `lib_hide_finished` in settings.
+- **Series:** a Series order in My Books (after Author): a header for each
+  series with its books in order ("Book 1", "Book 1.5", "Book 2" beside the
+  author), then "Not in a series"; the top screen says "The Expanse, book 2".
+  Read with the title and author (`Book.meta`): Calibre's calibre:series and
+  calibre:series_index, else EPUB 3 belongs-to-collection when its
+  collection-type is "series" (Standard Ebooks' curated sets aren't). Saved in
+  library.txt (two more columns; older lines are read again once).
 
 ## v1.5.0
 

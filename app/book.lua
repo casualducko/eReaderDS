@@ -489,9 +489,9 @@ local function open_txt(path)
     return book
 end
 
--- Title, author and the author's sort name ("Suarez, Daniel") from an EPUB's
--- package file, without opening the rest of the book: for the library list.
--- nil if it can't be read.
+-- Title, author, the author's sort name ("Suarez, Daniel") and the series
+-- (name and number) from an EPUB's package file, without opening the rest of
+-- the book: for the library list. nil if it can't be read.
 function M.meta(path)
     local z = Zip.open(path)
     if not z then return nil end
@@ -517,6 +517,34 @@ function M.meta(path)
                 end
             end
         end
+        -- The series: Calibre's own (calibre:series, calibre:series_index), else
+        -- EPUB 3's belongs-to-collection when it's marked a series (Standard
+        -- Ebooks uses collections for curated sets too, which aren't).
+        local metas = {}
+        for m in opf:gmatch("<meta%s[^>]*/>") do metas[#metas + 1] = { tag = m } end
+        for m, v in opf:gmatch("(<meta%s[^>]*[^/]>)(.-)</meta>") do metas[#metas + 1] = { tag = m, text = text(v) } end
+        for _, m in ipairs(metas) do
+            local name = attr(m.tag, "name")
+            if name == "calibre:series" then t.series = text(attr(m.tag, "content"))
+            elseif name == "calibre:series_index" then t.index = tonumber(attr(m.tag, "content") or "") end
+        end
+        if not t.series then
+            for _, m in ipairs(metas) do
+                local id = attr(m.tag, "id")
+                if attr(m.tag, "property") == "belongs-to-collection" and id and m.text then
+                    local kind, pos
+                    for _, r in ipairs(metas) do
+                        if attr(r.tag, "refines") == "#" .. id then
+                            local p = attr(r.tag, "property")
+                            if p == "collection-type" then kind = r.text
+                            elseif p == "group-position" then pos = tonumber(r.text or "") end
+                        end
+                    end
+                    if kind == "series" then t.series, t.index = m.text, pos; break end
+                end
+            end
+        end
+        if t.series == "" then t.series = nil end
         if t.title == "" then t.title = nil end
         return t
     end)

@@ -942,8 +942,8 @@ local function open_book(path)
 end
 
 -- Library order, chosen with left/right in the library.
-local SORTS = { "recent", "title", "author", "progress" }
-local SORT_NAMES = { recent = "Recent", title = "Title", author = "Author", progress = "Progress" }
+local SORTS = { "recent", "title", "author", "series", "progress" }
+local SORT_NAMES = { recent = "Recent", title = "Title", author = "Author", series = "Series", progress = "Progress" }
 
 -- "The Hobbit" sorts under H; authors sort by last name.
 local function title_key(t) return (t:lower():gsub("^the%s+", ""):gsub("^an?%s+", "")) end
@@ -980,6 +980,10 @@ function library.sort(items)
             k.t = Store.get_opened(it.path) or 0
         elseif mode == "author" then
             k.a = author_key(it.author, it.sort)
+        elseif mode == "series" then
+            -- Each series in order (1, 2, 3...), then the books in none.
+            k.s = it.series and title_key(it.series) or nil
+            k.i = it.index or math.huge
         elseif mode == "progress" then
             -- Books you're reading (most read first), then unread, then finished.
             local pr = Store.get_progress(it.path)
@@ -995,6 +999,11 @@ function library.sort(items)
         if mode == "author" and x.a ~= y.a then
             if x.a == "" or y.a == "" then return y.a == "" end   -- no author: last
             return x.a < y.a
+        end
+        if mode == "series" then
+            if (x.s == nil) ~= (y.s == nil) then return x.s ~= nil end
+            if x.s ~= y.s then return x.s < y.s end
+            if x.i ~= y.i then return x.i < y.i end
         end
         if mode == "progress" then
             if x.group ~= y.group then return x.group < y.group end
@@ -1089,6 +1098,7 @@ local function scan_library()
                         pending[#pending + 1] = it
                     elseif m.title then
                         it.title, it.author, it.sort = m.title, m.author or "", m.sort
+                        it.series, it.index = m.series, m.index
                     end
                 end
                 items[#items + 1] = it
@@ -1128,7 +1138,7 @@ function app.library_meta_step()
         local it = table.remove(q)
         local m = Book.meta(it.path) or {}
         Store.set_meta(it.path, it.size, m)
-        if m.title then it.title, it.author, it.sort = m.title, m.author or "", m.sort end
+        if m.title then it.title, it.author, it.sort, it.series, it.index = m.title, m.author or "", m.sort, m.series, m.index end
     end
     if #q == 0 then
         library.pending = nil
@@ -2226,13 +2236,29 @@ end
 
 local function list_rows(row_h) return math.floor((PAGE_H - 200) / row_h) end
 
--- Sorted by progress, My Books has a header over each group.
+-- Sorted by progress or by series, My Books has a header over each group:
+-- the group's key and its header (nil when this order has no groups).
 app.LIB_GROUPS = { "READING", "NOT STARTED", "FINISHED" }
 app.LIB_HEADER_H = 44
 function app.library_group(it)
-    if Store.get_finished(it.path) then return 3 end
-    local pr = Store.get_progress(it.path)
-    return (pr and pr.pct > 0) and 1 or 2
+    if S.lib_sort == "series" then
+        if it.series then return it.series, it.series:upper() end
+        return "", "NOT IN A SERIES"
+    end
+    if S.lib_sort ~= "progress" then return nil end
+    local g = 2
+    if Store.get_finished(it.path) then g = 3
+    else
+        local pr = Store.get_progress(it.path)
+        if pr and pr.pct > 0 then g = 1 end
+    end
+    return g, app.LIB_GROUPS[g]
+end
+
+-- A number in a series: 2, or 1.5.
+function app.series_number(i)
+    if not i then return nil end
+    return i == math.floor(i) and tostring(math.floor(i)) or tostring(i)
 end
 
 -- Where things go on the touchscreen from book `top` down: { { idx, y } or
@@ -2241,15 +2267,12 @@ end
 function app.library_layout(top)
     local rows, y, n, last = {}, 160, 0, nil
     local bottom = 160 + library.list_rows() * 96
-    local groups = S.lib_sort == "progress"
     for i = top, #library.items do
-        if groups then
-            local g = app.library_group(library.items[i])
-            if g ~= last then
-                if y + app.LIB_HEADER_H + 96 > bottom then break end
-                rows[#rows + 1] = { header = app.LIB_GROUPS[g], y = y }
-                y, last = y + app.LIB_HEADER_H, g
-            end
+        local g, label = app.library_group(library.items[i])
+        if g ~= nil and g ~= last then
+            if y + app.LIB_HEADER_H + 96 > bottom then break end
+            rows[#rows + 1] = { header = label, y = y }
+            y, last = y + app.LIB_HEADER_H, g
         end
         if y + 96 > bottom then break end
         rows[#rows + 1] = { idx = i, y = y }
@@ -2299,7 +2322,11 @@ local function draw_library(side)
                 local sw = status and ui.small:getWidth(status) + 24 or 0
                 love.graphics.setFont(ui.small)
                 color(th.dim)
-                love.graphics.print(fit_text(ui.small, it.author, rw - sw), rx, ty + 40)
+                local by = it.author
+                if S.lib_sort == "series" and it.series and it.index then
+                    by = "Book " .. app.series_number(it.index) .. (by ~= "" and ("  ·  " .. by) or "")
+                end
+                love.graphics.print(fit_text(ui.small, by, rw - sw), rx, ty + 40)
                 if status then love.graphics.printf(status, rx, ty + 40, rw, "right") end
             end
             for _, r in ipairs(rows) do
@@ -2308,8 +2335,9 @@ local function draw_library(side)
                     love.graphics.setFont(ui.small)
                     color(th.dim)
                     local ty = r.y + app.LIB_HEADER_H - ui.small:getHeight() - 8
-                    love.graphics.print(r.header, x, ty)
-                    local lx = x + ui.small:getWidth(r.header) + 14
+                    local label = fit_text(ui.small, r.header, w - 40)
+                    love.graphics.print(label, x, ty)
+                    local lx = x + ui.small:getWidth(label) + 14
                     local ly = ty + math.floor(ui.small:getHeight() * 0.55)
                     color(th.dim, 0.45)
                     love.graphics.setLineWidth(1)
@@ -2395,6 +2423,13 @@ local function draw_library(side)
     love.graphics.setFont(ui.font)
     color(th.dim)
     love.graphics.printf(pv.author or "", x, y, w, "center")
+    -- Its series: "The Expanse, book 2".
+    local cur = library.items[library.sel]
+    if cur and cur.path == pv.path and cur.series then
+        y = y + ui.font:getHeight() + 2
+        love.graphics.setFont(ui.small)
+        love.graphics.printf(cur.series .. (cur.index and (", book " .. app.series_number(cur.index)) or ""), x, y, w, "center")
+    end
     local pr = Store.get_progress(pv.path)
     local done = Store.get_finished(pv.path)
     if done then

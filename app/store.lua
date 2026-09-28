@@ -5,7 +5,7 @@ local M = {}
 local DEFAULTS = {
     font = "Crimson Pro", font_size = 40, spacing = 0.85, margins = 1, vmargins = 2, justify = true,
     hyphenate = false, -- English books only (the patterns are US English)
-    lib_sort = "recent", -- library order: "recent" | "title" | "author" | "progress"
+    lib_sort = "recent", -- library order: "recent" | "title" | "author" | "series" | "progress"
     dict = "all",      -- dictionary for look-ups: "all" or a dictionary's name
     theme = "Sepia", chrome = true, orient = "left", anim = "flip",
     tap = "next",      -- what a tap on the touchscreen does while reading: "menu" | "next"
@@ -127,7 +127,7 @@ function M.load_settings()
     -- Values edited by hand (or from older versions) that aren't valid fall
     -- back to the default.
     local ENUMS = {
-        lib_sort = { recent = true, title = true, author = true, progress = true },
+        lib_sort = { recent = true, title = true, author = true, series = true, progress = true },
         lid = { sleep = true, screen = true },
         tap = { next = true, menu = true },
         anim = { flip = true, fade = true, off = true },
@@ -328,9 +328,10 @@ function M.set_opened(p)
 end
 
 -- library.txt: the title and author inside each EPUB, read once for the
--- library list: path \t size \t title \t author \t author's sort name. An
--- entry is used while the file keeps its size; one with no title is a book
--- that couldn't be read (its file name is used).
+-- library list: path \t size \t title \t author \t author's sort name \t
+-- series \t number in the series. An entry is used while the file keeps its
+-- size; one with no title is a book that couldn't be read (its file name is
+-- used). Lines from before series were kept are read again.
 local meta
 local function load_meta()
     if meta then return meta end
@@ -338,9 +339,10 @@ local function load_meta()
     local f = io.open(path("library.txt"), "rb")
     if f then
         for line in f:lines() do
-            local p, size, t, a, so = line:match("^(.-)\t(%-?%d+)\t(.-)\t(.-)\t(.-)$")
+            local p, size, t, a, so, se, ix = line:match("^(.-)\t(%-?%d+)\t(.-)\t(.-)\t(.-)\t(.-)\t(.-)$")
             if p then
-                meta[p] = { size = tonumber(size), title = t ~= "" and t or nil, author = a, sort = so ~= "" and so or nil }
+                meta[p] = { size = tonumber(size), title = t ~= "" and t or nil, author = a, sort = so ~= "" and so or nil,
+                    series = se ~= "" and se or nil, index = tonumber(ix) }
             end
         end
         f:close()
@@ -354,7 +356,8 @@ function M.get_meta(p, size)
 end
 
 function M.set_meta(p, size, m)
-    load_meta()[p] = { size = size or -1, title = m.title, author = m.author or "", sort = m.sort }
+    load_meta()[p] = { size = size or -1, title = m.title, author = m.author or "", sort = m.sort,
+        series = m.series, index = m.index }
 end
 
 -- Written after a scan, keeping only the books still there (keep: path -> true).
@@ -363,7 +366,8 @@ function M.save_meta(keep)
     local function clean(v) return ((v or ""):gsub("[\t\r\n]", " ")) end
     for p, m in pairs(load_meta()) do
         if not keep or keep[p] then
-            out[#out + 1] = table.concat({ p, tostring(m.size or -1), clean(m.title), clean(m.author), clean(m.sort) }, "\t")
+            out[#out + 1] = table.concat({ p, tostring(m.size or -1), clean(m.title), clean(m.author), clean(m.sort),
+                clean(m.series), m.index and tostring(m.index) or "" }, "\t")
         end
     end
     table.sort(out)
