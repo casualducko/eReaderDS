@@ -2870,7 +2870,8 @@ app.HELP = {
         { "B", "Settings, or back after a jump" },
         { "X, Start", "Settings" },
         { "Curved arrow", "Settings (or press the stick)" },
-        { "Y", "Look up a word; then Select to highlight" },
+        { "Y", "Look up a word" },
+        { "Y, then Select", "Highlight: Select at the first word, move, Select at the last" },
         { "Select", "Bookmark the page" },
         { "Anbernic", "Quit" },
     } },
@@ -2881,6 +2882,7 @@ app.HELP = {
         { "Top-right corner", "Bookmark" },
         { "Top edge", "Show or hide the status bars" },
         { "Hold a word", "Look it up" },
+        { "Tap a word", "While highlighting: highlight up to it" },
         { "Note number", "Show the footnote" },
     }, "B back" },
 }

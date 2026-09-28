@@ -74,6 +74,8 @@ one-page summary of the buttons and touchscreen.
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.
 - Press and hold a word to look it up.
+- While highlighting (**Y**, then **Select**), tap a word to extend the
+  highlight to it.
 - In the library and Get books, tap an entry to see it on the other screen,
   and tap it again to open (or download) it. In Contents, Bookmarks and Find
   in book, tap an entry to go there.

@@ -13,6 +13,8 @@
   has the same name). Layout items
   now carry their word's text offset. Tested on ROCKNIX: choosing, saving,
   the list, text size 40 → 30, removing.
+- Help: a "Y, then Select" row explains highlighting, and the touchscreen side
+  says a tap on a word while highlighting extends it; so does the README.
 
 ## v0.3.27
 
