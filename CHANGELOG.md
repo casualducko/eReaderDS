@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.23
 
 - The E-ink theme's filter (grain texture and shader) is made the first
   time that theme is shown, so other themes don't prepare it at startup.
