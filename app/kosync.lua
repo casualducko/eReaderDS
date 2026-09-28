@@ -11,7 +11,12 @@
 --   PUT /syncs/progress { document, progress, percentage, device, device_id }.
 local M = {}
 
-M.DEFAULT_SERVER = "https://sync.koreader.rocks"
+-- The servers to choose from: CrossPoint's (the default: the Xteink crowd
+-- is already on it, and it has been the more reliable) and KOReader's own.
+-- Any other address is "your own". Both devices must use the same one.
+M.SERVERS = { crosspoint = "https://sync.crosspointreader.com", koreader = "https://sync.koreader.rocks" }
+M.SERVER_NAMES = { crosspoint = "CrossPoint", koreader = "KOReader", custom = "Your own" }
+M.DEFAULT_SERVER = M.SERVERS.crosspoint
 M.DEVICE = "RG DS Plus"
 
 local function md5hex(s) return love.data.encode("string", "hex", love.data.hash("md5", s)) end
@@ -40,8 +45,11 @@ function M.document(path, method)
     return M.partial_md5(path)
 end
 
--- The server's address without a trailing slash (the public one if blank).
-function M.server(s)
+-- The server's address without a trailing slash: for "crosspoint",
+-- "koreader", "custom" (then `custom` is the address) or an address.
+function M.server(s, custom)
+    if M.SERVERS[s] then return M.SERVERS[s] end
+    if s == "custom" then s = custom end
     s = (s or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if s == "" then s = M.DEFAULT_SERVER end
     if not s:match("^https?://") then s = "https://" .. s end
@@ -68,11 +76,13 @@ function M.get_job(server, user, key, doc)
         headers = M.headers(user, key) }
 end
 
-function M.put_job(server, user, key, doc, progress, percentage, device_id)
+-- metadata (optional, "Send book details"): { filename, title, authors },
+-- as KOReader sends it; its own server ignores it, others may show it.
+function M.put_job(server, user, key, doc, progress, percentage, device_id, metadata)
     return { kind = "call", method = "PUT", url = M.server(server) .. "/syncs/progress", headers = M.headers(user, key),
         body = require("json").encode({ document = doc, progress = progress,
             percentage = math.floor(percentage * 10000 + 0.5) / 10000,
-            device = M.DEVICE, device_id = device_id }) }
+            device = M.DEVICE, device_id = device_id, metadata = metadata }) }
 end
 
 return M

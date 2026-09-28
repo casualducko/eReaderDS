@@ -21,6 +21,14 @@
   the word within the landing paragraph 99.8-100%), else by chapter and
   percentage. `net.call` sends any method with a body; the keyboard gained
   capitals ("Aa"), symbols ("#@") and hidden passwords.
+- KOReader Sync's **Server** is a choice (‹ ›): **CrossPoint**
+  (sync.crosspointreader.com, the default: open-source, standard KOSync, and
+  where CrossPoint/Xteink readers already are; KOReader's own was down for
+  hours while this was built), **KOReader** (sync.koreader.rocks) or **Your
+  own** (A types the address). Choosing one sets **Match books by** to that
+  reader's default: File name for CrossPoint, File contents for KOReader.
+  **Send book details** (off by default) adds KOReader's metadata (filename,
+  title, authors) to what's sent.
 
 ## v1.8.0
 

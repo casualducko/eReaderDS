@@ -1781,6 +1781,16 @@ app.KOSync = require("kosync")
 app.sync = { checked = {}, pushed = {}, docs = {}, asked = {}, last_push = 0, last_try = 0 }
 
 function app.sync_on() return S.kosync_user ~= "" and S.kosync_key ~= "" end
+function app.sync_url() return app.KOSync.server(S.kosync_server, S.kosync_custom) end
+
+-- A new server: log in again there; match books the way its readers do.
+function app.sync_set_server(key)
+    S.kosync_server = key
+    if key == "crosspoint" then S.kosync_match = "filename"
+    elseif key == "koreader" then S.kosync_match = "binary" end
+    app.sync.checked, app.sync.pushed = {}, {}
+    Store.save_settings(S)
+end
 
 -- The book's name on the server (worked out once per book and way of matching).
 function app.sync_doc(b)
@@ -1827,7 +1837,7 @@ function app.sync_pull(interactive)
         return
     end
     app.sync.pulling, app.sync.last_try = true, love.timer.getTime()
-    shop.net_job(app.KOSync.get_job(S.kosync_server, S.kosync_user, S.kosync_key, doc), function(msg)
+    shop.net_job(app.KOSync.get_job(app.sync_url(), S.kosync_user, S.kosync_key, doc), function(msg)
         app.sync.pulling = nil
         if book ~= b then return end
         if msg.kind ~= "done" then
@@ -1901,8 +1911,9 @@ function app.sync_push(now)
     local doc = app.sync_doc(b)
     local xp = doc and b:xpointer(pos.ch, pos.off)
     if not xp or app.sync.pushed[b.path] == xp or not shop.online() then return end
-    local job = app.KOSync.put_job(S.kosync_server, S.kosync_user, S.kosync_key, doc, xp,
-        b:fraction(pos.ch, pos.off), app.sync_device_id())
+    local meta = S.kosync_meta and { filename = b.path:match("([^/]+)$"), title = b.title, authors = b.author } or nil
+    local job = app.KOSync.put_job(app.sync_url(), S.kosync_user, S.kosync_key, doc, xp,
+        b:fraction(pos.ch, pos.off), app.sync_device_id(), meta)
     app.sync.last_push = love.timer.getTime()
     if now then
         local ok, status = pcall(require("net").call, job.method, job.url, { headers = job.headers, body = job.body, timeout = 4 })
@@ -1932,14 +1943,32 @@ end
 -- Settings → KOReader Sync.
 function app.sync_items()
     local on = app.sync_on()
-    local host = app.KOSync.server(S.kosync_server):gsub("^https?://", "")
+    local server = app.KOSync.SERVERS[S.kosync_server] and S.kosync_server or "custom"
+    local shown = app.KOSync.SERVER_NAMES[server]
+    if server == "custom" and S.kosync_custom ~= "" then
+        shown = app.KOSync.server("custom", S.kosync_custom):gsub("^https?://", "")
+    end
     local items = {
         { label = "Account", value = on and S.kosync_user or "Log in", act = app.sync_login },
-        { label = "Server", value = host, act = app.sync_server_edit },
+        -- ‹ › CrossPoint / KOReader / your own; A types your own address.
+        { label = "Server", value = shown, act = app.sync_server_edit, adjust = function(d)
+              local order = { "crosspoint", "koreader", "custom" }
+              local i = 1
+              for k, v in ipairs(order) do if v == server then i = k end end
+              local to = order[(i - 1 + d) % #order + 1]
+              if to == "custom" and S.kosync_custom == "" then
+                  app.sync_server_edit()
+              else
+                  app.sync_set_server(to)
+              end
+          end },
         { label = "Match books by", value = S.kosync_match == "filename" and "File name" or "File contents",
           adjust = function()
               S.kosync_match = S.kosync_match == "filename" and "binary" or "filename"
               app.sync.checked, app.sync.pushed = {}, {}
+          end },
+        { label = "Send book details", value = S.kosync_meta and "On" or "Off", adjust = function()
+              S.kosync_meta = not S.kosync_meta
           end },
     }
     if on then
@@ -1969,7 +1998,7 @@ end
 function app.sync_auth(user, key)
     if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
     app.toast("Logging in…", 20)
-    shop.net_job(app.KOSync.auth_job(S.kosync_server, user, key), function(msg)
+    shop.net_job(app.KOSync.auth_job(app.sync_url(), user, key), function(msg)
         if msg.kind ~= "done" then app.toast("Couldn't reach the sync server", 3) return end
         if msg.status == 200 then
             S.kosync_user, S.kosync_key = user, key
@@ -1990,7 +2019,7 @@ end
 
 function app.sync_register(user, key)
     app.toast("Making the account…", 20)
-    shop.net_job(app.KOSync.register_job(S.kosync_server, user, key), function(msg)
+    shop.net_job(app.KOSync.register_job(app.sync_url(), user, key), function(msg)
         if msg.kind ~= "done" then app.toast("Couldn't reach the sync server", 3) return end
         if msg.status == 201 then
             S.kosync_user, S.kosync_key = user, key
@@ -2006,14 +2035,14 @@ function app.sync_register(user, key)
     end)
 end
 
+-- Your own server's address (A on the Server row).
 function app.sync_server_edit()
-    app.kb_open({ title = "Sync server", text = S.kosync_server, ok = "Save", allow_empty = true,
-        hint = "Leave it empty for KOReader's own server (sync.koreader.rocks), or type your own, "
-            .. "such as https://sync.example.com or http://192.168.1.20:7200.",
+    app.kb_open({ title = "Your own sync server", text = S.kosync_custom, ok = "Save", allow_empty = true,
+        hint = "The address of a KOReader sync server, such as https://sync.example.com or "
+            .. "http://192.168.1.20:7200. Empty: back to CrossPoint's.",
         submit = function(t)
-            S.kosync_server = t
-            Store.save_settings(S)
-            app.sync.checked, app.sync.pushed = {}, {}
+            S.kosync_custom = t
+            app.sync_set_server(t ~= "" and "custom" or "crosspoint")
         end })
 end
 

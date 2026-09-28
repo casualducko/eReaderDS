@@ -244,18 +244,18 @@ It's written again whenever they change, so add your own notes elsewhere.
 
 ## KOReader Sync
 
-If you also read in **KOReader** (on a phone, Kobo, Kindle, PocketBook, or an
-Xteink with CrossPoint), eReaderDS can share your place in a book with it
-through KOReader's progress sync server, so each picks up where the other
-left off.
+If you also read in **KOReader** or **CrossPoint** (on a phone, Kobo, Kindle,
+PocketBook, or an Xteink X4), eReaderDS can share your place in a book with
+it through a KOReader sync server, so each picks up where the other left off.
 
-1. In KOReader: **Tools → Progress sync → Register / Login** (once).
-2. Here: **Settings → KOReader Sync → Account**, and type the same user name
-   and password (a new name makes a new account). **Server** is KOReader's own
-   (`sync.koreader.rocks`) unless you run your own (Kavita, Komga,
-   Calibre-Web, BookLore and others can be sync servers, or
-   `koreader-sync-server`); type its address, such as
-   `http://192.168.1.20:7200`.
+1. **Settings → KOReader Sync → Server:** the same server as your other
+   device. **CrossPoint** (`sync.crosspointreader.com`, CrossPoint's default
+   and ours), **KOReader** (`sync.koreader.rocks`, KOReader's default), or
+   **Your own** (press A to type its address, such as
+   `http://192.168.1.20:7200`: Kavita, Komga, Calibre-Web, BookLore and others
+   can be sync servers).
+2. **Account:** the same user name and password as on the other device (a new
+   name makes a new account).
 3. Read. When you open a book, eReaderDS checks the server; if another device
    has been reading it since, it asks **Continue from 45%?** (Jump or Stay).
    It sends your place when you leave the book, close the lid, or the screens
@@ -265,12 +265,13 @@ left off.
 Places are matched to the paragraph (you may land a page or so from where the
 other device was, since screens differ). EPUB books only.
 
-**The same book on both devices:** by default a book is recognised by its
-file's contents, as in KOReader, so both need the *same file*. If they don't
-match (Calibre can change a book when it sends it to a device), set **Match
-books by** to **File name** here and in KOReader (Progress sync → Document
-matching method), and give the files the same name on both. The public
-server is free and sometimes slow or down; eReaderDS simply tries again later.
+**The same book on both devices:** **Match books by** must be the same on
+both. Choosing CrossPoint's server sets **File name** (CrossPoint's default:
+give the files the same name on both), KOReader's sets **File contents**
+(KOReader's default: both need the same file; Calibre can change a book when
+it sends it to a device). **Send book details** (off by default) adds the
+book's title, author and file name to what's sent, as KOReader and CrossPoint
+can. If a server is down, eReaderDS simply tries again later.
 
 ## Dictionaries
 

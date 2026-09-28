@@ -29,9 +29,12 @@ local DEFAULTS = {
     lib_hide_finished = false, -- My Books leaves out the books marked finished
     idle_min = 10,     -- left alone this many minutes, the screens dim, then turn off (0 = never)
     -- KOReader sync (kosync.lua): the account (the key is the password's MD5,
-    -- as KOReader keeps it), the server ("" = the public one), how books are
-    -- matched, and this device's id there.
-    kosync_user = "", kosync_key = "", kosync_server = "", kosync_match = "binary", kosync_device = "",
+    -- as KOReader keeps it), the server ("crosspoint", "koreader" or "custom":
+    -- kosync_custom's address), how books are matched (CrossPoint's server
+    -- goes with file names, KOReader's with file contents, as they default),
+    -- sending the book's details, and this device's id there.
+    kosync_user = "", kosync_key = "", kosync_server = "crosspoint", kosync_custom = "",
+    kosync_match = "filename", kosync_meta = false, kosync_device = "",
 }
 
 local function data_dir()
