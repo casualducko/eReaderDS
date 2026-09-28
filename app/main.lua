@@ -1097,12 +1097,18 @@ function shop.load_page(pg, url, append)
         end
         local ok, feed = pcall(Opds.parse_feed, msg.body, msg.url or url)
         if not ok then pg.error = tostring(feed):gsub("^[^:]*:%d+: ", ""); return end
-        -- Gutenberg's search results start with "Authors" and "Subjects"
-        -- lists that its server refuses to apps (403); leave them out.
-        for k = #feed.entries, 1, -1 do
-            local h = feed.entries[k].href or ""
-            if h:find("gutenberg%.org/ebooks/[%a]+/search%.opds") and not feed.entries[k].book then
-                table.remove(feed.entries, k)
+        -- Gutenberg: leave out entries that can't be opened here: the
+        -- "Authors" and "Subjects" lists at the top of search results (its
+        -- server refuses them to apps, 403), and links to its social media
+        -- pages ("Follow new books on Facebook...") at the top of Latest.
+        if (msg.url or url):find("gutenberg%.org") then
+            for k = #feed.entries, 1, -1 do
+                local e = feed.entries[k]
+                local h = e.href or ""
+                if not e.book and h ~= "" and (h:find("gutenberg%.org/ebooks/[%a]+/search%.opds")
+                        or not h:find("^https?://[%w%.]*gutenberg%.org/")) then
+                    table.remove(feed.entries, k)
+                end
             end
         end
         if append then

@@ -10,8 +10,10 @@
 - **Gutenberg is fast again:** eReaderDS now goes straight to
   www.gutenberg.org. The old m.gutenberg.org address only redirects there,
   and lately answers slowly or with errors (504) much of the time.
-- Gutenberg search results no longer list **Authors** and **Subjects**:
-  Gutenberg refuses those lists to apps (403).
+- Gutenberg search results no longer list **Authors** and **Subjects**
+  (Gutenberg refuses those lists to apps), and **Latest** no longer starts
+  with "Follow new books on Facebook / Bluesky / Mastodon" (links to those
+  sites, which can't be opened here).
 - A catalog that's slow to start answering, or busy, is tried again at once
   (up to twice) instead of waiting out its errors.
 - The font list is **alphabetical** (your own fonts included), with an
