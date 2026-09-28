@@ -5,15 +5,23 @@ local M = {}
 local BUNDLED_DIR = "fonts"   -- inside the LÖVE source
 M.DEFAULT = "Gentium Book Plus"
 
--- Bundled fonts in menu order: serifs, then sans-serifs, then accessibility.
-local ORDER = {
-    "Gentium Book Plus", "Literata", "Charis SIL", "Source Serif 4", "Crimson Text",
-    "EB Garamond", "Lora", "Merriweather", "PT Serif", "Spectral", "Vollkorn", "Bitter",
-    "Atkinson Hyperlegible Next", "Inter", "Lexend", "Andika",
-    "OpenDyslexic",
-}
-local RANK = {}
-for i, name in ipairs(ORDER) do RANK[name] = i end
+-- Serif or sans-serif, for the font list's filter. The bundled ones are
+-- known; for your own, the font's PANOSE class if it has one, then its name,
+-- and otherwise serif (most reading fonts are).
+local SANS = { ["Andika"] = true, ["Atkinson Hyperlegible Next"] = true, ["Inter"] = true,
+    ["Lexend"] = true, ["OpenDyslexic"] = true }
+local SANS_NAMES = { "sans", "grotesk", "grotesque", "gothic", "helvetica", "arial", "roboto", "lato",
+    "montserrat", "nunito", "poppins", "verdana", "tahoma", "futura", "ubuntu", "dyslex", "hyperlegible" }
+function M.kind(f)
+    if f.bundled then return SANS[f.name] and "sans" or "serif" end
+    if f.panose then return f.panose end
+    local n = f.name:lower()
+    if n:find("serif") and not n:find("sans") then return "serif" end
+    for _, w in ipairs(SANS_NAMES) do
+        if n:find(w, 1, true) then return "sans" end
+    end
+    return "serif"
+end
 
 -- Fonts that were renamed or replaced between versions.
 local ALIASES = { ["Atkinson Hyperlegible"] = "Atkinson Hyperlegible Next" }
@@ -64,13 +72,24 @@ local function parse_names(read)
     local n = u16(head, 5)
     local dir = read(base + 12, n * 16)
     if not dir or #dir < n * 16 then return nil end
-    local off, len
+    local off, len, os2
     for k = 0, n - 1 do
-        if dir:sub(k * 16 + 1, k * 16 + 4) == "name" then
+        local tag = dir:sub(k * 16 + 1, k * 16 + 4)
+        if tag == "name" then
             off, len = u32(dir, k * 16 + 9), u32(dir, k * 16 + 13)
+        elseif tag == "OS/2" then
+            os2 = u32(dir, k * 16 + 9)
         end
     end
     if not off then return nil end
+    -- PANOSE (in OS/2): for Latin text faces, serif styles 2-10 are serifs and
+    -- 11-13 sans-serifs. Often left blank (0).
+    local kind
+    local pan = os2 and read(os2 + 32, 2)
+    if pan and #pan == 2 and pan:byte(1) == 2 then
+        local st = pan:byte(2)
+        kind = (st >= 2 and st <= 10 and "serif") or (st >= 11 and st <= 13 and "sans") or nil
+    end
     local t = read(off, len)
     if not t or #t < 6 then return nil end
     local count, strings = u16(t, 3), u16(t, 5)
@@ -93,17 +112,17 @@ local function parse_names(read)
     local family = names[16] or names[1]
     local sub = names[17] or names[2]
     if not family then return nil end
-    return family, sub or "Regular"
+    return family, sub or "Regular", kind
 end
 
 local function names_from_path(path)
     local f = io.open(path, "rb")
     if not f then return nil end
-    local ok, fam, sub = pcall(parse_names, function(o, l)
+    local ok, fam, sub, kind = pcall(parse_names, function(o, l)
         f:seek("set", o); return f:read(l)
     end)
     f:close()
-    if ok then return fam, sub end
+    if ok then return fam, sub, kind end
 end
 
 local function names_from_bundle(path)
@@ -159,7 +178,7 @@ end
 
 local families, by_name
 
-local function add_face(path, bundled, fam, sub)
+local function add_face(path, bundled, fam, sub, kind)
     local weight, italic = classify(sub)
     local key = fam:lower()
     local f = by_name[key]
@@ -168,6 +187,7 @@ local function add_face(path, bundled, fam, sub)
         by_name[key] = f
         families[#families + 1] = f
     end
+    f.panose = f.panose or kind
     f.faces[#f.faces + 1] = { path = path, bundled = bundled, weight = weight, italic = italic }
 end
 
@@ -192,22 +212,18 @@ function M.scan()
             for file in ls:lines() do
                 if is_font(file) then
                     local p = dir .. "/" .. file
-                    local fam, sub = names_from_path(p)
+                    local fam, sub, kind = names_from_path(p)
                     if not fam then fam, sub = names_from_filename(file) end
-                    add_face(p, false, fam, sub)
+                    add_face(p, false, fam, sub, kind)
                 end
             end
             ls:close()
         end
     end
-    -- Bundled fonts in their curated order, then user fonts alphabetically.
-    table.sort(families, function(a, b)
-        local ra = a.bundled and (RANK[a.name] or 99) or 1000
-        local rb = b.bundled and (RANK[b.name] or 99) or 1000
-        if ra ~= rb then return ra < rb end
-        return a.name:lower() < b.name:lower()
-    end)
+    -- Every font, bundled or your own, alphabetically.
+    table.sort(families, function(a, b) return a.name:lower() < b.name:lower() end)
     for _, f in ipairs(families) do
+        f.kind = M.kind(f)
         f.r = pick(f.faces, 400, false)
         f.i = pick(f.faces, 400, true)
         f.b = pick(f.faces, 700, false)

@@ -138,7 +138,8 @@ the word is shown, yours first; pick a single one in
 
 **Settings → Font** opens a two-page view: the fonts on the touchscreen, each
 named in its own typeface, and a sample page in the highlighted one on the
-other screen. Up/down pick a font, left/right the size, A uses it.
+other screen. The list is alphabetical; **All · Serif · Sans** at the top (tap,
+or press Y) narrows it. Up/down pick a font, left/right the size, A uses it.
 
 **Built in:** Gentium Book Plus (default), Literata, Charis SIL, Source Serif
 4, Crimson Text, EB Garamond, Lora, Merriweather, PT Serif, Spectral,

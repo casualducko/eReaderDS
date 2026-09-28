@@ -2750,18 +2750,34 @@ app.FONT_SAMPLE = {
 }
 
 function app.font_open()
-    local list = Fonts.list()
-    local fp = { list = list, sel = 1, top = 1, size = S.font_size }
-    for i, f in ipairs(list) do if f.name == fonts.name then fp.sel = i end end
+    local fp = { sel = 1, top = 1, size = S.font_size }
     app.font_pick = fp
+    app.font_set_filter(app.font_filter_last or "all", fonts.name)
     app.mode = "fonts"
     redraw()
+end
+
+-- Show all fonts, or only serif or sans-serif ones, keeping the highlighted
+-- font if it's still listed.
+app.FONT_FILTERS = { { "all", "All" }, { "serif", "Serif" }, { "sans", "Sans" } }
+function app.font_set_filter(filter, keep)
+    local fp = app.font_pick
+    keep = keep or (fp.list and fp.list[fp.sel] and fp.list[fp.sel].name)
+    fp.filter = filter
+    app.font_filter_last = filter
+    fp.list = {}
+    for _, f in ipairs(Fonts.list()) do
+        if filter == "all" or f.kind == filter then fp.list[#fp.list + 1] = f end
+    end
+    fp.sel, fp.top = 1, 1
+    for i, f in ipairs(fp.list) do if f.name == keep then fp.sel = i end end
 end
 
 -- The highlighted font's faces at the chosen size, loaded once; the previous
 -- ones are released so scrolling through fonts doesn't pile them up.
 function app.font_sample()
     local fp = app.font_pick
+    if not fp.list[fp.sel] then return nil end
     local name = fp.list[fp.sel].name
     local cur = fp.sample
     if cur and cur.name == name and cur.size == fp.size then return cur.f end
@@ -2774,7 +2790,7 @@ end
 function app.font_close(apply)
     local fp = app.font_pick
     if fp.sample then for _, f in pairs(fp.sample.f) do f:release() end end
-    if apply then
+    if apply and fp.list[fp.sel] then
         S.font, S.font_size = fp.list[fp.sel].name, fp.size
         build_fonts()
         goto_pos(pos.ch, pos.off)
@@ -2792,6 +2808,10 @@ function app.font_action(a)
     elseif a == "down" then fp.sel = math.min(n, fp.sel + 1)
     elseif a == "left" or a == "prev" then fp.size = math.max(18, fp.size - 2)
     elseif a == "right" or a == "next" then fp.size = math.min(64, fp.size + 2)
+    elseif a == "toc" then                          -- Y: all / serif / sans
+        local idx = 1
+        for i, f in ipairs(app.FONT_FILTERS) do if f[1] == fp.filter then idx = i end end
+        app.font_set_filter(app.FONT_FILTERS[idx % #app.FONT_FILTERS + 1][1])
     elseif a == "confirm" then app.font_close(true) return
     elseif a == "back" or a == "menu" then app.font_close(false) return
     end
@@ -2801,6 +2821,12 @@ end
 function app.font_tap(side, u, v)
     if side ~= "right" then return end
     local fp = app.font_pick
+    if v < 140 then                                 -- the All / Serif / Sans switch
+        for _, t in ipairs(fp.tabs or {}) do
+            if u >= t.x0 - 12 and u <= t.x1 + 12 then app.font_set_filter(t.filter); redraw() end
+        end
+        return
+    end
     local idx = fp.top + math.floor((v - 160) / app.FONT_ROW_H)
     if v < 160 or idx >= fp.top + app.font_rows() or not fp.list[idx] then return end
     if idx == fp.sel then app.font_close(true) else fp.sel = idx; redraw() end
@@ -2812,6 +2838,7 @@ function app.font_draw(side)
     if side == "left" then
         -- A sample page, laid out roughly like the reader's.
         local f = app.font_sample()
+        if not f then return end
         local m = margins()
         local x, w = m.outer, PAGE_W - m.outer - m.inner
         local lh = math.floor(math.max(f.r:getHeight(), fp.size * 1.4) * S.spacing + 0.5)
@@ -2840,6 +2867,7 @@ function app.font_draw(side)
         end
         love.graphics.setFont(ui.small)
         color(th.dim)
+        love.graphics.print("Your own: .ttf or .otf files in " .. Store.books_folder() .. "/Fonts", x, PAGE_H - 70)
         love.graphics.printf("Size " .. fp.size, x, PAGE_H - 70, w, "right")
         return
     end
@@ -2848,6 +2876,27 @@ function app.font_draw(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print("Font", x, 60)
+    -- All / Serif / Sans, right-aligned on the title line; the current one bold.
+    fp.tabs = {}
+    local tx = x + w
+    local ty = 60 + ui.title:getBaseline() - ui.font:getBaseline()
+    for k = #app.FONT_FILTERS, 1, -1 do
+        local t = app.FONT_FILTERS[k]
+        local on = fp.filter == t[1]
+        local f = on and ui.bold or ui.font
+        local tw = f:getWidth(t[2])
+        tx = tx - tw
+        love.graphics.setFont(f)
+        color(on and th.fg or th.dim)
+        love.graphics.print(t[2], tx, ty)
+        fp.tabs[#fp.tabs + 1] = { x0 = tx, x1 = tx + tw, filter = t[1] }
+        if k > 1 then
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            tx = tx - ui.font:getWidth("  ·  ")
+            love.graphics.print("  ·  ", tx, ty)
+        end
+    end
     local rows = app.font_rows()
     if fp.sel < fp.top then fp.top = fp.sel end
     if fp.sel >= fp.top + rows then fp.top = fp.sel - rows + 1 end
@@ -2863,7 +2912,7 @@ function app.font_draw(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.print("A use      B back      ‹ › size", x, PAGE_H - 70)
+    love.graphics.print("A use    B back    ‹ › size    Y serif/sans", x, PAGE_H - 70)
     love.graphics.printf(fp.sel .. " / " .. #fp.list, x, PAGE_H - 70, w, "right")
 end
 
