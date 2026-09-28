@@ -131,6 +131,9 @@ function M.load_settings()
     for k, allowed in pairs(ENUMS) do
         if allowed and not allowed[s[k]] then s[k] = DEFAULTS[k] end
     end
+    -- Settings saved by a version from before seen_version (v0.3.10 and
+    -- older): that's an update, not a new install, so "what's new" is offered.
+    if raw.seen_version == nil and next(raw) then s.seen_version = "older" end
     s.read_cps = math.max(3, math.min(80, s.read_cps))
     -- The old default "UTC" meant "the device's time as it is".
     if s.tz == "UTC" then s.tz = "Device clock" end

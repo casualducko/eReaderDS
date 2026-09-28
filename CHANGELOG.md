@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Updating from v0.3.10 or older (which didn't record the version last
+  run) now shows the "Updated, tap to see what's new" note too, instead of
+  being taken for a new install.
+
 ## v0.3.19
 
 - Find in book results are dropped when another book is opened or the book
