@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- **Delta updates:** the updater still downloads the release zip, but
+  writes only the files that differ from the installed ones (a typical
+  release: ~9 files, ~0.4 MB instead of 125 files, 41 MB) into `.delta`,
+  with the installed `app/` files the new version dropped listed in
+  `.delta/DELETE`. On ROCKNIX's SD card saving went from ~40 s to ~2 s.
+- The launcher moves each changed file over the installed one (a rename,
+  instant), deletes the dropped ones, and moves itself last. A moved file
+  leaves `.delta` and READY is removed only at the end, so a start cut
+  short (power off) finishes the job next time. Tested: normal apply,
+  interrupted apply, a dropped file, result identical to the new release.
+- The old whole-folder swap (`.update`) stays for an update downloaded by
+  an older version. This release itself installs that way; deltas start
+  with the update after it.
+
 ## v0.3.23
 
 - The E-ink theme's filter (grain texture and shader) is made the first

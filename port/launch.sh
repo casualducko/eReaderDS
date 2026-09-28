@@ -30,11 +30,46 @@ if [ "${1:-}" = "--menu-icon" ]; then
     done
     exit 0
 fi
-# Updates: eReaderDS unpacks a newer version into .update (READY is written
-# last, once it's complete). Move it into place before starting: the app,
-# this launcher, the runtime and the icon. Settings, progress and books live
-# elsewhere. The new launcher is written under another name and renamed over
-# this one, so the shell running this copy isn't disturbed.
+# Updates: eReaderDS unpacks the files of a newer version that changed into
+# .delta (READY is written last, once it's complete), and lists files the new
+# version dropped in .delta/DELETE. Move each one over the installed file
+# before starting: a rename on the same card, so it's instant. A moved file
+# leaves .delta, so if this is cut short (power off) the next start carries
+# on where it stopped; READY goes last. This launcher is moved last too (the
+# shell running it keeps the old copy open, so it isn't disturbed).
+# Settings, progress and books live elsewhere.
+apply_delta() {
+    local U="$APP_DIR/.delta" PORTS rel
+    PORTS=$(dirname "$APP_DIR")
+    [ -f "$U/READY" ] || return 1
+    if [ -d "$U/eReaderDS" ]; then
+        while IFS= read -r rel; do
+            rel=${rel#./}
+            [ "$rel" = launch.sh ] && continue
+            mkdir -p "$APP_DIR/$(dirname "$rel")" && mv -f "$U/eReaderDS/$rel" "$APP_DIR/$rel" || return 1
+        done < <(cd "$U/eReaderDS" && find . -type f)
+    fi
+    if [ -f "$U/DELETE" ]; then
+        while IFS= read -r rel; do
+            case "$rel" in *..*) ;; app/?*) rm -f "$APP_DIR/$rel" ;; esac
+        done < "$U/DELETE"
+    fi
+    if [ -f "$U/eReaderDS.sh" ]; then mv -f "$U/eReaderDS.sh" "$PORTS/eReaderDS.sh" || return 1; fi
+    if [ -f "$U/Imgs/eReaderDS.png" ] && [ -d "$PORTS/Imgs" ]; then
+        mv -f "$U/Imgs/eReaderDS.png" "$PORTS/Imgs/eReaderDS.png" || return 1
+    fi
+    chmod +x "$PORTS/eReaderDS.sh" "$APP_DIR/runtime/love.aarch64" 2>/dev/null
+    if [ -f "$U/eReaderDS/launch.sh" ]; then
+        chmod +x "$U/eReaderDS/launch.sh" 2>/dev/null
+        mv -f "$U/eReaderDS/launch.sh" "$APP_DIR/launch.sh" || return 1
+    fi
+    sync
+    rm -rf "$U"
+    sync
+    return 0
+}
+# Versions before v0.3.24 unpacked the whole new version into .update and
+# swapped it in (kept for one left waiting when this launcher arrived).
 apply_update() {
     local U="$APP_DIR/.update" PORTS
     PORTS=$(dirname "$APP_DIR")
@@ -53,10 +88,12 @@ apply_update() {
     sync
     return 0
 }
-if apply_update; then exec /bin/bash "$APP_DIR/launch.sh" "$@"; fi
+if apply_delta || apply_update; then exec /bin/bash "$APP_DIR/launch.sh" "$@"; fi
 # Left over from an update that was cut short (quit while downloading or
-# unpacking: no READY marker) or that couldn't be put in place: free the
-# space rather than retrying on every launch. The app offers it again.
+# unpacking: no READY marker): free the space; the app offers it again. A
+# .delta with READY that couldn't be finished stays, to finish next time
+# (half of it may already be in place).
+[ -d "$APP_DIR/.delta" ] && [ ! -f "$APP_DIR/.delta/READY" ] && rm -rf "$APP_DIR/.delta"
 rm -rf "$APP_DIR/.update"
 rm -f "$APP_DIR/.update.zip" "$APP_DIR/.update.zip.part"
 
@@ -189,5 +226,5 @@ fi
 printf '[launch] exit=%s\n' "$rc"
 sync
 # The app asked to restart into a downloaded update.
-if [ "$rc" = 42 ] && apply_update; then exec /bin/bash "$APP_DIR/launch.sh" "$@"; fi
+if [ "$rc" = 42 ] && { apply_delta || apply_update; }; then exec /bin/bash "$APP_DIR/launch.sh" "$@"; fi
 exit "$rc"

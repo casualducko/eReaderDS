@@ -2897,7 +2897,7 @@ function app.update_start()
             app.task = coroutine.create(function()
                 local ok, err = pcall(function()
                     local co = coroutine.create(app.Updater.unpack)
-                    local args = { zip, dir .. "/.update", u.version }
+                    local args = { zip, dir .. "/.delta", u.version }
                     while true do
                         local ok2, frac, phase = coroutine.resume(co, unpack(args))
                         args = {}
@@ -2910,7 +2910,7 @@ function app.update_start()
                 os.remove(zip)
                 if ok then u.state = "ready"
                 else
-                    os.execute('rm -rf "' .. dir .. '/.update"')
+                    os.execute('rm -rf "' .. dir .. '/.delta"')
                     u.state, u.message = "error", tostring(err)
                 end
             end)

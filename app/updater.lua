@@ -1,7 +1,8 @@
--- Updates from GitHub releases: find a newer release, and unpack its zip into
--- a waiting folder beside the app (APP_DIR/.update). The launcher moves it
--- into place the next time eReaderDS starts (launch.sh), so the running app
--- is never overwritten. Settings, progress and books live elsewhere.
+-- Updates from GitHub releases: find a newer release, and unpack the files
+-- that changed into a waiting folder beside the app (APP_DIR/.delta). The
+-- launcher moves them into place the next time eReaderDS starts (launch.sh),
+-- so the running app is never overwritten. Settings, progress and books live
+-- elsewhere.
 local Json = require("json")
 local Zip = require("zip")
 
@@ -89,11 +90,25 @@ local function sync_yielding()
     while t:isRunning() do coroutine.yield(1, "saving") end
 end
 
--- Unpack the release zip into dest (APP_DIR/.update): Ports/eReaderDS/... ->
--- dest/eReaderDS/..., Ports/eReaderDS.sh and Ports/Imgs/eReaderDS.png beside
--- it. Meant to run in a coroutine: yields after each file with the fraction
--- done. Checks that it's a whole app for the expected version.
+local function read_file(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local data = f:read("*a")
+    f:close()
+    return data
+end
+
+-- Unpack the files of the release zip that differ from the installed ones
+-- into dest (APP_DIR/.delta): Ports/eReaderDS/... -> dest/eReaderDS/...,
+-- Ports/eReaderDS.sh and Ports/Imgs/eReaderDS.png beside it. Most of the app
+-- (fonts, dictionary, engine) rarely changes, and a slow SD card can take a
+-- minute to save all of it. Files of the installed app/ folder that the new
+-- version doesn't have are listed in dest/DELETE. Meant to run in a
+-- coroutine: yields after each file with the fraction done. Checks that it's
+-- a whole app for the expected version.
 function M.unpack(zip_path, dest, version)
+    local app_dir = dest:match("^(.*)/[^/]+$")
+    local ports = app_dir:match("^(.*)/[^/]+$")
     local z, err = Zip.open(zip_path)
     if not z then error("the download isn't a zip file (" .. tostring(err) .. ")", 0) end
     local names = {}
@@ -110,23 +125,45 @@ function M.unpack(zip_path, dest, version)
     local vfile = z:read("Ports/eReaderDS/app/version.lua") or ""
     if vfile:match('"(.-)"') ~= version then z:close(); error("the download is a different version", 0) end
     os.execute('rm -rf "' .. dest .. '"')
-    local made = {}
+    mkdir(dest)
+    local made, in_zip = {}, {}
     for i, name in ipairs(names) do
-        local out = dest .. "/" .. name:gsub("^Ports/", "")
-        local dir = out:match("^(.*)/")
-        if not made[dir] then mkdir(dir); made[dir] = true end
+        local rel = name:gsub("^Ports/", "")             -- eReaderDS/app/main.lua, eReaderDS.sh, ...
+        local installed = rel:match("^eReaderDS/") and (app_dir .. rel:gsub("^eReaderDS", ""))
+            or (ports .. "/" .. rel)
+        in_zip[installed] = true
         local data, rerr = z:read(name)
         if not data then z:close(); error("couldn't unpack " .. name .. ": " .. tostring(rerr), 0) end
-        local f = io.open(out, "wb")
-        if not f or not f:write(data) then
-            if f then f:close() end
-            z:close()
-            error("couldn't write to the SD card (is it full?)", 0)
+        if read_file(installed) ~= data then
+            local out = dest .. "/" .. rel
+            local dir = out:match("^(.*)/")
+            if not made[dir] then mkdir(dir); made[dir] = true end
+            local f = io.open(out, "wb")
+            if not f or not f:write(data) then
+                if f then f:close() end
+                z:close()
+                error("couldn't write to the SD card (is it full?)", 0)
+            end
+            f:close()
         end
-        f:close()
         coroutine.yield(i / #names)
     end
     z:close()
+    -- Files of the old app/ folder that aren't in the new version.
+    local gone = {}
+    local ls = io.popen('cd "' .. app_dir .. '" && find app -type f 2>/dev/null')
+    if ls then
+        for line in ls:lines() do
+            if not in_zip[app_dir .. "/" .. line] then gone[#gone + 1] = line end
+        end
+        ls:close()
+    end
+    if #gone > 0 then
+        local f = io.open(dest .. "/DELETE", "wb")
+        if not f then error("couldn't write to the SD card", 0) end
+        f:write(table.concat(gone, "\n") .. "\n")
+        f:close()
+    end
     -- The zip first, so its unsaved data needn't be written to the card at all.
     os.remove(zip_path)
     -- The files, then the marker that tells the launcher they're complete
