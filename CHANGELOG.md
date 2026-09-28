@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.3.1
 
 - **Standard Ebooks: the full catalog.** Standard Ebooks has allowed
   eReaderDS's User-Agent through to its OPDS catalog, so Get books → Standard
