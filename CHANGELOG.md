@@ -3,12 +3,13 @@
 ## Unreleased
 
 - The font list is **alphabetical** (your own fonts included), with an
-  **All · Serif · Sans** switch at the top (tap it, or press Y). The sample
+  **All · Serif · Sans** switch at the top (left/right, or tap it). The sample
   page says where your own fonts go.
 - **Font** in Settings opens its own spread: the fonts on the touchscreen,
   each in its own typeface, and a sample page on the other screen that
-  changes as you scroll. Left/right set the size; A or a second tap uses it.
-  (Left/right on the Font row no longer switch fonts: select it to choose.)
+  changes as you scroll (at a fixed size, so fonts compare fairly). A or a
+  second tap uses it. (Left/right on the Font row no longer switch fonts:
+  select it to choose.)
 - **Seven more fonts:** EB Garamond, Lora, Merriweather, PT Serif, Spectral,
   Vollkorn and Andika (all SIL Open Font License), for 17 built in.
 - **Find in book** results stand out more: each one's chapter is in bold,

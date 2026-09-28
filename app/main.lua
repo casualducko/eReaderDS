@@ -2731,10 +2731,12 @@ end
 ---------------------------------------------------------------- font picker
 
 -- Font, as a spread: the fonts on the right (the touchscreen), each name in
--- its own face, and a sample page on the left in the highlighted one at the
--- chosen size. Up/down pick a font, left/right the size; A (or tapping the
--- chosen font again) uses them, B leaves things as they were.
+-- its own face, and a sample page on the left in the highlighted one (at a
+-- fixed size, so fonts compare fairly). Up/down pick a font, left/right show
+-- all / serif / sans-serif fonts; A (or tapping the chosen font again) uses
+-- it, B leaves things as they were.
 app.FONT_ROW_H = 58
+app.FONT_SAMPLE_SIZE = 38
 -- Rows that fit above the footer.
 function app.font_rows() return list_rows(app.FONT_ROW_H) - 1 end
 app.FONT_SAMPLE = {
@@ -2750,7 +2752,7 @@ app.FONT_SAMPLE = {
 }
 
 function app.font_open()
-    local fp = { sel = 1, top = 1, size = S.font_size }
+    local fp = { sel = 1, top = 1, size = app.FONT_SAMPLE_SIZE }
     app.font_pick = fp
     app.font_set_filter(app.font_filter_last or "all", fonts.name)
     app.mode = "fonts"
@@ -2791,7 +2793,7 @@ function app.font_close(apply)
     local fp = app.font_pick
     if fp.sample then for _, f in pairs(fp.sample.f) do f:release() end end
     if apply and fp.list[fp.sel] then
-        S.font, S.font_size = fp.list[fp.sel].name, fp.size
+        S.font = fp.list[fp.sel].name
         build_fonts()
         goto_pos(pos.ch, pos.off)
         Store.save_settings(S)
@@ -2806,12 +2808,12 @@ function app.font_action(a)
     local n = #fp.list
     if a == "up" then fp.sel = math.max(1, fp.sel - 1)
     elseif a == "down" then fp.sel = math.min(n, fp.sel + 1)
-    elseif a == "left" or a == "prev" then fp.size = math.max(18, fp.size - 2)
-    elseif a == "right" or a == "next" then fp.size = math.min(64, fp.size + 2)
-    elseif a == "toc" then                          -- Y: all / serif / sans
+    elseif a == "left" or a == "prev" or a == "right" or a == "next" then
+        -- All / Serif / Sans, like the switch at the top of the list.
         local idx = 1
         for i, f in ipairs(app.FONT_FILTERS) do if f[1] == fp.filter then idx = i end end
-        app.font_set_filter(app.FONT_FILTERS[idx % #app.FONT_FILTERS + 1][1])
+        idx = idx + ((a == "left" or a == "prev") and -1 or 1)
+        app.font_set_filter(app.FONT_FILTERS[math.max(1, math.min(#app.FONT_FILTERS, idx))][1])
     elseif a == "confirm" then app.font_close(true) return
     elseif a == "back" or a == "menu" then app.font_close(false) return
     end
@@ -2868,7 +2870,6 @@ function app.font_draw(side)
         love.graphics.setFont(ui.small)
         color(th.dim)
         love.graphics.print("Your own: .ttf or .otf files in " .. Store.books_folder() .. "/Fonts", x, PAGE_H - 70)
-        love.graphics.printf("Size " .. fp.size, x, PAGE_H - 70, w, "right")
         return
     end
     local m = MARGINS[2]
@@ -2912,7 +2913,7 @@ function app.font_draw(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.print("A use    B back    ‹ › size    Y serif/sans", x, PAGE_H - 70)
+    love.graphics.print("A use      B back      ‹ › all / serif / sans", x, PAGE_H - 70)
     love.graphics.printf(fp.sel .. " / " .. #fp.list, x, PAGE_H - 70, w, "right")
 end
 
