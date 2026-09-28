@@ -3624,6 +3624,14 @@ function app.find_highlight(side)
     end
 end
 
+-- Seconds since the device started, for timing the start in the log.
+function app.uptime()
+    local f = io.open("/proc/uptime", "rb")
+    local t = f and f:read("*l"):match("^%S+")
+    if f then f:close() end
+    return t or "?"
+end
+
 -- While starting up: the name on the top screen.
 function app.splash_draw(side)
     if side ~= "left" then return end
@@ -4677,7 +4685,7 @@ function love.load()
         print(string.format("[joystick] %q %s gamepad=%s", joystick:getName(), joystick:getGUID(),
             tostring(joystick:isGamepad())))
     end
-    print("[reader] eReaderDS v" .. VERSION)
+    print("[reader] eReaderDS v" .. VERSION .. " (uptime " .. app.uptime() .. ")")
     S = Store.load_settings()
     if S.chrome == false then
         -- "Page info: Off" from older versions: hide the status bar text.
@@ -4696,6 +4704,19 @@ function love.load()
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     old_canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     old_canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+    ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
+    ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
+    ui.bold = load_font("GentiumBookPlus-Bold.ttf", UI_SIZE)
+    ui.small_bold = load_font("GentiumBookPlus-Bold.ttf", SMALL_SIZE)
+    ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
+    ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
+    -- Something on the screens straight away: loading the fonts and the
+    -- book takes a moment.
+    app.mode = "splash"
+    love.draw()
+    love.graphics.present()
+    app.mode = "library"
+    print("[reader] opening screen shown (uptime " .. app.uptime() .. ")")
     -- Horizontal gradient, opaque at x=0 fading to clear at x=1.
     shadow_mesh = love.graphics.newMesh({
         { 0, 0, 0, 0, 1, 1, 1, 1 }, { 1, 0, 1, 0, 1, 1, 1, 0 },
@@ -4721,18 +4742,6 @@ function love.load()
     else
         print("[eink] shader unavailable: " .. tostring(sh))
     end
-    ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
-    ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
-    ui.bold = load_font("GentiumBookPlus-Bold.ttf", UI_SIZE)
-    ui.small_bold = load_font("GentiumBookPlus-Bold.ttf", SMALL_SIZE)
-    ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
-    ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
-    -- Something on the screens straight away: loading the fonts and the
-    -- book takes a moment.
-    app.mode = "splash"
-    love.draw()
-    love.graphics.present()
-    app.mode = "library"
     build_fonts()
 
     scan_library()
@@ -4854,6 +4863,10 @@ function love.run()
             love.graphics.origin()
             love.draw()
             love.graphics.present()
+            if not app.first_shown then
+                app.first_shown = true
+                print("[reader] ready (uptime " .. app.uptime() .. ")")
+            end
         end
         local function handle(name, a, b, c, d, e, f)
             if not name then return end

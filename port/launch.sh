@@ -2,6 +2,7 @@
 # eReaderDS for RG DS Plus: two-page ebook reader, hold the device sideways.
 # Runs on the stock firmware (Ports/eReaderDS) and on ROCKNIX (roms/ports).
 set -u
+T0=$(cut -d" " -f1 /proc/uptime 2>/dev/null)     # for the log: how long starting takes
 APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 ROCKNIX=""
 grep -qs 'OS_NAME="ROCKNIX"' /etc/os-release && ROCKNIX=1
@@ -112,7 +113,7 @@ if [ -z "$ROCKNIX" ] && [ -d /mnt/mmc ] && [ -f "$APP_DIR/icon.png" ]; then
     [ -f "$IMGS/eReaderDS.png" ] || { mkdir -p "$IMGS" && cp "$APP_DIR/icon.png" "$IMGS/eReaderDS.png"; } 2>/dev/null
 fi
 exec > "$APP_DIR/log.txt" 2>&1
-printf '[launch] %s\n' "$(date -Iseconds 2>/dev/null || date)"
+printf '[launch] %s (uptime %s)\n' "$(date -Iseconds 2>/dev/null || date)" "${T0:-?}"
 printf '[launch] data=%s%s\n' "$READER_DATA" "${MIGRATED:+ (copied from $MIGRATED)}"
 chmod +x "$APP_DIR/runtime/love.aarch64" 2>/dev/null || true
 # Remember the system brightness so the reader's own level doesn't stick afterwards.
@@ -177,6 +178,7 @@ if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then
     fi
 else
     # In the background and waited for, so a stop signal is handled at once.
+    printf '[launch] starting the app (uptime %s)\n' "$(cut -d" " -f1 /proc/uptime 2>/dev/null)"
     "$APP_DIR/runtime/love.aarch64" "$APP_DIR/app" &
     pid=$!
     wait "$pid"

@@ -8,6 +8,10 @@
 - Faster start: the bundled fonts' names are read from their name tables
   alone instead of loading every font file in full (26 MB); the book now
   appears after 2.9 s instead of 3.6 s.
+- The opening screen is drawn before the E-ink filter and page-turn
+  meshes are set up (0.1 s sooner).
+- The log records start-up timing (uptime when the launcher starts, when
+  the app starts, when the opening screen shows and when it's ready).
 
 ## v0.3.21
 
