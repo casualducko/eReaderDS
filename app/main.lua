@@ -2658,24 +2658,120 @@ local function draw_toc(side)
     local x = side == "left" and m.outer or m.inner
     local w = PAGE_W - m.outer - m.inner
     local row_h = 58
-    local rows = list_rows(row_h)
-    -- two columns: left page then right page
-    if not toc.top then toc.top = math.max(1, toc.sel - rows) end
+    local rows = app.toc_rows()
+    -- The list is on the touchscreen (swipe to scroll, tap to see one, again
+    -- to go there); the selected one is described on the other page.
+    if not toc.top then toc.top = math.max(1, toc.sel - math.floor(rows / 2)) end
     if toc.sel < toc.top then toc.top = toc.sel end
-    if toc.sel >= toc.top + rows * 2 then toc.top = toc.sel - rows * 2 + 1 end
-    local first = side == "left" and toc.top or toc.top + rows
-    if side == "left" then
-        love.graphics.setFont(ui.title)
-        color(th.fg)
-        love.graphics.print("Table of Contents", x, 60)
-    end
-    draw_list(side, book.toc, toc.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
+    if toc.sel >= toc.top + rows then toc.top = toc.sel - rows + 1 end
+    local here = current_section()
+    if side == "left" then app.toc_draw_left(x, w, here) return end
+    love.graphics.setFont(ui.font)
+    color(th.dim)
+    love.graphics.printf(math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "% read", x,
+        60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
+    draw_list(side, book.toc, toc.sel, toc.top, rows, x, 160, w, row_h, function(it, idx, rx, ry, rw)
         love.graphics.setFont(ui.font)
-        color(th.fg)
         local indent = math.max(0, (it.depth or 1) - 1) * 28
-        love.graphics.print(fit_text(ui.font, it.title, rw - indent), rx + indent,
-            centered_y(ui.font, UI_SIZE, ry, row_h - 4))
+        local ty = centered_y(ui.font, UI_SIZE, ry, row_h - 4)
+        local mark = idx == here and "here" or nil
+        local mw = mark and ui.small:getWidth(mark) + 16 or 0
+        color(th.fg)
+        love.graphics.print(fit_text(ui.font, it.title, rw - indent - mw), rx + indent, ty)
+        if mark then
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.printf(mark, rx, ty + ui.font:getBaseline() - ui.small:getBaseline(), rw, "right")
+        end
     end)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print("A open    B back", x, PAGE_H - 70)
+    love.graphics.printf(toc.sel .. " / " .. #book.toc, x, PAGE_H - 70, w, "right")
+end
+
+-- Table of Contents rows that fit on the touchscreen above its footer.
+function app.toc_rows() return math.floor((PAGE_H - 250) / 58) end
+
+-- The open book's cover, loaded once (nil if it has none).
+function app.book_cover()
+    if not book or not book.cover then return nil end
+    if app.cover_for ~= book.path then
+        app.cover_for, app.cover_img = book.path, nil
+        local ok, img = pcall(function()
+            return love.graphics.newImage(love.filesystem.newFileData(book:read_resource(book.cover), book.cover))
+        end)
+        if ok then app.cover_img = img end
+    end
+    return app.cover_img
+end
+
+-- The left page of Table of Contents: the book (cover, title, author), then
+-- the selected entry: its title, and where it is in the book next to where
+-- you are.
+function app.toc_draw_left(x, w, here)
+    local th = theme()
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print("Table of Contents", x, 60)
+    local y = 160
+    local tx, tw, top_h = x, w, 0
+    local cover = app.book_cover()
+    if cover then
+        local sc = math.min(150 / cover:getHeight(), 110 / cover:getWidth())
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(cover, x, y, 0, sc, sc)
+        tx, tw, top_h = x + cover:getWidth() * sc + 22, w - cover:getWidth() * sc - 22, cover:getHeight() * sc
+    end
+    love.graphics.setFont(ui.bold)
+    color(th.fg)
+    local _, tl = ui.bold:getWrap(book.title or "", tw)
+    local ty = y
+    for k = 1, math.min(2, #tl) do
+        love.graphics.print(k == 2 and #tl > 2 and fit_text(ui.bold, tl[2] .. " …", tw) or tl[k], tx, ty)
+        ty = ty + ui.bold:getHeight()
+    end
+    if book.author and book.author ~= "" then
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print(fit_text(ui.small, book.author, tw), tx, ty + 4)
+        ty = ty + ui.small:getHeight() + 4
+    end
+    y = math.max(y + top_h, ty) + 60
+    local t = book.toc[toc.sel]
+    if not t then return end
+    -- Where it is: the book as a bar, this entry's stretch dark, a mark at your place.
+    local f0 = book:fraction(t.chapter, t.off or 0)
+    local nxt = book.toc[toc.sel + 1]
+    local f1 = nxt and book:fraction(nxt.chapter, nxt.off or 0) or 1
+    if f1 < f0 then f1 = f0 end
+    local me = book:fraction(pos.ch, pos.off)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print(toc.sel == here and "YOU'RE HERE" or ("STARTS AT " .. math.floor(f0 * 100 + 0.5) .. "%"), x, y)
+    y = y + ui.small:getHeight() + 14
+    color(th.sel)
+    love.graphics.rectangle("fill", x, y, w, 10, 5, 5)
+    color(th.fg)
+    love.graphics.rectangle("fill", x + w * f0, y, math.max(6, w * (f1 - f0)), 10, 5, 5)
+    local mx = x + w * math.max(0, math.min(1, me))
+    love.graphics.polygon("fill", mx, y + 16, mx - 9, y + 30, mx + 9, y + 30)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local lab = "you"
+    love.graphics.print(lab, math.max(x, math.min(x + w - ui.small:getWidth(lab), mx - ui.small:getWidth(lab) / 2)), y + 32)
+    y = y + 32 + ui.small:getHeight() + 36
+    -- Its title, in full.
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    local _, lines = ui.title:getWrap(t.title or "", w)
+    for k = 1, math.min(3, #lines) do
+        love.graphics.print(lines[k], x, y)
+        y = y + ui.title:getHeight()
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print(toc.sel == here and "A  back to it" or "A  go there", x, PAGE_H - 70)
 end
 
 ---------------------------------------------------------------- jump picker
@@ -4379,23 +4475,20 @@ function app.find_draw(side)
     local w = PAGE_W - m.outer - m.inner
     local row_h = 96
     local rows = list_rows(row_h)
+    -- The results are on the touchscreen (swipe to scroll, tap to see one,
+    -- again to go there); the selected one is shown in full on the other page.
     if f.sel < f.top then f.top = f.sel end
-    if f.sel >= f.top + rows * 2 then f.top = f.sel - rows * 2 + 1 end
-    local first = side == "left" and f.top or f.top + rows
-    love.graphics.setFont(ui.title)
-    color(th.fg)
-    if side == "left" then
-        love.graphics.print(fit_text(ui.title, "“" .. f.query .. "”", w), x, 60)
-    end
-    love.graphics.setFont(ui.small)
-    color(th.dim)
+    if f.sel >= f.top + rows then f.top = f.sel - rows + 1 end
     local status = (not f.done and ("Searching… " .. math.floor(f.pct * 100) .. "%"))
         or (f.error and "The search stopped on an error.")
         or (#f.results == 0 and "Not found in this book.")
         or (f.capped and ("The first " .. #f.results .. " matches"))
         or (#f.results == 1 and "1 match" or (#f.results .. " matches"))
-    if side == "left" then love.graphics.printf(status, x, 60 + ui.title:getHeight() + 8, w, "left") end
-    draw_list(side, f.results, f.sel, first, rows, x, 160, w, row_h, function(r, _, rx, ry, rw)
+    if side == "left" then app.find_draw_left(f, x, w, status) return end
+    love.graphics.setFont(ui.font)
+    color(th.dim)
+    love.graphics.printf(status, x, 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
+    draw_list(side, f.results, f.sel, f.top, rows, x, 160, w, row_h, function(r, _, rx, ry, rw)
         -- The chapter in bold, then the words around the match, the match bold.
         love.graphics.setFont(ui.small_bold)
         color(th.fg)
@@ -4420,10 +4513,79 @@ function app.find_draw(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    if side == "left" then
-        love.graphics.print("A go there      B search again      X close", x, PAGE_H - 70)
-    elseif #f.results > 0 then
+    love.graphics.print("A open    B search again    X close", x, PAGE_H - 70)
+    if #f.results > 0 then
         love.graphics.printf(f.sel .. " / " .. #f.results, x, PAGE_H - 70, w, "right")
+    end
+end
+
+-- The left page of Find in book: what was searched for, then the selected
+-- match in its whole paragraph (around it, if long), the match marked.
+function app.find_draw_left(f, x, w, status)
+    local th = theme()
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print(fit_text(ui.title, "“" .. f.query .. "”", w), x, 60)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print("A  go there      B  search again      X  close", x, PAGE_H - 70)
+    local r = f.results[f.sel]
+    if not r then return end
+    local y = 170
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local pct = math.floor(book:fraction(r.ch, r.off) * 100 + 0.5) .. "%"
+    love.graphics.printf(pct, x, y, w, "right")
+    love.graphics.setFont(ui.small_bold)
+    color(th.fg)
+    love.graphics.print(fit_text(ui.small_bold, app.find_label(r), w - ui.small:getWidth(pct) - 20), x, y)
+    y = y + ui.small:getHeight() + 18
+    -- The paragraph, cut to a window around the match at spaces.
+    local text = r.text
+    local a = math.max(1, r.s0 - 450)
+    if a > 1 then a = (text:find(" ", a, true) or a) + 1 end
+    local b = math.min(#text, r.s1 + 700)
+    if b < #text then b = (text:sub(1, b):match(".*() ") or b + 1) - 1 end
+    local lead = a > 1 and "… " or ""
+    local function squash(t) return (t:gsub("%s+", " ")) end
+    local pre, mid = squash(text:sub(a, r.s0 - 1)), squash(text:sub(r.s0, r.s1))
+    local disp = lead .. pre .. mid .. squash(text:sub(r.s1 + 1, b)) .. (b < #text and " …" or "")
+    local ms = #lead + #pre + 1
+    local me = ms + #mid - 1
+    local F = ui.font
+    local _, lines = F:getWrap(disp, w)
+    -- Where each line is in disp, and which one has the match.
+    local spans, cur, hit = {}, 1, 1
+    for k, line in ipairs(lines) do
+        local s0 = disp:find(line, cur, true) or cur
+        spans[k] = s0
+        cur = s0 + #line
+        if s0 <= ms then hit = k end
+    end
+    local lh = F:getHeight()
+    local max = math.max(1, math.floor((PAGE_H - 110 - y) / lh))
+    local first = math.max(1, math.min(hit - 2, #lines - max + 1))
+    love.graphics.setFont(F)
+    for k = first, math.min(#lines, first + max - 1) do
+        local line, ls = lines[k], spans[k]
+        local le = ls + #line - 1
+        if me < ls or ms > le then
+            color(th.fg, 0.75)
+            love.graphics.print(line, x, y)
+        else
+            -- before, the match, after
+            local i0, i1 = math.max(ms, ls) - ls + 1, math.min(me, le) - ls + 1
+            local pre, mid, post = line:sub(1, i0 - 1), line:sub(i0, i1), line:sub(i1 + 1)
+            local px, mw = F:getWidth(pre), F:getWidth(mid)
+            color(th.sel)
+            love.graphics.rectangle("fill", x + px - 3, y + 2, mw + 6, lh - 4, 4, 4)
+            color(th.fg, 0.75)
+            love.graphics.print(pre, x, y)
+            love.graphics.print(post, x + px + mw, y)
+            color(th.fg)
+            love.graphics.print(mid, x + px, y)
+        end
+        y = y + lh
     end
 end
 
@@ -4891,9 +5053,9 @@ function app.scroll_list()
     elseif m == "shop" then
         l = shop.page()
         n, shown = l and #l.entries or 0, list_rows(96)
-    elseif m == "toc" and book then l, n, row_h = toc, #book.toc, 58; shown = list_rows(58) * 2
+    elseif m == "toc" and book then l, n, row_h = toc, #book.toc, 58; shown = app.toc_rows()
     elseif m == "bookmarks" and book then l, n, shown = bm, #bookmark_entries(), list_rows(96)
-    elseif m == "find" and app.find then l, n, shown = app.find, #app.find.results, list_rows(96) * 2
+    elseif m == "find" and app.find then l, n, shown = app.find, #app.find.results, list_rows(96)
     elseif m == "fonts" and app.font_pick then
         l, n, shown, row_h = app.font_pick, #app.font_pick.list, app.font_rows(), app.FONT_ROW_H
     elseif m == "fontget" and app.fget.list then
@@ -5262,7 +5424,7 @@ function handle_action(a)
 
     if mode == "toc" then
         local n = #book.toc
-        local rows = list_rows(58)
+        local rows = app.toc_rows()
         if a == "up" then toc.sel = math.max(1, toc.sel - 1)
         elseif a == "down" then toc.sel = math.min(n, toc.sel + 1)
         elseif a == "left" or a == "prev" then toc.sel = math.max(1, toc.sel - rows)
@@ -5486,13 +5648,11 @@ function app.on_tap(side, u, v)
     elseif mode == "whatsnew" then
         app.whatsnew_action("next")                 -- a tap turns to the next spread
     elseif mode == "find" then
-        -- Like Contents: a tap on a result (right column) opens it.
+        -- Tap a result to see it on the other screen, again to go there.
         local f, rows = app.find, list_rows(96)
-        local first = f.top + rows
-        local idx = first + math.floor((v - 160) / 96)
-        if side == "right" and v >= 160 and idx < first + rows and f.results[idx] then
-            f.sel = idx
-            action("confirm")
+        local idx = f.top + math.floor((v - 160) / 96)
+        if side == "right" and v >= 160 and idx < f.top + rows and f.results[idx] then
+            if idx == f.sel then action("confirm") else f.sel = idx; redraw() end
         end
     elseif mode == "bookmarks" and bm.confirm then
         -- The "Delete this …?" card: Delete deletes; anywhere else keeps it.
@@ -5510,16 +5670,12 @@ function app.on_tap(side, u, v)
             if idx == bm.sel then action("confirm") else bm.sel = idx; redraw() end
         end
     elseif mode == "toc" then
-        -- A tap on a row (the bottom screen shows the list's second column)
-        -- opens it, like A. Anywhere else does nothing: closing on a tap
-        -- looked like the chapter had been chosen.
-        local st, row_h, n = toc, 58, book and #book.toc or 0
-        local rows = list_rows(row_h)
-        local first = (st.top or 1) + rows
-        local idx = first + math.floor((v - 160) / row_h)
-        if side == "right" and v >= 160 and idx < first + rows and idx <= n then
-            st.sel = idx
-            action("confirm")
+        -- Tap an entry to see it on the other screen, again to go there.
+        -- Anywhere else does nothing (closing on a tap looked like a choice).
+        local rows = app.toc_rows()
+        local idx = (toc.top or 1) + math.floor((v - 160) / 58)
+        if side == "right" and v >= 160 and idx < (toc.top or 1) + rows and book and book.toc[idx] then
+            if idx == toc.sel then action("confirm") else toc.sel = idx; redraw() end
         end
     elseif mode == "message" then
         action("back")

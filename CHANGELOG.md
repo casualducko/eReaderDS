@@ -14,6 +14,13 @@
   whole passage marked as on the page, a bookmark's words, or this page (A
   bookmarks it). A tap selects an entry and a second tap goes there, as in My
   Books.
+- **Table of Contents** and **Find in book** work the same way: one list on the
+  touchscreen (swipe to scroll, tap to see, tap again to go there). Table of
+  Contents shows the book (cover, title, author) and the selected entry: its
+  full title and a bar of the book with its stretch and your place ("here"
+  marks the current one in the list). Find shows the selected match in its
+  whole paragraph, the match marked, with the chapter and %. Nothing to pick
+  on the top screen any more.
 
 ## v1.3.1
 
