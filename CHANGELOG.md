@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Check for updates** on the About page too (tap it, or A), with where
+  things stand ("Up to date", "v0.3.17 available", "v0.3.17 skipped").
 - **Skip this version** on the update screen (tap it, or Y): no more notes
   about that version; the next one is offered as usual. Check for updates
   still finds it ("skipped").
