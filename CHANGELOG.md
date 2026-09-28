@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **What's new** (Settings → Page turns & device): the changes in each
+  version, in plain words. After an update, a note offers it once ("Updated
+  to v…: tap here to see what's new").
+
 ## v0.3.10
 
 - The **"Update available"** note can be tapped to go straight to the update

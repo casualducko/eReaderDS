@@ -1467,6 +1467,7 @@ local function more_items()
                   if u.state == "available" or u.state == "ready" then app.update_open()
                   else app.update_check(true); app.update_open() end
               end },
+            { label = "What's new", act = app.whatsnew_open },
             { label = "About", act = function() app.mode = "about" end },
             { label = "Back", act = close_sub },
         })
@@ -2982,6 +2983,97 @@ function app.update_draw(side)
     love.graphics.print(hint, x, PAGE_H - 70)
 end
 
+---------------------------------------------------------------- what's new
+
+-- The changes in each version, in plain words (whatsnew.txt), flowing down
+-- the left page, then the right, then onto further spreads.
+app.WN_TOP, app.WN_BOTTOM = 190, PAGE_H - 110
+
+function app.whatsnew_open()
+    if app.mode ~= "whatsnew" then app.whatsnew_back = app.mode end
+    app.wn = { spread = 1 }
+    app.mode = "whatsnew"
+    redraw()
+end
+
+-- Lay the text out into pages: { { {font, text, x, y}, ... }, ... }.
+function app.whatsnew_pages(w)
+    local pages, page, y = {}, {}, app.WN_TOP
+    local function new_page() pages[#pages + 1] = page; page, y = {}, 60 end
+    local function put(font, text, dx, h)
+        if y + h > app.WN_BOTTOM then new_page() end
+        page[#page + 1] = { font, text, dx, y }
+        y = y + h
+    end
+    local data = love.filesystem.read("whatsnew.txt") or ""
+    local first = true
+    for line in data:gmatch("[^\n]+") do
+        if not line:match("^#") and line:match("%S") then
+            local v = line:match("^v(%d[%d%.]*)%s*$")
+            if v then
+                if not first then y = y + 24 end
+                if y + ui.bold:getHeight() + ui.font:getHeight() > app.WN_BOTTOM then new_page() end
+                put(ui.bold, "Version " .. v .. (v == VERSION and "  (yours)" or ""), 0, ui.bold:getHeight() + 8)
+                first = false
+            else
+                local _, lines = ui.font:getWrap(line, w - 34)
+                for i, l in ipairs(lines) do
+                    put(ui.font, (i == 1 and "•" or "") .. "\t" .. l, 0, ui.font:getHeight())
+                end
+                y = y + 8
+            end
+        end
+    end
+    pages[#pages + 1] = page
+    return pages
+end
+
+function app.whatsnew_draw(side)
+    local th = theme()
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    local wn = app.wn
+    wn.pages = wn.pages or app.whatsnew_pages(w)
+    wn.spreads = math.ceil(#wn.pages / 2)
+    wn.spread = math.max(1, math.min(wn.spreads, wn.spread))
+    if side == "left" and wn.spread == 1 then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("What's new", x, 60)
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.print("You have v" .. VERSION, x, 60 + ui.title:getHeight() + 6)
+    end
+    local page = wn.pages[(wn.spread - 1) * 2 + (side == "left" and 1 or 2)] or {}
+    for _, it in ipairs(page) do
+        love.graphics.setFont(it[1])
+        color(th.fg)
+        local text = it[2]
+        local bullet, rest = text:match("^(•?)\t(.*)$")
+        if bullet then
+            if bullet ~= "" then color(th.dim); love.graphics.print("•", x, it[4]); color(th.fg) end
+            love.graphics.print(rest, x + 34, it[4])
+        else
+            love.graphics.print(text, x, it[4])
+        end
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    if side == "right" then
+        love.graphics.print(wn.spreads > 1 and "‹ › more      B back" or "B back", x, PAGE_H - 70)
+        if wn.spreads > 1 then love.graphics.printf(wn.spread .. " / " .. wn.spreads, x, PAGE_H - 70, w, "right") end
+    end
+end
+
+function app.whatsnew_action(a)
+    local wn = app.wn
+    if a == "right" or a == "next" or a == "down" or a == "confirm" then wn.spread = wn.spread + 1
+    elseif a == "left" or a == "prev" or a == "up" then wn.spread = math.max(1, wn.spread - 1)
+    elseif a == "back" or a == "menu" then app.mode = app.whatsnew_back or (book and "menu" or "library") end
+    redraw()
+end
+
 ---------------------------------------------------------------- font picker
 
 -- Font, as a spread: the fonts on the right (the touchscreen), each name in
@@ -3432,6 +3524,7 @@ local function render_canvases()
     elseif app.mode == "keyboard" then painter = app.kb_draw
     elseif app.mode == "fonts" then painter = app.font_draw
     elseif app.mode == "update" then painter = app.update_draw
+    elseif app.mode == "whatsnew" then painter = app.whatsnew_draw
     elseif app.mode == "find" then painter = app.find_draw
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
@@ -3981,6 +4074,7 @@ function handle_action(a)
     if mode == "keyboard" then app.kb_action(a) return end
     if mode == "fonts" then app.font_action(a) return end
     if mode == "update" then app.update_action(a) return end
+    if mode == "whatsnew" then app.whatsnew_action(a) return end
     if mode == "find" then app.find_action(a) return end
 
     if mode == "about" or mode == "help" then
@@ -4232,6 +4326,8 @@ function app.on_tap(side, u, v)
         app.font_tap(side, u, v)
     elseif mode == "update" then
         app.update_tap(side, u, v)
+    elseif mode == "whatsnew" then
+        app.whatsnew_action("next")                 -- a tap turns to the next spread
     elseif mode == "find" then
         -- Like Contents: a tap on a result (right column) opens it.
         local f, rows = app.find, list_rows(96)
@@ -4450,6 +4546,14 @@ function love.load()
     local last = Store.get_last()
     local f = last and io.open(last, "rb")
     if f then f:close(); open_book(last) end
+    -- Just updated? Offer what's new, once. (A new install has no seen_version.)
+    if S.seen_version ~= VERSION then
+        if S.seen_version ~= "" then
+            app.toast("Updated to v" .. VERSION .. "\nTap here to see what's new", 8, app.whatsnew_open)
+        end
+        S.seen_version = VERSION
+        Store.save_settings(S)
+    end
     -- A newer version? (Only when online; quietly does nothing otherwise.)
     if not os.getenv("READER_SCRIPT") or os.getenv("READER_FAKE_VERSION") then app.update_check() end
 end

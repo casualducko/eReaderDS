@@ -18,7 +18,7 @@ if [ "${1:-}" = "--ssh" ]; then
     STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
     P="$STAGE/Ports/eReaderDS"
     mkdir -p "$P/app/fonts" "$P/app/hyph" "$P/app/dict"
-    cp "$HERE"/app/*.lua "$P/app/"
+    cp "$HERE"/app/*.lua "$HERE/app/whatsnew.txt" "$P/app/"
     cp "$HERE"/app/hyph/* "$P/app/hyph/"
     cp "$HERE"/app/dict/* "$P/app/dict/"
     cp "$HERE"/app/fonts/* "$P/app/fonts/"
@@ -54,7 +54,7 @@ D="$SD/Ports/eReaderDS"
 # Replace the app folder wholesale; settings and progress live in Ebook/.ereaderds.
 rm -rf "$D/app"
 mkdir -p "$D/app/fonts" "$D/app/hyph" "$D/app/dict" "$D/runtime/libs.aarch64" "$SD/Ebook/Fonts" "$SD/Ebook/Dictionaries"
-cp "$HERE"/app/*.lua "$D/app/"
+cp "$HERE"/app/*.lua "$HERE/app/whatsnew.txt" "$D/app/"
 cp "$HERE"/app/hyph/* "$D/app/hyph/"
 cp "$HERE"/app/dict/* "$D/app/dict/"
 cp "$HERE"/app/fonts/* "$D/app/fonts/"

@@ -1,0 +1,52 @@
+# What's new, newest first, shown in Settings → Page turns & device.
+# "v" lines start a version; every other line is one change, in plain words.
+# Add the new version's lines at the top with each release.
+
+v0.3.10
+Tap the "Update available" message to go straight to the update.
+Settings shows Update in bold while a new version is waiting.
+
+v0.3.9
+Updates over Wi-Fi: eReaderDS tells you when a new version is out and installs it for you. Your books and reading progress stay put.
+The library and Get books lists are on the touchscreen now: tap a book once to see it, tap again to open it.
+A new font page shows every font with a sample page, and can show just serif or sans-serif fonts.
+Seven new fonts: EB Garamond, Lora, Merriweather, PT Serif, Spectral, Vollkorn and Andika.
+Project Gutenberg is fast again, and no longer lists links that go nowhere.
+Find in book results are easier to scan.
+
+v0.3.8
+Find in book: search for any word or phrase and jump straight to it.
+Search Project Gutenberg or your Calibre library by title or author.
+A touchscreen keyboard for both, or use the D-pad.
+
+v0.3.7
+More reliable on ROCKNIX.
+Help matches your Tap setting.
+
+v0.3.6
+Tap a chapter in Contents, or a bookmark, to jump to it.
+New readers start at a comfortable brightness.
+
+v0.3.5
+The menu icon puts itself in place on the stock firmware.
+
+v0.3.4
+A Help page with all the buttons and touch gestures.
+Clearer messages about where your books go.
+
+v0.3.3
+A new icon in the Ports menu.
+Book covers stay in color while you browse, even on the E-ink theme.
+Friendlier settings for new readers: Sepia, bigger text and a clock.
+
+v0.3.2
+eReaderDS runs on ROCKNIX too.
+The clock shows the right time.
+
+v0.3.1
+Pinch to make the text bigger or smaller.
+Tap the top edge to hide or show the status bars.
+
+v0.3.0
+Download books over Wi-Fi from Project Gutenberg or your own Calibre library.
+Look up words, read footnotes, bookmark pages and jump anywhere in a book.
