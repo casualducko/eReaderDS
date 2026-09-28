@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.8.0
 
 - **Screens off when left alone:** Settings → Reading & Device → **Screens
   off after** (Never, 2, 5, 10, 15 or 30 minutes; 10 by default). With no
