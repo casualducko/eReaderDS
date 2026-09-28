@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.21
 
 - Installing an update no longer freezes on "Installing… 100%" while the
   files are saved to the SD card (about 40 s on ROCKNIX): the saving runs on
