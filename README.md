@@ -53,7 +53,7 @@ Directions are as you hold it.
 | D-pad or stick | Turn pages (right/down forward) | Up/down move; left/right change a value, page through a list, or change the library's sort order |
 | A | Show the notes on these pages | Select |
 | B | Settings, or go back after a jump | Back |
-| Y | Look up a word | Delete (a book in the library, a bookmark in Bookmarks) |
+| Y | Look up (or highlight) a word | Delete (a book in the library, a bookmark or highlight in the list) |
 | Select | Bookmark the page (again to remove) | Close; in the library: Get books |
 | Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
 | Menu (Anbernic button) | Quit | Quit |
@@ -101,11 +101,13 @@ Press **B** (or Start, X, ↩) while reading. One page, top to bottom:
   page while the text stays put.
 - **Dictionary on the facing page:** press Y and move a cursor over the words;
   English is built in, and you can add your own ([below](#dictionaries)).
+- **Highlights:** mark passages and find them again in the list of bookmarks
+  and highlights ([below](#highlights)).
 - **Get books over Wi-Fi:** Project Gutenberg built in, plus Calibre or any
   OPDS catalog ([below](#getting-books-over-wi-fi)).
 - **Library:** covers and progress, sorted by recent, title, author or
   progress; delete books from it.
-- **Finding your place:** bookmarks, Contents, Jump to %, **Find in book**
+- **Finding your place:** bookmarks and highlights, Contents, Jump to %, **Find in book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
   and the words are marked on the page you open), and "Back to …" after any
   jump. Your place in every book is saved.
@@ -161,6 +163,15 @@ password = secret
 Leave out `user` and `password` if the server doesn't need them, and add a
 block for each extra catalog. Add `verify = no` for a server with a
 self-signed certificate, and `gutenberg = off` to hide Project Gutenberg.
+
+## Highlights
+
+Press **Y** for the word cursor, move to the first word, press **Select**, move
+to the last word (the highlight grows as you go, across both pages), and press
+**Select** again. **B** cancels. To remove one, put the cursor on it and press
+**Select**. Highlights show as a band behind the words in every theme, stay
+put when you change the font or text size, and are listed with your bookmarks
+in **Settings → Bookmarks** (A goes there, Y deletes).
 
 ## Dictionaries
 

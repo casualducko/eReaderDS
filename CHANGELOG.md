@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Highlights.** In look-up (Y), Select at the first word starts a
+  highlight; moving extends it (shown as you go, on both pages, with a hint
+  in place of the definition); Select saves it, B cancels. Select on a
+  highlighted word removes it. They're a band in the theme's selection colour
+  behind the words (drawn before the text, joined across the spaces), saved
+  as chapter text offsets in `highlights.txt` (so they survive font and size
+  changes; removed with the book), and listed in reading order on the
+  **Bookmarks & highlights** page (A goes there, Y deletes). Layout items
+  now carry their word's text offset. Tested on ROCKNIX: choosing, saving,
+  the list, text size 40 → 30, removing.
+
 ## v0.3.27
 
 - **Chapters that span several EPUB files:** pages left, time left, "Page x

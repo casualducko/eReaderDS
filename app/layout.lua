@@ -1,7 +1,7 @@
 -- Paginates a chapter's blocks into fixed-size pages.
 --
 -- page = { off = first char offset, items = { ... } }
--- item = { kind = "text", x, y, text, font }
+-- item = { kind = "text", x, y, text, font, off (the word's text offset) }
 --      | { kind = "image", x, y, w, h, src }
 --      | { kind = "rule", x, y, w }
 local utf8 = require("utf8")
@@ -168,8 +168,9 @@ function M.paginate(chapter, ctx)
                             if fr.font ~= (big and F.h or F.r) then
                                 by = ty + (big and F.h or F.r):getBaseline() - fr.font:getBaseline() - (fr.rise or 0)
                             end
+                            -- off: where the word starts in the chapter's text (highlights).
                             page.items[#page.items + 1] = { kind = "text", x = math.floor(x + 0.5), y = math.floor(by),
-                                text = fr.text, font = fr.font, link = fr.link }
+                                text = fr.text, font = fr.font, link = fr.link, off = wd.off }
                             x = x + fr.w
                         end
                         if k < #line then x = x + gap end

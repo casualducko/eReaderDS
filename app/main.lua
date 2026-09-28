@@ -606,7 +606,8 @@ function look.collect()
                     prev.text = prev.text .. it.text
                     prev.x2, prev.y, prev.y2 = x + w, math.min(prev.y, y), math.max(prev.y2, y + h)
                 else
-                    prev = { side = side, text = it.text, line = line, x = x, y = y, x2 = x + w, y2 = y + h }
+                    -- off: where it starts in the chapter's text (for highlights).
+                    prev = { side = side, text = it.text, line = line, x = x, y = y, x2 = x + w, y2 = y + h, off = it.off }
                     words[#words + 1] = prev
                 end
             end
@@ -719,7 +720,7 @@ function look.open(word)
     look.scan()
     look.words = look.collect()
     if #look.words == 0 then app.toast("No words on these pages"); return end
-    look.sel = 1
+    look.sel, look.hl_start = 1, nil
     for i, w in ipairs(look.words) do
         if word and w.side == word.side and w.x == word.x and w.y == word.y then look.sel = i end
     end
@@ -760,6 +761,131 @@ function look.hit(side, u, v)
     for i, w in ipairs(look.words) do
         if w.side == side and u >= w.x - 6 and u <= w.x2 + 6 and v >= w.y - 6 and v <= w.y2 + 6 then return w, i end
     end
+end
+
+---------------------------------------------------------------- highlights
+
+-- A highlight is a run of words, saved as text offsets in a chapter (so it
+-- survives changes to the font or layout), like a bookmark. Made in look-up
+-- (Y): Select at the first word, move to the last, Select again. Select on a
+-- highlighted word removes it. Listed with the bookmarks.
+
+-- The highlights on the visible chapter, and the one being chosen.
+function app.hl_ranges()
+    local out = {}
+    if not book or not spread then return out end
+    for _, h in ipairs(Store.get_highlights(book.path)) do
+        if h.ch == spread.ch then out[#out + 1] = h end
+    end
+    local p = app.mode == "lookup" and app.hl_span()
+    if p then out[#out + 1] = p end
+    return out
+end
+
+-- The words being chosen: { s, e, a, b } (offsets and word indexes), or nil.
+function app.hl_span()
+    if not look.hl_start then return nil end
+    local a, b = math.min(look.hl_start, look.sel), math.max(look.hl_start, look.sel)
+    local wa, wb = look.words[a], look.words[b]
+    if not (wa and wb and wa.off and wb.off) then return nil end
+    return { s = wa.off, e = wb.off + #wb.text, a = a, b = b }
+end
+
+-- The saved highlight a word is in (its index), or nil.
+function app.hl_at(w)
+    if not (w and w.off and book and spread) then return nil end
+    for i, h in ipairs(Store.get_highlights(book.path)) do
+        if h.ch == spread.ch and w.off >= h.s and w.off < h.e then return i end
+    end
+end
+
+-- Bands behind the highlighted words of a page (drawn before the text). A
+-- band runs on across the space to the next highlighted word on its line.
+function app.hl_bands(page, ox, oy)
+    local marked = {}
+    for _, it in ipairs(page.items) do
+        if it.kind == "text" and it.off then
+            for _, r in ipairs(app.hl_active) do
+                if it.off >= r.s and it.off < r.e then marked[#marked + 1] = it; break end
+            end
+        end
+    end
+    if #marked == 0 then return end
+    color(theme().sel)
+    for i, it in ipairs(marked) do
+        local x2 = it.x + it.font:getWidth(it.text)
+        local nx = marked[i + 1]
+        if nx and nx.x > it.x and math.abs((nx.y + nx.font:getBaseline()) - (it.y + it.font:getBaseline())) < 4 then
+            x2 = nx.x
+        end
+        local h = it.font:getHeight()
+        love.graphics.rectangle("fill", ox + it.x - 3, oy + it.y + math.floor(h * 0.06), x2 - it.x + 6,
+            math.ceil(h * 0.92), 4, 4)
+    end
+end
+
+-- While choosing: what to do, over the bottom of the touchscreen page.
+function app.hl_hint()
+    local th = theme()
+    local m = margins()
+    love.graphics.setFont(ui.small)
+    local h = ui.small:getHeight() + 24
+    color(th.bg)
+    love.graphics.rectangle("fill", 0, PAGE_H - h - 8, PAGE_W, h + 8)
+    color(th.fg)
+    love.graphics.printf("Highlighting: move to the last word    Select save    B cancel",
+        m.inner, PAGE_H - h + 4, PAGE_W - m.outer - m.inner, "left")
+end
+
+-- Select in look-up: start a highlight, save it, or remove the one here.
+function app.hl_select()
+    local w = look.words[look.sel]
+    if not (w and w.off) then app.toast("This can't be highlighted"); return end
+    local list = {}
+    for _, h in ipairs(Store.get_highlights(book.path)) do list[#list + 1] = h end
+    if not look.hl_start then
+        local i = app.hl_at(w)
+        if i then
+            table.remove(list, i)
+            Store.set_highlights(book.path, list)
+            app.toast("Highlight removed")
+        else
+            look.hl_start = look.sel
+        end
+        redraw()
+        return
+    end
+    local span = app.hl_span()
+    look.hl_start = nil
+    if not span then return end
+    -- The words, with a word split over two lines joined back up.
+    local parts = {}
+    for k = span.a, span.b do
+        local t, prv = look.words[k].text, look.words[k - 1]
+        if k > span.a and prv.text:sub(-1) == "-" and look.words[k].line == prv.line + 1 then
+            parts[#parts] = parts[#parts]:sub(1, -2) .. t
+        else
+            parts[#parts + 1] = t
+        end
+    end
+    local text = table.concat(parts, " ")
+    -- Overlapping highlights become one.
+    local keep = {}
+    for _, h in ipairs(list) do
+        if h.ch == spread.ch and h.s < span.e and h.e > span.s then
+            if h.s < span.s then span.s, text = h.s, h.text .. " … " .. text end
+            if h.e > span.e then span.e, text = h.e, text .. " … " .. h.text end
+        else
+            keep[#keep + 1] = h
+        end
+    end
+    keep[#keep + 1] = { ch = spread.ch, s = span.s, e = span.e, pct = book:fraction(spread.ch, span.s),
+        title = app.find_label({ ch = spread.ch, off = span.s }), text = text }
+    Store.set_highlights(book.path, keep)
+    app.mode = "reader"
+    reading.since = love.timer.getTime()
+    app.toast("Highlighted")
+    redraw()
 end
 
 ---------------------------------------------------------------- bookmarks
@@ -1559,7 +1685,7 @@ local function menu_items()
                 toc.top = nil
                 app.mode = "toc"
             end },
-            { label = "Bookmarks", value = tostring(#Store.get_bookmarks(book.path)),
+            { label = "Bookmarks", value = tostring(#Store.get_bookmarks(book.path) + #Store.get_highlights(book.path)),
               act = function() open_bookmarks("menu") end },
             { label = "Find in book", act = function() app.find_open() end },
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
@@ -1637,6 +1763,7 @@ local function draw_page(page, side, top)
     local ox = side == "left" and m.outer or m.inner
     local oy = top or text_top()
     if not page then return end
+    if app.hl_active and #app.hl_active > 0 then app.hl_bands(page, ox, oy) end
     for _, it in ipairs(page.items) do
         if it.kind == "text" then
             color(th.fg)
@@ -1897,11 +2024,15 @@ local function draw_reader_pages()
     end
 
     info.marked = bookmark_here() ~= nil
+    local ranges = app.hl_ranges()
     return function(side)
+        app.hl_active = ranges                   -- highlights, drawn behind the words
         if side == "left" then
             draw_page(left, "left")
+            app.hl_active = nil
         else
             draw_page(right, "right")
+            app.hl_active = nil
             if app.mode == "reader" and #note.on_spread() > 0 then
                 -- Notes on this spread: a button to show them (same as A).
                 local bx, by, bw, bh = note.button()
@@ -2475,7 +2606,8 @@ function look.draw_panel(side)
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
-    local hint = "‹ ›  word      up/down  line      B  close"
+    local hint = "‹ › word    up/down line    Select " .. (app.hl_at(look.words[look.sel]) and "remove highlight" or "highlight")
+        .. "    B close"
     if pages and #pages > 1 then hint = "A  more (" .. look.page .. "/" .. #pages .. ")     " .. hint end
     love.graphics.print(hint, ox, PAGE_H - 26 - ui.small:getHeight())
 end
@@ -2598,9 +2730,14 @@ local function draw_jump_panel()
     love.graphics.printf("A jump    B cancel", x, PAGE_H - 70, w, "left")
 end
 
+-- Bookmarks and highlights together, in reading order.
 local function bookmark_entries()
     local entries = { { action = true } }
-    for _, b in ipairs(Store.get_bookmarks(book.path)) do entries[#entries + 1] = b end
+    local all = {}
+    for _, b in ipairs(Store.get_bookmarks(book.path)) do all[#all + 1] = { item = b, ch = b.ch, off = b.off } end
+    for _, h in ipairs(Store.get_highlights(book.path)) do all[#all + 1] = { item = h, ch = h.ch, off = h.s, hl = true } end
+    table.sort(all, function(x, y) return x.ch < y.ch or (x.ch == y.ch and x.off < y.off) end)
+    for _, e in ipairs(all) do entries[#entries + 1] = e end
     return entries
 end
 
@@ -2620,9 +2757,9 @@ local function draw_bookmarks(side)
     if side == "left" then
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Bookmarks", x, 60)
+        love.graphics.print("Bookmarks & highlights", x, 60)
     end
-    draw_list(side, entries, bm.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
+    draw_list(side, entries, bm.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw, selected)
         if it.action then
             love.graphics.setFont(ui.font)
             color(th.fg)
@@ -2633,20 +2770,38 @@ local function draw_bookmarks(side)
         local top = ui.font:getBaseline() - UI_SIZE * 0.68
         local bottom = 40 + ui.small:getBaseline()
         local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
-        local pct = math.floor(it.pct * 100 + 0.5) .. "%"
-        love.graphics.setFont(ui.font)
-        color(th.fg)
-        love.graphics.print(fit_text(ui.font, it.title ~= "" and it.title or book.title, rw - 90), rx, ty)
+        local e = it.item
+        local pct = math.floor(e.pct * 100 + 0.5) .. "%"
+        local title = fit_text(ui.font, e.title ~= "" and e.title or book.title, rw - 90)
         love.graphics.setFont(ui.small)
         color(th.dim)
         love.graphics.printf(pct, rx, ty + ui.font:getBaseline() - ui.small:getBaseline(), rw, "right")
-        love.graphics.print(fit_text(ui.small, it.snippet, rw), rx, ty + 40)
+        if it.hl then
+            -- A highlight: its words, marked like on the page; the chapter under them.
+            local words = "“" .. fit_text(ui.font, e.text, rw - 110) .. "”"
+            love.graphics.setFont(ui.font)
+            color(selected and th.bg or th.sel)
+            love.graphics.rectangle("fill", rx - 3, ty + 2, ui.font:getWidth(words) + 6, ui.font:getHeight() - 4, 4, 4)
+            color(th.fg)
+            love.graphics.print(words, rx, ty)
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.print(fit_text(ui.small, title, rw), rx, ty + 40)
+            return
+        end
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.print(title, rx, ty)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print(fit_text(ui.small, e.snippet, rw), rx, ty + 40)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
     if side == "left" and #entries == 1 then
-        love.graphics.printf("No bookmarks yet. While reading, press Select or tap the top-right "
-            .. "corner of the page to bookmark it.", x, 160 + row_h + 20, w, "left")
+        love.graphics.printf("No bookmarks or highlights yet. While reading, press Select or tap the "
+            .. "top-right corner of the page to bookmark it. To highlight, press Y, then Select at "
+            .. "the first word and again at the last.", x, 160 + row_h + 20, w, "left")
     end
     if side == "right" then
         love.graphics.print("A open    Y delete    B back", x, PAGE_H - 70)
@@ -2715,7 +2870,7 @@ app.HELP = {
         { "B", "Settings, or back after a jump" },
         { "X, Start", "Settings" },
         { "Curved arrow", "Settings (or press the stick)" },
-        { "Y", "Look up a word" },
+        { "Y", "Look up a word; then Select to highlight" },
         { "Select", "Bookmark the page" },
         { "Anbernic", "Quit" },
     } },
@@ -3826,7 +3981,12 @@ local function render_canvases()
         local reader = draw_reader_pages()
         local wd = look.words[look.sel]
         painter = function(side)
-            if side == wd.side then reader(side); note.highlight(wd) else look.draw_panel(side) end
+            if look.hl_start then
+                -- Choosing a highlight: both pages, the words so far marked.
+                reader(side)
+                if side == wd.side then note.highlight(wd) end
+                if side == "right" then app.hl_hint() end
+            elseif side == wd.side then reader(side); note.highlight(wd) else look.draw_panel(side) end
         end
     elseif app.mode == "note" then
         local reader = draw_reader_pages()
@@ -4383,7 +4543,7 @@ function handle_action(a)
     if lid.closed then return end         -- pocket presses while the lid is shut
     local mode = app.mode
     -- Select bookmarks while reading; elsewhere it behaves like the menu button.
-    if a == "bookmark" and mode ~= "reader" and mode ~= "library" then a = "menu" end
+    if a == "bookmark" and mode ~= "reader" and mode ~= "library" and mode ~= "lookup" then a = "menu" end
     -- Pressing the stick in opens Settings while reading, and selects elsewhere.
     if a == "stick" then a = mode == "reader" and "menu" or "confirm" end
     if a == "quit" then love.event.quit() return end
@@ -4483,13 +4643,14 @@ function handle_action(a)
                 app.jump_to(e.ch, e.off); app.mode = "reader"
             end
         elseif a == "toc" and bm.sel > 1 then              -- Y deletes
+            local e = entries[bm.sel]
             local list = {}
-            for i, b in ipairs(Store.get_bookmarks(book.path)) do
-                if i ~= bm.sel - 1 then list[#list + 1] = b end
+            for _, x in ipairs(e.hl and Store.get_highlights(book.path) or Store.get_bookmarks(book.path)) do
+                if x ~= e.item then list[#list + 1] = x end
             end
-            Store.set_bookmarks(book.path, list)
-            bm.sel = math.min(bm.sel, #list + 1)
-            if app.toast then app.toast("Bookmark deleted") end
+            if e.hl then Store.set_highlights(book.path, list) else Store.set_bookmarks(book.path, list) end
+            bm.sel = math.min(bm.sel, n - 1)
+            if app.toast then app.toast(e.hl and "Highlight deleted" or "Bookmark deleted") end
         elseif a == "back" or a == "menu" then
             app.mode = bm.from == "menu" and "menu" or "reader"
         end
@@ -4513,9 +4674,12 @@ function handle_action(a)
 
     if mode == "lookup" then
         if a == "left" or a == "right" or a == "up" or a == "down" then look.move(a)
+        elseif a == "bookmark" then app.hl_select()              -- Select: highlight
+        elseif look.hl_start and (a == "back" or a == "toc") then look.hl_start = nil   -- cancel it
         elseif a == "confirm" then look.page = look.page + 1
             if look.pages and look.page > #look.pages then look.page = 1 end
-        elseif a == "back" or a == "menu" or a == "toc" or a == "bookmark" then
+        elseif a == "back" or a == "menu" or a == "toc" then
+            look.hl_start = nil
             app.mode = "reader"
             reading.since = love.timer.getTime()
         end
