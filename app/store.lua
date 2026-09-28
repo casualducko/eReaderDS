@@ -27,6 +27,7 @@ local DEFAULTS = {
     skip_version = "", -- a version the reader chose to skip (not mentioned again)
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)
     lib_hide_finished = false, -- My Books leaves out the books marked finished
+    idle_min = 10,     -- left alone this many minutes, the screens dim, then turn off (0 = never)
 }
 
 local function data_dir()

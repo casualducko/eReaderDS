@@ -1848,6 +1848,9 @@ local function more_items()
             end },
         }),
         section("Device", {
+            { label = "Screens off after", value = S.idle_min > 0 and (S.idle_min .. " min") or "Never", adjust = function(d)
+                S.idle_min = cycle(app.IDLE_CHOICES, S.idle_min, d)
+            end },
             { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
                 S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
             end },
@@ -5386,6 +5389,13 @@ end
 
 local function touch_event(kind, sx, sy)
     local now = love.timer.getTime()
+    -- A touch that wakes the screens does nothing else, until the finger lifts.
+    if (kind == "down" or kind == "pinch_start") and app.idle_input() then app.idle_swallow = true end
+    if app.idle_swallow then
+        if kind == "up" or kind == "pinch_end" then app.idle_swallow = nil end
+        return
+    end
+    if kind == "move" or kind == "pinch" then app.idle.last = now end
     -- Two-finger pinch while reading: previews a text size (shown with a
     -- percentage and a sample line) and applies it when the fingers lift.
     -- The size follows the square root of the pinch, so it changes gently.
@@ -5700,6 +5710,7 @@ end
 local function lid_opened()
     if not lid.closed then return end
     lid.closed = false
+    app.idle.last, app.idle.state = love.timer.getTime(), nil
     Backlight.power(true, lid.pct)
     redraw()
 end
@@ -5711,6 +5722,51 @@ local function lid_tick()
         and love.timer.getTime() - lid.since > RESLEEP_AFTER then
         suspend()
         lid.since = love.timer.getTime()
+    end
+end
+
+-- Left alone (no button or touch for S.idle_min minutes), the screens dim
+-- for their last half-minute, then turn off; the next button or touch turns
+-- them back on (and does nothing else). Not while a book is being received or
+-- downloaded, or with the lid shut.
+app.IDLE_CHOICES = { 0, 2, 5, 10, 15, 30 }
+app.IDLE_DIM = 30
+app.idle = { last = 0 }
+
+-- Any input: returns true if it only woke the screens (so it's not acted on).
+function app.idle_input()
+    local I = app.idle
+    I.last = love.timer.getTime()
+    if not I.state then return false end
+    local was = I.state
+    I.state = nil
+    if was == "off" then Backlight.power(true, I.pct) else Backlight.set(I.pct) end
+    print("[idle] awake")
+    redraw()
+    return was == "off"
+end
+
+function app.idle_tick()
+    local I = app.idle
+    local now = love.timer.getTime()
+    if I.last == 0 or lid.closed or (S.idle_min or 0) <= 0 or app.recv or shop.dl
+        or not Backlight.available() then
+        I.last = I.state and I.last or now
+        return
+    end
+    local t, limit = now - I.last, S.idle_min * 60
+    if not I.state and t > limit - app.IDLE_DIM then
+        I.pct = S.brightness >= 0 and S.brightness or Backlight.get() or 50
+        I.state = "dim"
+        Backlight.set(math.max(1, math.floor(I.pct / 3)))
+        print("[idle] dimmed")
+    elseif I.state == "dim" and t > limit then
+        I.state = "off"
+        reading_pause()
+        save_progress()
+        Store.flush()
+        Backlight.power(false)
+        print("[idle] screens off")
     end
 end
 
@@ -5743,6 +5799,7 @@ local ROTATE = {
 
 local handle_action
 local function action(a)
+    if app.idle_input() then return end        -- that press only woke the screens
     handle_action(a)
     -- Time outside the pages (menus, lists) doesn't count as reading.
     if app.mode ~= "reader" then reading_pause() end
@@ -6893,7 +6950,7 @@ function love.run()
     love.load(love.arg.parseGameArguments(arg), arg)
     run_test_script()
     return function()
-        if (app.dirty or app.anim) and love.graphics.isActive() and not lid.closed then
+        if (app.dirty or app.anim) and love.graphics.isActive() and not lid.closed and app.idle.state ~= "off" then
             app.dirty = false
             love.graphics.origin()
             love.draw()
@@ -6941,6 +6998,10 @@ function love.run()
             -- Wi-Fi coming or going changes the Get Books button.
             local was = shop.online_v
             if shop.online() ~= was and was ~= nil then redraw() end
+        end
+        app.idle_tick()
+        if app.idle.state == "off" and not lid.closed then
+            love.timer.sleep(0.1)               -- screens off: check for a press now and then
         end
         if lid.closed then
             lid_tick()

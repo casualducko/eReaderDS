@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Screens off when left alone:** Settings → Reading & Device → **Screens
+  off after** (Never, 2, 5, 10, 15 or 30 minutes; 10 by default). With no
+  button or touch for that long, the screens dim to a third for the last 30
+  seconds, then turn off (progress saved; the app checks for input less
+  often). The next button or touch turns them back on and does nothing else,
+  so waking never turns a page. Not while sending books over Wi-Fi, during a
+  Get Books download, or with the lid shut (`app.idle_tick`, `app.idle_input`).
+
 ## v1.7.0
 
 - **Highlights and bookmarks as a file** (like a Kindle's "My Clippings"):

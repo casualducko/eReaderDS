@@ -124,8 +124,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 2. **Line spacing, Justify text, Hyphenation, Margins, Top/bottom margins**;
    **Night Theme** ([below](#night-theme)); **Status Bar ›** (what the top
    and bottom lines show, and the clock style), **Reading & Device ›**
-   (page-turn animation, what a tap does, dictionary, closing the lid, time
-   zone), **About eReaderDS ›** (What's New, Check for Updates, Update
+   (page-turn animation, what a tap does, dictionary, screens off after a
+   while, closing the lid, time zone), **About eReaderDS ›** (What's New, Check for Updates, Update
    notices, Report a Problem, About & Credits); **Quit**.
 
 ## Features
