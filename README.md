@@ -84,7 +84,7 @@ one-page summary of the buttons and touchscreen.
 
 Press **B** (or Start, X, ↩) while reading. One page, top to bottom:
 
-- **Contents, Bookmarks, Find in book, Jump to %, Library**
+- **Contents, Bookmarks and highlights, Find in book, Jump to %, Library**
 - **Text:** Font (its own page, [below](#fonts)), text size, line spacing,
   justify, hyphenation
 - **Page:** margins, theme, **Night theme** ([below](#night-theme)), brightness
@@ -176,7 +176,7 @@ to the last word (the highlight grows as you go, across both pages), and press
 **Select** again. **B** cancels. To remove one, put the cursor on it and press
 **Select**. Highlights show as a band behind the words in every theme, stay
 put when you change the font or text size, and are listed with your bookmarks
-in **Settings → Bookmarks** (A goes there, Y deletes).
+in **Settings → Bookmarks and highlights** (A goes there, Y deletes).
 
 ## Dictionaries
 

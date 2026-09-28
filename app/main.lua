@@ -1685,7 +1685,7 @@ local function menu_items()
                 toc.top = nil
                 app.mode = "toc"
             end },
-            { label = "Bookmarks", value = tostring(#Store.get_bookmarks(book.path) + #Store.get_highlights(book.path)),
+            { label = "Bookmarks and highlights", value = tostring(#Store.get_bookmarks(book.path) + #Store.get_highlights(book.path)),
               act = function() open_bookmarks("menu") end },
             { label = "Find in book", act = function() app.find_open() end },
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
@@ -2757,7 +2757,7 @@ local function draw_bookmarks(side)
     if side == "left" then
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Bookmarks & highlights", x, 60)
+        love.graphics.print("Bookmarks and highlights", x, 60)
     end
     draw_list(side, entries, bm.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw, selected)
         if it.action then

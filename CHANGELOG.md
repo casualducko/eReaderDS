@@ -9,7 +9,8 @@
   behind the words (drawn before the text, joined across the spaces), saved
   as chapter text offsets in `highlights.txt` (so they survive font and size
   changes; removed with the book), and listed in reading order on the
-  **Bookmarks & highlights** page (A goes there, Y deletes). Layout items
+  **Bookmarks and highlights** page (A goes there, Y deletes; the Settings row
+  has the same name). Layout items
   now carry their word's text offset. Tested on ROCKNIX: choosing, saving,
   the list, text size 40 → 30, removing.
 
