@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.31
 
 - **Get more fonts:** a row at the end of the font list opens 14 free reading
   fonts to download over Wi-Fi (Alegreya, Cardo, Crimson Pro, Gelasio, IBM

@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.31
+Get more fonts: 14 free reading fonts to download, from Alegreya to Source Sans. Tap + Get more fonts at the top of the font list, or press Y.
+Clearer steps for installing on ROCKNIX, in the readme that comes with eReaderDS.
+
 v0.3.30
 Get books has Standard Ebooks: beautifully typeset classics. Browse the newest releases or search the whole collection.
 eReaderDS is now open source under the MIT License.
