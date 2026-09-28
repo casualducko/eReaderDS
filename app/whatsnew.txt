@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.30
+Get books has Standard Ebooks: beautifully typeset classics. Browse the newest releases or search the whole collection.
+eReaderDS is now open source under the MIT License.
+
 v0.3.29
 Pages sit in the middle of each screen, with the same margin on both sides.
 Deleting a bookmark or highlight asks first.

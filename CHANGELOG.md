@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.30
 
 - **Standard Ebooks** in Get books: its newest releases (the free
   New Releases feed) and Search over the whole collection (its OpenSearch
