@@ -2,12 +2,12 @@
 
 ## Unreleased
 
-- **Settings: bigger rows, in pages.** The main page is three pages of rows
-  about 72 px tall (were 37) in a larger font (36 px): 1. Contents,
+- **Settings: bigger rows, in pages.** The main page is two pages of rows
+  about 66–74 px tall (were 37) in a larger font (36 px): 1. Contents,
   Bookmarks and highlights, Find in book, Jump to %, Library, Font, Text
-  size, Theme, Brightness, Help (Update to v… on top when one is waiting);
-  2. line spacing, justify, hyphenation, margins, top/bottom margins, Night
-  theme; 3. Status bar, Reading & device, About eReaderDS, Quit. Dots show
+  size, Theme, Brightness, Help, Quit (Update to v… on top when one is
+  waiting); 2. line spacing, justify, hyphenation, margins, top/bottom
+  margins, Night theme, Status bar, Reading & device, About eReaderDS. Dots show
   the page; swipe left/right, or up/down past the end, or left/right on a
   row with nothing to change. Sub-pages use the same rows, shrinking a
   little (to 58 px) to stay on one page, else spreading over pages.

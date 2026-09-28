@@ -1644,7 +1644,7 @@ local function menu_items()
     if menu.page == "about" then return app.about_items() end
     local th = theme()
     local u = app.upd
-    -- Three pages (swipe, or up/down past the end): the everyday things first.
+    -- Two pages (swipe, or up/down past the end): the everyday things first.
     return join(
         app.menu_on_page(1, section(nil, join(
             u.state == "available" and { { label = "Update to v" .. u.version, bold = true, act = app.update_open } } or {},
@@ -1696,6 +1696,7 @@ local function menu_items()
         })),
         app.menu_on_page(1, section("", {
             { label = "Help", act = function() app.mode = "help" end },
+            { label = "Quit", act = function() love.event.quit() end },
         })),
         app.menu_on_page(2, section("Page", {
             { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
@@ -1718,13 +1719,12 @@ local function menu_items()
         app.menu_on_page(2, section("Night", {
             { label = "Night theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
         })),
-        app.menu_on_page(3, section("", {
+        app.menu_on_page(2, section("", {
             { label = "Status bar", value = "›", act = function() open_sub("status") end },
             { label = "Reading & device", value = "›", act = function() open_sub("more") end },
             { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
               value_bold = app.upd.state == "available" and "Update" or nil,
               act = function() open_sub("about") end },
-            { label = "Quit", act = function() love.event.quit() end },
         }))
     )
 end
