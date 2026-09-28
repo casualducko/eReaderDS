@@ -1462,10 +1462,7 @@ function app.night_items()
     local names = { "off" }
     for _, t in ipairs(THEMES) do names[#names + 1] = t.name end
     local rows = {
-        -- Whether it's on right now, so changing the hours shows what they do.
-        { label = "Night theme", value = S.night_theme == "off" and "Off"
-            or (S.night_theme .. (app.night and "  ·  on now"
-                or S.night_from == S.night_to and "  ·  never on" or ("  ·  from " .. app.hour_label(S.night_from)))),
+        { label = "Night theme", value = S.night_theme == "off" and "Off" or S.night_theme,
           adjust = function(d)
             S.night_theme = cycle(names, S.night_theme, d); app.night_check()
         end },
@@ -1586,7 +1583,7 @@ local function menu_items()
                 local name = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
                 if app.night then S.night_theme = name else S.theme = name end
             end },
-            { label = "Night theme", value = app.night_summary(), act = function() open_sub("night") end },
+            { label = "Night theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
                   or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
@@ -2317,6 +2314,9 @@ local function draw_menu_panel(side)
                 local v = it.value
                 if it.adjust then
                     v = "‹  " .. fit_text(ui.font, v, room - ui.font:getWidth("‹    ›")) .. "  ›"
+                elseif it.opens then
+                    -- A row that opens a page, showing its setting: "Off  ›".
+                    v = fit_text(ui.font, v, room - ui.font:getWidth("  ›")) .. "  ›"
                 end
                 love.graphics.printf(v, rx, ty, rw, "right")
             elseif it.adjust then

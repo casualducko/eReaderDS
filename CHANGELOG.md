@@ -10,6 +10,9 @@
   What's new, Check for updates, Update notices and About & credits (and
   "Update to v…" when one is waiting; the bold "Update" moved to its row).
   Help stays on the main page.
+- The main page's Night theme row ends in "›" like the other rows that open
+  a page ("Off  ›"); on its page, the Night theme row shows just the theme
+  (no "on now" / "from 9 PM").
 
 ## v0.3.25
 
