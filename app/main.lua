@@ -1460,6 +1460,9 @@ local function more_items()
             end },
         }),
         section("", {
+            { label = "Update notices", value = S.update_notices and "On" or "Off", adjust = function()
+                S.update_notices = not S.update_notices
+            end },
             { label = "Check for updates",
               value = (u.state == "checking" and "Checking…") or (u.state == "available" and ("v" .. u.version))
                   or (u.checked and "Up to date") or "",
@@ -4616,7 +4619,9 @@ function love.load()
         Store.save_settings(S)
     end
     -- A newer version? (Only when online; quietly does nothing otherwise.)
-    if not os.getenv("READER_SCRIPT") or os.getenv("READER_FAKE_VERSION") then app.update_check() end
+    if S.update_notices and (not os.getenv("READER_SCRIPT") or os.getenv("READER_FAKE_VERSION")) then
+        app.update_check()
+    end
 end
 
 function love.quit()

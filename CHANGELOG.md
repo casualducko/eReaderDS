@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Update notices** (Settings → Page turns & device): turn off the check for
+  a new version at launch, and its notes. Check for updates still works.
+
 ## v0.3.14
 
 - The version number at the top of Settings is a little bigger.
