@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Find in book** results stand out more: each one's chapter is in bold,
+  and so is the matched text.
+
 ## v0.3.8
 
 - **Find in book** (Settings): type a word or phrase on an on-screen keyboard

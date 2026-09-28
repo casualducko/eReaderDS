@@ -2857,22 +2857,25 @@ function app.find_draw(side)
         or (#f.results == 1 and "1 match" or (#f.results .. " matches"))
     if side == "left" then love.graphics.printf(status, x, 60 + ui.title:getHeight() + 8, w, "left") end
     draw_list(side, f.results, f.sel, first, rows, x, 160, w, row_h, function(r, _, rx, ry, rw)
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        love.graphics.print(fit_text(ui.small, app.find_label(r), rw), rx, ry + 8)
+        -- The chapter in bold, then the words around the match, the match bold.
+        love.graphics.setFont(ui.small_bold)
+        color(th.fg)
+        love.graphics.print(fit_text(ui.small_bold, app.find_label(r), rw), rx, ry + 8)
         local pre, hit, post = app.find_snippet(r)
-        love.graphics.setFont(ui.font)
         local y = ry + 8 + ui.small:getHeight() + 2
         -- Keep the match in view: trim the start if the line is too long.
-        while pre ~= "…" and pre ~= "" and ui.font:getWidth(pre .. hit) > rw * 0.7 do
+        while pre ~= "…" and pre ~= "" and ui.font:getWidth(pre) + ui.bold:getWidth(hit) > rw * 0.7 do
             pre = "…" .. pre:gsub("^…", ""):gsub("^.[\128-\191]*", "")
         end
+        love.graphics.setFont(ui.font)
         color(th.dim)
         love.graphics.print(pre, rx, y)
         local px = rx + ui.font:getWidth(pre)
+        love.graphics.setFont(ui.bold)
         color(th.fg)
         love.graphics.print(hit, px, y)
-        local hx = px + ui.font:getWidth(hit)
+        local hx = px + ui.bold:getWidth(hit)
+        love.graphics.setFont(ui.font)
         color(th.dim)
         love.graphics.print(fit_text(ui.font, post, math.max(0, rx + rw - hx)), hx, y)
     end)
@@ -3957,6 +3960,8 @@ function love.load()
     end
     ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
     ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
+    ui.bold = load_font("GentiumBookPlus-Bold.ttf", UI_SIZE)
+    ui.small_bold = load_font("GentiumBookPlus-Bold.ttf", SMALL_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
     ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
     build_fonts()
