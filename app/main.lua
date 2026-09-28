@@ -5760,7 +5760,7 @@ function app.recv_open()
     love.thread.getChannel("recv_out"):clear()
     local r = { ip = ip, files = {}, back = app.mode, books = 0, fonts = 0 }
     r.thread = love.thread.newThread("receiver.lua")
-    r.thread:start({ books = Store.download_dir(), fonts = Fonts.user_dir() })
+    r.thread:start({ books = Store.download_dir(), fonts = Fonts.user_dir(), version = VERSION })
     app.recv = r
     app.mode = "receive"
     redraw()
@@ -5880,29 +5880,50 @@ function app.recv_draw(side)
         color(th.dim)
         love.graphics.printf("Books (.epub, .txt) go to My Books, fonts (.ttf, .otf) to Fonts. "
             .. "Stay on this screen until they're sent.", x, 250 + ui.title:getHeight() + 14, w, "left")
-        -- What's arrived, newest first.
-        local y = 480
-        for i, f in ipairs(r.files) do
-            if y > PAGE_H - 150 then break end
-            local mark
-            if f.failed then mark = "Failed: " .. f.failed
-            elseif f.done then mark = f.replaced and "Replaced ✓" or "✓"
-            else mark = math.floor(f.got / math.max(1, f.total) * 100) .. "%" end
-            love.graphics.setFont(ui.small)
-            local mw = ui.small:getWidth(mark)
-            color(f.failed and th.fg or th.dim)
-            love.graphics.print(mark, x + w - mw, y)
-            love.graphics.setFont(ui.font)
+        -- What's arrived, newest first: the title (and author, as My Books
+        -- shows them), and what happened to it.
+        local y = 470
+        if r.books + r.fonts > 0 then
+            love.graphics.setFont(ui.small_bold)
             color(th.fg)
-            love.graphics.print(fit_text(ui.font, f.name:gsub("%.[^.]+$", ""), w - mw - 24), x, y - 4)
-            y = y + 56
-            if i == 1 and not f.done and not f.failed then
-                color(th.sel)
-                love.graphics.rectangle("fill", x, y - 12, w, 6, 3, 3)
-                color(th.fg)
-                love.graphics.rectangle("fill", x, y - 12, w * math.min(1, f.got / math.max(1, f.total)), 6, 3, 3)
-                y = y + 10
+            local parts = {}
+            if r.books > 0 then parts[#parts + 1] = r.books .. (r.books == 1 and " book" or " books") end
+            if r.fonts > 0 then parts[#parts + 1] = r.fonts .. (r.fonts == 1 and " font" or " fonts") end
+            love.graphics.print(table.concat(parts, " and ") .. " received", x, y - 50)
+        end
+        for _, f in ipairs(r.files) do
+            if y > PAGE_H - 170 then break end
+            local base = f.name:gsub("%.[^.]+$", "")
+            local title, author = base:match("^(.-)%s+%-%s+(.+)$")
+            title = title or base
+            love.graphics.setFont(ui.font)
+            color(f.failed and th.dim or th.fg)
+            local tw = ui.font:getWidth(fit_text(ui.font, title, w))
+            love.graphics.print(fit_text(ui.font, title, w), x, y)
+            if author and tw < w - 60 then
+                love.graphics.setFont(ui.small)
+                color(th.dim)
+                love.graphics.print(fit_text(ui.small, author, w - tw - 16), x + tw + 16,
+                    y + ui.font:getBaseline() - ui.small:getBaseline())
             end
+            local where = f.font and "Fonts" or "My Books"
+            local line
+            if f.failed then line = "Failed: " .. f.failed
+            elseif f.done then
+                line = "✓  " .. (f.replaced and "Replaced in " or "Added to ") .. where .. "  ·  " .. (shop.format_size(f.total) or "0 KB")
+            else
+                line = "Receiving…  " .. math.floor(f.got / math.max(1, f.total) * 100) .. "%"
+            end
+            love.graphics.setFont(ui.small)
+            color(f.failed and th.fg or th.dim)
+            love.graphics.print(fit_text(ui.small, line, w), x, y + 40)
+            if not f.done and not f.failed then
+                color(th.sel)
+                love.graphics.rectangle("fill", x, y + 76, w, 6, 3, 3)
+                color(th.fg)
+                love.graphics.rectangle("fill", x, y + 76, w * math.min(1, f.got / math.max(1, f.total)), 6, 3, 3)
+            end
+            y = y + 96
         end
         if #r.files == 0 and r.url then
             love.graphics.setFont(ui.small)

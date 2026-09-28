@@ -4,7 +4,7 @@
 -- one at a time (POST /upload?name=…, the file as the body) straight into the
 -- books folder (.epub, .txt) or the fonts folder (.ttf, .otf).
 --
--- Started with { books = dir, fonts = dir }. Control on "recv_ctl" ("stop");
+-- Started with { books = dir, fonts = dir, version }. Control on "recv_ctl" ("stop");
 -- reports on "recv_out":
 --   { kind = "ready", port }                  listening
 --   { kind = "error", message }               couldn't start
@@ -13,6 +13,7 @@
 --   { kind = "done", name, path, font, replaced }
 --   { kind = "failed", name, message }
 require("love.timer")
+require("love.filesystem")
 local socket = require("socket")
 
 local dirs = ...
@@ -22,77 +23,168 @@ local out = love.thread.getChannel("recv_out")
 local MAX_SIZE = 300 * 1024 * 1024
 local CHUNK = 64 * 1024
 
-local PAGE = [[<!doctype html>
+local PAGE = [==[<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Send to eReaderDS</title>
 <style>
-:root { --bg: #f4ecd8; --fg: #3b3024; --dim: #8a7a66; --line: #d9ccb0; --ok: #3d7a3d; --bad: #b8382f; --btn: #3b3024; --btnfg: #f4ecd8; }
-@media (prefers-color-scheme: dark) { :root { --bg: #1d1a16; --fg: #e8dfcf; --dim: #9a8f7e; --line: #3a342c; --ok: #7cbf7c; --bad: #e0776d; --btn: #e8dfcf; --btnfg: #1d1a16; } }
+@font-face { font-family: Crimson; src: url(/font/r.ttf); font-weight: 400; }
+@font-face { font-family: Crimson; src: url(/font/b.ttf); font-weight: 700; }
+:root { --bg: #f1e7d0; --card: #faf4e6; --fg: #3b3024; --dim: #86765f; --line: #e0d3b8; --accent: #7a5c3a;
+  --ok: #3f7a45; --okbg: #e3eed9; --bad: #b0412f; --badbg: #f5dfd6; --btn: #3b3024; --btnfg: #faf4e6; --shadow: 0 1px 2px rgba(59,48,36,.08), 0 6px 20px rgba(59,48,36,.06); }
+@media (prefers-color-scheme: dark) { :root { --bg: #1b1814; --card: #25211b; --fg: #ebe2d0; --dim: #9d917d; --line: #383128; --accent: #d1b287;
+  --ok: #8ccf8f; --okbg: #22321f; --bad: #ee8a78; --badbg: #3a221d; --btn: #ebe2d0; --btnfg: #1b1814; --shadow: 0 1px 2px rgba(0,0,0,.3); } }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.5 Georgia, "Times New Roman", serif; }
-main { max-width: 560px; margin: 0 auto; padding: 32px 16px 48px; }
-h1 { font-size: 28px; margin: 0 0 6px; font-weight: normal; }
-p { margin: 0 0 20px; color: var(--dim); }
-#drop { border: 2px dashed var(--line); border-radius: 14px; padding: 28px 16px; text-align: center; }
-#drop.over { border-color: var(--fg); }
-label.btn { display: inline-block; background: var(--btn); color: var(--btnfg); padding: 12px 26px; border-radius: 999px; cursor: pointer; font-size: 18px; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 19px/1.45 Crimson, Georgia, "Times New Roman", serif; }
+main { max-width: 600px; margin: 0 auto; padding: 28px 16px 64px; }
+header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+header svg { flex: none; color: var(--accent); }
+h1 { font-size: 30px; line-height: 1.1; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+#conn { font-size: 15px; color: var(--dim); margin-top: 3px; display: flex; align-items: center; gap: 7px; }
+#conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); display: inline-block; }
+#conn.on i { background: var(--ok); } #conn.off { color: var(--bad); } #conn.off i { background: var(--bad); }
+#drop { background: var(--card); border: 2px dashed var(--line); border-radius: 18px; padding: 30px 18px 26px; text-align: center;
+  box-shadow: var(--shadow); transition: border-color .15s, transform .15s; }
+#drop.over { border-color: var(--accent); transform: scale(1.01); }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--btn); color: var(--btnfg); border: 0; padding: 13px 28px;
+  border-radius: 999px; cursor: pointer; font: 700 19px Crimson, Georgia, serif; }
+.btn:active { transform: translateY(1px); }
 input[type=file] { display: none; }
-.hint { margin: 12px 0 0; font-size: 15px; }
-ul { list-style: none; padding: 0; margin: 24px 0 0; }
-li { padding: 12px 0; border-bottom: 1px solid var(--line); }
-.row { display: flex; gap: 12px; justify-content: space-between; align-items: baseline; }
-.name { overflow-wrap: anywhere; }
-.st { flex: none; color: var(--dim); font-size: 15px; }
-.st.ok { color: var(--ok); } .st.bad { color: var(--bad); }
-.bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
-.bar i { display: block; height: 100%; width: 0; background: var(--fg); }
+.hint { margin: 12px 0 14px; color: var(--dim); font-size: 16px; }
+.chips { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.chips span { font-size: 13px; letter-spacing: .06em; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+#summary { display: none; margin: 22px 0 0; padding: 14px 18px; border-radius: 14px; background: var(--okbg); color: var(--ok); }
+#summary.bad { background: var(--badbg); color: var(--bad); }
+#summary b { display: block; font-size: 20px; }
+#summary span { font-size: 16px; color: var(--fg); opacity: .8; }
+ul { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 10px; }
+li { background: var(--card); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); display: grid;
+  grid-template-columns: 40px 1fr; gap: 0 14px; align-items: center; animation: in .25s ease-out; }
+@keyframes in { from { opacity: 0; transform: translateY(6px); } }
+.ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--bg); color: var(--dim); grid-row: span 2; }
+li.ok .ic { background: var(--okbg); color: var(--ok); } li.bad .ic { background: var(--badbg); color: var(--bad); }
+.t { font-weight: 700; overflow-wrap: anywhere; line-height: 1.25; }
+.t small { font-weight: 400; color: var(--dim); font-size: 16px; }
+.st { font-size: 15px; color: var(--dim); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+li.ok .st { color: var(--ok); } li.bad .st { color: var(--bad); }
+.bar { grid-column: 2; height: 5px; background: var(--line); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 3px; transition: width .2s; }
+li.ok .bar, li.bad .bar, li.wait .bar { display: none; }
+.retry { font: inherit; font-size: 14px; color: var(--fg); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 1px 12px; cursor: pointer; }
+footer { margin-top: 28px; font-size: 15px; color: var(--dim); text-align: center; }
 </style></head><body><main>
-<h1>Send to eReaderDS</h1>
-<p>Books (.epub or .txt) go to My Books; fonts (.ttf or .otf) to Fonts. Keep eReaderDS on its Send books screen until they're done.</p>
+<header>
+<svg width="46" height="46" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true">
+<path d="M24 13c-4-3-10-4-17-3v26c7-1 13 0 17 3 4-3 10-4 17-3V10c-7-1-13 0-17 3z"/><path d="M24 13v26"/></svg>
+<div><h1>Send to eReaderDS</h1><div id="conn"><i></i><span>Connecting…</span></div></div>
+</header>
 <div id="drop">
-<label class="btn">Choose files<input id="pick" type="file" multiple accept=".epub,.txt,.ttf,.otf"></label>
+<label class="btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Choose books<input id="pick" type="file" multiple accept=".epub,.txt,.ttf,.otf"></label>
 <div class="hint">or drop them here</div>
+<div class="chips"><span>EPUB</span><span>TXT</span><span>TTF</span><span>OTF</span></div>
 </div>
+<div id="summary"></div>
 <ul id="list"></ul>
+<footer>Books go to My Books and fonts to Settings → Fonts.<br>Keep eReaderDS on its Send books screen until they're sent.</footer>
 </main><script>
-var OK = /\.(epub|txt|ttf|otf)$/i, queue = [], busy = false, list = document.getElementById('list');
+var OK = /\.(epub|txt|ttf|otf)$/i, FONT = /\.(ttf|otf)$/i, queue = [], busy = false, have = {}, tally = { books: 0, fonts: 0, bad: 0 };
+var list = document.getElementById('list'), conn = document.getElementById('conn');
+var ICON = {
+  book: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5zM12 6.5v13"/></svg>',
+  font: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19 9.5 5h1L16 19M6.3 14h7.4M17 19v-6m0 0a2.5 2.5 0 1 1 3 2.4"/></svg>',
+  ok: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  bad: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'
+};
+function esc(s) { return s.replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+function size(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+// "Title - Author.epub", as My Books shows it.
+function title(name) {
+  var base = name.replace(/\.[^.]+$/, ''), m = base.match(/^(.+?)\s+-\s+(.+)$/);
+  return m ? esc(m[1]) + ' <small>' + esc(m[2]) + '</small>' : esc(base);
+}
+function info() {
+  var x = new XMLHttpRequest();
+  x.open('GET', '/info'); x.timeout = 5000;
+  x.onload = function () {
+    try { var r = JSON.parse(x.responseText); } catch (e) { return x.onerror(); }
+    have = {}; (r.books || []).concat(r.fonts || []).forEach(function (n) { have[n.toLowerCase()] = true; });
+    conn.className = 'on';
+    conn.lastChild.textContent = 'Connected to eReaderDS v' + r.version + ' · ' + r.books.length + (r.books.length == 1 ? ' book' : ' books');
+  };
+  x.onerror = x.ontimeout = function () {
+    conn.className = 'off';
+    conn.lastChild.textContent = "Can't reach eReaderDS. Open Send books on it and reload this page.";
+  };
+  x.send();
+}
 function add(files) {
   for (var i = 0; i < files.length; i++) {
     var f = files[i], li = document.createElement('li');
-    li.innerHTML = '<div class="row"><span class="name"></span><span class="st"></span></div><div class="bar"><i></i></div>';
-    li.querySelector('.name').textContent = f.name;
-    list.appendChild(li);
-    if (!OK.test(f.name)) { done(li, false, 'Not a book or font'); continue; }
-    li.querySelector('.st').textContent = 'Waiting';
-    queue.push({ f: f, li: li });
+    li.innerHTML = '<div class="ic"></div><div class="t"></div><div class="st"></div><div class="bar"><i></i></div>';
+    li.querySelector('.ic').innerHTML = FONT.test(f.name) ? ICON.font : ICON.book;
+    li.querySelector('.t').innerHTML = title(f.name);
+    list.insertBefore(li, list.firstChild);
+    if (!OK.test(f.name)) { finish(li, false, 'Not a book or font (eReaderDS takes .epub, .txt, .ttf and .otf)'); tally.bad++; continue; }
+    var job = { f: f, li: li };
+    wait(job);
+    queue.push(job);
   }
+  document.getElementById('summary').style.display = 'none';
   next();
 }
-function done(li, ok, text) {
-  var st = li.querySelector('.st'); st.textContent = text; st.className = 'st ' + (ok ? 'ok' : 'bad');
-  li.querySelector('.bar').style.display = 'none';
+function wait(job) {
+  job.li.className = 'wait';
+  job.li.querySelector('.st').textContent = size(job.f.size) + (have[job.f.name.toLowerCase()] ? ' · already on eReaderDS, will be replaced' : '') + ' · waiting';
+}
+function finish(li, ok, text, job) {
+  li.className = ok ? 'ok' : 'bad';
+  li.querySelector('.ic').innerHTML = ok ? ICON.ok : ICON.bad;
+  var st = li.querySelector('.st'); st.textContent = text;
+  if (!ok && job) {
+    var b = document.createElement('button'); b.className = 'retry'; b.textContent = 'Try again';
+    b.onclick = function () { tally.bad--; wait(job); queue.push(job); next(); };
+    st.appendChild(b);
+  }
+}
+function summary() {
+  var el = document.getElementById('summary'), n = tally.books + tally.fonts;
+  if (!n && !tally.bad) return;
+  var parts = [];
+  if (tally.books) parts.push(tally.books + (tally.books == 1 ? ' book' : ' books') + ' in My Books');
+  if (tally.fonts) parts.push(tally.fonts + (tally.fonts == 1 ? ' font' : ' fonts') + ' in Fonts');
+  el.className = n ? '' : 'bad';
+  el.innerHTML = '<b>' + (n ? 'Sent! ' + parts.join(' and ') + '.' : 'Nothing was sent.') + '</b><span>'
+    + (tally.bad ? tally.bad + (tally.bad == 1 ? " file wasn't" : " files weren't") + ' sent. ' : '')
+    + (n ? 'Tap Done on eReaderDS when you’ve finished, or send more.' : '') + '</span>';
+  el.style.display = 'block';
 }
 function next() {
-  if (busy || !queue.length) return;
+  if (busy) return;
+  if (!queue.length) { summary(); info(); return; }
   busy = true;
-  var job = queue.shift(), li = job.li, x = new XMLHttpRequest();
-  li.querySelector('.st').textContent = 'Sending';
+  var job = queue.shift(), li = job.li, st = li.querySelector('.st'), bar = li.querySelector('.bar i'), x = new XMLHttpRequest();
+  li.className = ''; bar.style.width = '0';
+  st.textContent = 'Sending…';
   x.open('POST', '/upload?name=' + encodeURIComponent(job.f.name));
   x.upload.onprogress = function (e) {
-    if (e.lengthComputable) {
-      var p = Math.floor(e.loaded / e.total * 100);
-      li.querySelector('.bar i').style.width = p + '%';
-      li.querySelector('.st').textContent = p + '%';
-    }
+    if (!e.lengthComputable) return;
+    var p = Math.floor(e.loaded / e.total * 100);
+    bar.style.width = p + '%';
+    st.textContent = p < 100 ? 'Sending… ' + p + '% of ' + size(e.total) : 'Saving to the SD card…';
   };
   x.onload = function () {
     var r = {}; try { r = JSON.parse(x.responseText); } catch (e) {}
-    if (x.status == 200 && r.ok) done(li, true, r.replaced ? 'Replaced ✓' : 'Sent ✓');
-    else done(li, false, r.error || ('Failed (' + x.status + ')'));
+    if (x.status == 200 && r.ok) {
+      var font = FONT.test(job.f.name);
+      if (font) tally.fonts++; else tally.books++;
+      have[job.f.name.toLowerCase()] = true;
+      finish(li, true, (r.replaced ? 'Replaced in ' : 'Added to ') + (font ? 'Fonts' : 'My Books') + ' · ' + size(r.size || job.f.size) + ' saved');
+    } else { tally.bad++; finish(li, false, r.error || ('Failed (' + x.status + ')')); }
     busy = false; next();
   };
-  x.onerror = function () { done(li, false, "Couldn't reach eReaderDS"); busy = false; next(); };
+  x.onerror = function () { tally.bad++; finish(li, false, "Couldn't reach eReaderDS. Is its Send books screen still open?", job); busy = false; next(); };
   x.send(job.f);
 }
 document.getElementById('pick').onchange = function () { add(this.files); this.value = ''; };
@@ -100,15 +192,18 @@ var drop = document.getElementById('drop');
 ['dragenter', 'dragover'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); drop.className = 'over'; }); });
 ['dragleave', 'drop'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); drop.className = ''; }); });
 document.addEventListener('drop', function (e) { add(e.dataTransfer.files); });
+window.addEventListener('beforeunload', function (e) { if (busy || queue.length) { e.preventDefault(); e.returnValue = ''; } });
+info();
 </script></body></html>
-]]
+]==]
 
 local STATUS = { [200] = "OK", [400] = "Bad Request", [404] = "Not Found", [411] = "Length Required",
     [413] = "Payload Too Large", [415] = "Unsupported Media Type", [500] = "Internal Server Error" }
 
-local function send(client, code, ctype, body)
+local function send(client, code, ctype, body, cache)
     client:send("HTTP/1.1 " .. code .. " " .. (STATUS[code] or "") .. "\r\nContent-Type: " .. ctype
-        .. "\r\nContent-Length: " .. #body .. "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n" .. body)
+        .. "\r\nContent-Length: " .. #body .. "\r\nCache-Control: " .. (cache or "no-store")
+        .. "\r\nConnection: close\r\n\r\n" .. body)
 end
 
 local function json_str(s)
@@ -144,6 +239,30 @@ local function exists(path)
     if f then f:close() return true end
     return false
 end
+
+local function file_size(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local n = f:seek("end")
+    f:close()
+    return n
+end
+
+-- The books and fonts already there (so the page can say a file will replace one).
+local function names(dir, exts)
+    local list = {}
+    local p = dir and io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
+    if not p then return list end
+    for n in p:lines() do
+        local ext = (n:match("%.([^.]+)$") or ""):lower()
+        if exts[ext] and not n:match("^%.") then list[#list + 1] = json_str(n) end
+    end
+    p:close()
+    return list
+end
+
+-- The page is set in the app's own font.
+local FONT_FILES = { ["/font/r.ttf"] = "fonts/CrimsonPro-Regular.ttf", ["/font/b.ttf"] = "fonts/CrimsonPro-Bold.ttf" }
 
 -- An EPUB is a zip: it starts with a zip header and ends with the zip directory.
 local function whole_epub(path)
@@ -196,7 +315,8 @@ local function upload(client, query, headers)
     local replaced = exists(path)
     if not err then
         os.remove(path)
-        if not os.rename(part, path) then err = "Couldn't save it on the SD card" end
+        if not os.rename(part, path) then err = "Couldn't save it on the SD card"
+        elseif file_size(path) ~= total then err = "It didn't save properly (is the SD card full?)"; os.remove(path) end
     end
     if err then
         os.remove(part)
@@ -204,7 +324,7 @@ local function upload(client, query, headers)
         return pcall(reply, client, 500, false, { error = err })
     end
     out:push({ kind = "done", name = name, path = path, font = font, replaced = replaced })
-    reply(client, 200, true, { name = name, replaced = replaced })
+    reply(client, 200, true, { name = name, replaced = replaced, size = total })
 end
 
 local function handle(client)
@@ -225,6 +345,14 @@ local function handle(client)
     local p = target:match("^[^?]*")
     if method == "GET" and (p == "/" or p == "/index.html") then
         send(client, 200, "text/html; charset=utf-8", PAGE)
+    elseif method == "GET" and p == "/info" then
+        send(client, 200, "application/json", '{"version":' .. json_str(dirs.version or "") .. ',"books":['
+            .. table.concat(names(dirs.books, { epub = true, txt = true }), ",") .. '],"fonts":['
+            .. table.concat(names(dirs.fonts, { ttf = true, otf = true }), ",") .. "]}")
+    elseif method == "GET" and FONT_FILES[p] then
+        local data = love.filesystem.read(FONT_FILES[p])
+        if data then send(client, 200, "font/ttf", data, "max-age=86400")
+        else send(client, 404, "text/plain", "Not found") end
     elseif method == "POST" and p == "/upload" then
         if (headers["transfer-encoding"] or ""):lower():find("chunked") then
             return reply(client, 411, false, { error = "The browser didn't say how big it is" })

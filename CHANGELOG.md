@@ -11,6 +11,14 @@
   whole, files are written to a hidden `.part` and renamed, and a file with the
   same name is replaced. Closing the screen rescans the library (selecting the
   last book received) and fonts.
+- The Send to eReaderDS page is set in Crimson Pro (served by the device), in
+  light and dark, and says it's connected (version, how many books). Each file
+  is a card with its title and author, progress, then "Added to My Books ·
+  4.0 MB saved", "Replaced in …" or the reason it failed (Try again if the
+  connection dropped); files already there are flagged before sending, and a
+  summary follows each batch. The device checks the saved file's size before
+  saying it's done. On the device, each file shows its title and author and
+  "✓ Added to My Books · size" (or Replaced, or Failed: why), with a count.
 
 ## v1.2.1
 
