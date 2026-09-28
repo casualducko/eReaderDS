@@ -103,8 +103,9 @@ one-page summary of the buttons and touchscreen.
 - While highlighting (**Y**, then **Select**), tap a word to extend the
   highlight to it.
 - In the library and Get books, tap an entry to see it on the other screen,
-  and tap it again to open (or download) it. In Table of Contents, Bookmarks and Find
-  in book, tap an entry to go there.
+  and tap it again to open (or download) it; the same in Bookmarks and
+  highlights, where the other screen shows the whole passage. In Table of
+  Contents and Find in book, tap an entry to go there.
 - Swipe (or tap) to turn the pages of What's new.
 - Tap a note number, or the **Notes** button, to show footnotes.
 

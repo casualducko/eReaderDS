@@ -8,6 +8,12 @@
   along at the edge, as with the D-pad; Get books loads more near the end).
   On the book pages and other screens a vertical slide is still brightness;
   on a list it never is, even one that fits. Help says so.
+- **Bookmarks and highlights** is one list on the touchscreen (swipe or D-pad
+  to scroll, with counts at the top), and the other screen shows the selected
+  one in full under a drawing of an open book with a ribbon: a highlight's
+  whole passage marked as on the page, a bookmark's words, or this page (A
+  bookmarks it). A tap selects an entry and a second tap goes there, as in My
+  Books.
 
 ## v1.3.1
 
