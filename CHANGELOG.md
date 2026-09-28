@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.28
 
 - **Highlights.** In look-up (Y), Select at the first word starts a
   highlight; moving extends it (shown as you go, on both pages, with a hint

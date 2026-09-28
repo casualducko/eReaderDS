@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.28
+Highlights: press Y, then Select at the first word and again at the last. They're listed with your bookmarks in Settings → Bookmarks and highlights.
+Help explains how to highlight.
+
 v0.3.27
 Pages and time left in a chapter are right even when the book splits a chapter into several parts.
 If eReaderDS ever runs into a problem, it keeps your place and lets you report it from your phone: scan a code and the details are filled in for you.
