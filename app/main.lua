@@ -931,7 +931,7 @@ local function toggle_bookmark()
             title = sec and book.toc[sec].title or book.title, snippet = page_snippet() }
     end
     Store.set_bookmarks(book.path, list)
-    if app.toast then app.toast(here and "Bookmark removed" or "Bookmark added", 2.5) end
+    if app.toast then app.toast(here and "Bookmark removed" or "Bookmark added") end
     redraw()
 end
 
