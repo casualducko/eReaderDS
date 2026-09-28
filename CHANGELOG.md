@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.9
 
 - **Updates over Wi-Fi:** each time eReaderDS starts online, it checks for a
   newer version and says so, showing the new version and yours. Update from
