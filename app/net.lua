@@ -127,9 +127,15 @@ local function ssl_context(verify)
     return ctx
 end
 
+-- How long a wait may last: TIMEOUT, or less while waiting for an answer to
+-- start (see request's first_byte).
+local wait_limit = TIMEOUT
+local SLOW_START = "the server was slow to answer"
 local function wait(sock, writing)
-    local r, w = socket.select(not writing and { sock } or nil, writing and { sock } or nil, TIMEOUT)
-    if #(writing and w or r) == 0 then error("the server stopped responding") end
+    local r, w = socket.select(not writing and { sock } or nil, writing and { sock } or nil, wait_limit)
+    if #(writing and w or r) == 0 then
+        error(wait_limit < TIMEOUT and SLOW_START or "the server stopped responding", 0)
+    end
 end
 
 -- OpenSSL keeps a per-thread queue of errors; SSL_get_error() looks at it,
@@ -336,7 +342,8 @@ end
 
 -- One request/response. Returns status, headers (lower-case keys), and reads
 -- the body into sink(chunk) when the status is 200.
-local function request(url, opts, auth, sink)
+-- first_byte: seconds to wait for the answer to start (default TIMEOUT).
+local function request(url, opts, auth, sink, first_byte)
     local u = M.parse_url(url)
     if not u or (u.scheme ~= "http" and u.scheme ~= "https") then error("not a web address: " .. tostring(url)) end
     local conn = connect(u, opts.verify ~= false)
@@ -355,8 +362,12 @@ local function request(url, opts, auth, sink)
 
         local r = reader(conn)
         local status
+        wait_limit = first_byte or TIMEOUT
+        local first = r.line()
+        wait_limit = TIMEOUT
         repeat                                   -- skip "100 Continue" style responses
-            status = tonumber(r.line():match("^HTTP/%d[.%d]*%s+(%d+)"))
+            status = tonumber((first or r.line()):match("^HTTP/%d[.%d]*%s+(%d+)"))
+            first = nil
             if not status then error("the server sent something that isn't a web page") end
             local headers = {}
             while true do
@@ -409,6 +420,7 @@ local function request(url, opts, auth, sink)
             end
         until false
     end)
+    wait_limit = TIMEOUT
     conn.close()
     if not ok then error(status, 0) end
     return status, headers
@@ -438,8 +450,16 @@ function M.get(url, opts)
         -- The user name and password only go to the catalog's own server, and
         -- never over plain http after starting on https.
         local own = start and u.host == start.host and (u.scheme == start.scheme or u.scheme == "https")
-        local status, headers = request(url, own and opts or {}, own and auth_cache[host] or nil, sink)
-        if status == 200 then
+        -- A healthy server starts answering well within a second; a struggling
+        -- one (Gutenberg, often) takes 5+ s just to fail. So the first two
+        -- tries give up after 3 s without an answer and go again at once;
+        -- the last one waits as long as it takes.
+        local ok, status, headers = pcall(request, url, own and opts or {}, own and auth_cache[host] or nil,
+            sink, retries < 2 and 3 or nil)
+        if not ok then
+            if status ~= SLOW_START then error(status, 0) end
+            retries = retries + 1
+        elseif status == 200 then
             return parts and table.concat(parts) or true, url
         elseif status == 301 or status == 302 or status == 303 or status == 307 or status == 308 then
             if not headers.location then error("the server redirected nowhere") end
@@ -461,10 +481,9 @@ function M.get(url, opts)
             chosen.stale = chosen.params.stale and chosen.params.stale:lower() == "true"
             auth_cache[host] = chosen
         elseif (status == 502 or status == 503 or status == 504) and retries < 2 then
-            -- A busy or slow server (Gutenberg often answers 504 at first):
-            -- another try after a moment usually works.
+            -- A busy server (Gutenberg often answers 504): try again shortly.
             retries = retries + 1
-            socket.sleep(2 * retries)
+            socket.sleep(0.5)
         elseif status == 403 then error("the server refused access (403)")
         elseif status == 404 then error("not found on the server (404)")
         else error("the server answered " .. status) end

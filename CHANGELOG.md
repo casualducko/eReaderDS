@@ -4,9 +4,13 @@
 
 - The search keyboard starts with **no key highlighted**. The first D-pad
   press shows the highlight (on q); taps type without highlighting anything.
+- **Gutenberg is fast again:** eReaderDS now goes straight to
+  www.gutenberg.org. The old m.gutenberg.org address only redirects there,
+  and lately answers slowly or with errors (504) much of the time.
 - Gutenberg search results no longer list **Authors** and **Subjects**:
-  Gutenberg refuses those lists to apps (403). A busy catalog is now tried
-  twice more (after 2 and 4 seconds) before showing an error.
+  Gutenberg refuses those lists to apps (403).
+- A catalog that's slow to start answering, or busy, is tried again at once
+  (up to twice) instead of waiting out its errors.
 - The font list is **alphabetical** (your own fonts included), with an
   **All · Serif · Sans** switch at the top (left/right, or tap it). The sample
   page says where your own fonts go.

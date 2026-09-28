@@ -4245,6 +4245,11 @@ local function run_test_script()
     local freeze = tonumber(os.getenv("READER_ANIM_T") or "")
     if freeze and app.anim then app.anim.fixed = freeze
     elseif app.anim then app.anim = nil end      -- screenshot the finished page
+    if os.getenv("READER_DEBUG") and app.mode == "shop" and shop.page() then
+        local pg = shop.page()
+        print(string.format("[debug] shop page %q: %d entries%s", pg.title, #pg.entries,
+            pg.error and (", error: " .. pg.error) or ""))
+    end
     local out = os.getenv("READER_SHOT")
     if out then
         local shot = love.graphics.newCanvas(2048, 768)

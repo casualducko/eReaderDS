@@ -65,7 +65,9 @@ end
 
 -- Free catalogs offered without any setup.
 M.BUILT_IN = {
-    { name = "Project Gutenberg", url = "https://m.gutenberg.org/ebooks.opds/", verify = true,
+    -- www directly: m.gutenberg.org only redirects there, and is often slow
+    -- or failing (504) when www is fine.
+    { name = "Project Gutenberg", url = "https://www.gutenberg.org/ebooks.opds/", verify = true,
       about = "Over 70,000 free public-domain books." },
 }
 
@@ -234,7 +236,13 @@ function M.search_template(osd, base)
     for tag in osd:gmatch("<[%w:]*Url%s[^>]*>") do
         local t, tpl = tag:match('type%s*=%s*"([^"]*)"'), tag:match('template%s*=%s*"([^"]*)"')
         if tpl and t and t:find("atom") then
-            return Net.resolve(base, (tpl:gsub("&amp;", "&")))
+            tpl = Net.resolve(base, (tpl:gsub("&amp;", "&")))
+            -- Gutenberg's description still points at http://m.gutenberg.org,
+            -- two redirects away from the (much faster) https://www.
+            tpl = tpl:gsub("^https?://m%.gutenberg%.org/", "https://www.gutenberg.org/")
+            -- Otherwise stay on https if the description came over https.
+            if base:find("^https://") then tpl = tpl:gsub("^http://", "https://") end
+            return tpl
         end
     end
 end
