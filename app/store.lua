@@ -20,7 +20,8 @@ local DEFAULTS = {
     brightness = tonumber(os.getenv("READER_DEFAULT_BRIGHTNESS") or "") or 20,
     extra_dim = 0,
     seen_version = "",
-    update_notices = true, -- check for a newer version on launch and say so  -- the version last run: after an update, "what's new" is offered once
+    update_notices = true, -- check for a newer version on launch and say so
+    skip_version = "",     -- a version the reader chose to skip (not mentioned again)  -- the version last run: after an update, "what's new" is offered once
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)     -- 0-3: dark layer over the page, dimmer than the backlight allows
 }
 

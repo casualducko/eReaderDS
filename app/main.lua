@@ -1464,9 +1464,12 @@ local function more_items()
                 S.update_notices = not S.update_notices
             end },
             { label = "Check for updates",
-              value = (u.state == "checking" and "Checking…") or (u.state == "available" and ("v" .. u.version))
+              value = (u.state == "checking" and "Checking…")
+                  or (u.quiet and ("v" .. u.version .. " skipped"))
+                  or (u.state == "available" and ("v" .. u.version .. (u.skipped and " skipped" or "")))
                   or (u.checked and "Up to date") or "",
               act = function()
+                  if u.quiet then u.state, u.quiet = "available", nil end     -- skipped, but asked for
                   if u.state == "available" or u.state == "ready" then app.update_open()
                   else app.update_check(true); app.update_open() end
               end },
@@ -2841,6 +2844,9 @@ function app.update_check(by_hand)
         if rel then
             rel.state = "available"
             rel.url = os.getenv("READER_FAKE_UPDATE_URL") or rel.url     -- for testing failures
+            -- Skipped: nothing is said unless you check by hand.
+            rel.skipped = rel.version == S.skip_version
+            if rel.skipped and not by_hand then rel.state = "none"; rel.quiet = true end
             app.upd = rel
             -- Its notes in plain words (the release notes are the fallback).
             shop.net_job({ kind = "fetch", url = app.Updater.whatsnew_url(rel.version) }, function(m2)
@@ -2850,7 +2856,7 @@ function app.update_check(by_hand)
                     redraw()
                 end
             end)
-            if app.mode ~= "update" then
+            if app.mode ~= "update" and not rel.skipped then
                 -- Tapping it opens the update (so do Settings, and Start in the library).
                 app.toast("Update available: v" .. rel.version .. "\nYou have v" .. app.update_current()
                     .. "  ·  Tap here to update", 8, app.update_open)
@@ -2922,8 +2928,23 @@ function app.update_start()
     end)
 end
 
+-- Skip this version: no more notes about it; the next one is offered as usual.
+function app.update_skip()
+    local u = app.upd
+    if u.state ~= "available" then return end
+    S.skip_version = u.version
+    Store.save_settings(S)
+    -- Quiet from now on: no bold Update, no library line (Check for updates
+    -- still finds it).
+    u.skipped, u.state, u.quiet = true, "none", true
+    app.toast("Skipped v" .. u.version .. ". You'll hear about the next version.", 3)
+    app.mode = app.update_back or (book and "menu" or "library")
+    redraw()
+end
+
 function app.update_action(a)
     local u = app.upd
+    if a == "toc" then app.update_skip() return end               -- Y
     if a == "confirm" then
         if u.state == "available" or (u.state == "error" and u.url) then app.update_start()
         elseif u.state == "error" then app.update_check(true)
@@ -2946,8 +2967,11 @@ end
 
 function app.update_tap(side, u, v)
     local bx, by, bw, bh = app.update_button()
-    if side == "right" and u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 20 then
+    if side ~= "right" then return end
+    if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 20 then
         app.update_action("confirm")
+    elseif app.upd.state == "available" and v > by + bh + 20 and v < by + bh + 110 then
+        app.update_skip()                               -- "Skip this version" under the button
     end
 end
 
@@ -3043,10 +3067,17 @@ function app.update_draw(side)
         love.graphics.setFont(ui.title)
         color(th.fg)
         love.graphics.printf(button, bx, centered_y(ui.title, 44, by, bh), bw, "center")
+        if u.state == "available" then
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.printf(u.skipped and "You skipped this version" or "Skip this version",
+                x, by + bh + 40, w, "center")
+        end
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
     local hint = (u.state == "downloading" and "B cancel") or (u.state == "unpacking" and "")
+        or (u.state == "available" and "A update now      Y skip this version      B back")
         or (button and "A " .. button:lower() .. "      B back") or "B back"
     love.graphics.print(hint, x, PAGE_H - 70)
 end

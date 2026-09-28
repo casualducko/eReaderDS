@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Skip this version** on the update screen (tap it, or Y): no more notes
+  about that version; the next one is offered as usual. Check for updates
+  still finds it ("skipped").
+
 ## v0.3.16
 
 - **Updates cope with trouble:** no Wi-Fi, a dropped connection, a busy

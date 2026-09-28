@@ -34,7 +34,8 @@ or use **Settings → Page turns & device** (or **Start** in the library with no
 book open). It
 downloads the new version, installs it and restarts. Your books, settings and
 progress are kept. To stop the automatic check and its notes, set **Update notices** to Off
-(same page); **Check for updates** still works.
+(same page); **Check for updates** still works. To pass on just one version, choose
+**Skip this version** on the update screen; you'll still hear about the next.
 
 To update by hand, copy the same two items from a newer zip over the old ones. Your
 settings, reading positions, bookmarks and fonts are kept. (Copy the two
