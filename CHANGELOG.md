@@ -29,6 +29,19 @@
   reader's default: File name for CrossPoint, File contents for KOReader.
   **Send book details** (off by default) adds KOReader's metadata (filename,
   title, authors) to what's sent.
+- **Smart sync** (found testing with an Xteink X4: "Sync this book now" after
+  reading on here took the book back to the X4's older place, since this
+  device's pages hadn't been sent yet). Every check now decides like
+  CrossPoint's smart sync, without trusting either device's clock: "new
+  there" is a place from another device with a server timestamp we haven't
+  seen; "moved here" is pages turned here since the last sync. Nothing new
+  there: this device's place is sent (if it moved). New there, not moved
+  here: go there (asked when opening a book). Both: ask, "Continue from 23%?
+  Where you were on Xteink X4, just now. Here you're at 19%." (Jump / Stay).
+  Practically the same place: sent only if this one is ahead. While a
+  question is unanswered nothing is sent, not even on quitting. The regular
+  5-minute send checks the server first the same way (it used to send
+  blindly and could overwrite a newer place from another device).
 
 ## v1.8.0
 
