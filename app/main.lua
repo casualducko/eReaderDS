@@ -2869,7 +2869,7 @@ function app.font_draw(side)
         end
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.print("Your own: .ttf or .otf files in " .. Store.books_folder() .. "/Fonts", x, PAGE_H - 70)
+        love.graphics.print("Place your own .ttf or .otf files in " .. Store.books_folder() .. "/Fonts", x, PAGE_H - 70)
         return
     end
     local m = MARGINS[2]
