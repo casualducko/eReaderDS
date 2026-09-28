@@ -254,6 +254,12 @@ problem.
 
 See [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
+## License
+
+eReaderDS is open source under the [MIT License](LICENSE). The fonts,
+dictionary, hyphenation patterns, QR code library and engine it includes keep
+their own licenses (below, and in the download's `LICENSES` folder).
+
 ## Credits
 
 eReaderDS is created by **casualducko** (also in **Settings → About eReaderDS →

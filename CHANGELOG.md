@@ -12,6 +12,8 @@
 - OPDS: Atom `enclosure` links count as downloads and `media:thumbnail` as a
   cover (plain Atom feeds like Standard Ebooks'); a search address's
   `{count}` is filled with 24.
+- eReaderDS is now under the MIT License (LICENSE; copied into the
+  download's LICENSES folder as eReaderDS-LICENSE.txt).
 - opds.txt: `standardebooks = off` hides it; `gutenberg = off` now hides only
   Project Gutenberg.
 
