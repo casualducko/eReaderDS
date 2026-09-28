@@ -2553,28 +2553,10 @@ local function draw_about(side)
             local _, lines = ui.small:getWrap(c[2], w)
             y = y + #lines * ui.small:getHeight() + 30
         end
-        -- Check for updates (also A), with where things stand.
-        local bx, by, bw, bh = app.about_button()
-        color(th.sel)
-        love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
-        love.graphics.setFont(ui.font)
-        color(th.fg)
-        love.graphics.printf("Check for updates", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
-        local st = app.update_status()
-        if st ~= "" then
-            love.graphics.setFont(ui.small)
-            color(th.dim)
-            love.graphics.printf(st, x, by + bh + 10, w, "center")
-        end
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.print("A check for updates      B back", x, PAGE_H - 70)
+        love.graphics.print("B back", x, PAGE_H - 70)
     end
-end
-
-function app.about_button()
-    local w, h = 380, 64
-    return math.floor((PAGE_W - w) / 2), PAGE_H - 190, w, h
 end
 
 -- Help: the buttons on the left page, the touchscreen (the bottom screen,
@@ -2938,7 +2920,7 @@ function app.update_start()
     end)
 end
 
--- "Check for updates" (Settings and About): open what was found, even a
+-- "Check for updates" (Settings): open what was found, even a
 -- skipped version, or check now.
 function app.update_check_open()
     local u = app.upd
@@ -4261,7 +4243,6 @@ function handle_action(a)
     if mode == "whatsnew" then app.whatsnew_action(a) return end
     if mode == "find" then app.find_action(a) return end
 
-    if mode == "about" and a == "confirm" then app.update_check_open() return end
     if mode == "about" or mode == "help" then
         if a == "back" or a == "confirm" or a == "menu" then app.mode = "menu" end
         redraw()
@@ -4506,14 +4487,7 @@ function app.on_tap(side, u, v)
                 if idx == pg.sel then action("confirm") else pg.sel = idx; redraw() end
             end
         end
-    elseif mode == "about" then
-        local bx, by, bw, bh = app.about_button()
-        if side == "right" and u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 20 then
-            app.update_check_open()
-        else
-            action("back")
-        end
-    elseif mode == "help" then
+    elseif mode == "about" or mode == "help" then
         action("back")
     elseif mode == "keyboard" then
         app.kb_tap(side, u, v)

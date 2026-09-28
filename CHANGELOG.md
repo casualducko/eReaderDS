@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The About page no longer has its own Check for updates button (it
+  repeated the row just above it in Settings → Page turns & device).
+
 ## v0.3.17
 
 - **Check for updates** on the About page too (tap it, or A), with where
