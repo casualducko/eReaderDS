@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- **A tidier, more consistent UI** (every screen checked on the device):
+  - Button hints look the same everywhere (`app.hints`): the button in the text
+    colour, what it does dimmed, with even spacing; "3 / 12" counts the same
+    way (`app.count`). They're on the touchscreen, once (Table of Contents,
+    Bookmarks and Highlights and Find in book no longer repeat them on the top
+    screen), and say what A does to the selected entry: Get books says
+    download, read, open, search, start or try again (it said "open" for a
+    book); Get more fonts says download or read in it; Bookmarks says bookmark
+    this page or go there.
+  - One confirmation card on the touchscreen (`app.ask`) before deleting a
+    book, a bookmark or highlight, or a font; it was a card in Bookmarks, a box
+    on the top screen in My Books, and a line in Get more fonts.
+  - One button style (`app.button`): the label, then its button in small
+    text ("Get books  Select", "Get more fonts  Y", "Done  B", "Delete  A").
+  - My Books: Get books sits beside the title (like Get more fonts on the
+    Fonts page), the hints are at the foot of the touchscreen, and the list
+    shows two more books.
+  - Settings shows the version on its main page only.
+  - Find in book with no matches suggests fewer words or another spelling.
+
 ## v1.4.0
 
 - **Lists scroll with a finger:** sliding up/down on the touchscreen scrolls

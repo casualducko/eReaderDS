@@ -800,8 +800,9 @@ function app.hl_hint()
     color(th.bg)
     love.graphics.rectangle("fill", 0, PAGE_H - h - 8, PAGE_W, h + 8)
     color(th.fg)
-    love.graphics.printf("Highlighting: move to the last word    Select save    B cancel",
-        m.inner, PAGE_H - h + 4, PAGE_W - m.outer - m.inner, "left")
+    love.graphics.print("Highlighting: move to the last word", m.inner, PAGE_H - h + 4)
+    app.hints(m.inner + ui.small:getWidth("Highlighting: move to the last word") + 32, PAGE_H - h + 4,
+        { "Select", "save", "B", "cancel" })
 end
 
 -- Select in look-up: start a highlight, save it, or remove the one here.
@@ -905,7 +906,7 @@ local function toggle_bookmark()
 end
 
 local function open_bookmarks(from)
-    bm.sel, bm.top, bm.from, bm.confirm = 1, nil, from, nil
+    bm.sel, bm.top, bm.from = 1, nil, from
     app.mode = "bookmarks"
     redraw()
 end
@@ -919,7 +920,7 @@ local function show_message(text)
 end
 
 local function open_book(path)
-    library.confirm = nil
+    app.asking = nil
     local ok, b, err = pcall(Book.open, path)
     if not ok or not b then
         show_message("Could not open this book.\n\n" .. tostring(ok and err or b))
@@ -1115,8 +1116,11 @@ end
 
 -- The "Get books" button on the library's right page: x, y, w, h.
 function library.get_books_button()
-    local w, h = 340, 60
-    return math.floor((PAGE_W - w) / 2), PAGE_H - 96, w, h
+    -- Beside the "My Books" title, like "Get more fonts" beside "Fonts".
+    local key = shop.online() and "   Select" or "   No Wi-Fi"
+    local w, h = ui.font:getWidth("Get books") + ui.small:getWidth(key) + 44, 50
+    local x = MARGINS[2].inner + ui.title:getWidth("My Books") + 24
+    return x, math.floor(60 + (ui.title:getHeight() - h) / 2), w, h
 end
 
 local function go_library()
@@ -1253,7 +1257,7 @@ end
 -- "Get books" from the library: a list of catalogs (yours from opds.txt,
 -- then the free built-in ones), and how to add your own.
 function shop.start()
-    library.confirm = nil
+    app.asking = nil
     if not shop.online(true) then
         app.toast("Not connected to Wi-Fi")
         return
@@ -1277,6 +1281,23 @@ function shop.start()
     shop.stack = { { title = "Get books", entries = entries, sel = 1, top = 1 } }
     app.mode = "shop"
     redraw()
+end
+
+-- The hints under a catalog page: what A does to the selected entry.
+function shop.hints(pg, it)
+    if pg.error and (#pg.entries == 0 or not (it and it.book)) then return { "A", "try again", "B", "back" } end
+    if not it then return { "B", "back" } end
+    if it.book then
+        if shop.dl and shop.dl.item == it then return { "B", "cancel" } end
+        if it.have or shop.have(it) then return { "A", "read", "B", "back" } end
+        if it.failed then return { "A", "try again", "B", "back" } end
+        if shop.dl then return { "B", "back" } end
+        return { "A", "download", "B", "back" }
+    end
+    if it.search then return { "A", "search", "B", "back" } end
+    if it.receive then return { "A", "start", "B", "back" } end
+    if it.href or it.catalog then return { "A", "open", "B", "back" } end
+    return { "B", "back" }
 end
 
 -- Is this book already in the library (same file name, or same title)?
@@ -2040,6 +2061,32 @@ local function draw_reader_pages()
     end
 end
 
+-- Button hints at the foot of a page, the same everywhere: each button in the
+-- text colour, what it does dimmed, e.g. app.hints(x, y, { "A", "open", "B", "back" }).
+-- y defaults to the foot of the page.
+function app.hints(x, y, list)
+    local th = theme()
+    y = y or PAGE_H - 70
+    for i = 1, #list, 2 do
+        love.graphics.setFont(ui.small_bold)
+        color(th.fg)
+        love.graphics.print(list[i], x, y)
+        x = x + ui.small_bold:getWidth(list[i]) + 9
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print(list[i + 1], x, y)
+        x = x + ui.small:getWidth(list[i + 1]) + 32
+    end
+end
+
+-- "3 / 12" at the right of a list's foot.
+function app.count(x, w, sel, n, more)
+    if n < 1 then return end
+    love.graphics.setFont(ui.small)
+    color(theme().dim)
+    love.graphics.printf(sel .. " / " .. n .. (more and "+" or ""), x, PAGE_H - 70, w, "right")
+end
+
 local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
     local th = theme()
     for r = 0, rows - 1 do
@@ -2057,8 +2104,8 @@ end
 
 local function list_rows(row_h) return math.floor((PAGE_H - 200) / row_h) end
 
--- Library rows that fit above the Get books button.
-function library.list_rows() return math.floor((PAGE_H - 96 - 16 - 160) / 96) end
+-- Library rows that fit on the touchscreen above its hints.
+function library.list_rows() return list_rows(96) end
 
 local function draw_library(side)
     local th = theme()
@@ -2067,7 +2114,7 @@ local function draw_library(side)
     local w = PAGE_W - m.outer - m.inner
     if side == "right" then
         -- The touchscreen: the books (tap one to see it, again to open it),
-        -- and "Get books" at the bottom (also Select).
+        -- with "Get books" (also Select) beside the title.
         love.graphics.setFont(ui.title)
         color(th.fg)
         love.graphics.print("My Books", x, 60)
@@ -2101,25 +2148,14 @@ local function draw_library(side)
             end)
         end
         local bx, by, bw, bh = library.get_books_button()
+        -- Offline: an outline only, greyed out, saying why.
         local online = shop.online()
-        if online then
-            color(th.sel)
-            love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
-        else
-            -- Offline: an outline only, greyed out, saying why.
-            color(th.dim, 0.5)
-            love.graphics.setLineWidth(2)
-            love.graphics.rectangle("line", bx, by, bw, bh, bh / 2, bh / 2)
+        app.button(bx, by, bw, bh, "Get books", online and "Select" or "No Wi-Fi", online and "soft" or "off")
+        if #library.items > 0 then
+            app.hints(x, nil, book and { "A", "open", "Y", "delete", "‹ ›", "sort", "B", "back" }
+                or { "A", "open", "Y", "delete", "‹ ›", "sort" })
+            app.count(x, w, library.sel, #library.items)
         end
-        love.graphics.setFont(ui.font)
-        local label, hint = "Get books", online and "   Select" or "   No Wi-Fi"
-        local lx = bx + (bw - ui.font:getWidth(label) - ui.small:getWidth(hint)) / 2
-        local ly = centered_y(ui.font, UI_SIZE, by, bh)
-        color(online and th.fg or th.dim, online and 1 or 0.6)
-        love.graphics.print(label, lx, ly)
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        love.graphics.print(hint, lx + ui.font:getWidth(label), ly + ui.font:getBaseline() - ui.small:getBaseline())
         return
     end
 
@@ -2140,19 +2176,19 @@ local function draw_library(side)
         love.graphics.printf("Copy .epub or .txt files into the " .. folder .. " folder"
             .. (where and (" " .. where) or "") .. ", or tap Get books to download some or send them from a phone or computer.", x, 180, w, "left")
         love.graphics.setFont(ui.small)
-        love.graphics.print("Press the Anbernic button to quit", x, PAGE_H - 70)
+        app.hints(x, nil, { "Anbernic button", "quit" })
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
         return
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.print("A  open      Y  delete      ‹ ›  sort" .. (book and "      B  back" or ""), x, PAGE_H - 70)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
     love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
     local pv = library_preview()
     if not pv then return end
     local y = 80
-    local confirming = library.confirm == pv.path
-    if pv.cover and not confirming then
+    if pv.cover then
         local iw, ih = pv.cover:getDimensions()
         -- A little smaller when the "v… is available" line is at the bottom.
         local s = math.min(w / iw, (app.upd.state == "available" and 440 or 520) / ih)
@@ -2182,16 +2218,6 @@ local function draw_library(side)
         love.graphics.setFont(ui.small)
         color(th.dim)
         love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "% read", x, y + 20, w, "center")
-    end
-    if confirming then
-        local by = PAGE_H - 330
-        color(th.sel)
-        love.graphics.rectangle("fill", x - 14, by, w + 28, 150, 12, 12)
-        love.graphics.setFont(ui.font)
-        color(th.fg)
-        love.graphics.printf("Delete this book from the SD card?", x, by + 28, w, "center")
-        love.graphics.setFont(ui.small)
-        love.graphics.printf("A  delete      B  keep", x, by + 90, w, "center")
     end
 end
 
@@ -2228,14 +2254,13 @@ function shop.draw(side)
         love.graphics.print(fit_text(ui.title, pg.title, w), x, 60)
         love.graphics.setFont(ui.small)
         color(th.dim)
-        local footer = "A open      B back"
+        local footer = shop.hints(pg, it)
         if #pg.entries == 0 then
             love.graphics.setFont(ui.font)
             local text = pg.loading and "Loading…"
                 or pg.error and ("Couldn't load this page:\n" .. pg.error)
                 or "Nothing here."
             love.graphics.printf(text, x, 180, w, "left")
-            if pg.error then footer = "A try again      B back" end
         else
             local row_h = 96
             local rows = list_rows(row_h)
@@ -2265,18 +2290,15 @@ function shop.draw(side)
                     love.graphics.print(fit_text(ui.small, sub, rw - 60), rx, ty + 40)
                 end
             end)
+        end
+        if pg.loading and #pg.entries > 0 then
             love.graphics.setFont(ui.small)
             color(th.dim)
-            if pg.loading then footer = "Loading more…"
-            elseif pg.error then footer = "Couldn't load more. A try again"
-            elseif shop.dl then footer = "B cancel download" end
+            love.graphics.print("Loading more…", x, PAGE_H - 70)
+        else
+            app.hints(x, nil, footer)
         end
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        love.graphics.print(footer, x, PAGE_H - 70)
-        if #pg.entries > 0 then
-            love.graphics.printf(pg.sel .. " / " .. #pg.entries .. (pg.next and "+" or ""), x, PAGE_H - 70, w, "right")
-        end
+        app.count(x, w, pg.sel, #pg.entries, pg.next)
         return
     end
 
@@ -2314,26 +2336,17 @@ function shop.draw(side)
             frac = dl.total > 0 and math.min(1, dl.got / dl.total) or nil
             status = "Downloading…  " .. (shop.format_size(dl.got) or "0 KB")
                 .. (dl.total > 0 and (" of " .. shop.format_size(dl.total)) or "")
-            action_text = "B cancel"
         elseif it.have or shop.have(it) then
             status = "On your SD card"
-            action_text = "A read now"
         elseif it.failed then
             status = "Download failed: " .. it.failed
-            action_text = "A try again"
         else
             local size = shop.format_size(it.book.size)
             status = it.book.ext:upper() .. (size and ("  ·  " .. size) or "")
-            action_text = dl and "Another download is running" or "A download"
+                .. (dl and "\nAnother download is running" or "")
         end
     elseif #it.formats > 0 then
         status = "Only as " .. table.concat(it.formats, ", ") .. ".\nThis reader needs EPUB or TXT."
-    elseif it.href or it.catalog then
-        action_text = "A open"
-    elseif it.receive then
-        action_text = "A start"
-    elseif it.search then
-        action_text = "A search"
     end
 
     local bottom = PAGE_H - 70
@@ -2487,9 +2500,11 @@ local function draw_menu_panel(side)
     color(th.fg)
     love.graphics.print(({ status = "Status bar", more = "Reading & device", night = "Night theme",
         about = "About eReaderDS" })[menu.page] or "Settings", x, 60)
-    love.graphics.setFont(ui.font)                   -- the version, on the title's baseline
-    color(th.dim)
-    love.graphics.printf("v" .. VERSION, x, 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
+    if menu.page == "main" then
+        love.graphics.setFont(ui.font)               -- the version, on the title's baseline
+        color(th.dim)
+        love.graphics.printf("v" .. VERSION, x, 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
+    end
     local items = menu_items()
     local visible, page, pages = menu_layout(items)
     if pages > 1 then
@@ -2574,7 +2589,7 @@ local function draw_menu_panel(side)
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.printf("A select    ‹ › change    B back", x, PAGE_H - 70, w, "left")
+    app.hints(x, nil, { "A", "select", "‹ ›", "change", "B", "back" })
 end
 
 -- Box around the selected note number.
@@ -2644,12 +2659,10 @@ function look.draw_panel(side)
         look.page = math.max(1, math.min(look.page, #pages))
         draw_page(pages[look.page], side, top + 50)
     end
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    local hint = "‹ › word    up/down line    Select " .. (app.hl_at(look.words[look.sel]) and "remove highlight" or "highlight")
-        .. "    B close"
-    if pages and #pages > 1 then hint = "A  more (" .. look.page .. "/" .. #pages .. ")     " .. hint end
-    love.graphics.print(hint, ox, PAGE_H - 26 - ui.small:getHeight())
+    local hint = { "‹ ›", "word", "Up/Down", "line", "Select", app.hl_at(look.words[look.sel]) and "remove highlight" or "highlight",
+        "B", "close" }
+    if pages and #pages > 1 then table.insert(hint, 1, "more (" .. look.page .. "/" .. #pages .. ")"); table.insert(hint, 1, "A") end
+    app.hints(ox, PAGE_H - 26 - ui.small:getHeight(), hint)
 end
 
 local function draw_toc(side)
@@ -2684,10 +2697,8 @@ local function draw_toc(side)
             love.graphics.printf(mark, rx, ty + ui.font:getBaseline() - ui.small:getBaseline(), rw, "right")
         end
     end)
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    love.graphics.print("A open    B back", x, PAGE_H - 70)
-    love.graphics.printf(toc.sel .. " / " .. #book.toc, x, PAGE_H - 70, w, "right")
+    app.hints(x, nil, { "A", "go there", "B", "back" })
+    app.count(x, w, toc.sel, #book.toc)
 end
 
 -- Table of Contents rows that fit on the touchscreen above its footer.
@@ -2769,9 +2780,6 @@ function app.toc_draw_left(x, w, here)
         love.graphics.print(lines[k], x, y)
         y = y + ui.title:getHeight()
     end
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    love.graphics.print(toc.sel == here and "A  back to it" or "A  go there", x, PAGE_H - 70)
 end
 
 ---------------------------------------------------------------- jump picker
@@ -2863,7 +2871,7 @@ local function draw_jump_panel()
     color(th.dim)
     love.graphics.printf("Left/Right  1%      Up/Down  10%",
         x, by + 110, w, "center")
-    love.graphics.printf("A jump    B cancel", x, PAGE_H - 70, w, "left")
+    app.hints(x, nil, { "A", "jump", "B", "cancel" })
 end
 
 -- Bookmarks and highlights together, in reading order.
@@ -2953,9 +2961,13 @@ local function draw_bookmarks(side)
             .. "top-right corner of the page to bookmark it. To highlight, press Y, then Select at "
             .. "the first word and again at the last.", x, 160 + row_h + 20, w, "left")
     end
-    love.graphics.print("A open    Y delete    B back", x, PAGE_H - 70)
-    if #entries > 1 then love.graphics.printf(bm.sel .. " / " .. #entries, x, PAGE_H - 70, w, "right") end
-    if bm.confirm then app.bm_confirm_draw(x, w) end
+    local cur = entries[bm.sel]
+    if cur and cur.action then
+        app.hints(x, nil, { "A", bookmark_here() and "remove its bookmark" or "bookmark this page", "B", "back" })
+    else
+        app.hints(x, nil, { "A", "go there", "Y", "delete", "B", "back" })
+    end
+    if #entries > 1 then app.count(x, w, bm.sel, #entries) end
 end
 
 -- The mark on Bookmarks and Highlights: an open book with a ribbon, drawn in
@@ -3014,14 +3026,14 @@ function app.bm_draw_left(entries, x, w)
         title = sec and book.toc[sec].title or book.title or ""
         pct = book:fraction(pos.ch, pos.off)
         body = page_snippet()
-        hint = bookmark_here() and "A  remove its bookmark" or "A  bookmark it"
+        hint = nil
     else
         local it = e.item
         label = e.hl and "HIGHLIGHT" or "BOOKMARK"
         title = it.title ~= "" and it.title or book.title
         pct = it.pct
         body = (e.hl and it.text or it.snippet) or ""
-        hint = "A  go there      Y  delete"
+        hint = nil
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
@@ -3048,9 +3060,6 @@ function app.bm_draw_left(entries, x, w)
         love.graphics.print(line, x, y)
         y = y + lh
     end
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    love.graphics.print(hint, x, PAGE_H - 70)
 end
 
 -- Deleting from the list: a card on the touchscreen asks first.
@@ -3064,38 +3073,92 @@ function app.bm_delete(e, n)
     app.toast(e.hl and "Highlight deleted" or "Bookmark deleted")
 end
 
+-- A rounded button: its label, then the button that does the same in small
+-- dimmed text ("Get books  Select", "Delete  A"). style: "strong" (dark),
+-- "soft" (the selection colour), "plain" (the page colour) or "off" (an
+-- outline, greyed out).
+function app.button(bx, by, bw, bh, label, key, style)
+    local th = theme()
+    if style == "off" then
+        color(th.dim, 0.5)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", bx, by, bw, bh, bh / 2, bh / 2)
+    else
+        color(style == "strong" and th.fg or style == "plain" and th.bg or th.sel)
+        love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+    end
+    local k = key and ("   " .. key) or ""
+    local lx = bx + (bw - ui.font:getWidth(label) - ui.small:getWidth(k)) / 2
+    local ly = centered_y(ui.font, UI_SIZE, by, bh)
+    love.graphics.setFont(ui.font)
+    color(style == "strong" and th.bg or th.fg, style == "off" and 0.6 or 1)
+    love.graphics.print(label, lx, ly)
+    love.graphics.setFont(ui.small)
+    color(style == "strong" and th.bg or th.dim, style == "strong" and 0.75 or 1)
+    love.graphics.print(k, lx + ui.font:getWidth(label), ly + ui.font:getBaseline() - ui.small:getBaseline())
+end
+
+-- Before anything that can't be undone, a card on the touchscreen asks:
+-- app.ask({ question = "Delete this bookmark?", detail = "Chapter 3",
+-- yes = "Delete", on_yes = function() ... end }). A or the button does it;
+-- B, or a tap anywhere else, keeps things as they are.
+function app.ask(q)
+    app.asking = q
+    redraw()
+end
+
 -- The card's two buttons: x, y, w, h on the right page.
-function app.bm_button(which)
+function app.ask_button(which)
     local m = MARGINS[2]
     local w = PAGE_W - m.outer - m.inner
     local bw, bh = math.floor((w - 24) / 2), 70
     local y = PAGE_H - 240
-    return m.inner + (which == "delete" and 0 or bw + 24), y, bw, bh
+    return m.inner + (which == "yes" and 0 or bw + 24), y, bw, bh
 end
 
-function app.bm_confirm_draw(x, w)
+-- A key while the card is up: true if it was the card's.
+function app.ask_action(a)
+    local q = app.asking
+    if not q or a == "quit" then return false end
+    app.asking = nil
+    if a == "confirm" then q.on_yes() end
+    redraw()
+    return true
+end
+
+function app.ask_tap(side, u, v)
+    local q = app.asking
+    app.asking = nil
+    local dx, dy, dw, dh = app.ask_button("yes")
+    if side == "right" and u >= dx - 12 and u <= dx + dw + 12 and v >= dy - 12 and v <= dy + dh + 12 then
+        q.on_yes()
+    end
+    redraw()
+end
+
+function app.ask_draw()
+    local q = app.asking
     local th = theme()
-    local e = bm.confirm
+    local m = MARGINS[2]
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
     local top = PAGE_H - 440
     color(th.bg)
-    love.graphics.rectangle("fill", x - 30, top - 20, w + 60, PAGE_H - top, 16, 16)
+    love.graphics.rectangle("fill", x - 30, top - 20, w + 60, PAGE_H - top + 20, 16, 16)
     color(th.sel)
     love.graphics.rectangle("fill", x - 14, top, w + 28, 320, 14, 14)
     love.graphics.setFont(ui.font)
     color(th.fg)
-    love.graphics.printf(e.hl and "Delete this highlight?" or "Delete this bookmark?", x, top + 26, w, "center")
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    local what = e.hl and ("“" .. e.item.text .. "”") or (e.item.title ~= "" and e.item.title or book.title)
-    love.graphics.printf(fit_text(ui.small, what, w - 40), x + 20, top + 80, w - 40, "center")
-    for _, which in ipairs({ "delete", "keep" }) do
-        local bx, by, bw, bh = app.bm_button(which)
-        if which == "delete" then color(th.fg) else color(th.bg) end
-        love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
-        love.graphics.setFont(ui.font)
-        if which == "delete" then color(th.bg) else color(th.fg) end
-        love.graphics.printf(which == "delete" and "Delete  (A)" or "Keep  (B)", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
+    love.graphics.printf(q.question, x, top + 26, w, "center")
+    if q.detail and q.detail ~= "" then
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf(fit_text(ui.small, q.detail, w - 40), x + 20, top + 80, w - 40, "center")
     end
+    local bx, by, bw, bh = app.ask_button("yes")
+    app.button(bx, by, bw, bh, q.yes or "Yes", "A", "strong")
+    bx, by, bw, bh = app.ask_button("no")
+    app.button(bx, by, bw, bh, q.no or "Keep", "B", "plain")
+    app.hints(x, nil, { "A", (q.yes or "yes"):lower(), "B", (q.no or "keep"):lower() })
 end
 
 local CREDITS = {
@@ -3145,9 +3208,7 @@ local function draw_about(side)
             local _, lines = ui.small:getWrap(c[2], w)
             y = y + #lines * ui.small:getHeight() + 30
         end
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        love.graphics.print("B back", x, PAGE_H - 70)
+        app.hints(x, nil, { "B", "back" })
     end
 end
 
@@ -3199,7 +3260,7 @@ function app.draw_help(side)
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
-    if page[3] then love.graphics.print(page[3], x, PAGE_H - 70) end
+    if page[3] then app.hints(x, nil, { "B", "back" }) end
 end
 
 ---------------------------------------------------------------- keyboard
@@ -3676,12 +3737,9 @@ function app.update_draw(side)
                 x, by + bh + 40, w, "center")
         end
     end
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    local hint = (u.state == "downloading" and "B cancel") or (u.state == "unpacking" and "")
-        or (u.state == "available" and "A update now      Y skip this version      B back")
-        or (button and "A " .. button:lower() .. "      B back") or "B back"
-    love.graphics.print(hint, x, PAGE_H - 70)
+    app.hints(x, nil, (u.state == "downloading" and { "B", "cancel" }) or (u.state == "unpacking" and {})
+        or (u.state == "available" and { "A", "update now", "Y", "skip this version", "B", "back" })
+        or (button and { "A", button:lower(), "B", "back" }) or { "B", "back" })
 end
 
 ---------------------------------------------------------------- what's new
@@ -3802,8 +3860,8 @@ function app.whatsnew_draw(side)
     love.graphics.setFont(ui.small)
     color(th.dim)
     if side == "right" then
-        love.graphics.print(wn.spreads > 1 and "Swipe or ‹ › for more      B back" or "B back", x, PAGE_H - 70)
-        if wn.spreads > 1 then love.graphics.printf(wn.spread .. " / " .. wn.spreads, x, PAGE_H - 70, w, "right") end
+        app.hints(x, nil, wn.spreads > 1 and { "‹ ›", "more", "B", "back" } or { "B", "back" })
+        if wn.spreads > 1 then app.count(x, w, wn.spread, wn.spreads) end
     end
 end
 
@@ -3830,7 +3888,7 @@ function app.font_rows() return math.floor((PAGE_H - 90 - app.FONT_LIST_Y) / app
 
 -- "Get more fonts", beside the "Fonts" title (always in view); Y does the same.
 function app.font_get_button()
-    local w, h = ui.font:getWidth("Get more fonts") + 44, 50
+    local w, h = ui.font:getWidth("Get more fonts") + ui.small:getWidth("   Y") + 44, 50
     local x = MARGINS[2].inner + ui.title:getWidth("Fonts") + 24
     return x, math.floor(60 + (ui.title:getHeight() - h) / 2), w, h
 end
@@ -4008,11 +4066,7 @@ function app.font_draw(side)
     if fp.sel < fp.top then fp.top = fp.sel end
     if fp.sel >= fp.top + rows then fp.top = fp.sel - rows + 1 end
     local bx, by, bw, bh = app.font_get_button()
-    color(th.sel)
-    love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
-    love.graphics.setFont(ui.font)
-    color(th.fg)
-    love.graphics.printf("Get more fonts", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
+    app.button(bx, by, bw, bh, "Get more fonts", "Y", "soft")
     draw_list(side, fp.list, fp.sel, fp.top, rows, x, app.FONT_LIST_Y, w, app.FONT_ROW_H, function(it, _, rx, ry, rw)
         local pf = Fonts.preview(it.name, UI_SIZE) or ui.font
         love.graphics.setFont(pf)
@@ -4025,8 +4079,8 @@ function app.font_draw(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.print("A use    Y get more    ‹ › all / serif / sans    B back", x, PAGE_H - 70)
-    love.graphics.printf(fp.sel .. " / " .. #fp.list, x, PAGE_H - 70, w, "right")
+    app.hints(x, nil, { "A", "use", "Y", "get more", "‹ ›", "filter", "B", "back" })
+    app.count(x, w, fp.sel, #fp.list)
 end
 
 ---------------------------------------------------------------- get more fonts
@@ -4041,7 +4095,7 @@ app.fget = { sel = 1, top = 1 }
 
 function app.fget_open()
     local g = app.fget
-    g.sel, g.top, g.confirm = 1, 1, nil
+    g.sel, g.top = 1, 1
     -- A download cut short (the app quit) leaves a hidden zip: tidy it away.
     local dir = not g.busy and Fonts.user_dir()
     if dir then os.execute('rm -f "' .. dir .. '"/.*.zip "' .. dir .. '"/.*.zip.part 2>/dev/null') end
@@ -4195,12 +4249,6 @@ function app.fget_action(a)
     local g = app.fget
     local list = g.list or {}
     local e = list[g.sel]
-    if g.confirm then                       -- "Delete …?": A deletes, anything else keeps it
-        if a == "confirm" and e then app.fget_delete(e) end
-        g.confirm = nil
-        redraw()
-        return
-    end
     if a == "up" then g.sel = math.max(1, g.sel - 1)
     elseif a == "down" then g.sel = math.min(math.max(1, #list), g.sel + 1)
     elseif (a == "left" or a == "right" or a == "prev" or a == "next") and g.all then
@@ -4218,7 +4266,8 @@ function app.fget_action(a)
             app.fget_download(e)
         end
     elseif a == "toc" and e and app.fget_installed(e) and not g.busy then
-        g.confirm = true                    -- Y: delete, once confirmed
+        app.ask({ question = "Delete " .. e.name .. "?", detail = "From the fonts folder on the SD card",
+            yes = "Delete", on_yes = function() app.fget_delete(e) end })
     elseif a == "back" or a == "menu" then
         if g.busy then
             love.thread.getChannel("net_cancel"):push(g.busy.id)
@@ -4232,7 +4281,6 @@ end
 
 function app.fget_tap(side, u, v)
     local g = app.fget
-    if g.confirm then g.confirm = nil; redraw(); return end
     if side ~= "right" then return end
     if not g.list then
         if g.error then app.fget_action("confirm") end
@@ -4291,14 +4339,14 @@ function app.fget_draw(side)
         love.graphics.printf((e.kind == "sans" and "Sans-serif" or "Serif") .. ", " .. styles .. ". "
             .. shop.format_size(e.size or 0) .. ".\n" .. (e.license or ""), x, y, w, "left")
         local status
-        if g.confirm then status = "Delete " .. e.name .. "?\nA  delete      B  keep"
-        elseif g.busy and g.busy.e == e then
-            status = "Downloading…  " .. math.floor(g.busy.got / math.max(1, g.busy.total) * 100) .. "%\nB  cancel"
-        elseif app.fget_installed(e) then status = "✓  On your SD card\nA  read in it      Y  delete"
-        else status = "A  download" end
-        love.graphics.setFont(ui.font)
-        color(th.fg)
-        love.graphics.printf(status, x, PAGE_H - 200, w, "left")
+        if g.busy and g.busy.e == e then
+            status = "Downloading…  " .. math.floor(g.busy.got / math.max(1, g.busy.total) * 100) .. "%"
+        elseif app.fget_installed(e) then status = "✓  On your SD card" end
+        if status then
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.printf(status, x, PAGE_H - 200, w, "left")
+        end
         love.graphics.setFont(ui.small)
         color(th.dim)
         love.graphics.printf("Fonts go in " .. Store.books_folder() .. "/Fonts.", x, PAGE_H - 70, w, "left")
@@ -4334,9 +4382,8 @@ function app.fget_draw(side)
     if not g.list then
         love.graphics.setFont(ui.font)
         color(th.dim)
-        love.graphics.printf(g.loading and "Loading…" or ((g.error or "") .. "\n\nA  try again"), x, 180, w, "left")
-        love.graphics.setFont(ui.small)
-        love.graphics.print("B  back", x, PAGE_H - 70)
+        love.graphics.printf(g.loading and "Loading…" or (g.error or ""), x, 180, w, "left")
+        app.hints(x, nil, g.error and { "A", "try again", "B", "back" } or { "B", "back" })
         return
     end
     local rows = list_rows(app.FGET_ROW_H)
@@ -4360,8 +4407,15 @@ function app.fget_draw(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.print("A  get    Y  delete    ‹ ›  all / serif / sans    B  back", x, PAGE_H - 70)
-    love.graphics.printf(g.sel .. " / " .. #list, x, PAGE_H - 70, w, "right")
+    local cur = list[g.sel]
+    if g.busy then
+        app.hints(x, nil, { "B", "cancel" })
+    elseif cur and app.fget_installed(cur) then
+        app.hints(x, nil, { "A", "read in it", "Y", "delete", "‹ ›", "filter", "B", "back" })
+    else
+        app.hints(x, nil, { "A", "download", "‹ ›", "filter", "B", "back" })
+    end
+    app.count(x, w, g.sel, #list)
 end
 
 ---------------------------------------------------------------- find in book
@@ -4511,12 +4565,9 @@ function app.find_draw(side)
         color(th.dim)
         love.graphics.print(fit_text(ui.font, post, math.max(0, rx + rw - hx)), hx, y)
     end)
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    love.graphics.print("A open    B search again    X close", x, PAGE_H - 70)
-    if #f.results > 0 then
-        love.graphics.printf(f.sel .. " / " .. #f.results, x, PAGE_H - 70, w, "right")
-    end
+    app.hints(x, nil, #f.results > 0 and { "A", "go there", "B", "search again", "X", "close" }
+        or { "B", "search again", "X", "close" })
+    app.count(x, w, f.sel, #f.results)
 end
 
 -- The left page of Find in book: what was searched for, then the selected
@@ -4526,11 +4577,15 @@ function app.find_draw_left(f, x, w, status)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(fit_text(ui.title, "“" .. f.query .. "”", w), x, 60)
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    love.graphics.print("A  go there      B  search again      X  close", x, PAGE_H - 70)
     local r = f.results[f.sel]
-    if not r then return end
+    if not r then
+        if f.done and #f.results == 0 then
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.printf(status .. " Try fewer words, or another spelling.", x, 170, w, "left")
+        end
+        return
+    end
     local y = 170
     love.graphics.setFont(ui.small)
     color(th.dim)
@@ -4667,9 +4722,7 @@ local function draw_message(side)
         love.graphics.setFont(ui.font)
         color(th.fg)
         love.graphics.printf(message or "", m.outer, 200, PAGE_W - m.outer - m.inner, "left")
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        love.graphics.print("Press A to continue", m.outer, PAGE_H - 70)
+        app.hints(m.outer, nil, { "A", "continue" })
     end
 end
 
@@ -4733,6 +4786,7 @@ local function render_canvases()
         love.graphics.clear(bg[1], bg[2], bg[3], 1)
         love.graphics.origin()
         painter(side)
+        if side == "right" and app.asking then app.ask_draw() end
         if (app.mode == "menu" and menu.page ~= "status" or app.mode == "jump") and side == "left" then
             love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
             love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
@@ -4995,7 +5049,7 @@ local function touch_event(kind, sx, sy)
             local l, _, _, row_h = app.scroll_list()
             gesture.mode = "scroll"
             gesture.v0, gesture.top0, gesture.row_h = v, l.top or 1, row_h
-            library.confirm, bm.confirm, app.fget.confirm = nil, nil, nil
+            app.asking = nil
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
             -- Mostly vertical slide: brightness. Work in sqrt space so the
             -- dim end gets finer control.
@@ -5311,6 +5365,7 @@ function handle_action(a)
     -- Pressing the stick in opens Settings while reading, and selects elsewhere.
     if a == "stick" then a = mode == "reader" and "menu" or "confirm" end
     if a == "quit" then love.event.quit() return end
+    if app.asking and app.ask_action(a) then return end
 
     if mode == "message" then
         if a == "confirm" or a == "back" then
@@ -5395,13 +5450,6 @@ function handle_action(a)
         local entries = bookmark_entries()
         local n = #entries
         local rows = list_rows(96)
-        if bm.confirm then
-            -- "Delete this …?": A deletes, anything else keeps it.
-            if a == "confirm" then app.bm_delete(bm.confirm, n) end
-            bm.confirm = nil
-            redraw()
-            return
-        end
         if a == "up" then bm.sel = math.max(1, bm.sel - 1)
         elseif a == "down" then bm.sel = math.min(n, bm.sel + 1)
         elseif a == "left" or a == "prev" then bm.sel = math.max(1, bm.sel - rows)
@@ -5414,7 +5462,10 @@ function handle_action(a)
                 app.jump_to(e.ch, e.off); app.mode = "reader"
             end
         elseif a == "toc" and bm.sel > 1 then              -- Y: delete, once confirmed
-            bm.confirm = entries[bm.sel]
+            local e = entries[bm.sel]
+            app.ask({ question = e.hl and "Delete this highlight?" or "Delete this bookmark?",
+                detail = e.hl and ("“" .. e.item.text .. "”") or (e.item.title ~= "" and e.item.title or book.title),
+                yes = "Delete", on_yes = function() app.bm_delete(e, n) end })
         elseif a == "back" or a == "menu" then
             app.mode = bm.from == "menu" and "menu" or "reader"
         end
@@ -5477,15 +5528,6 @@ function handle_action(a)
 
     if mode == "library" then
         local n = #library.items
-        if library.confirm then
-            -- "Delete this book?" is showing: A deletes, anything else keeps it.
-            local path = library.confirm
-            library.confirm = nil
-            local it = library.items[library.sel]
-            if a == "confirm" and it and it.path == path then library.delete(path) end
-            redraw()
-            return
-        end
         if n > 0 then
             if a == "up" then library.sel = math.max(1, library.sel - 1)
             elseif a == "down" then library.sel = math.min(n, library.sel + 1)
@@ -5493,7 +5535,9 @@ function handle_action(a)
             elseif a == "confirm" then
                 open_book(library.items[library.sel].path)
             elseif a == "toc" then
-                library.confirm = library.items[library.sel].path
+                local it = library.items[library.sel]
+                app.ask({ question = "Delete this book from the SD card?", detail = it.title,
+                    yes = "Delete", on_yes = function() library.delete(it.path) end })
             end
         end
         if a == "bookmark" then shop.start() end
@@ -5530,6 +5574,7 @@ function app.on_tap(side, u, v)
         redraw()
         return
     end
+    if app.asking then app.ask_tap(side, u, v) return end
     local mode = app.mode
     if mode == "reader" then
         local ref = side == "right" and note.hit(note.on_spread(), side, u, v)
@@ -5594,13 +5639,11 @@ function app.on_tap(side, u, v)
     elseif mode == "library" then
         if side ~= "right" then return end
         local bx, by, bw, bh = library.get_books_button()
-        if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then
-            library.confirm = nil
+        if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 8 then
             shop.start()
             return
         end
         -- The list: tap a book to see it on the top screen, again to open it.
-        if library.confirm then library.confirm = nil; redraw(); return end   -- "Delete?" showing: keep
         local idx = library.top + math.floor((v - 160) / 96)
         if v >= 160 and idx < library.top + library.list_rows() and library.items[idx] then
             if idx == library.sel then action("confirm") else library.sel = idx; redraw() end
@@ -5654,14 +5697,6 @@ function app.on_tap(side, u, v)
         if side == "right" and v >= 160 and idx < f.top + rows and f.results[idx] then
             if idx == f.sel then action("confirm") else f.sel = idx; redraw() end
         end
-    elseif mode == "bookmarks" and bm.confirm then
-        -- The "Delete this …?" card: Delete deletes; anywhere else keeps it.
-        local dx, dy, dw, dh = app.bm_button("delete")
-        if side == "right" and u >= dx - 12 and u <= dx + dw + 12 and v >= dy - 12 and v <= dy + dh + 12 then
-            app.bm_delete(bm.confirm, #bookmark_entries())
-        end
-        bm.confirm = nil
-        redraw()
     elseif mode == "bookmarks" then
         -- The list: tap one to see it on the other screen, again to go there.
         local rows = list_rows(96)
@@ -5997,11 +6032,9 @@ function app.report_draw(side)
             color(th.dim)
             love.graphics.printf(r.crash.error, x, y + ui.small:getHeight() + 6, w, "left")
         end
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        love.graphics.print("B back", x, PAGE_H - 70)
         return
     end
+    app.hints(x, nil, { "B", "back" })
     -- The QR code: dark modules on white (phones read it best), with the quiet
     -- border around it that scanners need.
     if not r.qr then
@@ -6235,9 +6268,7 @@ function app.recv_draw(side)
             color(th.dim)
             love.graphics.print("Waiting for books…", x, y)
         end
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        love.graphics.print("B  done", x, PAGE_H - 70)
+
         return
     end
     -- The QR code of the address, as on Report a problem: dark on white, with
@@ -6262,11 +6293,7 @@ function app.recv_draw(side)
         love.graphics.printf(r.url, x, qy + size + 20, w, "center")
     end
     local bx, by, bw, bh = app.recv_button()
-    color(th.sel)
-    love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
-    love.graphics.setFont(ui.font)
-    color(th.fg)
-    love.graphics.printf("Done", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
+    app.button(bx, by, bw, bh, "Done", "B", "soft")
 end
 
 function love.load()
