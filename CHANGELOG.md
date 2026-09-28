@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.12
 
 - **What's new:** swipe to turn its pages, and the latest version stands out
   (a bigger heading, a "Latest" tag and a bar beside its notes).

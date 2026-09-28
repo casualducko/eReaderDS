@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.12
+Swipe to turn the pages of What's new.
+The newest version's notes stand out, so you can see what just changed.
+
 v0.3.11
 What's new: see what changed in each version, in Settings → Page turns & device.
 After an update, a note offers to show you what's new.
