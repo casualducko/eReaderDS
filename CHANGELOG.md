@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- The repository is now **casualducko/eReaderDS** (renamed from
+  eReaderDS-beta; GitHub redirects the old addresses, so installed copies
+  keep finding updates, fonts and What's new; checked on the device). The
+  updater, Get more fonts, Report a problem and the readmes use the new name.
+- Requests send a fixed user agent, `eReaderDS
+  (+https://github.com/casualducko/eReaderDS)` (was `eReaderDS`), which
+  Standard Ebooks is allowing through to its full catalog.
+
 ## v0.3.32
 
 Review of the day's changes:

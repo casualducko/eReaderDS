@@ -8,7 +8,7 @@ local Zip = require("zip")
 
 local M = {}
 
-M.RELEASES = "https://api.github.com/repos/casualducko/eReaderDS-beta/releases?per_page=5"
+M.RELEASES = "https://api.github.com/repos/casualducko/eReaderDS/releases?per_page=5"
 
 -- The folder the app runs from (Ports/eReaderDS or roms/ports/eReaderDS).
 function M.app_dir()
@@ -58,7 +58,7 @@ end
 
 -- The plain-words notes (whatsnew.txt) for a release, to show before updating.
 function M.whatsnew_url(version)
-    return "https://raw.githubusercontent.com/casualducko/eReaderDS-beta/v" .. version .. "/app/whatsnew.txt"
+    return "https://raw.githubusercontent.com/casualducko/eReaderDS/v" .. version .. "/app/whatsnew.txt"
 end
 
 -- The versions in a whatsnew.txt newer than `current`, newest first:

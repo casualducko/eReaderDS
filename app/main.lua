@@ -3743,7 +3743,7 @@ end
 -- listed in the eReaderDS repository (fontpack/, built by
 -- tools/build-font-pack.py): each is a zip of its styles, unpacked into the
 -- fonts folder, and a preview of its name set in the font.
-app.FONTPACK = "https://raw.githubusercontent.com/casualducko/eReaderDS-beta/main/fontpack/"
+app.FONTPACK = "https://raw.githubusercontent.com/casualducko/eReaderDS/main/fontpack/"
 app.FGET_ROW_H = 84
 app.fget = { sel = 1, top = 1 }
 
@@ -5315,7 +5315,7 @@ end
 -- the place in the book saved, and a report (version, system, error; no book
 -- titles) in crash.txt. The next start offers to report it: a QR code opens
 -- a GitHub bug report with the details filled in, on the reader's phone.
-app.REPORT_URL = "https://github.com/casualducko/eReaderDS-beta/issues/new"
+app.REPORT_URL = "https://github.com/casualducko/eReaderDS/issues/new"
 
 -- The error and where it happened, without paths or book file names.
 function app.crash_clean(text)
@@ -5526,7 +5526,7 @@ function app.report_draw(side)
     if not r.qr then
         love.graphics.setFont(ui.font)
         color(th.fg)
-        love.graphics.printf("Couldn't make the code. Report at\ngithub.com/casualducko/eReaderDS-beta/issues", x, 300, w, "center")
+        love.graphics.printf("Couldn't make the code. Report at\ngithub.com/casualducko/eReaderDS/issues", x, 300, w, "center")
         return
     end
     local n = #r.qr
@@ -5545,7 +5545,7 @@ function app.report_draw(side)
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.printf("github.com/casualducko/eReaderDS-beta", x, qy + size + 24, w, "center")
+    love.graphics.printf("github.com/casualducko/eReaderDS", x, qy + size + 24, w, "center")
 end
 
 function love.load()

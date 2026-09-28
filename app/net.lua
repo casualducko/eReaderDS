@@ -6,6 +6,10 @@ local socket = require("socket")
 local ffi = require("ffi")
 
 local M = {}
+
+-- Sent with every request. Fixed (no version number): Standard Ebooks allows
+-- it through to its full catalog, so it mustn't change.
+M.USER_AGENT = "eReaderDS (+https://github.com/casualducko/eReaderDS)"
 local TIMEOUT = 20            -- seconds without progress before giving up
 
 ---------------------------------------------------------------- URLs
@@ -353,7 +357,7 @@ local function request(url, opts, auth, sink, first_byte)
             host = host .. ":" .. u.port
         end
         local lines = {
-            "GET " .. u.path .. " HTTP/1.1", "Host: " .. host, "User-Agent: eReaderDS",
+            "GET " .. u.path .. " HTTP/1.1", "Host: " .. host, "User-Agent: " .. M.USER_AGENT,
             "Accept: */*", "Accept-Encoding: identity", "Connection: close",
         }
         local a = auth_header(auth, opts, u.path)

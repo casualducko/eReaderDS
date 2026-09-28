@@ -44,4 +44,4 @@ YOUR OWN FONTS
 PROBLEMS?
   Send Ports/eReaderDS/log.txt, the version (top of Settings) and what
   happened to whoever gave you eReaderDS, or open an issue at
-  https://github.com/casualducko/eReaderDS-beta/issues
+  https://github.com/casualducko/eReaderDS/issues

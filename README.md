@@ -17,7 +17,7 @@ device sideways like an open book: each screen shows one page.
 ## Install
 
 Download `eReaderDS-vX.Y.Z.zip` from the
-[releases page](https://github.com/casualducko/eReaderDS-beta/releases) (the
+[releases page](https://github.com/casualducko/eReaderDS/releases) (the
 newest is at the top) and unzip it on your computer. Then follow the steps for
 your firmware.
 
@@ -270,7 +270,7 @@ the device; you read the report and send it yourself. **Settings → About
 eReaderDS → Report a problem** shows the same code any time.
 
 Or tell whoever sent you eReaderDS, or
-[open a bug report](https://github.com/casualducko/eReaderDS-beta/issues/new?template=bug_report.yml).
+[open a bug report](https://github.com/casualducko/eReaderDS/issues/new?template=bug_report.yml).
 Include the **version** (top of Settings), **what happened** (a photo of the
 screens helps), and **`Ports/eReaderDS/log.txt`**, copied right after the
 problem.
