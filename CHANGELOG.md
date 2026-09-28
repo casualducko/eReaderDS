@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- "Bookmark added" / "Bookmark removed" stay up for 2.5 s (was 1.2 s, the
+  default for messages), long enough to read.
+- Test hooks: an `untoast` script action clears a message (for screenshots);
+  with READER_DEBUG the log notes when a message opens and closes.
+
 ## v0.3.28
 
 - **Highlights.** In look-up (Y), Select at the first word starts a

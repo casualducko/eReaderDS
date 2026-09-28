@@ -931,7 +931,7 @@ local function toggle_bookmark()
             title = sec and book.toc[sec].title or book.title, snippet = page_snippet() }
     end
     Store.set_bookmarks(book.path, list)
-    if app.toast then app.toast(here and "Bookmark removed" or "Bookmark added") end
+    if app.toast then app.toast(here and "Bookmark removed" or "Bookmark added", 2.5) end
     redraw()
 end
 
@@ -4320,6 +4320,7 @@ end
 -- on_tap: what tapping the toast does (it's on the touchscreen), if anything.
 function app.toast(text, secs, on_tap)
     overlay = { side = "right", text = text, hide_at = love.timer.getTime() + (secs or 1.2), on_tap = on_tap }
+    if os.getenv("READER_DEBUG") then print(string.format("[debug] message %q at %.2f", text, love.timer.getTime())) end
     redraw()
 end
 
@@ -5359,6 +5360,7 @@ local function run_test_script()
             elseif a:match("^type:") then app.kb_type(a:sub(6):gsub("_", " "))
             elseif a == "update" then app.update_open()
             elseif a == "crash" then error("a test crash")       -- the crash screen
+            elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
             elseif a == "report" then app.report_open()
             elseif a == "work" then                -- finish a background task
                 while app.task do app.task_step() end
@@ -5459,7 +5461,10 @@ function love.run()
         end
         if shop.net_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
-        if overlay and love.timer.getTime() >= overlay.hide_at then overlay = nil; redraw() end
+        if overlay and love.timer.getTime() >= overlay.hide_at then
+            if os.getenv("READER_DEBUG") then print(string.format("[debug] message closed at %.2f", love.timer.getTime())) end
+            overlay = nil; redraw()
+        end
         if save_due and love.timer.getTime() >= save_due then save_progress() end
         if app.mode == "library" and not lid.closed then
             -- Wi-Fi coming or going changes the Get books button.
