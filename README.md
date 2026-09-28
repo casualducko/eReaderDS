@@ -101,7 +101,7 @@ one-page summary of the buttons and touchscreen.
 - While highlighting (**Y**, then **Select**), tap a word to extend the
   highlight to it.
 - In the library and Get books, tap an entry to see it on the other screen,
-  and tap it again to open (or download) it. In Contents, Bookmarks and Find
+  and tap it again to open (or download) it. In Table of Contents, Bookmarks and Find
   in book, tap an entry to go there.
 - Swipe (or tap) to turn the pages of What's new.
 - Tap a note number, or the **Notes** button, to show footnotes.
@@ -112,16 +112,16 @@ Press **B** (or Start, X, ↩) while reading. Settings has big rows on two
 pages: swipe left or right on the touchscreen, or keep pressing down past the
 last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
-1. **Contents, Bookmarks and highlights, Find in book, Jump to %, Library**;
-   **Font** (its own page, [below](#fonts)), **Text size**, **Theme**,
-   **Brightness**; **Help**, **Quit**. (**Update to v…** is at the top when
-   one is waiting.)
+1. **Table of Contents, Bookmarks and highlights, Find in book, Jump to %,
+   My Books** (your library); **Font** (its own page, [below](#fonts)),
+   **Text size**, **Theme**, **Brightness**; **Help**. (**Update to v…** is at
+   the top when one is waiting.)
 2. **Line spacing, Justify text, Hyphenation, Margins, Top/bottom margins**;
    **Night theme** ([below](#night-theme)); **Status bar ›** (what the top
    and bottom lines show, and the clock style), **Reading & device ›**
    (page-turn animation, what a tap does, dictionary, closing the lid, time
    zone), **About eReaderDS ›** (What's new, Check for updates, Update
-   notices, Report a problem, About & credits).
+   notices, Report a problem, About & credits); **Quit**.
 
 ## Features
 
@@ -138,9 +138,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   and highlights ([below](#highlights)).
 - **Get books over Wi-Fi:** Project Gutenberg and Standard Ebooks built in,
   plus Calibre or any OPDS catalog ([below](#getting-books-over-wi-fi)).
-- **Library:** covers and progress, sorted by recent, title, author or
+- **My Books** (the library): covers and progress, sorted by recent, title, author or
   progress; delete books from it.
-- **Finding your place:** bookmarks and highlights, Contents, Jump to %, **Find in book**
+- **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
   and the words are marked on the page you open). Your place in every book is
   saved.

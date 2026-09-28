@@ -1649,7 +1649,7 @@ local function menu_items()
         app.menu_on_page(1, section(nil, join(
             u.state == "available" and { { label = "Update to v" .. u.version, bold = true, act = app.update_open } } or {},
             {
-            { label = "Contents", act = function()
+            { label = "Table of Contents", act = function()
                 if #book.toc == 0 then return end
                 toc.sel = current_section() or 1
                 toc.top = nil
@@ -1660,7 +1660,7 @@ local function menu_items()
             { label = "Find in book", act = function() app.find_open() end },
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
               act = function() app.open_jump() end },
-            { label = "Library", act = go_library },
+            { label = "My Books", act = go_library },
             }))),
         app.menu_on_page(1, section("Text and look", {
             -- The font's name is drawn in the font itself: a preview, and the only way
@@ -1696,7 +1696,6 @@ local function menu_items()
         })),
         app.menu_on_page(1, section("", {
             { label = "Help", act = function() app.mode = "help" end },
-            { label = "Quit", act = function() love.event.quit() end },
         })),
         app.menu_on_page(2, section("Page", {
             { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
@@ -1725,6 +1724,7 @@ local function menu_items()
             { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
               value_bold = app.upd.state == "available" and "Update" or nil,
               act = function() open_sub("about") end },
+            { label = "Quit", act = function() love.event.quit() end },
         }))
     )
 end
@@ -2059,7 +2059,7 @@ local function draw_library(side)
         -- and "Get books" at the bottom (also Select).
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Library", x, 60)
+        love.graphics.print("My Books", x, 60)
         if #library.items > 0 then
             -- The sort order, changed with left/right, like a settings value.
             love.graphics.setFont(ui.font)
@@ -2435,7 +2435,9 @@ local function menu_layout(items)
             prev = i
         end
     end
-    local row_h = math.min(app.MENU_ROW_BIG, math.floor((app.MENU_AVAIL - extra) / math.max(1, n)))
+    -- Page 1 of the main page keeps a row's room for "Swipe for more options".
+    local slots = n + ((menu.page == "main" and page == 1 and pages > 1) and 1 or 0)
+    local row_h = math.min(app.MENU_ROW_BIG, math.floor((app.MENU_AVAIL - extra) / math.max(1, slots)))
     local y = MENU_TOP
     for _, row in ipairs(rows) do
         if row.kind == "item" then row.h = row_h end
@@ -2481,6 +2483,13 @@ local function draw_menu_panel(side)
         end
     end
     local F, FB, FS = ui.menu, ui.menu_bold, app.MENU_SIZE
+    if menu.page == "main" and page == 1 and pages > 1 then
+        -- Where to find the rest (not a row: the cursor never stops on it).
+        local last = visible[#visible]
+        love.graphics.setFont(F)
+        color(th.dim)
+        love.graphics.print("Swipe for more options  ›", x, centered_y(F, FS, last.y + last.h + 10, last.h - 4))
+    end
     for _, row in ipairs(visible) do
         if row.kind == "header" then
             -- Section header: small dimmed capitals and a hairline.
@@ -2640,7 +2649,7 @@ local function draw_toc(side)
     if side == "left" then
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Contents", x, 60)
+        love.graphics.print("Table of Contents", x, 60)
     end
     draw_list(side, book.toc, toc.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
         love.graphics.setFont(ui.font)
