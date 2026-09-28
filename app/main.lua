@@ -1542,7 +1542,8 @@ local function menu_items()
         }),
         section("", {
             { label = "Status bar", value = "›", act = function() open_sub("status") end },
-            { label = "Page turns & device", value = app.upd.state == "available" and "Update ›" or "›",
+            { label = "Page turns & device", value = app.upd.state ~= "available" and "›" or nil,
+              value_bold = app.upd.state == "available" and "Update" or nil,
               act = function() open_sub("more") end },
             { label = "Help", act = function() app.mode = "help" end },
             { label = "Quit", act = function() love.event.quit() end },
@@ -2234,6 +2235,14 @@ local function draw_menu_panel(side)
                 love.graphics.print(open, right - cw - nw - ui.font:getWidth(open), ty)
                 love.graphics.setFont(vf)
                 love.graphics.print(name, right - cw - nw, centered_y(vf, UI_SIZE, ry, row_h - 4))
+                love.graphics.setFont(ui.font)
+            elseif it.value_bold then
+                -- A word in bold, then the › of a row that opens a page ("Update ›").
+                local tail = "  ›"
+                local tw = ui.font:getWidth(tail)
+                love.graphics.print(tail, rx + rw - tw, ty)
+                love.graphics.setFont(ui.bold)
+                love.graphics.print(it.value_bold, rx + rw - tw - ui.bold:getWidth(it.value_bold), ty)
                 love.graphics.setFont(ui.font)
             elseif it.value and it.value ~= "" then
                 local room = rw - ui.font:getWidth(it.label) - 40

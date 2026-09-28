@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- When an update is waiting, **Update** is in bold on the Page turns & device
+  row in Settings.
+
 ## v0.3.9
 
 - **Updates over Wi-Fi:** each time eReaderDS starts online, it checks for a
