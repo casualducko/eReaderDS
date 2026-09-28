@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.16
+Before you update, you can read what's new in plain words, for every version you've missed.
+Updates handle Wi-Fi trouble gracefully: a clear message and a Try again button, and nothing half-finished left behind.
+
 v0.3.15
 Prefer not to hear about new versions? Turn off Update notices in Settings → Page turns & device. You can still check for updates yourself.
 

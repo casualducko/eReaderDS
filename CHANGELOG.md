@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.16
 
 - **Updates cope with trouble:** no Wi-Fi, a dropped connection, a busy
   GitHub or a cut-off download each give a plain message and **Try again**,
