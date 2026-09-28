@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.29
+Pages sit in the middle of each screen, with the same margin on both sides.
+Deleting a bookmark or highlight asks first.
+B always opens Settings while reading; the "Back to" line after a jump is gone.
+
 v0.3.28
 Highlights: press Y, then Select at the first word and again at the last. They're listed with your bookmarks in Settings → Bookmarks and highlights.
 Help explains how to highlight.

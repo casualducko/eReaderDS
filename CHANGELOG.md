@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.29
 
 - Pages are centred on their screens: equal side margins (Narrow 32/32, Normal
   52/52, Wide 77/77; were 36/28, 60/44, 90/64). The screens are apart, so a
