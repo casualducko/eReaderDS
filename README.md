@@ -104,7 +104,7 @@ one-page summary of the buttons and touchscreen.
   highlight to it.
 - In the library and Get books, tap an entry to see it on the other screen,
   and tap it again to open (or download) it; the same in Bookmarks and
-  highlights, where the other screen shows the whole passage. In Table of
+  Highlights, where the other screen shows the whole passage. In Table of
   Contents and Find in book, tap an entry to go there.
 - Swipe (or tap) to turn the pages of What's new.
 - Tap a note number, or the **Notes** button, to show footnotes.
@@ -115,7 +115,7 @@ Press **B** (or Start, X, ↩) while reading. Settings has big rows on two
 pages: swipe left or right on the touchscreen, or keep pressing down past the
 last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
-1. **Table of Contents, Bookmarks and highlights, Find in book, Jump to %,
+1. **Table of Contents, Bookmarks and Highlights, Find in book, Jump to %,
    My Books** (your library); **Fonts** (its own page, [below](#fonts)),
    **Text size**, **Theme**, **Brightness**; **Help**. (**Update to v…** is at
    the top when one is waiting.)
@@ -224,7 +224,7 @@ to the last word (the highlight grows as you go, across both pages), and press
 **Select** again. **B** cancels. To remove one, put the cursor on it and press
 **Select**. Highlights show as a band behind the words in every theme, stay
 put when you change the font or text size, and are listed with your bookmarks
-in **Settings → Bookmarks and highlights** (A goes there; Y deletes one after you
+in **Settings → Bookmarks and Highlights** (A goes there; Y deletes one after you
 confirm).
 
 ## Dictionaries

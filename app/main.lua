@@ -1666,7 +1666,7 @@ local function menu_items()
                 toc.top = nil
                 app.mode = "toc"
             end },
-            { label = "Bookmarks and highlights", value = tostring(#Store.get_bookmarks(book.path) + #Store.get_highlights(book.path)),
+            { label = "Bookmarks and Highlights", value = tostring(#Store.get_bookmarks(book.path) + #Store.get_highlights(book.path)),
               act = function() open_bookmarks("menu") end },
             { label = "Find in book", act = function() app.find_open() end },
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
@@ -2862,7 +2862,7 @@ local function draw_bookmarks(side)
     if bm.confirm then app.bm_confirm_draw(x, w) end
 end
 
--- The mark on Bookmarks and highlights: an open book with a ribbon, drawn in
+-- The mark on Bookmarks and Highlights: an open book with a ribbon, drawn in
 -- the theme's colours. (cx, cy) is the middle of the spine; s the scale.
 function app.draw_book_art(cx, cy, s)
     local th = theme()
@@ -2900,13 +2900,13 @@ function app.draw_book_art(cx, cy, s)
         rx + rw / 2, cy + 90 * s, rx, cy + 104 * s)
 end
 
--- The left page of Bookmarks and highlights: the title, the mark, and the
+-- The left page of Bookmarks and Highlights: the title, the mark, and the
 -- selected entry in full (a highlight's whole passage, a bookmark's words).
 function app.bm_draw_left(entries, x, w)
     local th = theme()
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print("Bookmarks and highlights", x, 60)
+    love.graphics.print("Bookmarks and Highlights", x, 60)
     app.draw_book_art(x + w / 2, 250, 0.9)
     local e = entries[bm.sel]
     if not e then return end
