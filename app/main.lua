@@ -823,6 +823,8 @@ local function open_book(path)
         return
     end
     if book and book ~= b then book:close() end
+    -- Find results belong to one book; drop them (and the old book they hold).
+    if app.find and app.find.book ~= b then app.find, app.find_mark = nil, nil end
     jump = nil
     book = b
     clear_book_caches()
@@ -999,6 +1001,7 @@ function library.delete(path)
     if book and book.path == path then
         book:close()
         book, jump, spread = nil, nil, nil
+        app.find, app.find_mark = nil, nil
         clear_book_caches()
     end
     previews[path] = nil
@@ -1910,7 +1913,8 @@ local function draw_library(side)
     local confirming = library.confirm == pv.path
     if pv.cover and not confirming then
         local iw, ih = pv.cover:getDimensions()
-        local s = math.min(w / iw, 520 / ih)
+        -- A little smaller when the "v… is available" line is at the bottom.
+        local s = math.min(w / iw, (app.upd.state == "available" and 440 or 520) / ih)
         love.graphics.setColor(1, 1, 1)
         love.graphics.draw(pv.cover, x + (w - iw * s) / 2, y, 0, s, s)
         y = y + ih * s + 40
@@ -2778,7 +2782,7 @@ function app.kb_draw(side)
             else
                 color(th.dim, 0.45)
                 love.graphics.rectangle("line", kx, ky, kw, kh, 10, 10)
-                color(k.key == "ok" and th.fg or th.fg)
+                color(th.fg)
             end
             local f = #k.label > 1 and ui.font or ui.title
             love.graphics.setFont(f)

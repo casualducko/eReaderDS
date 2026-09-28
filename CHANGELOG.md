@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Find in book results are dropped when another book is opened or the book
+  is deleted, instead of keeping the old book in memory.
+- The library's book cover is a little smaller while the "v… is available"
+  line is showing, so a long title and the progress bar don't run into it.
+- The launcher removes an update folder it couldn't put in place, instead
+  of trying it again on every launch.
+- Tidied comments in the settings defaults and the OPDS module.
+
 ## v0.3.18
 
 - The About page no longer has its own Check for updates button (it

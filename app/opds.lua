@@ -228,8 +228,6 @@ function M.parse_feed(xml, base)
     return out
 end
 
--- A file name for a downloaded book: "Title - Author.epub", matching how the
--- library splits titles and authors, without characters FAT/exFAT reject.
 -- The catalog-search address in an OpenSearch description (the Url for Atom
 -- results), resolved against the description's own address; or nil.
 function M.search_template(osd, base)
@@ -261,6 +259,8 @@ function M.search_url(template, words)
     end))
 end
 
+-- A file name for a downloaded book: "Title - Author.epub", matching how the
+-- library splits titles and authors, without characters FAT/exFAT reject.
 function M.file_name(it)
     local function clean(s)
         s = (s or ""):gsub('[%c\\/:%*%?"<>|]', " "):gsub("%s+", " "):gsub("^[%s%.]+", ""):gsub("[%s%.]+$", "")

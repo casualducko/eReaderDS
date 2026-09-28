@@ -54,8 +54,9 @@ apply_update() {
 }
 if apply_update; then exec /bin/bash "$APP_DIR/launch.sh" "$@"; fi
 # Left over from an update that was cut short (quit while downloading or
-# unpacking): no READY marker, so it's incomplete. Free the space.
-[ -d "$APP_DIR/.update" ] && [ ! -f "$APP_DIR/.update/READY" ] && rm -rf "$APP_DIR/.update"
+# unpacking: no READY marker) or that couldn't be put in place: free the
+# space rather than retrying on every launch. The app offers it again.
+rm -rf "$APP_DIR/.update"
 rm -f "$APP_DIR/.update.zip" "$APP_DIR/.update.zip.part"
 
 if [ -n "$ROCKNIX" ]; then
