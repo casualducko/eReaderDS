@@ -3,12 +3,14 @@
 -- database needed) and calling tzset(); os.date() then returns local time.
 local M = {}
 
--- "Device clock" shows the device's time as it is. The stock firmware keeps
--- the clock on local time (set in its own settings) while calling it UTC, so
--- that's the right choice there; the named zones are for a clock that really
--- runs on UTC. Then zones with daylight saving, then fixed UTC offsets.
+-- "Device clock" shows the time as the system does: its own time zone
+-- setting. The stock firmware keeps the clock on local time (set in its own
+-- settings) with the system zone left at UTC; ROCKNIX runs the clock on UTC
+-- with a real zone (e.g. America/New_York), so both show the right time. The
+-- named zones are for a clock that really runs on UTC with no zone set. Then
+-- zones with daylight saving, then fixed UTC offsets.
 M.ZONES = {
-    { "Device clock", "UTC0" },
+    { "Device clock", nil },
     { "UTC", "UTC0" },
     { "US Eastern", "EST5EDT,M3.2.0,M11.1.0" },
     { "US Central", "CST6CDT,M3.2.0,M11.1.0" },
@@ -48,6 +50,7 @@ local ok_ffi, ffi = pcall(require, "ffi")
 if ok_ffi then
     pcall(ffi.cdef, [[
         int setenv(const char *name, const char *value, int overwrite);
+        int unsetenv(const char *name);
         void tzset(void);
     ]])
 end
@@ -57,7 +60,11 @@ function M.apply(name)
     for _, z in ipairs(M.ZONES) do
         if z[1] == name then rule = z[2] end
     end
-    if ok_ffi and pcall(function() ffi.C.setenv("TZ", rule, 1); ffi.C.tzset() end) then
+    -- rule nil: no TZ, so the C library uses the system's zone (/etc/localtime).
+    if ok_ffi and pcall(function()
+        if rule then ffi.C.setenv("TZ", rule, 1) else ffi.C.unsetenv("TZ") end
+        ffi.C.tzset()
+    end) then
         return true
     end
     print("[clock] could not set time zone")
