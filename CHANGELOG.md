@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Installing an update no longer freezes on "Installing… 100%" while the
+  files are saved to the SD card (about 40 s on ROCKNIX): the saving runs on
+  a thread and the screen says "Saving to the SD card…". The downloaded zip
+  is deleted before saving, so it isn't written out for nothing, and the
+  files are saved before the READY marker, which is then saved on its own.
+
 ## v0.3.20
 
 - Updating from v0.3.10 or older (which didn't record the version last

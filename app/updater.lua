@@ -80,6 +80,15 @@ end
 
 local function mkdir(p) os.execute('mkdir -p "' .. p .. '"') end
 
+-- Flush everything to the SD card on a thread, yielding meanwhile (the
+-- screen stays live: on a slow card this takes a while).
+local function sync_yielding()
+    -- (A code string needs a newline, or LÖVE takes it for a file name.)
+    local t = love.thread.newThread('os.execute("sync")\n')
+    t:start()
+    while t:isRunning() do coroutine.yield(1, "saving") end
+end
+
 -- Unpack the release zip into dest (APP_DIR/.update): Ports/eReaderDS/... ->
 -- dest/eReaderDS/..., Ports/eReaderDS.sh and Ports/Imgs/eReaderDS.png beside
 -- it. Meant to run in a coroutine: yields after each file with the fraction
@@ -118,12 +127,16 @@ function M.unpack(zip_path, dest, version)
         coroutine.yield(i / #names)
     end
     z:close()
-    -- Last: the marker that tells the launcher it's complete.
+    -- The zip first, so its unsaved data needn't be written to the card at all.
+    os.remove(zip_path)
+    -- The files, then the marker that tells the launcher they're complete
+    -- (so it never finds the marker without them).
+    sync_yielding()
     local f = io.open(dest .. "/READY", "wb")
     if not f then error("couldn't write to the SD card", 0) end
     f:write(version .. "\n")
     f:close()
-    os.execute("sync")
+    sync_yielding()
 end
 
 return M

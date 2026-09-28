@@ -2892,18 +2892,18 @@ function app.update_start()
                 u.state, u.message = "error", "The download was incomplete. Try again."
                 return
             end
-            u.state, u.frac = "unpacking", 0
+            u.state, u.frac, u.saving = "unpacking", 0, nil
             -- Unpack a file at a time between frames (the screen stays live).
             app.task = coroutine.create(function()
                 local ok, err = pcall(function()
                     local co = coroutine.create(app.Updater.unpack)
                     local args = { zip, dir .. "/.update", u.version }
                     while true do
-                        local ok2, frac = coroutine.resume(co, unpack(args))
+                        local ok2, frac, phase = coroutine.resume(co, unpack(args))
                         args = {}
                         if not ok2 then error(frac, 0) end
                         if coroutine.status(co) == "dead" then break end
-                        u.frac = frac
+                        u.frac, u.saving = frac, phase == "saving"
                         coroutine.yield()
                     end
                 end)
@@ -3050,7 +3050,7 @@ function app.update_draw(side)
         status = "Downloading…  " .. (shop.format_size(u.got or 0) or "0 KB")
             .. ((u.total or 0) > 0 and (" of " .. shop.format_size(u.total)) or "")
     elseif u.state == "unpacking" then
-        status = "Installing…  " .. math.floor((u.frac or 0) * 100) .. "%"
+        status = u.saving and "Saving to the SD card…" or ("Installing…  " .. math.floor((u.frac or 0) * 100) .. "%")
     elseif u.state == "ready" then
         status, button = "Ready. eReaderDS restarts with the new version.", "Restart now"
     elseif u.state == "checking" then
