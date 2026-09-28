@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.19
 
 - Find in book results are dropped when another book is opened or the book
   is deleted, instead of keeping the old book in memory.
