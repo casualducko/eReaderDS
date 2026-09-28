@@ -113,7 +113,7 @@ pages: swipe left or right on the touchscreen, or keep pressing down past the
 last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 1. **Table of Contents, Bookmarks and highlights, Find in book, Jump to %,
-   My Books** (your library); **Font** (its own page, [below](#fonts)),
+   My Books** (your library); **Fonts** (its own page, [below](#fonts)),
    **Text size**, **Theme**, **Brightness**; **Help**. (**Update to v…** is at
    the top when one is waiting.)
 2. **Line spacing, Justify text, Hyphenation, Margins, Top/bottom margins**;
@@ -224,7 +224,7 @@ the word is shown, yours first; pick a single one in
 
 ## Fonts
 
-**Settings → Font** opens a two-page view: the fonts on the touchscreen, each
+**Settings → Fonts** opens a two-page view: the fonts on the touchscreen, each
 named in its own typeface, and a sample page in the highlighted one on the
 other screen. The list is alphabetical; left/right (or tapping **All · Serif ·
 Sans** at the top) narrow it. Up/down pick a font, A uses it.
@@ -243,7 +243,7 @@ fonts folder, then A reads in it and Y deletes it. The list lives in this
 repository's `fontpack` folder (built by `tools/build-font-pack.py`).
 
 **Your own:** copy `.ttf` or `.otf` files into `Ebook/Fonts`, then choose
-them in **Settings → Font**. Regular, italic and bold files of a family are
+them in **Settings → Fonts**. Regular, italic and bold files of a family are
 grouped automatically. Use static fonts: a variable font (`[wght]` in the
 name) only shows one weight.
 
