@@ -19,25 +19,27 @@ local SAMPLE = [[
 #
 # For a server with a self-signed certificate, add:  verify = no
 #
-# Project Gutenberg is always listed. To hide it, add:  gutenberg = off
+# Project Gutenberg and Standard Ebooks are always listed. To hide one, add:
+#   gutenberg = off
+#   standardebooks = off
 ]]
 
 -- Catalogs from opds.txt: { name, url, user, password, verify }, plus
--- options ({ gutenberg = true|false }). Writes a commented example the first
+-- options ({ gutenberg = true|false, standardebooks = true|false }). Writes a commented example the first
 -- time so there's something to edit.
 function M.load_catalogs(file)
     local f = io.open(file, "rb")
     if not f then
         local w = io.open(file, "wb")
         if w then w:write(SAMPLE); w:close() end
-        return {}, { gutenberg = true }
+        return {}, { gutenberg = true, standardebooks = true }
     end
-    local list, cur, opts = {}, nil, { gutenberg = true }
+    local list, cur, opts = {}, nil, { gutenberg = true, standardebooks = true }
     for line in f:lines() do
         line = line:gsub("\r$", "")
         local k, v = line:match("^%s*([%a_]+)%s*=%s*(.-)%s*$")
-        if k and not line:match("^%s*#") and k:lower() == "gutenberg" then
-            opts.gutenberg = not (v:lower():match("^no") or v:lower():match("^off") or v == "0" or v:lower() == "false")
+        if k and not line:match("^%s*#") and (k:lower() == "gutenberg" or k:lower() == "standardebooks") then
+            opts[k:lower()] = not (v:lower():match("^no") or v:lower():match("^off") or v == "0" or v:lower() == "false")
         elseif k and not line:match("^%s*#") then
             k = k:lower()
             -- A new name or a second url starts another catalog.
@@ -67,8 +69,12 @@ end
 M.BUILT_IN = {
     -- www directly: m.gutenberg.org only redirects there, and is often slow
     -- or failing (504) when www is fine.
-    { name = "Project Gutenberg", url = "https://www.gutenberg.org/ebooks.opds/", verify = true,
+    { name = "Project Gutenberg", key = "gutenberg", url = "https://www.gutenberg.org/ebooks.opds/", verify = true,
       about = "Over 70,000 free public-domain books." },
+    -- Its full catalog feed is for its patrons; the newest releases and search
+    -- (over every title) are open to everyone.
+    { name = "Standard Ebooks", key = "standardebooks", url = "https://standardebooks.org/feeds/atom/new-releases", verify = true,
+      about = "Classics, carefully proofread and beautifully typeset. The newest releases, and search across the whole collection." },
 }
 
 ---------------------------------------------------------------- XML
@@ -196,7 +202,10 @@ function M.parse_feed(xml, base)
             local rel, t, href = l.attrs.rel or "", (l.attrs.type or ""):lower(), l.attrs.href
             if href then
                 href = Net.resolve(base, href)
-                if rel:find("opds%-spec%.org/acquisition") and not rel:find("buy") and not rel:find("subscribe") then
+                -- Downloads: OPDS acquisition links, or a plain Atom feed's
+                -- enclosures (Standard Ebooks).
+                if (rel:find("opds%-spec%.org/acquisition") and not rel:find("buy") and not rel:find("subscribe"))
+                        or rel == "enclosure" then
                     local mime = t:match("^[^;%s]+") or ""
                     local kind = BOOK_TYPES[mime]
                     if kind then
@@ -222,6 +231,9 @@ function M.parse_feed(xml, base)
                 end
             end
         end
+        -- A plain Atom feed's cover: <media:thumbnail url="..."> (prefix dropped).
+        local mt = child(e, "thumbnail")
+        if mt and mt.attrs.url and not it.thumb then it.thumb = Net.resolve(base, mt.attrs.url) end
         it.cover = it.thumb or it.cover
         if it.title ~= "" or it.href or it.book then out.entries[#out.entries + 1] = it end
     end
@@ -255,6 +267,7 @@ function M.search_url(template, words)
     return (template:gsub("{([%w:]+)(%??)}", function(name, _)
         if name == "searchTerms" then return q end
         if name == "startPage" or name == "startIndex" then return "1" end
+        if name == "count" then return "24" end
         return ""
     end))
 end

@@ -110,8 +110,8 @@ Press **B** (or Start, X, ↩) while reading. One page, top to bottom:
   English is built in, and you can add your own ([below](#dictionaries)).
 - **Highlights:** mark passages and find them again in the list of bookmarks
   and highlights ([below](#highlights)).
-- **Get books over Wi-Fi:** Project Gutenberg built in, plus Calibre or any
-  OPDS catalog ([below](#getting-books-over-wi-fi)).
+- **Get books over Wi-Fi:** Project Gutenberg and Standard Ebooks built in,
+  plus Calibre or any OPDS catalog ([below](#getting-books-over-wi-fi)).
 - **Library:** covers and progress, sorted by recent, title, author or
   progress; delete books from it.
 - **Finding your place:** bookmarks and highlights, Contents, Jump to %, **Find in book**
@@ -155,7 +155,9 @@ greyed out. **Search** (at the top of a catalog, when it supports searching,
 as Gutenberg and Calibre do) opens an on-screen keyboard on the touchscreen:
 tap the keys, or use the D-pad and A.
 
-**Project Gutenberg** (70,000+ free books) works with no setup. To add your
+**Project Gutenberg** (70,000+ free books) and **Standard Ebooks** (classics,
+carefully proofread and beautifully typeset: the newest releases, and search
+across the whole collection) work with no setup. To add your
 own catalog, such as a Calibre content server or Calibre-Web, edit
 `Ebook/.ereaderds/opds.txt` on the SD card (it's created the first time
 eReaderDS runs):
@@ -169,7 +171,8 @@ password = secret
 
 Leave out `user` and `password` if the server doesn't need them, and add a
 block for each extra catalog. Add `verify = no` for a server with a
-self-signed certificate, and `gutenberg = off` to hide Project Gutenberg.
+self-signed certificate. To hide a built-in catalog, add `gutenberg = off` or
+`standardebooks = off`.
 
 ## Highlights
 

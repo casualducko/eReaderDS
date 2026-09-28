@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **Standard Ebooks** in Get books: its newest releases (the free
+  New Releases feed) and Search over the whole collection (its OpenSearch
+  Atom results; the full catalog feeds are for its patrons). Checked the
+  other well-known free catalogs first: Feedbooks (gone), Internet Archive
+  (times out), ManyBooks (blocked), unglue.it (10 s responses), Wikisource
+  (one unsorted 700-item list) weren't good enough. Tested on the device:
+  list, covers, search, download (the real SE edition).
+- OPDS: Atom `enclosure` links count as downloads and `media:thumbnail` as a
+  cover (plain Atom feeds like Standard Ebooks'); a search address's
+  `{count}` is filled with 24.
+- opds.txt: `standardebooks = off` hides it; `gutenberg = off` now hides only
+  Project Gutenberg.
+
 ## v0.3.29
 
 - Pages are centred on their screens: equal side margins (Narrow 32/32, Normal

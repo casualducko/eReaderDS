@@ -1040,8 +1040,8 @@ local function scan_library()
     -- on the right page).
     local ok, catalogs, opts = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
     if not ok then print("[opds] " .. tostring(catalogs)); catalogs, opts = {}, {} end
-    if opts.gutenberg ~= false then
-        for _, c in ipairs(Opds.BUILT_IN) do catalogs[#catalogs + 1] = c end
+    for _, c in ipairs(Opds.BUILT_IN) do
+        if opts[c.key] ~= false then catalogs[#catalogs + 1] = c end      -- "gutenberg = off" etc.
     end
     library.catalogs = catalogs
     library.items = items
