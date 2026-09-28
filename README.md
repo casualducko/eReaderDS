@@ -93,8 +93,9 @@ one-page summary of the buttons and touchscreen.
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
   open Settings instead: **Settings → Reading & device → Tap**.)
-- Slide up/down to change brightness; keep going below 1% for Extra dim. (In
-  My Books, sliding up/down scrolls the list instead.)
+- Slide up/down to change brightness; keep going below 1% for Extra dim. (On
+  a list, such as My Books, Get books, Table of Contents or Fonts, sliding
+  up/down scrolls it instead.)
 - Pinch with two fingers to make the text bigger or smaller.
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.

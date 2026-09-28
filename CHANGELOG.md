@@ -2,9 +2,12 @@
 
 ## Unreleased
 
-- **My Books scrolls with a finger:** sliding up/down on the touchscreen in
-  My Books scrolls the list (the selected book moves along at the edge, as
-  with the D-pad). Everywhere else a vertical slide is still brightness.
+- **Lists scroll with a finger:** sliding up/down on the touchscreen scrolls
+  the list on screen: My Books, Get books, Table of Contents, Bookmarks and
+  highlights, Find in book, Fonts and Get more fonts (the selection moves
+  along at the edge, as with the D-pad; Get books loads more near the end).
+  On the book pages and other screens a vertical slide is still brightness;
+  on a list it never is, even one that fits. Help says so.
 
 ## v1.3.1
 

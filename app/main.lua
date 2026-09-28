@@ -2973,7 +2973,7 @@ app.HELP = {
     } },
     right = { "Touchscreen", {
         { "Tap or swipe", "Turn pages (right half forward)" },
-        { "Slide up/down", "Brightness, down to extra dim" },
+        { "Slide up/down", "Brightness (in lists: scroll)" },
         { "Pinch", "Text size" },
         { "Top-right corner", "Bookmark" },
         { "Top edge", "Show or hide the status bars" },
@@ -4730,11 +4730,12 @@ local function touch_event(kind, sx, sy)
         elseif not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
             gesture.mode = "swipe"          -- mostly horizontal: page turn on release
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5
-                and app.mode == "library" and gesture.side == "right" and #library.items > 0 then
-            -- My Books: a vertical slide scrolls the list (brightness everywhere else).
+                and gesture.side == "right" and app.scroll_list() then
+            -- On a list, a vertical slide scrolls it (brightness everywhere else).
+            local l, _, _, row_h = app.scroll_list()
             gesture.mode = "scroll"
-            gesture.v0, gesture.top0 = v, library.top
-            library.confirm = nil
+            gesture.v0, gesture.top0, gesture.row_h = v, l.top or 1, row_h
+            library.confirm, bm.confirm, app.fget.confirm = nil, nil, nil
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
             -- Mostly vertical slide: brightness. Work in sqrt space so the
             -- dim end gets finer control.
@@ -4742,7 +4743,7 @@ local function touch_event(kind, sx, sy)
             gesture.v0 = v
             gesture.p0 = S.extra_dim > 0 and (0.1 - S.extra_dim * 0.05) or math.sqrt(current_brightness() / 100)
         end
-        if gesture.mode == "scroll" then app.library_scroll(gesture.top0 + math.floor((gesture.v0 - v) / 96 + 0.5)) end
+        if gesture.mode == "scroll" then app.list_scroll(gesture.top0 + math.floor((gesture.v0 - v) / gesture.row_h + 0.5)) end
         if gesture.mode == "brightness" then
             local p = gesture.p0 + (gesture.v0 - v) / (PAGE_H * 0.8)
             -- Below 1% (p < 0.1) the slide continues into the extra dim levels.
@@ -4783,14 +4784,36 @@ local function touch_event(kind, sx, sy)
     end
 end
 
--- Scroll My Books so `top` is the first row shown, keeping the selected book
--- on screen (it moves along at the edge, like the D-pad would).
-function app.library_scroll(top)
-    local rows = library.list_rows()
-    top = math.max(1, math.min(math.max(1, #library.items - rows + 1), top))
-    if top == library.top then return end
-    library.top = top
-    library.sel = math.max(top, math.min(top + rows - 1, library.sel))
+-- The list on screen that a slide scrolls: its state (with sel and top), the
+-- number of entries, how many show at once (both pages for two-page lists) and
+-- the row height; nil when this screen has no list to scroll.
+function app.scroll_list()
+    local m, l, n, shown, row_h = app.mode, nil, 0, 0, 96
+    if m == "library" then l, n, shown = library, #library.items, library.list_rows()
+    elseif m == "shop" then
+        l = shop.page()
+        n, shown = l and #l.entries or 0, list_rows(96)
+    elseif m == "toc" and book then l, n, row_h = toc, #book.toc, 58; shown = list_rows(58) * 2
+    elseif m == "bookmarks" and book then l, n, shown = bm, #bookmark_entries(), list_rows(96) * 2
+    elseif m == "find" and app.find then l, n, shown = app.find, #app.find.results, list_rows(96) * 2
+    elseif m == "fonts" and app.font_pick then
+        l, n, shown, row_h = app.font_pick, #app.font_pick.list, app.font_rows(), app.FONT_ROW_H
+    elseif m == "fontget" and app.fget.list then
+        l, n, shown, row_h = app.fget, #app.fget.list, list_rows(app.FGET_ROW_H), app.FGET_ROW_H
+    end
+    if l then return l, n, shown, row_h end            -- (one that fits just doesn't move)
+end
+
+-- Scroll that list so `top` is the first row shown, keeping the selection on
+-- screen (it moves along at the edge, as the D-pad would move it).
+function app.list_scroll(top)
+    local l, n, shown = app.scroll_list()
+    if not l then return end
+    top = math.max(1, math.min(math.max(1, n - shown + 1), top))
+    if top == l.top then return end
+    l.top = top
+    l.sel = math.max(top, math.min(top + shown - 1, l.sel))
+    if app.mode == "shop" then shop.move(0) end            -- near the end: load more
     redraw()
 end
 
