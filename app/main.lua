@@ -1460,7 +1460,11 @@ function app.night_items()
     local names = { "off" }
     for _, t in ipairs(THEMES) do names[#names + 1] = t.name end
     local rows = {
-        { label = "Night theme", value = S.night_theme == "off" and "Off" or S.night_theme, adjust = function(d)
+        -- Whether it's on right now, so changing the hours shows what they do.
+        { label = "Night theme", value = S.night_theme == "off" and "Off"
+            or (S.night_theme .. (app.night and "  ·  on now"
+                or S.night_from == S.night_to and "  ·  never on" or ("  ·  from " .. app.hour_label(S.night_from)))),
+          adjust = function(d)
             S.night_theme = cycle(names, S.night_theme, d); app.night_check()
         end },
     }

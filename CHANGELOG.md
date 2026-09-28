@@ -6,7 +6,9 @@
   theme (e.g. Midnight or Amber) to use automatically between two hours (9 PM
   to 7 AM to start, in the clock's 12/24-hour style), by the device's clock
   and time zone. Checked once a minute, so it switches on the hour. While
-  it's on, the Theme row changes the night theme and says "(night)".
+  it's on, the Theme row changes the night theme and says "(night)". The
+  Night theme row says whether it's on now ("Dusk · on now", "· from 9 PM",
+  "· never on" when From and Until are the same hour).
 - The "Night" theme is now called **Midnight** (so the night theme setting
   doesn't read "Night theme: Night"); a saved "Night" becomes Midnight.
 - Clock: "Device clock" now uses the system's own time zone instead of
