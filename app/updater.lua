@@ -55,6 +55,29 @@ function M.parse(body, current)
     return best
 end
 
+-- The plain-words notes (whatsnew.txt) for a release, to show before updating.
+function M.whatsnew_url(version)
+    return "https://raw.githubusercontent.com/casualducko/eReaderDS-beta/v" .. version .. "/app/whatsnew.txt"
+end
+
+-- The versions in a whatsnew.txt newer than `current`, newest first:
+-- { { version = "0.3.12", items = { "...", ... } }, ... }
+function M.whatsnew_since(text, current)
+    local out, cur = {}, nil
+    for line in (text or ""):gmatch("[^\n]+") do
+        if not line:match("^#") and line:match("%S") then
+            local v = line:match("^v(%d[%d%.]*)%s*$")
+            if v then
+                cur = M.newer(v, current) and { version = v, items = {} } or nil
+                if cur then out[#out + 1] = cur end
+            elseif cur then
+                cur.items[#cur.items + 1] = line
+            end
+        end
+    end
+    return out
+end
+
 local function mkdir(p) os.execute('mkdir -p "' .. p .. '"') end
 
 -- Unpack the release zip into dest (APP_DIR/.update): Ports/eReaderDS/... ->

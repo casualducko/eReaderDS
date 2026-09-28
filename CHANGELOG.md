@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The **update** screen shows what's coming in plain words, as on What's
+  new (every version since yours), in the same, larger text.
+
 ## v0.3.15
 
 - **Update notices** (Settings → Page turns & device): turn off the check for

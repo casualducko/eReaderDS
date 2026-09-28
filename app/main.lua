@@ -2824,6 +2824,14 @@ function app.update_check(by_hand)
         if rel then
             rel.state = "available"
             app.upd = rel
+            -- Its notes in plain words (the release notes are the fallback).
+            shop.net_job({ kind = "fetch", url = app.Updater.whatsnew_url(rel.version) }, function(m2)
+                if m2.kind ~= "error" and app.upd == rel then
+                    local list = app.Updater.whatsnew_since(m2.body, app.update_current())
+                    if #list > 0 then rel.whatsnew = list end
+                    redraw()
+                end
+            end)
             if app.mode ~= "update" then
                 -- Tapping it opens the update (so do Settings, and Start in the library).
                 app.toast("Update available: v" .. rel.version .. "\nYou have v" .. app.update_current()
@@ -2924,16 +2932,41 @@ function app.update_draw(side)
         love.graphics.setFont(ui.font)
         color(th.dim)
         love.graphics.print("You have v" .. app.update_current(), x, 60 + ui.title:getHeight() + 6)
-        if u.notes and u.notes ~= "" then
-            love.graphics.setFont(ui.small)
+        -- What's in it, like the What's new page: each newer version's notes
+        -- in plain words (else the release notes), as far as they fit.
+        local y, limit, full = 200, PAGE_H - 110, false
+        local function item(text)
+            local _, lines = ui.font:getWrap(text, w - 34)
+            if y + #lines * ui.font:getHeight() > limit then full = true; return end
+            color(th.dim)
+            love.graphics.setFont(ui.font)
+            love.graphics.print("•", x, y)
             color(th.fg)
-            local y, limit = 190, PAGE_H - 110
-            local _, lines = ui.small:getWrap(u.notes, w)
-            for _, line in ipairs(lines) do
-                if y + ui.small:getHeight() > limit then love.graphics.print("…", x, y); break end
-                love.graphics.print(line, x, y)
-                y = y + ui.small:getHeight() + 2
+            for _, l in ipairs(lines) do love.graphics.print(l, x + 34, y); y = y + ui.font:getHeight() end
+            y = y + 8
+        end
+        if u.whatsnew then
+            for k, ver in ipairs(u.whatsnew) do
+                if full then break end
+                if #u.whatsnew > 1 then
+                    if y + ui.bold:getHeight() + ui.font:getHeight() > limit then full = true; break end
+                    love.graphics.setFont(ui.bold)
+                    color(th.fg)
+                    love.graphics.print("Version " .. ver.version, x, y)
+                    y = y + ui.bold:getHeight() + 6
+                end
+                for _, t in ipairs(ver.items) do if not full then item(t) end end
+                y = y + (k < #u.whatsnew and 16 or 0)
             end
+        elseif u.notes and u.notes ~= "" then
+            for para in u.notes:gmatch("[^\n]+") do
+                if not full then item((para:gsub("^•%s*", ""))) end
+            end
+        end
+        if full then
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.print("…", x + 34, y - 4)
         end
         love.graphics.setFont(ui.small)
         color(th.dim)
