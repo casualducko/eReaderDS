@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.2.0
+Crimson Pro is built in, and is the font new readers start with.
+The Fonts page has its Get more fonts button beside the title.
+Get more fonts is in alphabetical order, and can show just serif or sans-serif fonts.
+
 v1.1.0
 Settings has bigger, easier-to-tap rows on two pages: swipe for more. Tap ‹ or › to change a value.
 Contents is now Table of Contents, and Library is now My Books.

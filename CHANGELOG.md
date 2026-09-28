@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.2.0
 
 - **Crimson Pro** is built in and is new readers' default font (40 pt, as
   before), and the fallback font; readers keep the font they chose. It's no
