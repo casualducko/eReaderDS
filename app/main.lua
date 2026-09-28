@@ -41,7 +41,11 @@ local THEMES = {
 -- Listed alphabetically in Settings.
 table.sort(THEMES, function(a, b) return a.name:lower() < b.name:lower() end)
 local OLD_THEME_NUMBERS = { "Paper", "White", "Sepia", "Midnight" }
-local MARGINS = { { name = "Narrow", outer = 36, inner = 28 }, { name = "Normal", outer = 60, inner = 44 }, { name = "Wide", outer = 90, inner = 64 } }
+-- Side margins. The two screens sit apart (there's no shared gutter as in a
+-- printed book), so each page is centred on its own screen: the same margin
+-- on both sides. The totals are the old outer + inner, so line lengths and
+-- page breaks are unchanged.
+local MARGINS = { { name = "Narrow", outer = 32, inner = 32 }, { name = "Normal", outer = 52, inner = 52 }, { name = "Wide", outer = 77, inner = 77 } }
 -- Space above and below the text (the header/footer sit inside it).
 local VMARGINS = { { name = "Narrow", size = 60 }, { name = "Normal", size = 76 }, { name = "Wide", size = 110 }, { name = "Extra wide", size = 150 } }
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Pages are centred on their screens: equal side margins (Narrow 32/32, Normal
+  52/52, Wide 77/77; were 36/28, 60/44, 90/64). The screens are apart, so a
+  book-style narrow gutter pushed the left page's text toward the hinge. The
+  totals are the same, so line lengths and page breaks don't change.
 - Test hooks: an `untoast` script action clears a message (for screenshots);
   with READER_DEBUG the log notes when a message opens and closes.
 
