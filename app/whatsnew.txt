@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.7.0
+Your highlights and bookmarks are also saved as a file for each book, in the Highlights folder on your SD card, to read on a computer.
+Bookmarks and Highlights can show everything, just highlights or just bookmarks: press left or right, or tap the label at the top.
+
 v1.6.0
 Books are marked finished when you reach the last page. My Books shows which you're reading and which you've finished.
 Press Y on a book in My Books to mark it finished (or not), hide finished books, or delete it.

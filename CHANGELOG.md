@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.7.0
 
 - **Highlights and bookmarks as a file** (like a Kindle's "My Clippings"):
   `Ebook/Highlights/<Title - Author>.md`, one per book, in reading order under
