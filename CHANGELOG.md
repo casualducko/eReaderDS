@@ -18,6 +18,10 @@
 - Settings headings: **Main** above Table of Contents (so both pages start
   with a heading in the same place) and **Other** above Status bar.
 - Help's text is larger (34 px, was 30), with the rows a little closer.
+- Bookmarks and highlights: the first row says which page it bookmarks, like
+  the bookmark rows ("Chapter 1 · 9% · I am by birth a Genevese…"); when it's
+  bookmarked it reads "Remove the bookmark on this page". Bookmark snippets
+  start at the text, not the chapter heading (which is shown beside them).
 - Tapping **‹** or **›** on a row steps its value down or up (a tap used to
   always step it up); tapping the label selects the row. Tested on the
   device: 40 → 42 (›), 40 → 38 (‹), label leaves it.

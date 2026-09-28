@@ -876,7 +876,8 @@ end
 local function page_snippet()
     local words, n = {}, 0
     for _, it in ipairs(spread.pages[spread.pi].items) do
-        if it.kind == "text" then
+        -- The text, not a heading (the chapter's name is shown beside it).
+        if it.kind == "text" and it.font ~= fonts.h then
             words[#words + 1] = it.text
             n = n + #it.text
             if n > 80 then break end
@@ -2783,10 +2784,20 @@ local function draw_bookmarks(side)
     end
     draw_list(side, entries, bm.sel, first, rows, x, 160, w, row_h, function(it, _, rx, ry, rw, selected)
         if it.action then
+            -- The page you're on (the one this bookmarks), like the rows below:
+            -- where it is, and its first words.
+            local top = ui.font:getBaseline() - UI_SIZE * 0.68
+            local bottom = 40 + ui.small:getBaseline()
+            local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
             love.graphics.setFont(ui.font)
             color(th.fg)
-            love.graphics.print(bookmark_here() and "Remove bookmark here" or "+  Bookmark this page", rx,
-                centered_y(ui.font, UI_SIZE, ry, row_h - 4))
+            love.graphics.print(bookmark_here() and "Remove the bookmark on this page" or "+  Bookmark this page", rx, ty)
+            local sec = current_section()
+            local where = (sec and book.toc[sec].title or book.title or "") .. "  ·  "
+                .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%  ·  "
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.print(fit_text(ui.small, where .. page_snippet(), rw), rx, ty + 40)
             return
         end
         local top = ui.font:getBaseline() - UI_SIZE * 0.68
