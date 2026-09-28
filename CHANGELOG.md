@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.13
 
 - Tapping anywhere but the **update** (or "what's new") note just dismisses
   it, instead of also turning the page.

@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.13
+Tapping anywhere else closes the update message, instead of turning the page by accident.
+
 v0.3.12
 Swipe to turn the pages of What's new.
 The newest version's notes stand out, so you can see what just changed.
