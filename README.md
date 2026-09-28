@@ -216,8 +216,8 @@ problem.
 ## Known limitations
 
 - Touch works only on the bottom screen.
-- "Pages left in chapter" can be too low when a chapter spans several files in
-  the EPUB.
+- When a chapter runs over several files in the EPUB, its pages in files not
+  opened yet are estimated (usually within a few pages) until you reach them.
 - No tables, fixed-layout EPUBs, PDF, MOBI or DRM-protected books.
 - Hyphenation and the built-in dictionary are English only.
 

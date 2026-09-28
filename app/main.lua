@@ -84,7 +84,10 @@ local book = nil
 local PAGES_KEEP, IMAGES_KEEP = 4, 12
 local pages_cache, pages_order = {}, {}
 local images, images_order, image_dims = {}, {}, {}
-local function clear_pages() pages_cache, pages_order = {}, {} end
+-- app.page_offs: where each laid-out file's pages start (numbers only), kept
+-- after its pages are dropped, for counting a chapter's pages across files.
+local function clear_pages() pages_cache, pages_order, app.page_offs = {}, {}, {} end
+app.page_offs = {}
 local function clear_book_caches()
     for _, img in pairs(images) do if img then img:release() end end
     images, images_order, image_dims = {}, {}, {}
@@ -253,6 +256,9 @@ local function pages_for(ch)
         })
         pages_cache[ch] = p
         pages_order[#pages_order + 1] = ch
+        local offs = {}
+        for k, pg in ipairs(p) do offs[k] = pg.off end
+        app.page_offs[ch] = offs
         -- Keep the few most recent chapters (never the one on screen).
         while #pages_order > PAGES_KEEP do
             local k = 1
@@ -1769,9 +1775,64 @@ local function format_time(seconds, compact)
     return mm > 0 and string.format("%d%s %d%s", h, H, mm, M) or string.format("%d%s", h, H)
 end
 
--- Characters left in the book after offset `off` of chapter `ch`. Chapters
--- not opened yet are estimated from their file size, scaled by how much of the
--- file turned out to be text in the chapters already opened.
+-- A section (Contents entry) can run over several files of the EPUB. Its
+-- pages and characters outside the current file: exact for files already
+-- laid out, otherwise estimated (text per byte of the files opened so far,
+-- characters per page of this one). Returns the pages before this file, the
+-- pages after it and the characters after it; nil when the section is most
+-- of the book (a Contents with just a title entry), where the file itself
+-- is the more useful "chapter".
+function app.section_extent(cur, nxt)
+    local ch = spread.ch
+    local s_ch, s_off = ch, 0
+    if cur and cur.chapter < ch then s_ch, s_off = toc_pos(cur) end
+    local e_ch, e_off = #book.chapters + 1, 0                -- no next entry: the book's end
+    if nxt then
+        e_ch = nxt.chapter
+        e_off = nxt.anchor and select(2, toc_pos(nxt)) or 0  -- no anchor: the file's start
+    end
+    if e_ch == ch then e_ch, e_off = ch + 1, 0 end         -- ends in this file
+    if s_ch == ch and e_ch == ch + 1 and e_off == 0 then return 0, 0, 0 end
+    local span = 0
+    for i = s_ch, math.min(e_ch, #book.chapters) do span = span + book.chapters[i].weight end
+    if span > book.total * 0.5 then return nil end
+    local text, bytes = 0, 0
+    for _, c in ipairs(book.chapters) do
+        if c.length then text, bytes = text + c.length, bytes + c.weight end
+    end
+    local ratio = bytes > 0 and text / bytes or 0.5
+    local cpp = math.max(1, (book.chapters[ch].length or 1) / math.max(1, #spread.pages))
+    local function chars(i) local c = book.chapters[i]; return c.length or c.weight * ratio end
+    -- Pages of file i between offsets a and b (b nil: to its end).
+    local function pages(i, a, b)
+        local offs = app.page_offs[i]
+        if offs and #offs > 0 then
+            local function find(x)              -- the page holding offset x
+                local k = 1
+                while offs[k + 1] and offs[k + 1] <= x do k = k + 1 end
+                return k
+            end
+            local first, last = find(a), #offs
+            if b then
+                last = find(b)
+                if offs[last] >= b then last = last - 1 end
+            end
+            return math.max(0, last - first + 1)
+        end
+        return math.max(0, (b or chars(i)) - a) / cpp
+    end
+    local before, after, after_chars = 0, 0, 0
+    for i = s_ch, ch - 1 do before = before + pages(i, i == s_ch and s_off or 0) end
+    for i = ch + 1, math.min(e_ch, #book.chapters) do
+        if i < e_ch then
+            after, after_chars = after + pages(i, 0), after_chars + chars(i)
+        elseif e_off > 0 then
+            after, after_chars = after + pages(i, 0, e_off), after_chars + e_off
+        end
+    end
+    return math.floor(before + 0.5), math.floor(after + 0.5), after_chars
+end
+
 local function draw_reader_pages()
     local sec = current_section()
     local frac = book:fraction(pos.ch, pos.off)
@@ -1792,6 +1853,12 @@ local function draw_reader_pages()
         if pages[p].off == off and p > first then last = p - 1 else last = p end
     end
     local shown = math.min(spread.pi + 1, #pages)
+    -- Pages and characters of the section in other files (0 when it's all here).
+    local before, after, after_chars = 0, 0, 0
+    if sec then
+        local b, a, c = app.section_extent(cur, nxt)
+        if b then before, after, after_chars = b, a, c end
+    end
 
     local info = {
         book_title = book.title,
@@ -1800,12 +1867,13 @@ local function draw_reader_pages()
         clock = clock_text(),
     }
     if S.sb_pages == "left" then
-        local remaining = last - shown
+        local remaining = last - shown + after
         if remaining > 0 then
             info.pages_text = remaining == 1 and "1 page left in chapter" or (remaining .. " pages left in chapter")
         end
     elseif S.sb_pages == "of" then
-        info.pages_text = string.format("Page %d of %d", math.max(1, spread.pi - first + 1), math.max(1, last - first + 1))
+        info.pages_text = string.format("Page %d of %d", math.max(1, before + spread.pi - first + 1),
+            math.max(1, before + last - first + 1 + after))
     end
     if S.sb_percent then
         info.percent_text = string.format("%d%% read", math.floor(frac * 100 + 0.5))
@@ -1815,7 +1883,7 @@ local function draw_reader_pages()
     if S.sb_time == "chapter" or S.sb_time == "both" then
         local section_end = book.chapters[spread.ch].length or end_off
         if nxt and nxt.chapter == spread.ch then section_end = select(2, toc_pos(nxt)) end
-        local left = section_end - end_off
+        local left = section_end - end_off + after_chars
         if left > 0 then
             local t = format_time(left / S.read_cps, true)
             info.pages_text = info.pages_text and (info.pages_text .. " (" .. t .. ")") or (t .. " left in chapter")
@@ -1824,7 +1892,7 @@ local function draw_reader_pages()
     if S.sb_bar == "book" then
         info.bar_frac = frac
     elseif S.sb_bar == "chapter" then
-        info.bar_frac = math.max(0, math.min(1, (shown - first + 1) / math.max(1, last - first + 1)))
+        info.bar_frac = math.max(0, math.min(1, (before + shown - first + 1) / math.max(1, before + last - first + 1 + after)))
     end
 
     info.marked = bookmark_here() ~= nil

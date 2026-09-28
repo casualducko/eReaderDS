@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Chapters that span several EPUB files:** pages left, time left, "Page x
+  of y" and the chapter progress bar now cover the whole chapter (from its
+  Contents entry to the next), not just the current file. Files already laid
+  out are counted exactly (their page starts are kept after the pages are
+  dropped); others are estimated from their size and the text-per-byte and
+  characters-per-page seen so far. Tested with a chapter over three files:
+  60 pages, 57 estimated from the start, exact from the files read. A
+  Contents that's just a title entry (the "chapter" would be most of the
+  book) keeps the per-file count.
+
 ## v0.3.26
 
 - **Settings reorganised.** The main page's Page section has a **Night
