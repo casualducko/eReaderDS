@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Night theme:** Settings → Page turns & device → Night theme: pick a
+- **Night theme:** Settings → Page turns & device → Night → Night theme: pick a
   theme (e.g. Night or Amber) to use automatically between two hours (9 PM
   to 7 AM to start, in the clock's 12/24-hour style), by the device's clock
   and time zone. Checked once a minute, so it switches on the hour. While

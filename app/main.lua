@@ -1460,7 +1460,7 @@ function app.night_items()
     local names = { "off" }
     for _, t in ipairs(THEMES) do names[#names + 1] = t.name end
     local rows = {
-        { label = "Use", value = S.night_theme == "off" and "Off" or S.night_theme, adjust = function(d)
+        { label = "Night theme", value = S.night_theme == "off" and "Off" or S.night_theme, adjust = function(d)
             S.night_theme = cycle(names, S.night_theme, d); app.night_check()
         end },
     }
@@ -1489,7 +1489,7 @@ local function more_items()
                 S.tap = S.tap == "next" and "menu" or "next"
             end },
         }),
-        section("Night theme", app.night_items()),
+        section("Night", app.night_items()),
         section("Look up", {
             { label = "Dictionary", value = look.only() or "All", adjust = function(d)
                 local names = { "all" }
