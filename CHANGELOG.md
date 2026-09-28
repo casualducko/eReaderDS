@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.8
 
 - **Find in book** (Settings): type a word or phrase on an on-screen keyboard
   and every match is listed with its chapter and the words around it. Opening
