@@ -6,6 +6,9 @@
   before), and the fallback font; readers keep the font they chose. It's no
   longer in Get more fonts (13 there now). `tools/build-fonts.py` can build
   just the families named.
+- Get more fonts is in alphabetical order and has the All · Serif · Sans
+  switch (tap it, or left/right), like the Fonts page. The Settings row is
+  **Fonts** too.
 - The font page is titled **Fonts**, with its **Get more fonts** button beside
   the title (no "+"); the list moves back up.
 

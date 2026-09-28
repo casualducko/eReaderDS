@@ -1666,7 +1666,7 @@ local function menu_items()
         app.menu_on_page(1, section("Text and look", {
             -- The font's name is drawn in the font itself: a preview, and the only way
             -- names in other scripts (e.g. Chinese firmware fonts) can display.
-            { label = "Font", value = fonts.name or S.font,
+            { label = "Fonts", value = fonts.name or S.font,
               value_font = Fonts.preview(fonts.name or S.font, app.MENU_SIZE),
               act = function() app.font_open() end },
             { label = "Text size", value = tostring(S.font_size), adjust = function(d)
@@ -3853,14 +3853,28 @@ function app.fget_load()
             -- Not the ones built in (a font can move into the app later).
             local bundled = {}
             for _, f in ipairs(Fonts.list()) do if f.bundled then bundled[f.name] = true end end
-            g.list = {}
+            g.all = {}
             for _, e in ipairs(data.fonts) do
-                if type(e) == "table" and e.name and not bundled[e.name] then g.list[#g.list + 1] = e end
+                if type(e) == "table" and e.name and not bundled[e.name] then g.all[#g.all + 1] = e end
             end
-            for _, e in ipairs(g.list) do app.fget_fetch_preview(e) end     -- small: get them all now
+            table.sort(g.all, function(a, b) return a.name:lower() < b.name:lower() end)
+            app.fget_filter(g.filter or "all")
+            for _, e in ipairs(g.all) do app.fget_fetch_preview(e) end      -- small: get them all now
         end
         redraw()
     end)
+end
+
+-- All / Serif / Sans, like the Fonts page, keeping the highlighted font if it's still listed.
+function app.fget_filter(filter)
+    local g = app.fget
+    local keep = g.list and g.list[g.sel]
+    g.filter, g.list = filter, {}
+    for _, e in ipairs(g.all or {}) do
+        if filter == "all" or e.kind == filter then g.list[#g.list + 1] = e end
+    end
+    g.sel, g.top = 1, 1
+    for i, e in ipairs(g.list) do if e == keep then g.sel = i end end
 end
 
 -- Is it in the fonts folder already?
@@ -3977,6 +3991,11 @@ function app.fget_action(a)
     end
     if a == "up" then g.sel = math.max(1, g.sel - 1)
     elseif a == "down" then g.sel = math.min(math.max(1, #list), g.sel + 1)
+    elseif (a == "left" or a == "right" or a == "prev" or a == "next") and g.all then
+        local idx = 1
+        for i, f in ipairs(app.FONT_FILTERS) do if f[1] == (g.filter or "all") then idx = i end end
+        idx = math.max(1, math.min(#app.FONT_FILTERS, idx + ((a == "left" or a == "prev") and -1 or 1)))
+        app.fget_filter(app.FONT_FILTERS[idx][1])
     elseif a == "confirm" then
         if not g.list then
             if not g.loading then app.fget_load() end
@@ -4005,6 +4024,12 @@ function app.fget_tap(side, u, v)
     if side ~= "right" then return end
     if not g.list then
         if g.error then app.fget_action("confirm") end
+        return
+    end
+    if v < 140 then                                 -- the All / Serif / Sans switch
+        for _, t in ipairs(g.tabs or {}) do
+            if u >= t.x0 - 12 and u <= t.x1 + 12 then app.fget_filter(t.filter); redraw() end
+        end
         return
     end
     local idx = g.top + math.floor((v - 160) / app.FGET_ROW_H)
@@ -4071,6 +4096,29 @@ function app.fget_draw(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print("Fonts", x, 60)
+    if g.all then
+        -- All / Serif / Sans, right-aligned on the title line; the current one bold.
+        g.tabs = {}
+        local tx = x + w
+        local ty = 60 + ui.title:getBaseline() - ui.font:getBaseline()
+        for k = #app.FONT_FILTERS, 1, -1 do
+            local t = app.FONT_FILTERS[k]
+            local on = (g.filter or "all") == t[1]
+            local f = on and ui.bold or ui.font
+            local tw = f:getWidth(t[2])
+            tx = tx - tw
+            love.graphics.setFont(f)
+            color(on and th.fg or th.dim)
+            love.graphics.print(t[2], tx, ty)
+            g.tabs[#g.tabs + 1] = { x0 = tx, x1 = tx + tw, filter = t[1] }
+            if k > 1 then
+                love.graphics.setFont(ui.font)
+                color(th.dim)
+                tx = tx - ui.font:getWidth("  ·  ")
+                love.graphics.print("  ·  ", tx, ty)
+            end
+        end
+    end
     if not g.list then
         love.graphics.setFont(ui.font)
         color(th.dim)
@@ -4100,7 +4148,7 @@ function app.fget_draw(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.print("A  get      Y  delete      B  back", x, PAGE_H - 70)
+    love.graphics.print("A  get    Y  delete    ‹ ›  all / serif / sans    B  back", x, PAGE_H - 70)
     love.graphics.printf(g.sel .. " / " .. #list, x, PAGE_H - 70, w, "right")
 end
 
