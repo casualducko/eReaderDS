@@ -30,7 +30,7 @@ ROCKNIX.
 
 **Updates:** when it's online, eReaderDS checks for a newer version each time
 it starts and says so (with the version you have): tap that note to update,
-or use **Settings → Page turns & device** (or **Start** in the library with no
+or use **Settings → About eReaderDS** (or **Start** in the library with no
 book open). It
 downloads the new version, installs it and restarts. Your books, settings and
 progress are kept. To stop the automatic check and its notes, set **Update notices** to Off
@@ -63,7 +63,7 @@ summary of the buttons and touchscreen) is at the bottom.
 
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
-  open Settings instead: **Settings → Page turns & device → Tap**.)
+  open Settings instead: **Settings → Reading & device → Tap**.)
 - Slide up/down to change brightness; keep going below 1% for Extra dim.
 - Pinch with two fingers to make the text bigger or smaller.
 - Tap the top-right corner to bookmark the page.
@@ -143,7 +143,7 @@ English (WordNet) is built in. To add others, copy **StarDict** dictionaries
 (the files KOReader uses: `.ifo`, `.idx`, `.dict` or `.dict.dz`, and `.syn`
 if there is one) into `Ebook/Dictionaries`. By default every dictionary with
 the word is shown, yours first; pick a single one in
-**Settings → Page turns & device → Dictionary**.
+**Settings → Reading & device → Dictionary**.
 
 ## Fonts
 
@@ -196,8 +196,8 @@ See [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## Credits
 
-eReaderDS is created by **casualducko** (also in **Settings → Page turns &
-device → About**).
+eReaderDS is created by **casualducko** (also in **Settings → About eReaderDS →
+About & credits**).
 
 - **Fonts**, all under the SIL Open Font License 1.1 (license files in
   `app/fonts/` and the download's `LICENSES` folder):

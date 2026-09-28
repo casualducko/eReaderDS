@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Settings reorganised.** The main page's Page section has a **Night
+  theme** row next to Theme ("Dusk · 9 PM–7 AM" or "Off") that opens its
+  own page. "Page turns & device" is now **Reading & device** (page turns,
+  dictionary, the lid, and the time zone, moved from Status bar since it
+  also sets the night theme's hours). A new **About eReaderDS** page holds
+  What's new, Check for updates, Update notices and About & credits (and
+  "Update to v…" when one is waiting; the bold "Update" moved to its row).
+  Help stays on the main page.
+
 ## v0.3.25
 
 - **Night theme:** Settings → Page turns & device → Night → Night theme: pick a

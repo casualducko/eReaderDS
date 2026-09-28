@@ -1403,11 +1403,6 @@ local function status_items()
                 S.sb_title = cycle(SB.title, S.sb_title, d) end },
             { label = "Clock", value = SB_NAMES.clock[S.sb_clock], adjust = function(d)
                 S.sb_clock = cycle(SB.clock, S.sb_clock, d) end },
-            { label = "Time zone", value = S.tz, adjust = function(d)
-                S.tz = cycle(Timezone.NAMES, S.tz, d)
-                Timezone.apply(S.tz)
-                app.night_check()
-            end },
             { label = "Battery", value = Battery.get() and (S.sb_battery and "Show" or "Hide") or "n/a",
               adjust = function() S.sb_battery = not S.sb_battery end },
         }),
@@ -1456,6 +1451,13 @@ function app.hour_label(h)
     return ((h + 11) % 12 + 1) .. (h < 12 and " AM" or " PM")
 end
 
+-- The Night theme row on the main page: "Off" or "Dusk · 9 PM–7 AM".
+function app.night_summary()
+    if S.night_theme == "off" then return "Off" end
+    return S.night_theme .. "  ·  " .. app.hour_label(S.night_from) .. "–" .. app.hour_label(S.night_to)
+end
+
+-- The Night theme page.
 function app.night_items()
     local names = { "off" }
     for _, t in ipairs(THEMES) do names[#names + 1] = t.name end
@@ -1476,16 +1478,32 @@ function app.night_items()
             S.night_to = (S.night_to + d) % 24; app.night_check()
         end }
     end
-    return rows
+    return join(section(nil, rows), section("", { { label = "Back", act = close_sub } }))
 end
 
--- Settings you set once: page turns, night theme, the lid, updates and About.
-local function more_items()
+-- About eReaderDS: what's new, updates and credits.
+function app.about_items()
     local u = app.upd
     return join(
-        u.state == "available" and section("Update", {
+        u.state == "available" and section(nil, {
             { label = "Update to v" .. u.version, act = app.update_open },
         }) or {},
+        section(u.state == "available" and "" or nil, {
+            { label = "What's new", act = app.whatsnew_open },
+            { label = "Check for updates",
+              value = app.update_status(), act = app.update_check_open },
+            { label = "Update notices", value = S.update_notices and "On" or "Off", adjust = function()
+                S.update_notices = not S.update_notices
+            end },
+            { label = "About & credits", act = function() app.mode = "about" end },
+        }),
+        section("", { { label = "Back", act = close_sub } })
+    )
+end
+
+-- Reading & device: page turns, look up, the lid and the time zone.
+local function more_items()
+    return join(
         section("Page turns", {
             { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
               adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
@@ -1493,7 +1511,6 @@ local function more_items()
                 S.tap = S.tap == "next" and "menu" or "next"
             end },
         }),
-        section("Night", app.night_items()),
         section("Look up", {
             { label = "Dictionary", value = look.only() or "All", adjust = function(d)
                 local names = { "all" }
@@ -1505,23 +1522,22 @@ local function more_items()
             { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
                 S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
             end },
-        }),
-        section("", {
-            { label = "Update notices", value = S.update_notices and "On" or "Off", adjust = function()
-                S.update_notices = not S.update_notices
+            -- The clock's zone: the status bar and the night theme's hours.
+            { label = "Time zone", value = S.tz, adjust = function(d)
+                S.tz = cycle(Timezone.NAMES, S.tz, d)
+                Timezone.apply(S.tz)
+                app.night_check()
             end },
-            { label = "Check for updates",
-              value = app.update_status(), act = app.update_check_open },
-            { label = "What's new", act = app.whatsnew_open },
-            { label = "About", act = function() app.mode = "about" end },
-            { label = "Back", act = close_sub },
-        })
+        }),
+        section("", { { label = "Back", act = close_sub } })
     )
 end
 
 local function menu_items()
     if menu.page == "status" then return status_items() end
     if menu.page == "more" then return more_items() end
+    if menu.page == "night" then return app.night_items() end
+    if menu.page == "about" then return app.about_items() end
     local th = theme()
     return join(
         section(nil, {
@@ -1570,6 +1586,7 @@ local function menu_items()
                 local name = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
                 if app.night then S.night_theme = name else S.theme = name end
             end },
+            { label = "Night theme", value = app.night_summary(), act = function() open_sub("night") end },
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
                   or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
@@ -1590,9 +1607,10 @@ local function menu_items()
         }),
         section("", {
             { label = "Status bar", value = "›", act = function() open_sub("status") end },
-            { label = "Page turns & device", value = app.upd.state ~= "available" and "›" or nil,
+            { label = "Reading & device", value = "›", act = function() open_sub("more") end },
+            { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
               value_bold = app.upd.state == "available" and "Update" or nil,
-              act = function() open_sub("more") end },
+              act = function() open_sub("about") end },
             { label = "Help", act = function() app.mode = "help" end },
             { label = "Quit", act = function() love.event.quit() end },
         })
@@ -1933,7 +1951,7 @@ local function draw_library(side)
         love.graphics.setFont(ui.small_bold)
         color(th.fg)
         love.graphics.printf("eReaderDS v" .. app.upd.version .. " is available: "
-            .. (book and "Settings → Page turns & device" or "press Start"), x, PAGE_H - 110, w, "left")
+            .. (book and "Settings → About eReaderDS" or "press Start"), x, PAGE_H - 110, w, "left")
     end
     if #library.items == 0 then
         love.graphics.setFont(ui.title)
@@ -2236,7 +2254,8 @@ local function draw_menu_panel(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(({ status = "Status bar", more = "Page turns & device" })[menu.page] or "Settings", x, 60)
+    love.graphics.print(({ status = "Status bar", more = "Reading & device", night = "Night theme",
+        about = "About eReaderDS" })[menu.page] or "Settings", x, 60)
     love.graphics.setFont(ui.font)                   -- the version, on the title's baseline
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
