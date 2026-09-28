@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The version number at the top of Settings is a little bigger.
+
 ## v0.3.13
 
 - Tapping anywhere but the **update** (or "what's new") note just dismisses

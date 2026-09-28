@@ -2189,9 +2189,9 @@ local function draw_menu_panel(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(({ status = "Status bar", more = "Page turns & device" })[menu.page] or "Settings", x, 60)
-    love.graphics.setFont(ui.small)
+    love.graphics.setFont(ui.font)                   -- the version, on the title's baseline
     color(th.dim)
-    love.graphics.printf("v" .. VERSION, x, 78, w, "right")
+    love.graphics.printf("v" .. VERSION, x, 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
     local items = menu_items()
     local visible, more_up, more_down = menu_layout(items)
     if more_up then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP - 14, true) end
