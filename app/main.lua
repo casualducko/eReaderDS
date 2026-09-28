@@ -2589,7 +2589,8 @@ app.KB_MAX = 60                              -- characters
 
 -- Open the keyboard. opts: title, hint, text, submit(text), cancel().
 function app.kb_open(opts)
-    app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "", r = 2, c = 1,
+    -- No key is highlighted until the D-pad is used (r, c = nil).
+    app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "",
         submit = opts.submit, cancel = opts.cancel, back = app.mode }
     app.mode = "keyboard"
     redraw()
@@ -2642,6 +2643,12 @@ end
 function app.kb_action(a)
     local kb = app.kb
     local rows = app.KB_ROWS
+    local dir = a == "left" or a == "prev" or a == "right" or a == "next" or a == "up" or a == "down"
+    if dir and not kb.r then
+        kb.r, kb.c = 2, 1                           -- the first press shows where you are
+        redraw()
+        return
+    end
     if a == "left" or a == "prev" then kb.c = (kb.c - 2) % #rows[kb.r] + 1
     elseif a == "right" or a == "next" then kb.c = kb.c % #rows[kb.r] + 1
     elseif a == "up" or a == "down" then
@@ -2649,7 +2656,8 @@ function app.kb_action(a)
         local c0, c1 = app.kb_cols(kb.r, kb.c)
         kb.r = (kb.r - 1 + (a == "down" and 1 or -1)) % #rows + 1
         kb.c = app.kb_key_at(kb.r, (c0 + c1) / 2 - 0.01)
-    elseif a == "confirm" then app.kb_press(rows[kb.r][kb.c].key)
+    elseif a == "confirm" then
+        if kb.r then app.kb_press(rows[kb.r][kb.c].key) end
     elseif a == "back" then
         if kb.text == "" then app.kb_press("cancel") else app.kb_press("del") end
     elseif a == "toc" then app.kb_press("space")
@@ -2672,8 +2680,9 @@ function app.kb_tap(side, u, v)
     if r < 1 or r > #app.KB_ROWS or u < x0 - 10 or u > x0 + unit * 10 + 10 then return end
     local col = math.max(0, math.min(9.99, (u - x0) / unit))
     local kb = app.kb
-    kb.r, kb.c = r, app.kb_key_at(r, col)
-    app.kb_press(app.KB_ROWS[r][kb.c].key)
+    local c = app.kb_key_at(r, col)
+    if kb.r then kb.r, kb.c = r, c end              -- follow taps only once the D-pad is in use
+    app.kb_press(app.KB_ROWS[r][c].key)
 end
 
 function app.kb_draw(side)
@@ -2720,7 +2729,7 @@ function app.kb_draw(side)
             local c0, c1 = app.kb_cols(r, c)
             local kx, ky = x0 + c0 * unit + 3, app.KB_TOP + (r - 1) * app.KB_ROW_H + 3
             local kw, kh = (c1 - c0) * unit - 6, app.KB_ROW_H - 6
-            if r == kb.r and c == kb.c then
+            if kb.r and r == kb.r and c == kb.c then
                 color(th.fg)
                 love.graphics.rectangle("fill", kx, ky, kw, kh, 10, 10)
                 color(th.bg)

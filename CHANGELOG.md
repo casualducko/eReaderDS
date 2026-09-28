@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The search keyboard starts with **no key highlighted**. The first D-pad
+  press shows the highlight (on q); taps type without highlighting anything.
 - Gutenberg search results no longer list **Authors** and **Subjects**:
   Gutenberg refuses those lists to apps (403). A busy catalog is now tried
   twice more (after 2 and 4 seconds) before showing an error.
