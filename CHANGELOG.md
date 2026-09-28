@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.2.1
 
 - Settings: tapping "Swipe for more options" turns to page 2. Taps on ‹ and ›
   find them where they're drawn, even when a long value is shortened.
