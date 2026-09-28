@@ -125,8 +125,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
    **Night Theme** ([below](#night-theme)); **Status Bar ›** (what the top
    and bottom lines show, and the clock style), **Reading & Device ›**
    (page-turn animation, what a tap does, dictionary, screens off after a
-   while, closing the lid, time zone), **About eReaderDS ›** (What's New, Check for Updates, Update
-   notices, Report a Problem, About & Credits); **Quit**.
+   while, closing the lid, time zone), **KOReader Sync ›**
+   ([below](#koreader-sync)), **About eReaderDS ›** (What's New, Check for
+   Updates, Update notices, Report a Problem, About & Credits); **Quit**.
 
 ## Features
 
@@ -140,7 +141,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 - **Dictionary on the facing page:** press Y and move a cursor over the words;
   English is built in, and you can add your own ([below](#dictionaries)).
 - **Highlights:** mark passages and find them again in the list of bookmarks
-  and highlights ([below](#highlights)).
+  and highlights ([below](#highlights)); they're also saved as a file for each
+  book, to read on a computer.
 - **Get books over Wi-Fi:** Project Gutenberg and Standard Ebooks built in,
   plus Calibre or any OPDS catalog ([below](#getting-books-over-wi-fi)); or
   send your own books from a phone or computer's web browser
@@ -151,9 +153,11 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   recent, title, author (by last name), series (each series in order, "Book 2",
   from the series Calibre and other EPUBs record) or progress (grouped under
   Reading, Not Started and Finished); each shows "Reading · 16%" or
-  "Finished ✓". A book is marked
-  finished when you reach its last page (or by hand: **Y** in My Books, which
-  can also hide finished books, or delete a book).
+  "Finished ✓". A book is marked finished when you reach its last page (or by
+  hand: **Y** in My Books, which can also hide finished books, or delete a
+  book).
+- **KOReader Sync:** carry your place between eReaderDS and KOReader or
+  CrossPoint (a phone, Kobo, Kindle, Xteink X4...) ([below](#koreader-sync)).
 - **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in Book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
   and the words are marked on the page you open). Your place in every book is
@@ -162,9 +166,11 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   (learned from your reading speed), percent read, a progress bar, battery and a clock.
   Choose what shows in **Settings → Status Bar**. The clock follows the
   device's time; if it's off, pick your zone in **Settings → Reading &
-  device → Time zone**.
-- **Battery-friendly:** the screen only redraws when something changes, and
-  closing the lid puts the device to sleep.
+  Device → Time zone**.
+- **Battery-friendly:** the screen only redraws when something changes,
+  closing the lid puts the device to sleep, and left alone for 10 minutes the
+  screens dim, then turn off (any button or touch brings them back; change the
+  time or turn it off in **Settings → Reading & Device → Screens off after**).
 
 | Library | Contents |
 |---|---|
@@ -259,8 +265,14 @@ it through a KOReader sync server, so each picks up where the other left off.
 3. Read. When you open a book, eReaderDS checks the server; if another device
    has been reading it since, it asks **Continue from 45%?** (Jump or Stay).
    It sends your place when you leave the book, close the lid, or the screens
-   go off, and every few minutes while reading. **Sync this book now** does
-   both at once.
+   go off, and every few minutes while reading (checking first that no other
+   device has moved on meanwhile).
+
+**Sync this book now** (Settings → KOReader Sync) works out which way to go,
+like CrossPoint's smart sync: if you've read on here since the last sync, it
+sends your place; if only the other device has read on, it goes there; if
+both have, it asks. It never sends an older place over a newer one without
+asking.
 
 Places are matched to the paragraph (you may land a page or so from where the
 other device was, since screens differ). EPUB books only.
