@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The font page is titled **Fonts**, with its **Get more fonts** button beside
+  the title (no "+"); the list moves back up.
+
 ## v1.1.0
 
 - **Settings: bigger rows, in pages.** The main page is two pages of rows

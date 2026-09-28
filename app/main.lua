@@ -3614,13 +3614,14 @@ end
 app.FONT_ROW_H = 58
 app.FONT_SAMPLE_SIZE = 38
 -- Rows that fit above the footer.
-app.FONT_LIST_Y = 200                 -- the list, under the title and the Get more fonts button
+app.FONT_LIST_Y = 160                 -- the list, under the title
 function app.font_rows() return math.floor((PAGE_H - 90 - app.FONT_LIST_Y) / app.FONT_ROW_H) end
 
--- "Get more fonts" at the top of the list (always in view); Y does the same.
+-- "Get more fonts", beside the "Fonts" title (always in view); Y does the same.
 function app.font_get_button()
-    local w = ui.font:getWidth("Get more fonts") + 84
-    return MARGINS[2].inner, 128, w, 54
+    local w, h = ui.font:getWidth("Get more fonts") + 44, 50
+    local x = MARGINS[2].inner + ui.title:getWidth("Fonts") + 24
+    return x, math.floor(60 + (ui.title:getHeight() - h) / 2), w, h
 end
 
 function app.font_to_get()
@@ -3717,7 +3718,7 @@ function app.font_tap(side, u, v)
         app.font_to_get()
         return
     end
-    if v < by then                                  -- the All / Serif / Sans switch
+    if v < app.FONT_LIST_Y then                     -- the All / Serif / Sans switch
         for _, t in ipairs(fp.tabs or {}) do
             if u >= t.x0 - 12 and u <= t.x1 + 12 then app.font_set_filter(t.filter); redraw() end
         end
@@ -3770,7 +3771,7 @@ function app.font_draw(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print("Font", x, 60)
+    love.graphics.print("Fonts", x, 60)
     -- All / Serif / Sans, right-aligned on the title line; the current one bold.
     fp.tabs = {}
     local tx = x + w
@@ -3800,7 +3801,7 @@ function app.font_draw(side)
     love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
     love.graphics.setFont(ui.font)
     color(th.fg)
-    love.graphics.printf("+  Get more fonts", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
+    love.graphics.printf("Get more fonts", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
     draw_list(side, fp.list, fp.sel, fp.top, rows, x, app.FONT_LIST_Y, w, app.FONT_ROW_H, function(it, _, rx, ry, rw)
         local pf = Fonts.preview(it.name, UI_SIZE) or ui.font
         love.graphics.setFont(pf)
