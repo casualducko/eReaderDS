@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.32
 
 Review of the day's changes:
 - Fonts from the fonts folder (now including downloaded ones) were read into
