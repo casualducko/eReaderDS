@@ -1433,9 +1433,13 @@ local function close_sub()
     menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
 end
 
--- Settings you set once: page turns, the lid, and About.
+-- Settings you set once: page turns, the lid, updates and About.
 local function more_items()
+    local u = app.upd
     return join(
+        u.state == "available" and section("Update", {
+            { label = "Update to v" .. u.version, act = app.update_open },
+        }) or {},
         section("Page turns", {
             { label = "Animation", value = ({ flip = "Flip", fade = "Fade", off = "Off" })[S.anim] or "Flip",
               adjust = function(d) S.anim = cycle({ "flip", "fade", "off" }, S.anim, d) end },
@@ -1456,6 +1460,13 @@ local function more_items()
             end },
         }),
         section("", {
+            { label = "Check for updates",
+              value = (u.state == "checking" and "Checking…") or (u.state == "available" and ("v" .. u.version))
+                  or (u.checked and "Up to date") or "",
+              act = function()
+                  if u.state == "available" or u.state == "ready" then app.update_open()
+                  else app.update_check(true); app.update_open() end
+              end },
             { label = "About", act = function() app.mode = "about" end },
             { label = "Back", act = close_sub },
         })
@@ -1531,7 +1542,8 @@ local function menu_items()
         }),
         section("", {
             { label = "Status bar", value = "›", act = function() open_sub("status") end },
-            { label = "Page turns & device", value = "›", act = function() open_sub("more") end },
+            { label = "Page turns & device", value = app.upd.state == "available" and "Update ›" or "›",
+              act = function() open_sub("more") end },
             { label = "Help", act = function() app.mode = "help" end },
             { label = "Quit", act = function() love.event.quit() end },
         })
@@ -1868,6 +1880,12 @@ local function draw_library(side)
     end
 
     -- The top screen: the selected book, or how to add books.
+    if app.upd.state == "available" then
+        love.graphics.setFont(ui.small_bold)
+        color(th.fg)
+        love.graphics.printf("eReaderDS v" .. app.upd.version .. " is available: "
+            .. (book and "Settings → Page turns & device" or "press Start"), x, PAGE_H - 110, w, "left")
+    end
     if #library.items == 0 then
         love.graphics.setFont(ui.title)
         color(th.fg)
@@ -2761,6 +2779,200 @@ function app.kb_draw(side)
     end
 end
 
+---------------------------------------------------------------- updates
+
+-- On launch (when online) eReaderDS asks GitHub for its newest releases; a
+-- newer one is offered in Settings (and a note says so). Updating downloads
+-- the release zip, unpacks it beside the app, and restarts: the launcher
+-- moves it into place (see updater.lua and launch.sh). app.upd = { state =
+-- "checking" | "none" | "available" | "downloading" | "unpacking" | "ready"
+-- | "error", version, url, size, notes, got, total, frac, message }
+app.Updater = require("updater")
+app.UPDATE_EXIT = 42                 -- tells the launcher to install and restart
+app.upd = { state = "none" }
+
+-- The version to compare with (READER_FAKE_VERSION pretends to be older, for testing).
+function app.update_current() return os.getenv("READER_FAKE_VERSION") or VERSION end
+
+function app.update_check(by_hand)
+    local u = app.upd
+    if u.state == "checking" or u.state == "downloading" or u.state == "unpacking" or u.state == "ready" then return end
+    if not shop.online(true) then
+        if by_hand then app.upd = { state = "error", message = "Not connected to Wi-Fi." } end
+        return
+    end
+    app.upd = { state = "checking" }
+    shop.net_job({ kind = "fetch", url = app.Updater.RELEASES }, function(msg)
+        if msg.kind == "error" then
+            app.upd = { state = by_hand and "error" or "none", message = msg.message }
+            return
+        end
+        local rel, err = app.Updater.parse(msg.body or "", app.update_current())
+        if rel then
+            rel.state = "available"
+            app.upd = rel
+            if app.mode ~= "update" then
+                -- Without a book open there's no Settings: Start opens the update.
+                app.toast("Update available: v" .. rel.version .. "\nYou have v" .. app.update_current()
+                    .. "  ·  " .. (book and "Settings → Update" or "Start to update"), 6)
+            end
+        else
+            app.upd = { state = err and "error" or "none", message = err, checked = true }
+        end
+    end)
+end
+
+function app.update_open()
+    if app.mode ~= "update" then app.update_back = app.mode end
+    app.mode = "update"
+    redraw()
+end
+
+function app.update_start()
+    local u = app.upd
+    local dir = app.Updater.app_dir()
+    local zip = dir .. "/.update.zip"
+    u.state, u.got, u.total, u.message = "downloading", 0, u.size or 0, nil
+    u.job = shop.net_job({ kind = "download", url = u.url, dest = zip, size = u.size }, function(msg)
+        if msg.kind == "progress" then
+            u.got, u.total = msg.got, msg.total
+        elseif msg.kind == "done" then
+            u.state, u.frac = "unpacking", 0
+            -- Unpack a file at a time between frames (the screen stays live).
+            app.task = coroutine.create(function()
+                local ok, err = pcall(function()
+                    local co = coroutine.create(app.Updater.unpack)
+                    local args = { zip, dir .. "/.update", u.version }
+                    while true do
+                        local ok2, frac = coroutine.resume(co, unpack(args))
+                        args = {}
+                        if not ok2 then error(frac, 0) end
+                        if coroutine.status(co) == "dead" then break end
+                        u.frac = frac
+                        coroutine.yield()
+                    end
+                end)
+                os.remove(zip)
+                if ok then u.state = "ready"
+                else
+                    os.execute('rm -rf "' .. dir .. '/.update"')
+                    u.state, u.message = "error", tostring(err)
+                end
+            end)
+        else
+            os.remove(zip)
+            u.state = "available"
+            if msg.message ~= "cancelled" then
+                u.state, u.message = "error", shop.online(true) and msg.message or "Not connected to Wi-Fi."
+            end
+        end
+    end)
+end
+
+function app.update_action(a)
+    local u = app.upd
+    if a == "confirm" then
+        if u.state == "available" or (u.state == "error" and u.url) then app.update_start()
+        elseif u.state == "error" then app.update_check(true)
+        elseif u.state == "ready" then love.event.quit(app.UPDATE_EXIT) end
+    elseif a == "back" or a == "menu" then
+        if u.state == "downloading" and u.job then
+            love.thread.getChannel("net_cancel"):push(u.job)
+        elseif u.state ~= "unpacking" then
+            app.mode = app.update_back or (book and "menu" or "library")
+        end
+    end
+    redraw()
+end
+
+-- The button on the touchscreen: what A does.
+function app.update_button()
+    local w, h = 420, 80
+    return math.floor((PAGE_W - w) / 2), PAGE_H - 260, w, h
+end
+
+function app.update_tap(side, u, v)
+    local bx, by, bw, bh = app.update_button()
+    if side == "right" and u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 20 then
+        app.update_action("confirm")
+    end
+end
+
+function app.update_draw(side)
+    local th = theme()
+    local u = app.upd
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    if side == "left" then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print(u.version and ("Update to v" .. u.version) or "Updates", x, 60)
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.print("You have v" .. app.update_current(), x, 60 + ui.title:getHeight() + 6)
+        if u.notes and u.notes ~= "" then
+            love.graphics.setFont(ui.small)
+            color(th.fg)
+            local y, limit = 190, PAGE_H - 110
+            local _, lines = ui.small:getWrap(u.notes, w)
+            for _, line in ipairs(lines) do
+                if y + ui.small:getHeight() > limit then love.graphics.print("…", x, y); break end
+                love.graphics.print(line, x, y)
+                y = y + ui.small:getHeight() + 2
+            end
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("Your books, settings and progress are kept.", x, PAGE_H - 70, w, "left")
+        return
+    end
+    -- The touchscreen: what's happening, and the button.
+    local status, button
+    if u.state == "available" then
+        status, button = "eReaderDS v" .. u.version .. (u.size and u.size > 0 and ("  ·  " .. shop.format_size(u.size)) or ""), "Update now"
+    elseif u.state == "downloading" then
+        status = "Downloading…  " .. (shop.format_size(u.got or 0) or "0 KB")
+            .. ((u.total or 0) > 0 and (" of " .. shop.format_size(u.total)) or "")
+    elseif u.state == "unpacking" then
+        status = "Installing…  " .. math.floor((u.frac or 0) * 100) .. "%"
+    elseif u.state == "ready" then
+        status, button = "Ready. eReaderDS restarts with the new version.", "Restart now"
+    elseif u.state == "checking" then
+        status = "Checking for updates…"
+    elseif u.state == "error" then
+        status, button = "Couldn't update: " .. (u.message or "unknown error"), "Try again"
+    else
+        status = "eReaderDS v" .. VERSION .. " is up to date."
+    end
+    love.graphics.setFont(ui.font)
+    color(th.fg)
+    love.graphics.printf(status, x, 300, w, "center")
+    local frac = (u.state == "downloading" and (u.total or 0) > 0 and u.got / u.total)
+        or (u.state == "unpacking" and u.frac) or nil
+    if frac then
+        local bw = w * 0.8
+        local bx = x + (w - bw) / 2
+        color(th.sel)
+        love.graphics.rectangle("fill", bx, 400, bw, 10, 5, 5)
+        color(th.fg)
+        love.graphics.rectangle("fill", bx, 400, bw * math.min(1, frac), 10, 5, 5)
+    end
+    if button then
+        local bx, by, bw, bh = app.update_button()
+        color(th.sel)
+        love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.printf(button, bx, centered_y(ui.title, 44, by, bh), bw, "center")
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local hint = (u.state == "downloading" and "B cancel") or (u.state == "unpacking" and "")
+        or (button and "A " .. button:lower() .. "      B back") or "B back"
+    love.graphics.print(hint, x, PAGE_H - 70)
+end
+
 ---------------------------------------------------------------- font picker
 
 -- Font, as a spread: the fonts on the right (the touchscreen), each name in
@@ -2958,6 +3170,7 @@ end
 -- unloaded again. { query, book, results, sel, top, done, pct, capped }
 app.FIND_MAX = 300
 function app.find_open()
+    if app.task then app.toast("Installing an update…"); return end
     local f = app.find
     if f and f.book == book and f.done then
         app.mode = "find"                       -- last results, B to search again
@@ -3209,6 +3422,7 @@ local function render_canvases()
     elseif app.mode == "help" then painter = app.draw_help
     elseif app.mode == "keyboard" then painter = app.kb_draw
     elseif app.mode == "fonts" then painter = app.font_draw
+    elseif app.mode == "update" then painter = app.update_draw
     elseif app.mode == "find" then painter = app.find_draw
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
@@ -3490,8 +3704,8 @@ local function touch_event(kind, sx, sy)
 end
 
 -- A short message popup (e.g. "Bookmark added").
-function app.toast(text)
-    overlay = { side = "right", text = text, hide_at = love.timer.getTime() + 1.2 }
+function app.toast(text, secs)
+    overlay = { side = "right", text = text, hide_at = love.timer.getTime() + (secs or 1.2) }
     redraw()
 end
 
@@ -3517,13 +3731,18 @@ local function draw_overlay()
         return
     end
     if overlay.text then
-        local w, h = 460, 80
+        -- One line in a 460-wide box; longer messages get a wider, taller one.
+        local tw, lines = ui.font:getWrap(overlay.text, 640 - 48)
+        local w = math.max(460, tw + 48)
+        local lh = ui.font:getHeight()
+        local h = math.max(80, #lines * lh + 36)
         local x, y = (PAGE_W - w) / 2, 120
         love.graphics.setColor(0.08, 0.08, 0.08, 0.94)
         love.graphics.rectangle("fill", x, y, w, h, 22, 22)
         love.graphics.setColor(1, 1, 1, 0.95)
         love.graphics.setFont(ui.font)
-        love.graphics.printf(overlay.text, x, centered_y(ui.font, UI_SIZE, y, h), w, "center")
+        local ty = #lines == 1 and centered_y(ui.font, UI_SIZE, y, h) or y + 18
+        love.graphics.printf(overlay.text, x + 24, ty, w - 48, "center")
         love.graphics.pop()
         return
     end
@@ -3750,6 +3969,7 @@ function handle_action(a)
 
     if mode == "keyboard" then app.kb_action(a) return end
     if mode == "fonts" then app.font_action(a) return end
+    if mode == "update" then app.update_action(a) return end
     if mode == "find" then app.find_action(a) return end
 
     if mode == "about" or mode == "help" then
@@ -3878,6 +4098,7 @@ function handle_action(a)
             end
         end
         if a == "bookmark" then shop.start() end
+        if a == "menu" and not book and app.upd.state == "available" then app.update_open() end
         if a == "menu" and book then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil end
         if a == "back" and book then app.mode = "reader" end
         redraw()
@@ -3989,6 +4210,8 @@ function app.on_tap(side, u, v)
         app.kb_tap(side, u, v)
     elseif mode == "fonts" then
         app.font_tap(side, u, v)
+    elseif mode == "update" then
+        app.update_tap(side, u, v)
     elseif mode == "find" then
         -- Like Contents: a tap on a result (right column) opens it.
         local f, rows = app.find, list_rows(96)
@@ -4207,6 +4430,8 @@ function love.load()
     local last = Store.get_last()
     local f = last and io.open(last, "rb")
     if f then f:close(); open_book(last) end
+    -- A newer version? (Only when online; quietly does nothing otherwise.)
+    if not os.getenv("READER_SCRIPT") or os.getenv("READER_FAKE_VERSION") then app.update_check() end
 end
 
 function love.quit()
@@ -4242,6 +4467,7 @@ local function run_test_script()
                 else touch_event("pinch", tonumber(a:match("([%d.]+)$"))) end
             elseif a == "poll" then shop.net_poll()
             elseif a:match("^type:") then app.kb_type(a:sub(6):gsub("_", " "))
+            elseif a == "update" then app.update_open()
             elseif a == "work" then                -- finish a background task
                 while app.task do app.task_step() end
             elseif a == "net" then               -- wait for network jobs (and the cover)

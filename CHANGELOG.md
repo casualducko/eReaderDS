@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Updates over Wi-Fi:** each time eReaderDS starts online, it checks for a
+  newer version and says so, showing the new version and yours. Update from
+  **Settings → Page turns & device** (or **Start** in the library with no book
+  open): it downloads the release, unpacks it beside the app, and restarts into
+  it. The launcher swaps it in, so the running app is never overwritten; your
+  books, settings and progress aren't touched. "Check for updates" is there too.
 - **Jump to %** is tidier: no "you are here" label (the marker stays) and no
   "Drag the bar" hint.
 - The **library** list is on the touchscreen too, with Get books still at the

@@ -29,6 +29,31 @@ if [ "${1:-}" = "--menu-icon" ]; then
     done
     exit 0
 fi
+# Updates: eReaderDS unpacks a newer version into .update (READY is written
+# last, once it's complete). Move it into place before starting: the app,
+# this launcher, the runtime and the icon. Settings, progress and books live
+# elsewhere. The new launcher is written under another name and renamed over
+# this one, so the shell running this copy isn't disturbed.
+apply_update() {
+    local U="$APP_DIR/.update" PORTS
+    PORTS=$(dirname "$APP_DIR")
+    [ -f "$U/READY" ] && [ -f "$U/eReaderDS/app/main.lua" ] && [ -f "$U/eReaderDS/launch.sh" ] || return 1
+    rm -rf "$APP_DIR/app.old"
+    mv "$APP_DIR/app" "$APP_DIR/app.old" || return 1
+    if ! mv "$U/eReaderDS/app" "$APP_DIR/app"; then mv "$APP_DIR/app.old" "$APP_DIR/app"; return 1; fi
+    rm -rf "$APP_DIR/app.old"
+    mv "$U/eReaderDS/launch.sh" "$APP_DIR/launch.sh.new"
+    cp -R "$U/eReaderDS/." "$APP_DIR/" 2>/dev/null            # runtime, icon, notes, licences
+    [ -f "$U/eReaderDS.sh" ] && cp "$U/eReaderDS.sh" "$PORTS/eReaderDS.sh.new" && mv -f "$PORTS/eReaderDS.sh.new" "$PORTS/eReaderDS.sh"
+    [ -d "$PORTS/Imgs" ] && [ -f "$U/Imgs/eReaderDS.png" ] && cp "$U/Imgs/eReaderDS.png" "$PORTS/Imgs/eReaderDS.png"
+    chmod +x "$APP_DIR/launch.sh.new" "$PORTS/eReaderDS.sh" "$APP_DIR/runtime/love.aarch64" 2>/dev/null
+    mv -f "$APP_DIR/launch.sh.new" "$APP_DIR/launch.sh"
+    rm -rf "$U"
+    sync
+    return 0
+}
+if apply_update; then exec /bin/bash "$APP_DIR/launch.sh" "$@"; fi
+
 if [ -n "$ROCKNIX" ]; then
     # Its Wayland display, sway socket and controller database (the buttons
     # are "retrogame_joypad" there); set -u off for its profile scripts.
@@ -156,4 +181,6 @@ else
 fi
 printf '[launch] exit=%s\n' "$rc"
 sync
+# The app asked to restart into a downloaded update.
+if [ "$rc" = 42 ] && apply_update; then exec /bin/bash "$APP_DIR/launch.sh" "$@"; fi
 exit "$rc"

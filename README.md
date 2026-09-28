@@ -28,7 +28,13 @@ Created by **casualducko**.
 The bottom screen turns on while it runs; closing the lid is handled by
 ROCKNIX.
 
-To update, copy the same two items from a newer zip over the old ones. Your
+**Updates:** when it's online, eReaderDS checks for a newer version each time
+it starts and says so (with the version you have). Update from **Settings →
+Page turns & device**, or press **Start** in the library if no book is open: it
+downloads the new version, installs it and restarts. Your books, settings and
+progress are kept.
+
+To update by hand, copy the same two items from a newer zip over the old ones. Your
 settings, reading positions, bookmarks and fonts are kept. (Copy the two
 items, not the whole `Ports` folder: on a Mac, replacing `Ports` deletes your
 other ports.)
