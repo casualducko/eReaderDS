@@ -2,6 +2,12 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.6.0
+Books are marked finished when you reach the last page. My Books shows which you're reading and which you've finished.
+Press Y on a book in My Books to mark it finished (or not), hide finished books, or delete it.
+Sorting by progress groups your books under Reading, Not Started and Finished.
+A new Series order puts each series together, in order: book 1, book 2, and so on.
+
 v1.5.0
 My Books finds books in folders inside the Ebook folder, so you can copy a whole Calibre library or keep your own folders.
 Books are listed by the title and author inside each book, not the file name, and sorting by author uses last names.

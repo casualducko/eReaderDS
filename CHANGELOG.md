@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.6.0
 
 - **Finished books:** reaching the last page marks a book finished (once;
   "Finished! It's marked as finished in My Books"). My Books shows "Reading · 16%" or "Finished ✓" beside the
