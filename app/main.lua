@@ -3567,6 +3567,7 @@ function app.font_set_filter(filter, keep)
     for _, f in ipairs(Fonts.list()) do
         if filter == "all" or f.kind == filter then fp.list[#fp.list + 1] = f end
     end
+    fp.list[#fp.list + 1] = { name = "Get more fonts", get = true }   -- downloads (see below)
     fp.sel, fp.top = 1, 1
     for i, f in ipairs(fp.list) do if f.name == keep then fp.sel = i end end
 end
@@ -3575,7 +3576,7 @@ end
 -- ones are released so scrolling through fonts doesn't pile them up.
 function app.font_sample()
     local fp = app.font_pick
-    if not fp.list[fp.sel] then return nil end
+    if not fp.list[fp.sel] or fp.list[fp.sel].get then return nil end
     local name = fp.list[fp.sel].name
     local cur = fp.sample
     if cur and cur.name == name and cur.size == fp.size then return cur.f end
@@ -3588,6 +3589,11 @@ end
 function app.font_close(apply)
     local fp = app.font_pick
     if fp.sample then for _, f in pairs(fp.sample.f) do f:release() end end
+    if apply and fp.list[fp.sel] and fp.list[fp.sel].get then
+        app.font_pick = nil
+        app.fget_open()
+        return
+    end
     if apply and fp.list[fp.sel] then
         S.font = fp.list[fp.sel].name
         build_fonts()
@@ -3636,7 +3642,20 @@ function app.font_draw(side)
     if side == "left" then
         -- A sample page, laid out roughly like the reader's.
         local f = app.font_sample()
-        if not f then return end
+        if not f then
+            local item = fp.list[fp.sel]
+            if item and item.get then
+                local x, w = MARGINS[2].outer, PAGE_W - MARGINS[2].outer - MARGINS[2].inner
+                love.graphics.setFont(ui.title)
+                color(th.fg)
+                love.graphics.print("Get more fonts", x, 60)
+                love.graphics.setFont(ui.font)
+                color(th.dim)
+                love.graphics.printf("Download more reading fonts over Wi-Fi: free and open-licensed, from Google "
+                    .. "Fonts. Each one takes a few seconds and appears in this list.\n\nA  see the fonts", x, 180, w, "left")
+            end
+            return
+        end
         local m = margins()
         local x, w = m.outer, PAGE_W - m.outer - m.inner
         local lh = math.floor(math.max(f.r:getHeight(), fp.size * 1.4) * S.spacing + 0.5)
@@ -3698,6 +3717,13 @@ function app.font_draw(side)
     if fp.sel < fp.top then fp.top = fp.sel end
     if fp.sel >= fp.top + rows then fp.top = fp.sel - rows + 1 end
     draw_list(side, fp.list, fp.sel, fp.top, rows, x, 160, w, app.FONT_ROW_H, function(it, _, rx, ry, rw)
+        if it.get then
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.print("Get more fonts", rx, centered_y(ui.font, UI_SIZE, ry, app.FONT_ROW_H - 4))
+            love.graphics.printf("›", rx, centered_y(ui.font, UI_SIZE, ry, app.FONT_ROW_H - 4), rw, "right")
+            return
+        end
         local pf = Fonts.preview(it.name, UI_SIZE) or ui.font
         love.graphics.setFont(pf)
         color(th.fg)
@@ -3711,6 +3737,283 @@ function app.font_draw(side)
     color(th.dim)
     love.graphics.print("A use      B back      ‹ › all / serif / sans", x, PAGE_H - 70)
     love.graphics.printf(fp.sel .. " / " .. #fp.list, x, PAGE_H - 70, w, "right")
+end
+
+---------------------------------------------------------------- get more fonts
+
+-- Free reading fonts to download (SIL Open Font License, from Google Fonts),
+-- listed in the eReaderDS repository (fontpack/, built by
+-- tools/build-font-pack.py): each is a zip of its styles, unpacked into the
+-- fonts folder, and a preview of its name set in the font.
+app.FONTPACK = "https://raw.githubusercontent.com/casualducko/eReaderDS-beta/main/fontpack/"
+app.FGET_ROW_H = 84
+app.fget = { sel = 1, top = 1 }
+
+function app.fget_open()
+    local g = app.fget
+    g.sel, g.top, g.confirm = 1, 1, nil
+    app.mode = "fontget"
+    if not g.list and not g.loading then app.fget_load() end
+    redraw()
+end
+
+function app.fget_load()
+    local g = app.fget
+    if not shop.online(true) then g.error = "Not connected to Wi-Fi."; return end
+    g.loading, g.error = true, nil
+    shop.net_job({ kind = "fetch", url = app.FONTPACK .. "catalog.json" }, function(msg)
+        g.loading = false
+        if msg.kind ~= "done" then g.error = app.update_error(msg.message); redraw(); return end
+        local ok, data = pcall(require("json").decode, msg.body or "")
+        if not ok or type(data) ~= "table" or type(data.fonts) ~= "table" then
+            g.error = "Couldn't read the list of fonts."
+        else
+            g.list = data.fonts
+            for _, e in ipairs(g.list) do app.fget_fetch_preview(e) end     -- small: get them all now
+        end
+        redraw()
+    end)
+end
+
+-- Is it in the fonts folder already?
+function app.fget_installed(e)
+    for _, f in ipairs(Fonts.list()) do
+        if f.name == e.name and not f.bundled then return true end
+    end
+    return false
+end
+
+-- A font's preview image (its name set in the font), once fetched; or nil.
+function app.fget_preview(e)
+    local p = (app.fget.previews or {})[e.preview]
+    return p or nil
+end
+
+function app.fget_fetch_preview(e)
+    local g = app.fget
+    g.previews = g.previews or {}
+    if g.previews[e.preview] ~= nil then return end
+    g.previews[e.preview] = false
+    shop.net_job({ kind = "fetch", url = app.FONTPACK .. e.preview }, function(msg)
+        if msg.kind == "done" then
+            local ok, img = pcall(function()
+                return love.graphics.newImage(love.filesystem.newFileData(msg.body, e.preview))
+            end)
+            if ok then g.previews[e.preview] = img end
+        end
+        redraw()
+    end)
+end
+
+function app.fget_download(e)
+    local g = app.fget
+    if g.busy then return end
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
+    local dir = Fonts.user_dir()
+    if not dir then app.toast("There's no fonts folder"); return end
+    local zip = dir .. "/." .. e.zip
+    local b = { e = e, got = 0, total = e.size or 0 }
+    g.busy = b
+    b.id = shop.net_job({ kind = "download", url = app.FONTPACK .. e.zip, dest = zip, size = e.size }, function(msg)
+        if msg.kind == "progress" then b.got, b.total = msg.got, msg.total; redraw(); return end
+        g.busy = nil
+        if msg.kind ~= "done" then
+            os.remove(zip)
+            app.toast(msg.message == "cancelled" and "Download cancelled" or ("Couldn't download " .. e.name
+                .. "\n" .. app.update_error(msg.message)), 3)
+            redraw()
+            return
+        end
+        local ok, err = pcall(app.fget_unpack, zip, dir)
+        os.remove(zip)
+        if not ok then
+            print("[fonts] " .. tostring(err))
+            app.toast("Couldn't install " .. e.name .. "\nIs the SD card full?", 3)
+        else
+            Fonts.scan()
+            app.toast(e.name .. " is ready", 2)
+        end
+        redraw()
+    end)
+    redraw()
+end
+
+-- The zip's font files and licence, straight into the fonts folder.
+function app.fget_unpack(zip, dir)
+    local z = assert(require("zip").open(zip))
+    for name in pairs(z.entries) do
+        if not name:find("/") and (name:match("%.[ot]tf$") or name:match("%.txt$")) then
+            local data = assert(z:read(name))
+            local f = assert(io.open(dir .. "/" .. name, "wb"))
+            local wrote = f:write(data)
+            f:close()
+            assert(wrote, "write failed")
+        end
+    end
+    z:close()
+end
+
+function app.fget_delete(e)
+    local dir = Fonts.user_dir()
+    local stem = e.zip:gsub("%.zip$", "")
+    for _, st in ipairs(e.styles or {}) do os.remove(dir .. "/" .. stem .. "-" .. st .. ".ttf") end
+    os.remove(dir .. "/" .. stem .. "-OFL.txt")
+    Fonts.scan()
+    if S.font == e.name then               -- the font in use: back to the default
+        S.font = Fonts.DEFAULT
+        build_fonts()
+        if book then goto_pos(pos.ch, pos.off) end
+        Store.save_settings(S)
+    end
+    app.toast(e.name .. " deleted")
+end
+
+-- Read in it now: back to the font page with it chosen.
+function app.fget_use(e)
+    S.font = e.name
+    build_fonts()
+    if book then goto_pos(pos.ch, pos.off) end
+    Store.save_settings(S)
+    app.font_open()
+end
+
+function app.fget_action(a)
+    local g = app.fget
+    local list = g.list or {}
+    local e = list[g.sel]
+    if g.confirm then                       -- "Delete …?": A deletes, anything else keeps it
+        if a == "confirm" and e then app.fget_delete(e) end
+        g.confirm = nil
+        redraw()
+        return
+    end
+    if a == "up" then g.sel = math.max(1, g.sel - 1)
+    elseif a == "down" then g.sel = math.min(math.max(1, #list), g.sel + 1)
+    elseif a == "confirm" then
+        if not g.list then
+            if not g.loading then app.fget_load() end
+        elseif e and app.fget_installed(e) then
+            app.fget_use(e)
+            return
+        elseif e then
+            app.fget_download(e)
+        end
+    elseif a == "toc" and e and app.fget_installed(e) and not g.busy then
+        g.confirm = true                    -- Y: delete, once confirmed
+    elseif a == "back" or a == "menu" then
+        if g.busy then
+            love.thread.getChannel("net_cancel"):push(g.busy.id)
+        else
+            app.font_open()
+            return
+        end
+    end
+    redraw()
+end
+
+function app.fget_tap(side, u, v)
+    local g = app.fget
+    if g.confirm then g.confirm = nil; redraw(); return end
+    if side ~= "right" then return end
+    if not g.list then
+        if g.error then app.fget_action("confirm") end
+        return
+    end
+    local idx = g.top + math.floor((v - 160) / app.FGET_ROW_H)
+    if v >= 160 and idx < g.top + list_rows(app.FGET_ROW_H) and g.list[idx] then
+        if idx == g.sel then app.fget_action("confirm") else g.sel = idx; redraw() end
+    end
+end
+
+function app.fget_draw(side)
+    local th = theme()
+    local g = app.fget
+    local m = MARGINS[2]
+    local w = PAGE_W - m.outer - m.inner
+    local list = g.list or {}
+    local e = list[g.sel]
+    if side == "left" then
+        local x = m.outer
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Get more fonts", x, 60)
+        if not e then
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.printf(g.loading and "Getting the list of fonts…" or (g.error or ""), x, 180, w, "left")
+            return
+        end
+        local y = 190
+        local img = app.fget_preview(e)
+        color(th.fg)
+        if img then
+            local sc = math.min(w / img:getWidth(), 100 / img:getHeight())
+            love.graphics.draw(img, x, y, 0, sc, sc)
+            y = y + img:getHeight() * sc + 36
+        else
+            love.graphics.setFont(ui.title)
+            love.graphics.print(e.name, x, y)
+            y = y + ui.title:getHeight() + 36
+        end
+        love.graphics.setFont(ui.font)
+        love.graphics.printf(e.about or "", x, y, w, "left")
+        local _, lines = ui.font:getWrap(e.about or "", w)
+        y = y + #lines * ui.font:getHeight() + 24
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        local styles = #(e.styles or {}) >= 4 and "regular, italic, bold and bold italic"
+            or (#(e.styles or {}) == 3 and "regular, italic and bold" or "")
+        love.graphics.printf((e.kind == "sans" and "Sans-serif" or "Serif") .. ", " .. styles .. ". "
+            .. shop.format_size(e.size or 0) .. ".\n" .. (e.license or ""), x, y, w, "left")
+        local status
+        if g.confirm then status = "Delete " .. e.name .. "?\nA  delete      B  keep"
+        elseif g.busy and g.busy.e == e then
+            status = "Downloading…  " .. math.floor(g.busy.got / math.max(1, g.busy.total) * 100) .. "%\nB  cancel"
+        elseif app.fget_installed(e) then status = "✓  On your SD card\nA  read in it      Y  delete"
+        else status = "A  download" end
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.printf(status, x, PAGE_H - 200, w, "left")
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("Fonts go in " .. Store.books_folder() .. "/Fonts.", x, PAGE_H - 70, w, "left")
+        return
+    end
+    local x = m.inner
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print("Fonts", x, 60)
+    if not g.list then
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.printf(g.loading and "Loading…" or ((g.error or "") .. "\n\nA  try again"), x, 180, w, "left")
+        love.graphics.setFont(ui.small)
+        love.graphics.print("B  back", x, PAGE_H - 70)
+        return
+    end
+    local rows = list_rows(app.FGET_ROW_H)
+    if g.sel < g.top then g.top = g.sel end
+    if g.sel >= g.top + rows then g.top = g.sel - rows + 1 end
+    draw_list(side, list, g.sel, g.top, rows, x, 160, w, app.FGET_ROW_H, function(it, _, rx, ry, rw)
+        local h = app.FGET_ROW_H - 4
+        local img = app.fget_preview(it)
+        color(th.fg)
+        if img then
+            local sc = math.min((rw - 110) / img:getWidth(), 46 / img:getHeight())
+            love.graphics.draw(img, rx, math.floor(ry + (h - img:getHeight() * sc) / 2), 0, sc, sc)
+        else
+            love.graphics.setFont(ui.font)
+            love.graphics.print(it.name, rx, centered_y(ui.font, UI_SIZE, ry, h))
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        local right = app.fget_installed(it) and "✓" or shop.format_size(it.size or 0)
+        love.graphics.printf(right, rx, centered_y(ui.small, SMALL_SIZE, ry, h), rw, "right")
+    end)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print("A  get      Y  delete      B  back", x, PAGE_H - 70)
+    love.graphics.printf(g.sel .. " / " .. #list, x, PAGE_H - 70, w, "right")
 end
 
 ---------------------------------------------------------------- find in book
@@ -4005,6 +4308,7 @@ local function render_canvases()
     elseif app.mode == "message" then painter = draw_message
     elseif app.mode == "splash" then painter = app.splash_draw
     elseif app.mode == "report" then painter = app.report_draw
+    elseif app.mode == "fontget" then painter = app.fget_draw
     else painter = draw_library end
 
     for i, side in ipairs({ "left", "right" }) do
@@ -4603,6 +4907,7 @@ function handle_action(a)
     if mode == "whatsnew" then app.whatsnew_action(a) return end
     if mode == "find" then app.find_action(a) return end
     if mode == "report" then app.report_action(a) return end
+    if mode == "fontget" then app.fget_action(a) return end
 
     if mode == "about" or mode == "help" then
         if a == "back" or a == "confirm" or a == "menu" then app.mode = "menu" end
@@ -4854,6 +5159,8 @@ function app.on_tap(side, u, v)
         app.kb_tap(side, u, v)
     elseif mode == "fonts" then
         app.font_tap(side, u, v)
+    elseif mode == "fontget" then
+        app.fget_tap(side, u, v)
     elseif mode == "update" then
         app.update_tap(side, u, v)
     elseif mode == "whatsnew" then

@@ -37,6 +37,14 @@ local function user_dirs()
     return dirs
 end
 
+-- The folder downloaded fonts go in: the first fonts folder (created if
+-- need be), e.g. Ebook/Fonts or roms/ebook/Fonts.
+function M.user_dir()
+    local d = user_dirs()[1]
+    if d then os.execute('mkdir -p "' .. d .. '"') end
+    return d
+end
+
 ---------------------------------------------------------------- font name table
 
 local function u16(s, i) local a, b = s:byte(i, i + 1); return a * 256 + b end

@@ -1,0 +1,214 @@
+{
+ "version": 1,
+ "fonts": [
+  {
+   "name": "Alegreya",
+   "kind": "serif",
+   "about": "Lively and calligraphic, made for long literary reading.",
+   "zip": "Alegreya.zip",
+   "preview": "Alegreya.png",
+   "size": 517874,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Cardo",
+   "kind": "serif",
+   "about": "An old-style book face in the spirit of Renaissance printing.",
+   "zip": "Cardo.zip",
+   "preview": "Cardo.png",
+   "size": 571535,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Crimson Pro",
+   "kind": "serif",
+   "about": "A classic Garamond-like text face, crisp and even.",
+   "zip": "CrimsonPro.zip",
+   "preview": "CrimsonPro.png",
+   "size": 200428,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Gelasio",
+   "kind": "serif",
+   "about": "Sturdy and friendly, in the manner of Georgia.",
+   "zip": "Gelasio.zip",
+   "preview": "Gelasio.png",
+   "size": 235310,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "IBM Plex Serif",
+   "kind": "serif",
+   "about": "Clean and modern, with a slightly technical character.",
+   "zip": "IBMPlexSerif.zip",
+   "preview": "IBMPlexSerif.png",
+   "size": 299341,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Libre Baskerville",
+   "kind": "serif",
+   "about": "A Baskerville cut for screens: open, tall and elegant.",
+   "zip": "LibreBaskerville.zip",
+   "preview": "LibreBaskerville.png",
+   "size": 229538,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Newsreader",
+   "kind": "serif",
+   "about": "Designed for reading long stretches of text on screens.",
+   "zip": "Newsreader.zip",
+   "preview": "Newsreader.png",
+   "size": 265948,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Noticia Text",
+   "kind": "serif",
+   "about": "A warm text face with strong, clear letters.",
+   "zip": "NoticiaText.zip",
+   "preview": "NoticiaText.png",
+   "size": 215398,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Zilla Slab",
+   "kind": "serif",
+   "about": "A slab serif: friendly, bold and very readable.",
+   "zip": "ZillaSlab.zip",
+   "preview": "ZillaSlab.png",
+   "size": 443719,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Alegreya Sans",
+   "kind": "sans",
+   "about": "The sans companion to Alegreya, with a humanist hand.",
+   "zip": "AlegreyaSans.zip",
+   "preview": "AlegreyaSans.png",
+   "size": 517710,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Fira Sans",
+   "kind": "sans",
+   "about": "Open and legible, made for small screens.",
+   "zip": "FiraSans.zip",
+   "preview": "FiraSans.png",
+   "size": 879391,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "IBM Plex Sans",
+   "kind": "sans",
+   "about": "Neutral and precise, with a gentle warmth.",
+   "zip": "IBMPlexSans.zip",
+   "preview": "IBMPlexSans.png",
+   "size": 420533,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Lato",
+   "kind": "sans",
+   "about": "Smooth and balanced; one of the most popular sans-serifs.",
+   "zip": "Lato.zip",
+   "preview": "Lato.png",
+   "size": 1398247,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
+   "name": "Source Sans 3",
+   "kind": "sans",
+   "about": "Adobe's first open source typeface, clear and quiet.",
+   "zip": "SourceSans3.zip",
+   "preview": "SourceSans3.png",
+   "size": 531733,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  }
+ ]
+}
