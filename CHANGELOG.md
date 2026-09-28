@@ -19,6 +19,8 @@
 - Keyboard: Cancel, Space, Delete and Search share one bottom row (2/4/2/2
   columns, lined up with the keys above) instead of two staggered rows;
   Search is filled as the main action, and the keys are a little taller.
+- Help: the "In the library: …" line under the buttons is gone (the
+  library shows its own button hints).
 
 ## v0.3.25
 

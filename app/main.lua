@@ -2648,7 +2648,7 @@ app.HELP = {
         { "Y", "Look up a word" },
         { "Select", "Bookmark the page" },
         { "Anbernic", "Quit" },
-    }, "In the library: ‹ › sort, A open, Y delete, Select get books." },
+    } },
     right = { "Touchscreen", {
         { "Tap or swipe", "Turn pages (right half forward)" },
         { "Slide up/down", "Brightness, down to extra dim" },
@@ -2682,11 +2682,7 @@ function app.draw_help(side)
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
-    if side == "left" then
-        love.graphics.printf(page[3], x, y + 20, w, "left")
-    else
-        love.graphics.print(page[3], x, PAGE_H - 70)
-    end
+    if page[3] then love.graphics.print(page[3], x, PAGE_H - 70) end
 end
 
 ---------------------------------------------------------------- keyboard
