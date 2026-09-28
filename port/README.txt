@@ -8,7 +8,12 @@ INSTALL / UPDATE
   2. Put .epub or .txt books in the card's "Ebook" folder.
   3. On the device: Ports > eReaderDS.
   Copy the two items, not the whole Ports folder, or you may lose other ports.
-  ROCKNIX: copy them into roms/ports instead, and put books in roms/ebook.
+  ROCKNIX: copy over Wi-Fi, not with the card in your computer (its roms
+  folder is on a Linux part of the card that Mac and Windows can't open; if
+  asked to initialize or format the card, choose Ignore). On a Mac: Finder >
+  Go > Connect to Server > smb://<device address>; on Windows: \\<address>.
+  Copy both into the games-roms share's "ports" folder, books into "ebook",
+  then Start > Game settings > Update gamelists.
 
   Updates install themselves over Wi-Fi: eReaderDS says when a new version
   is out (or use Settings > About eReaderDS > Check for updates).

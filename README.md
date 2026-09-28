@@ -16,19 +16,43 @@ device sideways like an open book: each screen shows one page.
 
 ## Install
 
-1. Download `eReaderDS-vX.Y.Z.zip` from the
-   [releases page](https://github.com/casualducko/eReaderDS-beta/releases) (the newest is at the top)
-   and unzip it on your computer.
-2. From the unzipped `Ports` folder, copy **`eReaderDS.sh`** and the
-   **`eReaderDS`** folder into the `Ports` folder on the SD card, and
-   `Imgs/eReaderDS.png` (the menu icon) into `Ports/Imgs`.
-3. Put `.epub` or `.txt` books in the card's `Ebook` folder.
-4. On the device, open **Ports → eReaderDS**.
+Download `eReaderDS-vX.Y.Z.zip` from the
+[releases page](https://github.com/casualducko/eReaderDS-beta/releases) (the
+newest is at the top) and unzip it on your computer. Then follow the steps for
+your firmware.
 
-**On ROCKNIX:** copy `eReaderDS.sh` and the `eReaderDS` folder into
-`roms/ports` instead (over the network, `/storage/roms/ports`), put books in
-`roms/ebook` (fonts in `roms/ebook/Fonts`), and open **Ports → eReaderDS**.
-The bottom screen turns on while it runs; closing the lid is handled by
+### Stock firmware
+
+1. Put the SD card in your computer. From the unzipped `Ports` folder, copy
+   **`eReaderDS.sh`** and the **`eReaderDS`** folder into the `Ports` folder on
+   the card, and `Imgs/eReaderDS.png` (the menu icon) into `Ports/Imgs`.
+2. Put `.epub` or `.txt` books in the card's `Ebook` folder.
+3. On the device, open **Ports → eReaderDS**.
+
+### ROCKNIX
+
+On ROCKNIX, copy the files **over Wi-Fi**, not with the SD card in your
+computer. The card has two parts: a small `ROCKNIX` one (the system) that Mac
+and Windows can open, and a larger Linux one with `roms` (games, ports and
+books) that they **can't**. If your computer says the card is unreadable and
+offers to initialize or format it, choose **Ignore**: formatting would erase
+it.
+
+1. Put the card in the device, start ROCKNIX and turn on Wi-Fi. Its address is
+   in **Start → Network settings** (for example `192.168.1.50`).
+2. On your computer, open the device's shared folders:
+   - **Mac:** Finder → **Go → Connect to Server…** (⌘K), type
+     `smb://192.168.1.50` (the device's address), and connect as a guest.
+   - **Windows:** in File Explorer's address bar, type `\\192.168.1.50`.
+3. Open the **games-roms** share (that's `roms`). From the unzipped `Ports`
+   folder, copy **`eReaderDS.sh`** and the **`eReaderDS`** folder into its
+   **`ports`** folder. (`Imgs` isn't needed; eReaderDS adds its own menu icon.)
+4. Put books in the share's **`ebook`** folder (fonts in `ebook/Fonts`). It's
+   created the first time eReaderDS runs, if it isn't there yet.
+5. On the device, press **Start → Game settings → Update gamelists**, then open
+   **Ports → eReaderDS**.
+
+While it runs, the bottom screen is turned on; closing the lid is handled by
 ROCKNIX.
 
 **Updates:** when it's online, eReaderDS checks for a newer version each time
@@ -43,10 +67,10 @@ To stop the automatic check and its notes, set **Update notices** to Off (same
 page); **Check for updates** still works. To pass on just one version, choose
 **Skip this version** on the update screen; you'll still hear about the next.
 
-To update by hand, copy the same two items from a newer zip over the old ones. Your
-settings, reading positions, bookmarks and fonts are kept. (Copy the two
-items, not the whole `Ports` folder: on a Mac, replacing `Ports` deletes your
-other ports.)
+To update by hand, copy the same two items from a newer zip over the old ones
+(on ROCKNIX, over Wi-Fi into `games-roms/ports`, as above). Your settings,
+reading positions, bookmarks and fonts are kept. (Copy the two items, not the
+whole `Ports` folder: on a Mac, replacing `Ports` deletes your other ports.)
 
 ## Controls
 
@@ -217,7 +241,8 @@ name) only shows one weight.
 
 | Problem | Try this |
 |---|---|
-| Not in the Ports menu | `eReaderDS.sh` and the `eReaderDS` folder must be directly inside `Ports`. |
+| Not in the Ports menu | `eReaderDS.sh` and the `eReaderDS` folder must be directly inside `Ports` (ROCKNIX: `roms/ports`, then **Start → Game settings → Update gamelists**). |
+| ROCKNIX: can't find `roms` on the SD card | It's on the card's Linux part, which Mac and Windows can't open. Copy over Wi-Fi instead ([ROCKNIX](#rocknix)); never let the computer format the card. |
 | Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems). |
 | "No books found" | Put `.epub` or `.txt` files in the `Ebook` folder at the top of the card. |
 | A book won't open or looks wrong | Unusual EPUBs may not display well; DRM-protected books, PDF and MOBI aren't supported. |

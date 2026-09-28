@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- README and the download's README: ROCKNIX installs over Wi-Fi, step by
+  step (the card's `roms` is on a Linux partition Mac and Windows can't open;
+  never let the computer format it): the device's address, Connect to Server
+  (Mac) or `\\address` (Windows), the `games-roms` share's `ports` and `ebook`
+  folders, then Update gamelists. Troubleshooting has a row for it.
+
 ## v0.3.30
 
 - **Standard Ebooks** in Get books: its newest releases (the free
