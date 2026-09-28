@@ -2226,6 +2226,38 @@ end
 
 local function list_rows(row_h) return math.floor((PAGE_H - 200) / row_h) end
 
+-- Sorted by progress, My Books has a header over each group.
+app.LIB_GROUPS = { "READING", "NOT STARTED", "FINISHED" }
+app.LIB_HEADER_H = 44
+function app.library_group(it)
+    if Store.get_finished(it.path) then return 3 end
+    local pr = Store.get_progress(it.path)
+    return (pr and pr.pct > 0) and 1 or 2
+end
+
+-- Where things go on the touchscreen from book `top` down: { { idx, y } or
+-- { header, y } }, and how many books fit. The top book's group always has
+-- its header, even partway down a group.
+function app.library_layout(top)
+    local rows, y, n, last = {}, 160, 0, nil
+    local bottom = 160 + library.list_rows() * 96
+    local groups = S.lib_sort == "progress"
+    for i = top, #library.items do
+        if groups then
+            local g = app.library_group(library.items[i])
+            if g ~= last then
+                if y + app.LIB_HEADER_H + 96 > bottom then break end
+                rows[#rows + 1] = { header = app.LIB_GROUPS[g], y = y }
+                y, last = y + app.LIB_HEADER_H, g
+            end
+        end
+        if y + 96 > bottom then break end
+        rows[#rows + 1] = { idx = i, y = y }
+        y, n = y + 96, n + 1
+    end
+    return rows, math.max(1, n)
+end
+
 -- Library rows that fit on the touchscreen above its hints.
 function library.list_rows() return list_rows(96) end
 
@@ -2247,10 +2279,13 @@ local function draw_library(side)
             love.graphics.printf("‹ " .. SORT_NAMES[S.lib_sort] .. " ›", x,
                 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
             local row_h = 96
-            local rows = library.list_rows()
             if library.sel < library.top then library.top = library.sel end
-            if library.sel >= library.top + rows then library.top = library.sel - rows + 1 end
-            draw_list(side, library.items, library.sel, library.top, rows, x, 160, w, row_h, function(it, _, rx, ry, rw)
+            local rows, fit = app.library_layout(library.top)
+            while library.sel >= library.top + fit and library.top < library.sel do
+                library.top = library.top + 1
+                rows, fit = app.library_layout(library.top)
+            end
+            local function book_row(it, rx, ry, rw)
                 love.graphics.setFont(ui.font)
                 color(th.fg)
                 -- Center the title + author block: from the title's cap height to
@@ -2266,7 +2301,27 @@ local function draw_library(side)
                 color(th.dim)
                 love.graphics.print(fit_text(ui.small, it.author, rw - sw), rx, ty + 40)
                 if status then love.graphics.printf(status, rx, ty + 40, rw, "right") end
-            end)
+            end
+            for _, r in ipairs(rows) do
+                if r.header then
+                    -- A group (sorted by progress): small capitals and a hairline, as in Settings.
+                    love.graphics.setFont(ui.small)
+                    color(th.dim)
+                    local ty = r.y + app.LIB_HEADER_H - ui.small:getHeight() - 8
+                    love.graphics.print(r.header, x, ty)
+                    local lx = x + ui.small:getWidth(r.header) + 14
+                    local ly = ty + math.floor(ui.small:getHeight() * 0.55)
+                    color(th.dim, 0.45)
+                    love.graphics.setLineWidth(1)
+                    love.graphics.line(lx, ly, x + w, ly)
+                else
+                    if r.idx == library.sel then
+                        color(th.sel)
+                        love.graphics.rectangle("fill", x - 14, r.y, w + 28, row_h - 4, 10, 10)
+                    end
+                    book_row(library.items[r.idx], x, r.y, w)
+                end
+            end
         end
         local bx, by, bw, bh = library.get_books_button()
         -- Offline: an outline only, greyed out, saying why.
@@ -5308,7 +5363,7 @@ end
 -- the row height; nil when this screen has no list to scroll.
 function app.scroll_list()
     local m, l, n, shown, row_h = app.mode, nil, 0, 0, 96
-    if m == "library" then l, n, shown = library, #library.items, library.list_rows()
+    if m == "library" then l, n, shown = library, #library.items, select(2, app.library_layout(library.top))
     elseif m == "shop" then
         l = shop.page()
         n, shown = l and #l.entries or 0, list_rows(96)
@@ -5851,9 +5906,10 @@ function app.on_tap(side, u, v)
             return
         end
         -- The list: tap a book to see it on the top screen, again to open it.
-        local idx = library.top + math.floor((v - 160) / 96)
-        if v >= 160 and idx < library.top + library.list_rows() and library.items[idx] then
-            if idx == library.sel then action("confirm") else library.sel = idx; redraw() end
+        for _, r in ipairs((app.library_layout(library.top))) do
+            if r.idx and v >= r.y and v < r.y + 96 then
+                if r.idx == library.sel then action("confirm") else library.sel = r.idx; redraw() end
+            end
         end
     elseif mode == "lookup" then
         -- Another word on this page: look that up. Anywhere else: close.

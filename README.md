@@ -148,8 +148,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 - **My Books** (the library): every book in the `Ebook` folder and the folders
   inside it (a copied Calibre library works as it is), listed by the title and
   author inside each book (not the file name); covers and progress, sorted by
-  recent, title, author (by last name) or
-  progress; each shows "Reading · 16%" or "Finished ✓". A book is marked
+  recent, title, author (by last name) or progress (grouped under Reading,
+  Not Started and Finished); each shows "Reading · 16%" or "Finished ✓". A book is marked
   finished when you reach its last page (or by hand: **Y** in My Books, which
   can also hide finished books, or delete a book).
 - **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in Book**

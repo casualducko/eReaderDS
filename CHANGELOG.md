@@ -8,8 +8,10 @@
   opens an options card on the touchscreen (`app.choose`): Mark as finished /
   not finished, Hide / Show finished books (the count says "· 3 finished
   hidden"; if all are, the top screen says so and Y shows them), and Delete
-  from the SD card (still confirmed). Sorting by progress puts finished
-  books last. Stored in `.ereaderds/finished.txt` (path, time);
+  from the SD card (still confirmed). Sorting by progress groups the books
+  under headers, READING, NOT STARTED and FINISHED, like the sections in
+  Settings (`app.library_layout`; the top book's group keeps its header while
+  scrolling). Stored in `.ereaderds/finished.txt` (path, time);
   `lib_hide_finished` in settings.
 
 ## v1.5.0
