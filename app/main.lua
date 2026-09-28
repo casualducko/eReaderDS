@@ -101,7 +101,8 @@ local message = nil
 
 local function theme_index()
     local default = 1
-    local want = app.night and S.night_theme or S.theme      -- the night theme at night
+    -- The night theme at night; a preview while one is being picked.
+    local want = app.preview_theme or (app.night and S.night_theme or S.theme)
     for i, t in ipairs(THEMES) do
         if t.name == want then return i end
         if t.name == "Sepia" then default = i end   -- the default theme (store.lua)
@@ -1455,6 +1456,13 @@ end
 function app.night_summary()
     if S.night_theme == "off" then return "Off" end
     return S.night_theme .. "  ·  " .. app.hour_label(S.night_from) .. "–" .. app.hour_label(S.night_to)
+end
+
+-- Picking a night theme: the touchscreen shows the menu in it.
+function app.night_preview(side)
+    if side == "right" and app.mode == "menu" and menu.page == "night" and S.night_theme ~= "off" then
+        return S.night_theme
+    end
 end
 
 -- The Night theme page.
@@ -3769,8 +3777,10 @@ local function render_canvases()
     else painter = draw_library end
 
     for i, side in ipairs({ "left", "right" }) do
+        app.preview_theme = app.night_preview(side)
+        local bg = theme().bg
         love.graphics.setCanvas(canvases[i])
-        love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
+        love.graphics.clear(bg[1], bg[2], bg[3], 1)
         love.graphics.origin()
         painter(side)
         if (app.mode == "menu" and menu.page ~= "status" or app.mode == "jump") and side == "left" then
@@ -3778,6 +3788,7 @@ local function render_canvases()
             love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
         end
     end
+    app.preview_theme = nil
     love.graphics.setCanvas()
 end
 
@@ -3890,9 +3901,11 @@ local function compose()
     -- filter, so covers stay in color whatever the theme.
     if app.mode == "shop" then set_theme_shader(false) end
     blit_page(canvases[1], "left")
+    app.preview_theme = app.night_preview("right")        -- its E-ink filter, if any
     set_theme_shader(true)
     blit_page(canvases[2], "right")
     set_theme_shader(false)
+    app.preview_theme = nil
 end
 
 local ANIM_TIME = { flip = 0.38, fade = 0.22 }

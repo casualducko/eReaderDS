@@ -13,6 +13,9 @@
 - The main page's Night theme row ends in "›" like the other rows that open
   a page ("Off  ›"); on its page, the Night theme row shows just the theme
   (no "on now" / "from 9 PM").
+- On the Night theme page the touchscreen shows the menu in the chosen
+  night theme (E-ink filter included), so ‹ › previews each one; the top
+  screen keeps the current theme.
 
 ## v0.3.25
 
