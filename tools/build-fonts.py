@@ -6,10 +6,12 @@ Fonts published only as variable fonts are cut into static instances at
 weight 400 and 700 (eReaderDS picks faces by family and style name), like
 Bitter and Atkinson Hyperlegible Next.
 
-    tools/build-fonts.py        (needs fontTools: pip install fonttools)
+    tools/build-fonts.py                  (needs fontTools: pip install fonttools)
+    tools/build-fonts.py "Crimson Pro"    just the families named
 """
 import io
 import os
+import sys
 import urllib.request
 
 from fontTools.ttLib import TTFont
@@ -24,6 +26,7 @@ STYLES = [("Regular", False, 400), ("Italic", True, 400), ("Bold", False, 700), 
 # family: (Google Fonts folder, file stem, {style: file} for static fonts or
 # (upright, italic) variable files, extra axis values)
 FAMILIES = {
+    "Crimson Pro": ("crimsonpro", "CrimsonPro", ("CrimsonPro[wght].ttf", "CrimsonPro-Italic[wght].ttf"), {}),
     "EB Garamond": ("ebgaramond", "EBGaramond", ("EBGaramond[wght].ttf", "EBGaramond-Italic[wght].ttf"), {}),
     "Lora": ("lora", "Lora", ("Lora[wght].ttf", "Lora-Italic[wght].ttf"), {}),
     "Merriweather": ("merriweather", "Merriweather",
@@ -66,7 +69,10 @@ def set_names(font, family, style, italic, weight):
 
 
 def main():
+    only = set(sys.argv[1:])
     for family, (folder, stem, files, axes) in FAMILIES.items():
+        if only and family not in only:
+            continue
         print(family)
         if isinstance(files, dict):
             for style, italic, weight in STYLES:

@@ -2888,7 +2888,7 @@ function app.bm_confirm_draw(x, w)
 end
 
 local CREDITS = {
-    { "Fonts", "Gentium Book Plus, Charis SIL and Andika (SIL International), Literata "
+    { "Fonts", "Crimson Pro (Jacques Le Bailly), Gentium Book Plus, Charis SIL and Andika (SIL International), Literata "
         .. "(TypeTogether), Source Serif 4 (Adobe), Crimson Text (Sebastian Kosch), "
         .. "EB Garamond (Georg Duffner, Octavio Pardo), Lora (Cyreal), Merriweather "
         .. "(Sorkin Type), PT Serif (ParaType), Spectral (Production Type), Vollkorn "

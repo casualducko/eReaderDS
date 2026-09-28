@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Crimson Pro** is built in and is new readers' default font (40 pt, as
+  before), and the fallback font; readers keep the font they chose. It's no
+  longer in Get more fonts (13 there now). `tools/build-fonts.py` can build
+  just the families named.
 - The font page is titled **Fonts**, with its **Get more fonts** button beside
   the title (no "+"); the list moves back up.
 

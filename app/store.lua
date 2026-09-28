@@ -3,7 +3,7 @@
 local M = {}
 
 local DEFAULTS = {
-    font = "Gentium Book Plus", font_size = 40, spacing = 0.85, margins = 1, vmargins = 2, justify = true,
+    font = "Crimson Pro", font_size = 40, spacing = 0.85, margins = 1, vmargins = 2, justify = true,
     hyphenate = false, -- English books only (the patterns are US English)
     lib_sort = "recent", -- library order: "recent" | "title" | "author" | "progress"
     dict = "all",      -- dictionary for look-ups: "all" or a dictionary's name

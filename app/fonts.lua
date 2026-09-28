@@ -3,7 +3,7 @@
 local M = {}
 
 local BUNDLED_DIR = "fonts"   -- inside the LÖVE source
-M.DEFAULT = "Gentium Book Plus"
+M.DEFAULT = "Crimson Pro"            -- new readers' font, and the fallback
 
 -- Serif or sans-serif, for the font list's filter. The bundled ones are
 -- known; for your own, the font's PANOSE class if it has one, then its name,

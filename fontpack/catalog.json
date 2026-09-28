@@ -31,21 +31,6 @@
    "license": "SIL Open Font License 1.1"
   },
   {
-   "name": "Crimson Pro",
-   "kind": "serif",
-   "about": "A classic Garamond-like text face, crisp and even.",
-   "zip": "CrimsonPro.zip",
-   "preview": "CrimsonPro.png",
-   "size": 200428,
-   "styles": [
-    "Regular",
-    "Italic",
-    "Bold",
-    "BoldItalic"
-   ],
-   "license": "SIL Open Font License 1.1"
-  },
-  {
    "name": "Gelasio",
    "kind": "serif",
    "about": "Sturdy and friendly, in the manner of Georgia.",

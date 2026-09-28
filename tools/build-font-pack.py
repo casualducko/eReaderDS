@@ -43,8 +43,6 @@ FAMILIES = [
      "Lively and calligraphic, made for long literary reading."),
     ("Cardo", "cardo", "Cardo", static("Cardo", ("Regular", "Italic", "Bold")), {}, "serif",
      "An old-style book face in the spirit of Renaissance printing."),
-    ("Crimson Pro", "crimsonpro", "CrimsonPro", ("CrimsonPro[wght].ttf", "CrimsonPro-Italic[wght].ttf"), {}, "serif",
-     "A classic Garamond-like text face, crisp and even."),
     ("Gelasio", "gelasio", "Gelasio", ("Gelasio[wght].ttf", "Gelasio-Italic[wght].ttf"), {}, "serif",
      "Sturdy and friendly, in the manner of Georgia."),
     ("IBM Plex Serif", "ibmplexserif", "IBMPlexSerif", static("IBMPlexSerif"), {}, "serif",

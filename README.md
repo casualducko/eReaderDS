@@ -126,7 +126,7 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 ## Features
 
 - **Reading:** EPUB and plain text with italics, headings, images and covers;
-  justified text with optional hyphenation (English); 17 built-in fonts plus
+  justified text with optional hyphenation (English); 18 built-in fonts plus
   your own; 11 themes (Sepia by default, plus E-ink, Paper, Midnight, Amber
   and more) that the whole app follows, and a night theme that switches on by
   itself in the evening; page-flip or fade animation.
@@ -229,13 +229,13 @@ named in its own typeface, and a sample page in the highlighted one on the
 other screen. The list is alphabetical; left/right (or tapping **All · Serif ·
 Sans** at the top) narrow it. Up/down pick a font, A uses it.
 
-**Built in:** Gentium Book Plus (default), Literata, Charis SIL, Source Serif
+**Built in:** Crimson Pro (default), Gentium Book Plus, Literata, Charis SIL, Source Serif
 4, Crimson Text, EB Garamond, Lora, Merriweather, PT Serif, Spectral,
 Vollkorn, Bitter, Atkinson Hyperlegible Next, Inter, Lexend, Andika and
 OpenDyslexic.
 
 **Get more fonts:** the **Get more fonts** button beside the title of the font page (or Y) downloads more over Wi-Fi:
-Alegreya, Cardo, Crimson Pro, Gelasio, IBM Plex Serif, Libre Baskerville,
+Alegreya, Cardo, Gelasio, IBM Plex Serif, Libre Baskerville,
 Newsreader, Noticia Text, Zilla Slab, Alegreya Sans, Fira Sans, IBM Plex Sans,
 Lato and Source Sans 3 (free, SIL Open Font License, from Google Fonts; about
 200 KB–1.4 MB each). Each is shown in its own typeface; A downloads it into the
@@ -307,6 +307,7 @@ About & credits**).
   [Andika](https://software.sil.org/andika/) (SIL International),
   [Literata](https://github.com/googlefonts/literata) (TypeTogether),
   [Source Serif 4](https://github.com/adobe-fonts/source-serif) (Adobe),
+  [Crimson Pro](https://github.com/Fonthausen/CrimsonPro) (Jacques Le Bailly),
   [Crimson Text](https://github.com/googlefonts/Crimson) (Sebastian Kosch),
   [EB Garamond](https://github.com/octaviopardo/EBGaramond12) (Georg Duffner,
   Octavio Pardo), [Lora](https://github.com/cyrealtype/Lora-Cyrillic) (Cyreal),
@@ -319,9 +320,9 @@ About & credits**).
   (Braille Institute), [Inter](https://github.com/rsms/inter) (Rasmus Andersson),
   [Lexend](https://github.com/googlefonts/lexend) (Lexend Project) and
   [OpenDyslexic](https://github.com/antijingoist/opendyslexic) (Abbie Gonzalez).
-  Bitter, Atkinson Hyperlegible Next, EB Garamond, Lora, Merriweather and
-  Vollkorn are static instances generated from their variable fonts
-  (`tools/build-fonts.py` for the last four).
+  Crimson Pro, Bitter, Atkinson Hyperlegible Next, EB Garamond, Lora,
+  Merriweather and Vollkorn are static instances generated from their
+  variable fonts (`tools/build-fonts.py` for Crimson Pro and the last four).
 - **Hyphenation:** US English patterns from TeX's
   [hyph-utf8](https://www.hyphenation.org/tex), © Gerard D.C. Kuiken (notice
   in `app/hyph/en-us.txt`).
