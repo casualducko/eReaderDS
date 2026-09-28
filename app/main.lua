@@ -1023,7 +1023,7 @@ local function scan_library()
             for name in p:lines() do
                 local ext = (name:match("%.([^.]+)$") or ""):lower()
                 -- Left over from a download that was cut off.
-                if ext == "part" and not shop.dl then os.remove(dir .. "/" .. name) end
+                if ext == "part" and not shop.dl and not app.recv then os.remove(dir .. "/" .. name) end
                 if (ext == "epub" or ext == "txt") and not name:match("^%._") then
                     local path = dir .. "/" .. name
                     if not seen[path] then
@@ -1256,7 +1256,10 @@ function shop.start()
     end
     shop.dir = nil
     for url, c in pairs(shop.covers) do if c == false then shop.covers[url] = nil end end
-    local entries = {}
+    local entries = { { title = "Send from your phone or computer", author = "Over Wi-Fi, from a web browser",
+        formats = {}, receive = true, summary = "Send your own books (.epub or .txt) to eReaderDS from a phone "
+            .. "or computer on the same Wi-Fi: open the address it shows in a web browser and choose the files. "
+            .. "Fonts (.ttf or .otf) can be sent the same way." } }
     for _, c in ipairs(library.catalogs or {}) do
         local u = Opds.parse_url(c.url)
         entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = c.about or "",
@@ -1379,6 +1382,8 @@ function shop.confirm()
     elseif it.catalog then
         shop.catalog = it.catalog
         shop.push_page(it.catalog.name, it.catalog.url, true)
+    elseif it.receive then
+        app.recv_open()
     elseif it.search then
         app.kb_open({ title = "Search " .. shop.catalog.name, text = shop.last_query,
             hint = "Words from a book's title or its author's name.",
@@ -2129,7 +2134,7 @@ local function draw_library(side)
         color(th.dim)
         local folder, where = Store.books_folder()
         love.graphics.printf("Copy .epub or .txt files into the " .. folder .. " folder"
-            .. (where and (" " .. where) or "") .. ", or tap Get books to download some.", x, 180, w, "left")
+            .. (where and (" " .. where) or "") .. ", or tap Get books to download some or send them from a phone or computer.", x, 180, w, "left")
         love.graphics.setFont(ui.small)
         love.graphics.print("Press the Anbernic button to quit", x, PAGE_H - 70)
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
@@ -2243,11 +2248,11 @@ function shop.draw(side)
                 if e.book then
                     mark = (shop.dl and shop.dl.item == e) and "…"
                         or (e.have or shop.have(e)) and "✓" or nil
-                elseif e.href or e.catalog then
+                elseif e.href or e.catalog or e.receive then
                     mark = "›"
                 end
                 love.graphics.setFont(ui.font)
-                color((e.book or e.href or e.catalog) and th.fg or th.dim)
+                color((e.book or e.href or e.catalog or e.receive) and th.fg or th.dim)
                 love.graphics.print(fit_text(ui.font, e.title, rw - 60), rx, ty)
                 if mark then love.graphics.printf(mark, rx, ty, rw, "right") end
                 if sub ~= "" then
@@ -2321,6 +2326,8 @@ function shop.draw(side)
         status = "Only as " .. table.concat(it.formats, ", ") .. ".\nThis reader needs EPUB or TXT."
     elseif it.href or it.catalog then
         action_text = "A open"
+    elseif it.receive then
+        action_text = "A start"
     elseif it.search then
         action_text = "A search"
     end
@@ -4452,6 +4459,7 @@ local function render_canvases()
     elseif app.mode == "splash" then painter = app.splash_draw
     elseif app.mode == "report" then painter = app.report_draw
     elseif app.mode == "fontget" then painter = app.fget_draw
+    elseif app.mode == "receive" then painter = app.recv_draw
     else painter = draw_library end
 
     for i, side in ipairs({ "left", "right" }) do
@@ -5053,6 +5061,7 @@ function handle_action(a)
     if mode == "find" then app.find_action(a) return end
     if mode == "report" then app.report_action(a) return end
     if mode == "fontget" then app.fget_action(a) return end
+    if mode == "receive" then app.recv_action(a) return end
 
     if mode == "about" or mode == "help" then
         if a == "back" or a == "confirm" or a == "menu" then app.mode = "menu" end
@@ -5327,6 +5336,8 @@ function app.on_tap(side, u, v)
         app.font_tap(side, u, v)
     elseif mode == "fontget" then
         app.fget_tap(side, u, v)
+    elseif mode == "receive" then
+        app.recv_tap(side, u, v)
     elseif mode == "update" then
         app.update_tap(side, u, v)
     elseif mode == "whatsnew" then
@@ -5713,6 +5724,225 @@ function app.report_draw(side)
     love.graphics.printf("github.com/casualducko/eReaderDS", x, qy + size + 24, w, "center")
 end
 
+---------------------------------------------------------------- send books over Wi-Fi
+
+-- "Send books over Wi-Fi" (in Get books): while this screen is open, a small
+-- web server (receiver.lua, on its own thread) takes books and fonts from a
+-- phone or computer on the same network. The address and a QR code of it are
+-- on the screens; what arrives is listed as it comes in.
+
+-- This device's address on the network: the one a connection out would use
+-- (no packet is sent), else the first from `ip`.
+function app.recv_ip()
+    local ok, ip = pcall(function()
+        local u = require("socket").udp()
+        u:setpeername("8.8.8.8", 53)
+        local a = u:getsockname()
+        u:close()
+        return a
+    end)
+    if ok and ip and ip ~= "0.0.0.0" and not ip:match("^127%.") then return ip end
+    local p = io.popen("ip -4 -o addr show 2>/dev/null")
+    if p then
+        for line in p:lines() do
+            local a = line:match("inet (%d+%.%d+%.%d+%.%d+)")
+            if a and not a:match("^127%.") then p:close(); return a end
+        end
+        p:close()
+    end
+end
+
+function app.recv_open()
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
+    local ip = app.recv_ip()
+    if not ip then app.toast("Couldn't find this device's address on the network"); return end
+    love.thread.getChannel("recv_ctl"):clear()
+    love.thread.getChannel("recv_out"):clear()
+    local r = { ip = ip, files = {}, back = app.mode, books = 0, fonts = 0 }
+    r.thread = love.thread.newThread("receiver.lua")
+    r.thread:start({ books = Store.download_dir(), fonts = Fonts.user_dir() })
+    app.recv = r
+    app.mode = "receive"
+    redraw()
+end
+
+-- Stop the server (after the file arriving, if any, is cut off) and wait for it.
+function app.recv_stop()
+    local r = app.recv
+    if not r then return end
+    love.thread.getChannel("recv_ctl"):push("stop")
+    r.thread:wait()
+    love.thread.getChannel("recv_ctl"):clear()
+    app.recv_poll()
+    app.recv = nil
+    love.thread.getChannel("recv_out"):clear()
+    if r.fonts > 0 then Fonts.scan() end
+    if r.books > 0 then
+        Store.flush()
+        scan_library()
+        for i, it in ipairs(library.items) do                  -- the last one received
+            if it.path == r.last then library.sel = i end
+        end
+    end
+    return r
+end
+
+function app.recv_close()
+    local r = app.recv_stop()
+    app.mode = r and r.back or "library"
+    if app.mode ~= "shop" then app.mode = "library" end
+    if r and r.books > 0 then
+        app.toast(r.books == 1 and "1 book received" or (r.books .. " books received"))
+    end
+    redraw()
+end
+
+-- Messages from the server thread; true if anything changed.
+function app.recv_poll()
+    local r = app.recv
+    if not r then return false end
+    local got = false
+    local ch = love.thread.getChannel("recv_out")
+    while true do
+        local msg = ch:pop()
+        if not msg then break end
+        got = true
+        if msg.kind == "ready" then
+            r.port = msg.port
+            r.url = "http://" .. r.ip .. (msg.port == 80 and "" or (":" .. msg.port))
+            local ok, tab = pcall(function() return select(2, require("qrencode").qrcode(r.url, 1)) end)
+            r.qr = ok and type(tab) == "table" and tab or nil
+        elseif msg.kind == "error" then
+            r.error = msg.message
+        elseif msg.kind == "start" then
+            table.insert(r.files, 1, { name = msg.name, got = 0, total = msg.total })
+        else
+            local f = r.files[1]
+            if f and f.name == msg.name then
+                if msg.kind == "progress" then
+                    f.got, f.total = msg.got, msg.total
+                elseif msg.kind == "done" then
+                    f.done, f.replaced, f.font = true, msg.replaced, msg.font
+                    if msg.font then r.fonts = r.fonts + 1 else r.books, r.last = r.books + 1, msg.path end
+                elseif msg.kind == "failed" then
+                    f.failed = msg.message
+                end
+            end
+        end
+    end
+    if not r.error and not r.thread:isRunning() and r.thread:getError() then
+        r.error = "Receiving stopped: " .. tostring(r.thread:getError()):gsub("^[^:]*:%d+: ", "")
+        print("[receive] " .. r.error)
+        got = true
+    end
+    if got then redraw() end
+    return got
+end
+
+-- The Done button, on the touchscreen: x, y, w, h.
+function app.recv_button()
+    local w, h = 240, 60
+    return math.floor((PAGE_W - w) / 2), PAGE_H - 96, w, h
+end
+
+function app.recv_action(a)
+    if a == "back" or a == "menu" then app.recv_close() end
+end
+
+function app.recv_tap(side, u, v)
+    if side ~= "right" then return end
+    local bx, by, bw, bh = app.recv_button()
+    if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then app.recv_close() end
+end
+
+function app.recv_draw(side)
+    local th = theme()
+    local r = app.recv
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    if side == "left" then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Send books over Wi-Fi", x, 60)
+        love.graphics.setFont(ui.font)
+        if r.error then
+            color(th.fg)
+            love.graphics.printf(r.error, x, 170, w, "left")
+            return
+        end
+        color(th.dim)
+        love.graphics.printf("On a phone or computer on the same Wi-Fi, scan the code or open:", x, 160, w, "left")
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print(r.url and fit_text(ui.title, r.url:gsub("^http://", ""), w) or "Starting…", x, 250)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("Books (.epub, .txt) go to My Books, fonts (.ttf, .otf) to Fonts. "
+            .. "Stay on this screen until they're sent.", x, 250 + ui.title:getHeight() + 14, w, "left")
+        -- What's arrived, newest first.
+        local y = 480
+        for i, f in ipairs(r.files) do
+            if y > PAGE_H - 150 then break end
+            local mark
+            if f.failed then mark = "Failed: " .. f.failed
+            elseif f.done then mark = f.replaced and "Replaced ✓" or "✓"
+            else mark = math.floor(f.got / math.max(1, f.total) * 100) .. "%" end
+            love.graphics.setFont(ui.small)
+            local mw = ui.small:getWidth(mark)
+            color(f.failed and th.fg or th.dim)
+            love.graphics.print(mark, x + w - mw, y)
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.print(fit_text(ui.font, f.name:gsub("%.[^.]+$", ""), w - mw - 24), x, y - 4)
+            y = y + 56
+            if i == 1 and not f.done and not f.failed then
+                color(th.sel)
+                love.graphics.rectangle("fill", x, y - 12, w, 6, 3, 3)
+                color(th.fg)
+                love.graphics.rectangle("fill", x, y - 12, w * math.min(1, f.got / math.max(1, f.total)), 6, 3, 3)
+                y = y + 10
+            end
+        end
+        if #r.files == 0 and r.url then
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.print("Waiting for books…", x, y)
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print("B  done", x, PAGE_H - 70)
+        return
+    end
+    -- The QR code of the address, as on Report a problem: dark on white, with
+    -- the quiet border scanners need.
+    if r.qr then
+        local n = #r.qr
+        local cell = math.floor(math.min(w, PAGE_H - 330) / (n + 8))
+        local size = cell * (n + 8)
+        local qx, qy = math.floor((PAGE_W - size) / 2), 110
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.rectangle("fill", qx, qy, size, size, 12, 12)
+        love.graphics.setColor(0, 0, 0)
+        for cx = 1, n do
+            for cy = 1, n do
+                if r.qr[cx][cy] > 0 then
+                    love.graphics.rectangle("fill", qx + (cx + 3) * cell, qy + (cy + 3) * cell, cell, cell)
+                end
+            end
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf(r.url, x, qy + size + 20, w, "center")
+    end
+    local bx, by, bw, bh = app.recv_button()
+    color(th.sel)
+    love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
+    love.graphics.setFont(ui.font)
+    color(th.fg)
+    love.graphics.printf("Done", bx, centered_y(ui.font, UI_SIZE, by, bh), bw, "center")
+end
+
 function love.load()
     app.scale = love.graphics.getWidth() / 2048
     if os.getenv("READER_SCALE") == nil then pcall(love.window.setPosition, 0, 0, 1) end
@@ -5807,6 +6037,7 @@ function love.load()
 end
 
 function love.quit()
+    if app.recv then app.recv_stop() end
     if net.thread then
         -- Stop a download (its .part file is removed) and the network thread.
         if shop.dl then love.thread.getChannel("net_cancel"):push(shop.dl.id) end
@@ -5843,6 +6074,8 @@ local function run_test_script()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
             elseif a == "report" then app.report_open()
+            elseif a == "receive" then app.recv_open()
+            elseif a == "recvpoll" then app.recv_poll()
             elseif a == "work" then                -- finish a background task
                 while app.task do app.task_step() end
             elseif a == "net" then               -- wait for network jobs (and the cover)
@@ -5941,6 +6174,7 @@ function love.run()
             app.on_hold(gesture.side, gesture.u0, gesture.v0)
         end
         if shop.net_poll() then got = true end
+        if app.recv and app.recv_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
         if overlay and love.timer.getTime() >= overlay.hide_at then
             if os.getenv("READER_DEBUG") then print(string.format("[debug] message closed at %.2f", love.timer.getTime())) end
@@ -5964,7 +6198,7 @@ function love.run()
         end
         if app.anim or app.task then
             love.timer.sleep(0.001)            -- animating or working: next frame
-        elseif Touch.enabled or overlay or net.count > 0 then
+        elseif Touch.enabled or overlay or net.count > 0 or app.recv then
             -- Touch events don't wake love.event.wait(), so poll at a gentle rate.
             if not got and not app.dirty then love.timer.sleep(gesture and 0.008 or 0.025) end
         elseif not got then

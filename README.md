@@ -137,7 +137,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 - **Highlights:** mark passages and find them again in the list of bookmarks
   and highlights ([below](#highlights)).
 - **Get books over Wi-Fi:** Project Gutenberg and Standard Ebooks built in,
-  plus Calibre or any OPDS catalog ([below](#getting-books-over-wi-fi)).
+  plus Calibre or any OPDS catalog ([below](#getting-books-over-wi-fi)); or
+  send your own books from a phone or computer's web browser
+  ([below](#sending-books-from-a-phone-or-computer)).
 - **My Books** (the library): covers and progress, sorted by recent, title, author or
   progress; delete books from it.
 - **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in book**
@@ -170,6 +172,18 @@ switches on the hour by the device's clock, and the whole app changes with
 it. While picking, the touchscreen previews each theme. At night, the
 **Theme** row changes the night theme (it says "(night)"), so your daytime
 theme is left alone.
+
+## Sending books from a phone or computer
+
+In the library press **Select** (or tap **Get books**) and choose **Send from
+your phone or computer**. The screens show an address (such as
+`192.168.1.50`) and a QR code. On a phone or computer on the same Wi-Fi,
+scan the code or type the address into a web browser, then tap **Choose
+files** (or drop files on the page). Books (`.epub`, `.txt`) go into the
+books folder and fonts (`.ttf`, `.otf`) into the fonts folder; each is listed
+on the device as it arrives. Press **B** or tap **Done** when they're sent:
+the new books are in My Books. The page only works while this screen is open.
+This is the easy way to add books on ROCKNIX.
 
 ## Getting books over Wi-Fi
 

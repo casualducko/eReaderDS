@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Send books from a phone or computer:** Get books → **Send from your phone
+  or computer** starts a small web server (`receiver.lua`, on its own thread,
+  port 80 or else 8080) while the screen is open. It shows the address and a
+  QR code; the page it serves uploads books (.epub, .txt) to the books folder
+  and fonts (.ttf, .otf) to the fonts folder, one at a time, with progress on
+  both ends. Names are cleaned (no folders or odd characters), EPUBs are checked
+  whole, files are written to a hidden `.part` and renamed, and a file with the
+  same name is replaced. Closing the screen rescans the library (selecting the
+  last book received) and fonts.
+
 ## v1.2.1
 
 - Settings: tapping "Swipe for more options" turns to page 2. Taps on ‹ and ›
