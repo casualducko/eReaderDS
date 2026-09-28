@@ -99,4 +99,31 @@ function M.decode(s)
     return value()
 end
 
+-- Values to JSON text: tables with [1] as arrays, other tables as objects.
+function M.encode(v)
+    local t = type(v)
+    if t == "nil" then return "null" end
+    if t == "boolean" then return tostring(v) end
+    if t == "number" then
+        if v ~= v or v == math.huge or v == -math.huge then return "null" end
+        return v == math.floor(v) and string.format("%d", v) or string.format("%.14g", v)
+    end
+    if t == "string" then
+        return '"' .. v:gsub('[%c"\\]', function(c)
+            local named = { ['"'] = '\\"', ["\\"] = "\\\\", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t" }
+            return named[c] or string.format("\\u%04x", c:byte())
+        end) .. '"'
+    end
+    local parts = {}
+    if v[1] ~= nil then
+        for _, x in ipairs(v) do parts[#parts + 1] = M.encode(x) end
+        return "[" .. table.concat(parts, ",") .. "]"
+    end
+    local keys = {}
+    for k in pairs(v) do keys[#keys + 1] = tostring(k) end
+    table.sort(keys)
+    for _, k in ipairs(keys) do parts[#parts + 1] = M.encode(k) .. ":" .. M.encode(v[k]) end
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
 return M

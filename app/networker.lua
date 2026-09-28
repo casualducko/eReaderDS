@@ -24,6 +24,11 @@ local function run(job)
         out:push({ id = job.id, kind = "done", body = body, url = final })
         return
     end
+    if job.kind == "call" then           -- any method and body: { status, body }
+        local status, body = Net.call(job.method, job.url, { headers = job.headers, body = job.body, verify = job.verify })
+        out:push({ id = job.id, kind = "done", status = status, body = body })
+        return
+    end
     if job.kind == "feed" then
         local body, final = Net.get(job.url, opts)
         local ok, feed = pcall(Opds.parse_feed, body, final or job.url)

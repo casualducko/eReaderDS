@@ -359,6 +359,7 @@ local function next_spread()
     end
     save_progress_soon()
     app.check_finished()
+    app.sync_tick()
 end
 
 local function prev_spread()
@@ -926,6 +927,7 @@ end
 
 local function open_book(path)
     app.asking = nil
+    if book and book.path ~= path then app.sync_push() end    -- the book being left
     local ok, b, err = pcall(Book.open, path)
     if not ok or not b then
         show_message("Could not open this book.\n\n" .. tostring(ok and err or b))
@@ -943,6 +945,8 @@ local function open_book(path)
     Store.set_opened(path)
     save_progress()
     app.export_notes(true)                 -- highlights from before there were files
+    app.sync.checked[path], app.sync.pushed[path], app.sync.asked[path] = nil, nil, nil
+    app.sync_pull()                        -- where another device has got to
 end
 
 -- Highlights and bookmarks as a file to read on a computer, like a Kindle's
@@ -1318,6 +1322,7 @@ end
 
 local function go_library()
     save_progress()
+    app.sync_push()
     Store.flush()
     scan_library()
     for i, it in ipairs(library.items) do
@@ -1757,6 +1762,261 @@ local function close_sub()
     menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
 end
 
+---------------------------------------------------------------- KOReader sync
+
+-- Your place in a book, shared with KOReader (on a phone, a Kobo, a Kindle...)
+-- through its sync server (kosync.lua). As KOReader and others do it, with
+-- their lessons learned:
+--  * Opening a book (online), ask the server first. If another device has
+--    been reading it since, offer to go there. Nothing is sent for a book
+--    until that check is done, so a stale place here never overwrites a newer
+--    one there.
+--  * Send the place when leaving the book (My Books, another book, Quit, the
+--    lid, the screens going off) and every few minutes while reading; while
+--    offline it waits for the next chance.
+--  * Places are to the paragraph (Book:xpointer, Book:resolve_xpointer); one
+--    whose paragraph can't be found goes by its chapter and percentage.
+-- EPUB only: KOReader marks places in other kinds of file differently.
+app.KOSync = require("kosync")
+app.sync = { checked = {}, pushed = {}, docs = {}, asked = {}, last_push = 0, last_try = 0 }
+
+function app.sync_on() return S.kosync_user ~= "" and S.kosync_key ~= "" end
+
+-- The book's name on the server (worked out once per book and way of matching).
+function app.sync_doc(b)
+    local key = b.path .. "|" .. S.kosync_match
+    local d = app.sync.docs[key]
+    if d == nil then
+        d = app.KOSync.document(b.path, S.kosync_match) or false
+        app.sync.docs[key] = d
+    end
+    return d or nil
+end
+
+-- This device's id on the server: made once, kept in the settings.
+function app.sync_device_id()
+    if S.kosync_device == "" then
+        local t = {}
+        for i = 1, 16 do t[i] = string.format("%02x", love.math.random(0, 255)) end
+        S.kosync_device = table.concat(t)
+        Store.save_settings(S)
+    end
+    return S.kosync_device
+end
+
+local function ago(t)
+    local d = os.time() - (tonumber(t) or os.time())
+    if d < 120 then return "just now" end
+    if d < 7200 then return math.floor(d / 60) .. " minutes ago" end
+    if d < 172800 then return math.floor(d / 3600) .. " hours ago" end
+    return math.floor(d / 86400) .. " days ago"
+end
+
+-- Ask the server where the open book is up to. interactive ("Sync this book
+-- now"): go there without asking, and say what happened.
+function app.sync_pull(interactive)
+    local b = book
+    if not (b and b.zip and app.sync_on()) then
+        if interactive then app.toast(b and not b.zip and "KOReader sync is for EPUB books" or "Log in to KOReader sync first") end
+        return
+    end
+    local doc = app.sync_doc(b)
+    if not doc then return end
+    if not shop.online() then
+        if interactive then app.toast("Not connected to Wi-Fi") end
+        return
+    end
+    app.sync.pulling, app.sync.last_try = true, love.timer.getTime()
+    shop.net_job(app.KOSync.get_job(S.kosync_server, S.kosync_user, S.kosync_key, doc), function(msg)
+        app.sync.pulling = nil
+        if book ~= b then return end
+        if msg.kind ~= "done" then
+            print("[sync] pull failed: " .. tostring(msg.message))
+            if interactive then app.toast("Couldn't reach the sync server", 3) end
+            return
+        end
+        if msg.status == 401 then
+            if interactive then app.toast("The sync server didn't accept your user name and password", 3) end
+            return
+        end
+        if msg.status ~= 200 then
+            print("[sync] pull: status " .. tostring(msg.status))
+            if interactive then app.toast("The sync server answered " .. tostring(msg.status), 3) end
+            return
+        end
+        -- Checked, so this book's place may be sent from now on: at once when
+        -- there's nothing to decide, else once you've answered (Jump or Stay).
+        -- Until then nothing is sent, so the other device's place is safe.
+        local ok, r = pcall(require("json").decode, msg.body or "")
+        if not ok or type(r) ~= "table" or tonumber(r.percentage) == nil or r.device_id == S.kosync_device then
+            app.sync.checked[b.path] = true
+            -- Nothing there yet, or it's our own: this device is where the book is.
+            print("[sync] pull: " .. ((ok and type(r) == "table" and r.device_id == S.kosync_device) and "ours" or "nothing yet"))
+            if interactive then app.sync.pushed[b.path] = nil; app.sync_push(); app.toast("Sent where you are to the sync server") end
+            return
+        end
+        -- Where that is here: the paragraph, else its chapter and percentage.
+        local frac = math.max(0, math.min(1, tonumber(r.percentage) or 0))
+        local ch, off = b:resolve_xpointer(r.progress)
+        if not off then
+            local lc, loff = b:locate(frac)
+            if not ch or lc == ch then ch, off = lc, loff else off = 0 end
+        end
+        print(string.format("[sync] pull: %s at %.1f%% (%s) -> chapter %d offset %d", tostring(r.device),
+            frac * 100, tostring(r.progress), ch, off))
+        if math.abs(b:fraction(ch, off) - b:fraction(pos.ch, pos.off)) < 0.002 then
+            app.sync.checked[b.path] = true
+            if interactive then app.toast("Already in sync") end
+            return
+        end
+        local device = (r.device and r.device ~= "") and r.device or "another device"
+        local function go()
+            if book ~= b then return end
+            app.sync.checked[b.path] = true
+            app.jump_to(ch, off)
+            app.mode = "reader"
+            app.sync.pushed[b.path] = b:xpointer(pos.ch, pos.off) -- the server has this place already
+            app.toast("Moved to " .. math.floor(frac * 100 + 0.5) .. "%, where you were on " .. device, 3)
+        end
+        if interactive then go() return end
+        app.sync.asked[b.path] = true           -- (not again this time the book is open)
+        app.ask({ question = "Continue from " .. math.floor(frac * 100 + 0.5) .. "%?",
+            detail = "Where you were on " .. device .. ", " .. ago(r.timestamp),
+            yes = "Jump", no = "Stay", on_yes = go,
+            -- Stay: this device's place wins, and is sent next time.
+            on_no = function() if book == b then app.sync.checked[b.path] = true end end })
+    end)
+end
+
+-- Send where the open book is up to. now: leaving the book (the app may quit
+-- or sleep next), so wait for the answer, briefly.
+function app.sync_push(now)
+    local b = book
+    if not (b and b.zip and app.sync_on() and spread) then return end
+    if not app.sync.checked[b.path] then
+        -- Not checked yet (offline when it opened): check first; send next time.
+        if not now and not app.sync.pulling and not app.sync.asked[b.path] and shop.online() then app.sync_pull() end
+        return
+    end
+    local doc = app.sync_doc(b)
+    local xp = doc and b:xpointer(pos.ch, pos.off)
+    if not xp or app.sync.pushed[b.path] == xp or not shop.online() then return end
+    local job = app.KOSync.put_job(S.kosync_server, S.kosync_user, S.kosync_key, doc, xp,
+        b:fraction(pos.ch, pos.off), app.sync_device_id())
+    app.sync.last_push = love.timer.getTime()
+    if now then
+        local ok, status = pcall(require("net").call, job.method, job.url, { headers = job.headers, body = job.body, timeout = 4 })
+        print("[sync] push " .. xp .. ": " .. tostring(ok and status or status))
+        if ok and status and status < 300 then app.sync.pushed[b.path] = xp end
+        return
+    end
+    shop.net_job(job, function(msg)
+        print("[sync] push " .. xp .. ": " .. tostring(msg.status or msg.message))
+        if msg.kind == "done" and msg.status and msg.status < 300 then app.sync.pushed[b.path] = xp end
+    end)
+end
+
+-- After a page turn: send every few minutes; check if that hasn't happened yet.
+function app.sync_tick()
+    if not (book and book.zip and app.sync_on()) then return end
+    local now = love.timer.getTime()
+    if not app.sync.checked[book.path] then
+        if not app.sync.pulling and not app.sync.asked[book.path] and now - app.sync.last_try > 60 and shop.online() then
+            app.sync_pull()
+        end
+    elseif now - app.sync.last_push > 300 then
+        app.sync_push()
+    end
+end
+
+-- Settings → KOReader Sync.
+function app.sync_items()
+    local on = app.sync_on()
+    local host = app.KOSync.server(S.kosync_server):gsub("^https?://", "")
+    local items = {
+        { label = "Account", value = on and S.kosync_user or "Log in", act = app.sync_login },
+        { label = "Server", value = host, act = app.sync_server_edit },
+        { label = "Match books by", value = S.kosync_match == "filename" and "File name" or "File contents",
+          adjust = function()
+              S.kosync_match = S.kosync_match == "filename" and "binary" or "filename"
+              app.sync.checked, app.sync.pushed = {}, {}
+          end },
+    }
+    if on then
+        items[#items + 1] = { label = "Sync this book now", act = function()
+            if not book then app.toast("Open a book first") else app.sync_pull(true) end
+        end }
+        items[#items + 1] = { label = "Log out", act = function()
+            S.kosync_user, S.kosync_key = "", ""
+            Store.save_settings(S)
+            app.sync.checked, app.sync.pushed = {}, {}
+            app.toast("Logged out of KOReader sync")
+        end }
+    end
+    return join(section(nil, items), section("", { { label = "Back", act = close_sub } }))
+end
+
+function app.sync_login()
+    app.kb_open({ title = "KOReader sync: user name", text = S.kosync_user, ok = "Next",
+        hint = "Your KOReader progress sync account (KOReader: Tools → Progress sync). A new name makes a new account.",
+        submit = function(user)
+            app.kb_open({ title = "Password for " .. user, secret = true, ok = "Log in",
+                hint = "The password for " .. user .. " on the sync server.",
+                submit = function(pw) app.sync_auth(user, app.KOSync.md5(pw)) end })
+        end })
+end
+
+function app.sync_auth(user, key)
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
+    app.toast("Logging in…", 20)
+    shop.net_job(app.KOSync.auth_job(S.kosync_server, user, key), function(msg)
+        if msg.kind ~= "done" then app.toast("Couldn't reach the sync server", 3) return end
+        if msg.status == 200 then
+            S.kosync_user, S.kosync_key = user, key
+            Store.save_settings(S)
+            app.sync.checked, app.sync.pushed = {}, {}
+            app.toast("Logged in as " .. user)
+            app.sync_pull()
+        elseif msg.status == 401 then
+            app.untoast()
+            app.ask({ question = "Make a new account?", detail = "“" .. user .. "” isn't an account there with that password. "
+                .. "If it is yours, check the password instead.", yes = "Make it", no = "Cancel",
+                on_yes = function() app.sync_register(user, key) end })
+        else
+            app.toast("The sync server answered " .. tostring(msg.status), 3)
+        end
+    end)
+end
+
+function app.sync_register(user, key)
+    app.toast("Making the account…", 20)
+    shop.net_job(app.KOSync.register_job(S.kosync_server, user, key), function(msg)
+        if msg.kind ~= "done" then app.toast("Couldn't reach the sync server", 3) return end
+        if msg.status == 201 then
+            S.kosync_user, S.kosync_key = user, key
+            Store.save_settings(S)
+            app.sync.checked, app.sync.pushed = {}, {}
+            app.toast("Account made. Logged in as " .. user, 3)
+            app.sync_pull()
+        elseif msg.status == 402 then
+            app.toast("That name is taken: if it's yours, check the password", 4)
+        else
+            app.toast("The sync server answered " .. tostring(msg.status), 3)
+        end
+    end)
+end
+
+function app.sync_server_edit()
+    app.kb_open({ title = "Sync server", text = S.kosync_server, ok = "Save", allow_empty = true,
+        hint = "Leave it empty for KOReader's own server (sync.koreader.rocks), or type your own, "
+            .. "such as https://sync.example.com or http://192.168.1.20:7200.",
+        submit = function(t)
+            S.kosync_server = t
+            Store.save_settings(S)
+            app.sync.checked, app.sync.pushed = {}, {}
+        end })
+end
+
 -- Night theme: another theme, used automatically between two hours (by
 -- the device's clock, like the status bar). app.night says whether it's on
 -- now; checked once a minute.
@@ -1870,6 +2130,7 @@ local function menu_items()
     if menu.page == "more" then return more_items() end
     if menu.page == "night" then return app.night_items() end
     if menu.page == "about" then return app.about_items() end
+    if menu.page == "sync" then return app.sync_items() end
     local th = theme()
     local u = app.upd
     -- Two pages (swipe, or up/down past the end): the everyday things first.
@@ -1949,6 +2210,7 @@ local function menu_items()
         app.menu_on_page(2, section("Other", {
             { label = "Status Bar", value = "›", act = function() open_sub("status") end },
             { label = "Reading & Device", value = "›", act = function() open_sub("more") end },
+            { label = "KOReader Sync", value = app.sync_on() and "On" or "Off", opens = true, act = function() open_sub("sync") end },
             { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
               value_bold = app.upd.state == "available" and "Update" or nil,
               act = function() open_sub("about") end },
@@ -2794,7 +3056,7 @@ local function draw_menu_panel(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(({ status = "Status Bar", more = "Reading & Device", night = "Night Theme",
-        about = "About eReaderDS" })[menu.page] or "Settings", x, 60)
+        about = "About eReaderDS", sync = "KOReader Sync" })[menu.page] or "Settings", x, 60)
     if menu.page == "main" then
         love.graphics.setFont(ui.font)               -- the version, on the title's baseline
         color(th.dim)
@@ -3430,7 +3692,8 @@ end
 -- Before anything that can't be undone, a card on the touchscreen asks:
 -- app.ask({ question = "Delete this bookmark?", detail = "Chapter 3",
 -- yes = "Delete", on_yes = function() ... end }). A or the button does it;
--- B, or a tap anywhere else, keeps things as they are.
+-- B, or a tap anywhere else, keeps things as they are. on_no (optional):
+-- when the other button, or B, was chosen (not just any other press).
 function app.ask(q)
     app.asking = q
     redraw()
@@ -3450,7 +3713,8 @@ function app.ask_action(a)
     local q = app.asking
     if not q or a == "quit" then return false end
     app.asking = nil
-    if a == "confirm" then q.on_yes() end
+    if a == "confirm" then q.on_yes()
+    elseif a == "back" and q.on_no then q.on_no() end
     redraw()
     return true
 end
@@ -3458,10 +3722,12 @@ end
 function app.ask_tap(side, u, v)
     local q = app.asking
     app.asking = nil
-    local dx, dy, dw, dh = app.ask_button("yes")
-    if side == "right" and u >= dx - 12 and u <= dx + dw + 12 and v >= dy - 12 and v <= dy + dh + 12 then
-        q.on_yes()
+    local function hit(which)
+        local bx, by, bw, bh = app.ask_button(which)
+        return side == "right" and u >= bx - 12 and u <= bx + bw + 12 and v >= by - 12 and v <= by + bh + 12
     end
+    if hit("yes") then q.on_yes()
+    elseif hit("no") and q.on_no then q.on_no() end
     redraw()
 end
 
@@ -3663,23 +3929,39 @@ end
 -- touchscreen), what the buttons do on the left. Tap a key, or move with the
 -- D-pad and press A. B deletes (or cancels when empty), Y types a space,
 -- Start or X searches.
-app.KB_ROWS = {}
-for _, row in ipairs({ "1234567890", "qwertyuiop", "asdfghjkl'", "zxcvbnm,.-" }) do
-    local keys = {}
-    for ch in row:gmatch(".") do keys[#keys + 1] = { key = ch, label = ch, span = 1 } end
-    app.KB_ROWS[#app.KB_ROWS + 1] = keys
+-- Three layers: small letters, capitals ("Aa") and symbols ("#@"), for
+-- searches as well as user names, passwords and web addresses.
+app.KB_LAYERS = {
+    lower = { "1234567890", "qwertyuiop", "asdfghjkl'", "zxcvbnm,.-" },
+    upper = { "1234567890", "QWERTYUIOP", "ASDFGHJKL'", "ZXCVBNM,.-" },
+    symbols = { "1234567890", "@#$%&*+=/:", "_~()[]{}<>", "!?;\"`^|\\,." },
+}
+function app.kb_layer(layer)
+    app.KB_ROWS = {}
+    for _, row in ipairs(app.KB_LAYERS[layer]) do
+        local keys = {}
+        for ch in row:gmatch(".") do keys[#keys + 1] = { key = ch, label = ch, span = 1 } end
+        app.KB_ROWS[#app.KB_ROWS + 1] = keys
+    end
+    -- One bottom row, its keys lined up with the columns above.
+    app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "cancel", label = "Cancel", span = 2 },
+        { key = "shift", label = "Aa", span = 1 }, { key = "symbols", label = layer == "symbols" and "abc" or "#@", span = 1 },
+        { key = "space", label = "Space", span = 2 }, { key = "del", label = "Delete", span = 2 },
+        { key = "ok", label = "Search", span = 2 } }
+    if app.kb then app.kb.layer = layer end
 end
--- One bottom row, its keys lined up with the columns above.
-app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "cancel", label = "Cancel", span = 2 }, { key = "space", label = "Space", span = 4 },
-    { key = "del", label = "Delete", span = 2 }, { key = "ok", label = "Search", span = 2 } }
+app.kb_layer("lower")
 app.KB_TOP, app.KB_ROW_H = 300, 112          -- keys area on the right page
-app.KB_MAX = 60                              -- characters
+app.KB_MAX = 120                             -- characters
 
--- Open the keyboard. opts: title, hint, text, submit(text), cancel().
+-- Open the keyboard. opts: title, hint, text, submit(text), cancel(),
+-- ok (the confirm key's label, "Search" by default), secret (show dots).
 function app.kb_open(opts)
     -- No key is highlighted until the D-pad is used (r, c = nil).
     app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "",
-        submit = opts.submit, cancel = opts.cancel, back = app.mode }
+        submit = opts.submit, cancel = opts.cancel, back = app.mode, ok = opts.ok, secret = opts.secret,
+        allow_empty = opts.allow_empty }
+    app.kb_layer("lower")
     app.mode = "keyboard"
     redraw()
 end
@@ -3716,9 +3998,13 @@ function app.kb_press(key)
         app.mode = kb.back
         app.kb = nil
         if kb.cancel then kb.cancel() end
+    elseif key == "shift" then
+        app.kb_layer(kb.layer == "upper" and "lower" or "upper")
+    elseif key == "symbols" then
+        app.kb_layer(kb.layer == "symbols" and "lower" or "symbols")
     elseif key == "ok" then
         local q = kb.text:gsub("^%s+", ""):gsub("%s+$", "")
-        if q == "" then return end
+        if q == "" and not kb.allow_empty then return end
         app.mode = kb.back
         app.kb = nil
         kb.submit(q)
@@ -3808,7 +4094,10 @@ function app.kb_draw(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     local shown = kb.text
-    while ui.title:getWidth(shown .. "|") > w - 20 and #shown > 0 do shown = shown:sub(2) end
+    if kb.secret then shown = string.rep("•", #kb.text:gsub("[\128-\191]", "")) end
+    while ui.title:getWidth(shown .. "|") > w - 20 and #shown > 0 do
+        shown = shown:sub(2):gsub("^[\128-\191]+", "")
+    end
     love.graphics.print(shown .. "|", x0 + 8, 150 + (96 - ui.title:getHeight()) / 2)
     -- The keys.
     love.graphics.setLineWidth(2)
@@ -3823,14 +4112,18 @@ function app.kb_draw(side)
                 color(th.bg)
             else
                 -- Search, the main action, filled; the rest outlined.
-                if k.key == "ok" then color(th.sel); love.graphics.rectangle("fill", kx, ky, kw, kh, 10, 10) end
+                -- (and the layer keys while their layer is on)
+                if k.key == "ok" or (k.key == "shift" and kb.layer == "upper") or (k.key == "symbols" and kb.layer == "symbols") then
+                    color(th.sel); love.graphics.rectangle("fill", kx, ky, kw, kh, 10, 10)
+                end
                 color(th.dim, 0.45)
                 love.graphics.rectangle("line", kx, ky, kw, kh, 10, 10)
                 color(th.fg)
             end
-            local f = #k.label > 1 and ui.font or ui.title
+            local label = k.key == "ok" and (kb.ok or "Search") or k.label
+            local f = #label > 1 and ui.font or ui.title
             love.graphics.setFont(f)
-            love.graphics.printf(k.label, kx, ky + (kh - f:getHeight()) / 2, kw, "center")
+            love.graphics.printf(label, kx, ky + (kh - f:getHeight()) / 2, kw, "center")
         end
     end
 end
@@ -5374,6 +5667,7 @@ end
 
 -- Brightness popup shown while sliding a finger on the touchscreen.
 local overlay = nil        -- { side, pct, hide_at }
+function app.untoast() overlay = nil; redraw() end
 local gesture = nil        -- current touch: { side, u0, v0, mode, p0 }
 
 -- Bottom-screen native coordinates (0..1024 x 0..768) -> page side + page coords.
@@ -5700,6 +5994,7 @@ local function lid_closed()
     Store.flush()
     lid.pct = S.brightness >= 0 and S.brightness or Backlight.get() or 50
     Backlight.power(false)
+    app.sync_push(true)
     lid.since = love.timer.getTime()
     if S.lid == "sleep" then
         if not suspend() then S.lid_failed = true end
@@ -5767,6 +6062,7 @@ function app.idle_tick()
         Store.flush()
         Backlight.power(false)
         print("[idle] screens off")
+        app.sync_push()
     end
 end
 
@@ -6849,6 +7145,7 @@ end
 
 function love.quit()
     if app.recv then app.recv_stop() end
+    app.sync_push(true)
     if net.thread then
         -- Stop a download (its .part file is removed) and the network thread.
         if shop.dl then love.thread.getChannel("net_cancel"):push(shop.dl.id) end

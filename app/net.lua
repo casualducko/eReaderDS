@@ -345,7 +345,9 @@ local function auth_header(auth, opts, path)
 end
 
 -- One request/response. Returns status, headers (lower-case keys), and reads
--- the body into sink(chunk) when the status is 200.
+-- the body into sink(chunk) when the status is 200 (any status with
+-- opts.any_status). opts.method (default GET), opts.headers (extra ones) and
+-- opts.body (sent with opts.content_type) are for the KOReader sync server.
 -- first_byte: seconds to wait for the answer to start (default TIMEOUT).
 local function request(url, opts, auth, sink, first_byte)
     local u = M.parse_url(url)
@@ -356,13 +358,21 @@ local function request(url, opts, auth, sink, first_byte)
         if (u.scheme == "https" and u.port ~= 443) or (u.scheme == "http" and u.port ~= 80) then
             host = host .. ":" .. u.port
         end
+        local extra = opts.headers or {}
         local lines = {
-            "GET " .. u.path .. " HTTP/1.1", "Host: " .. host, "User-Agent: " .. M.USER_AGENT,
-            "Accept: */*", "Accept-Encoding: identity", "Connection: close",
+            (opts.method or "GET") .. " " .. u.path .. " HTTP/1.1", "Host: " .. host, "User-Agent: " .. M.USER_AGENT,
+            "Accept: " .. (extra.Accept or "*/*"), "Accept-Encoding: identity", "Connection: close",
         }
+        for k, v in pairs(extra) do
+            if k ~= "Accept" then lines[#lines + 1] = k .. ": " .. v end
+        end
         local a = auth_header(auth, opts, u.path)
         if a then lines[#lines + 1] = "Authorization: " .. a end
-        conn.send(table.concat(lines, "\r\n") .. "\r\n\r\n")
+        if opts.body then
+            lines[#lines + 1] = "Content-Type: " .. (opts.content_type or "application/json")
+            lines[#lines + 1] = "Content-Length: " .. #opts.body
+        end
+        conn.send(table.concat(lines, "\r\n") .. "\r\n\r\n" .. (opts.body or ""))
 
         local r = reader(conn)
         local status
@@ -388,7 +398,7 @@ local function request(url, opts, auth, sink, first_byte)
                 end
             end
             if status >= 200 then
-                if status ~= 200 then return status, headers end
+                if status ~= 200 and not opts.any_status then return status, headers end
                 local total = tonumber(headers["content-length"])
                 if (headers["transfer-encoding"] or ""):lower():find("chunked") then
                     while true do
@@ -428,6 +438,25 @@ local function request(url, opts, auth, sink, first_byte)
     conn.close()
     if not ok then error(status, 0) end
     return status, headers
+end
+
+-- Any method, with extra headers and a body: returns the status and the body
+-- (whatever the status). Follows redirects. opts.timeout: seconds to wait for
+-- the answer to start (10). For the KOReader sync server.
+function M.call(method, url, opts)
+    opts = opts or {}
+    local o = { method = method, headers = opts.headers, body = opts.body, content_type = opts.content_type,
+        verify = opts.verify, any_status = true }
+    for _ = 1, 5 do
+        local parts = {}
+        local status, headers = request(url, o, nil, function(d) parts[#parts + 1] = d end, opts.timeout or 10)
+        if (status == 301 or status == 302 or status == 307 or status == 308) and headers.location then
+            url = M.resolve(url, headers.location)
+        else
+            return status, table.concat(parts)
+        end
+    end
+    error("too many redirects")
 end
 
 local auth_cache = {}      -- "scheme://host:port" -> { scheme, params } from the last challenge

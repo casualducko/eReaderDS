@@ -130,6 +130,10 @@ local function parse_html(html, base, classes, show_notes)
     local blocks, anchors = {}, {}
     local off = 0
     local stack = {}          -- open elements with their style
+    -- The element tree under <body>, as KOReader numbers it (for its sync
+    -- positions): each node counts its children by name.
+    local root = { name = "body", counts = {} }
+    local dom, body_seen, last_node = { root }, false, root
     local cur = nil           -- current text block
     local skipping = 0
     local last_blank = false
@@ -161,7 +165,7 @@ local function parse_html(html, base, classes, show_notes)
         if not cur then
             local s = style()
             cur = { kind = "text", runs = {}, off = off, center = s.center,
-                heading = s.heading, list = s.list }
+                heading = s.heading, list = s.list, node = dom[#dom] }
         end
     end
 
@@ -275,6 +279,24 @@ local function parse_html(html, base, classes, show_notes)
             if name then
                 name = name:lower():gsub("^.*:", "")
                 local selfclose = tag:sub(-2) == "/>"
+                -- The element tree: count this element among its parent's
+                -- children of the same name, and open it (or close it).
+                if closing == "/" then
+                    for k = #dom, 2, -1 do
+                        if dom[k].name == name then
+                            for _ = #dom, k, -1 do table.remove(dom) end
+                            break
+                        end
+                    end
+                elseif name == "body" and not body_seen then
+                    body_seen = true
+                else
+                    local parent = dom[#dom]
+                    local n = (parent.counts[name] or 0) + 1
+                    parent.counts[name] = n
+                    last_node = { name = name, idx = n, parent = parent, counts = {} }
+                    if not selfclose and not VOID[name] then dom[#dom + 1] = last_node end
+                end
                 if closing == "/" then
                     if SKIP[name] then skipping = math.max(0, skipping - 1) end
                     if BLOCK[name] then flush() end
@@ -291,12 +313,12 @@ local function parse_html(html, base, classes, show_notes)
                         end
                     elseif name == "hr" then
                         flush()
-                        blocks[#blocks + 1] = { kind = "rule", off = off }
+                        blocks[#blocks + 1] = { kind = "rule", off = off, node = last_node }
                     elseif name == "img" or name == "image" then
                         local src = attr(tag, "src") or attr(tag, "xlink:href") or attr(tag, "href")
                         if src and skipping == 0 and not style().hidden then
                             flush()
-                            blocks[#blocks + 1] = { kind = "image", src = resolve(base, src), off = off }
+                            blocks[#blocks + 1] = { kind = "image", src = resolve(base, src), off = off, node = last_node }
                             off = off + 1
                         end
                     else
@@ -559,6 +581,71 @@ function M.open(path)
 end
 
 -- Ensure chapter i has parsed blocks.
+---------------------------------------------------------------- KOReader positions
+
+-- KOReader (and the sync servers it uses) marks a place in an EPUB with an
+-- XPointer: /body/DocFragment[N]/body/div/p[4]/text().233 is the 4th p in
+-- the div in the Nth spine item (our chapter N). We give and take them to the
+-- paragraph: the element a block starts in, with [n] where the name is shared
+-- by siblings, as KOReader writes them.
+local function node_path(node, explicit)
+    local parts = {}
+    while node and node.parent do
+        local shared = (node.parent.counts[node.name] or 1) > 1
+        parts[#parts + 1] = node.name .. ((explicit or shared) and ("[" .. node.idx .. "]") or "")
+        node = node.parent
+    end
+    local out = {}
+    for k = #parts, 1, -1 do out[#out + 1] = parts[k] end
+    return table.concat(out, "/")
+end
+
+-- The XPointer of the paragraph at chapter i, offset off (nil for TXT books).
+function Book:xpointer(i, off)
+    if not self.zip then return nil end
+    local c = self:chapter(i)
+    if not c then return nil end
+    local node
+    for _, b in ipairs(c.blocks) do
+        if b.off > off then break end
+        node = b.node or node
+    end
+    local path = node and node_path(node) or ""
+    return "/body/DocFragment[" .. i .. "]/body" .. (path ~= "" and ("/" .. path) or "")
+end
+
+-- Where an XPointer is: chapter, offset, and whether its element was found
+-- (exact) or only some element around it. nil if it isn't in this book;
+-- the chapter alone (offset nil) if nothing in it matched.
+function Book:resolve_xpointer(xp)
+    local i = tonumber((xp or ""):match("^/body/DocFragment%[(%d+)%]"))
+    if not i or not self.zip or not self.chapters[i] then return nil end
+    local c = self:chapter(i)
+    local rest = xp:match("^/body/DocFragment%[%d+%]/body(.*)$") or ""
+    local steps = {}
+    for step in rest:gmatch("[^/]+") do
+        if step:match("^text%(") then break end
+        local name, n = step:match("^([%w:%-_]+)%[?(%d*)%]?")
+        if not name then break end
+        steps[#steps + 1] = name:lower():gsub("^.*:", "") .. "[" .. (tonumber(n) or 1) .. "]"
+    end
+    -- Every element that starts a block (and its ancestors) -> first offset.
+    local first = {}
+    for _, b in ipairs(c.blocks) do
+        local node = b.node
+        while node and node.parent do
+            local key = node_path(node, true)
+            if not first[key] then first[key] = b.off end
+            node = node.parent
+        end
+    end
+    for n = #steps, 1, -1 do
+        local off = first[table.concat(steps, "/", 1, n)]
+        if off then return i, off, n == #steps end
+    end
+    return i, nil, false
+end
+
 function Book:chapter(i)
     local c = self.chapters[i]
     if not c then return nil end

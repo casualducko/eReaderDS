@@ -242,6 +242,36 @@ or copy on a computer (like a Kindle's "My Clippings"):
 `Ebook/Highlights/Title - Author.md`, in reading order under each chapter.
 It's written again whenever they change, so add your own notes elsewhere.
 
+## KOReader Sync
+
+If you also read in **KOReader** (on a phone, Kobo, Kindle, PocketBook, or an
+Xteink with CrossPoint), eReaderDS can share your place in a book with it
+through KOReader's progress sync server, so each picks up where the other
+left off.
+
+1. In KOReader: **Tools → Progress sync → Register / Login** (once).
+2. Here: **Settings → KOReader Sync → Account**, and type the same user name
+   and password (a new name makes a new account). **Server** is KOReader's own
+   (`sync.koreader.rocks`) unless you run your own (Kavita, Komga,
+   Calibre-Web, BookLore and others can be sync servers, or
+   `koreader-sync-server`); type its address, such as
+   `http://192.168.1.20:7200`.
+3. Read. When you open a book, eReaderDS checks the server; if another device
+   has been reading it since, it asks **Continue from 45%?** (Jump or Stay).
+   It sends your place when you leave the book, close the lid, or the screens
+   go off, and every few minutes while reading. **Sync this book now** does
+   both at once.
+
+Places are matched to the paragraph (you may land a page or so from where the
+other device was, since screens differ). EPUB books only.
+
+**The same book on both devices:** by default a book is recognised by its
+file's contents, as in KOReader, so both need the *same file*. If they don't
+match (Calibre can change a book when it sends it to a device), set **Match
+books by** to **File name** here and in KOReader (Progress sync → Document
+matching method), and give the files the same name on both. The public
+server is free and sometimes slow or down; eReaderDS simply tries again later.
+
 ## Dictionaries
 
 While reading, press **Y**: a cursor appears on a word. Left/right move it

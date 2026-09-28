@@ -28,6 +28,10 @@ local DEFAULTS = {
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)
     lib_hide_finished = false, -- My Books leaves out the books marked finished
     idle_min = 10,     -- left alone this many minutes, the screens dim, then turn off (0 = never)
+    -- KOReader sync (kosync.lua): the account (the key is the password's MD5,
+    -- as KOReader keeps it), the server ("" = the public one), how books are
+    -- matched, and this device's id there.
+    kosync_user = "", kosync_key = "", kosync_server = "", kosync_match = "binary", kosync_device = "",
 }
 
 local function data_dir()
@@ -132,6 +136,7 @@ function M.load_settings()
         lid = { sleep = true, screen = true },
         tap = { next = true, menu = true },
         anim = { flip = true, fade = true, off = true },
+        kosync_match = { binary = true, filename = true },
     }
     for k, allowed in pairs(ENUMS) do
         if allowed and not allowed[s[k]] then s[k] = DEFAULTS[k] end

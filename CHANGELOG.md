@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- **KOReader Sync:** share your place in a book with KOReader through its
+  progress sync server (Settings → KOReader Sync: account, server, match
+  books by file contents or file name, sync this book now, log out). The
+  kosync protocol as KOReader's plugin speaks it (`kosync.lua`): the partial
+  MD5 of the file (checked against KOReader's util.partialMD5) or of its name,
+  x-auth-user / x-auth-key (the password's MD5), /users/auth, /users/create,
+  GET and PUT /syncs/progress. Opening a book asks the server first and, if
+  another device has been reading it since, offers to jump there (Jump /
+  Stay); nothing is sent for a book until that's settled, so an older place
+  here never overwrites a newer one there (the bug other readers hit). Sent
+  when leaving the book (My Books, another book, Quit, lid, screens off) and
+  every 5 minutes of reading. Places are to the paragraph: `Book:xpointer`
+  gives KOReader's /body/DocFragment[n]/body/... path of the paragraph at the
+  top of the page (the parser now keeps the element tree, numbered as
+  KOReader's engine does), and `Book:resolve_xpointer` finds one (tested
+  against KOReader's own pointers for five EPUBs: the right chapter always,
+  the word within the landing paragraph 99.8-100%), else by chapter and
+  percentage. `net.call` sends any method with a body; the keyboard gained
+  capitals ("Aa"), symbols ("#@") and hidden passwords.
+
 ## v1.8.0
 
 - **Screens off when left alone:** Settings → Reading & Device → **Screens
