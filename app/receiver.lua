@@ -229,7 +229,8 @@ local function clean_name(raw)
     name = name:gsub("[%c\"`$\\:*?<>|]", ""):gsub("^[%s%.]+", ""):gsub("%s+$", "")
     if #name > 200 then
         local ext = name:match("(%.[^.]+)$") or ""
-        name = name:sub(1, 200 - #ext) .. ext
+        local stem = name:sub(1, 200 - #ext):gsub("[\192-\255][\128-\191]*$", "")   -- not half a character
+        name = stem .. ext
     end
     return name
 end

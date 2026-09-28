@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **Review of everything since v1.2.0** (Send Books, Standard Ebooks,
+  scrolling lists, the new list screens, My Books folders, titles, finished
+  and series, highlight files, screens off, KOReader Sync). Fixed:
+  - KOReader Sync: once a "Continue from…?" question had been answered, the
+    regular 5-minute check stopped for the rest of the session. It goes on
+    now.
+  - KOReader Sync: quitting or closing the lid waits for the send, briefly;
+    the limit now covers connecting and the secure handshake too (it could
+    take 20 s on a server that didn't answer), and after a failure the
+    waiting send is skipped for 10 minutes. All sync requests give up after
+    8 s (quitting waits for one that's running).
+  - Send Books: a very long file name was cut in the middle of a character
+    (Japanese titles, say); uploads cut off by the app closing left hidden
+    .part files behind, now removed when receiving starts.
+  - Find in Book: the paragraph shown could start or end halfway through a
+    character when there was no space nearby.
+
 - **KOReader Sync:** share your place in a book with KOReader through its
   progress sync server (Settings → KOReader Sync: account, server, match
   books by file contents or file name, sync this book now, log out). The

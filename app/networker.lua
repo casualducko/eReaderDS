@@ -25,7 +25,8 @@ local function run(job)
         return
     end
     if job.kind == "call" then           -- any method and body: { status, body }
-        local status, body = Net.call(job.method, job.url, { headers = job.headers, body = job.body, verify = job.verify })
+        local status, body = Net.call(job.method, job.url, { headers = job.headers, body = job.body, verify = job.verify,
+            timeout = job.timeout })
         out:push({ id = job.id, kind = "done", status = status, body = body })
         return
     end

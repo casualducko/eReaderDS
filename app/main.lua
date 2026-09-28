@@ -1856,9 +1856,11 @@ function app.sync_pull(how)
         if book ~= b then return end
         if msg.kind ~= "done" then
             print("[sync] pull failed: " .. tostring(msg.message))
+            app.sync.failed = love.timer.getTime()
             if now then app.toast("Couldn't reach the sync server", 3) end
             return
         end
+        app.sync.failed = nil
         if msg.status == 401 then
             if now then app.toast("The sync server didn't accept your user name and password", 3) end
             return
@@ -1917,7 +1919,7 @@ function app.sync_pull(how)
         local device = (r.device and r.device ~= "") and r.device or "another device"
         local function go()
             if book ~= b then return end
-            app.sync.checked[b.path] = true
+            app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
             app.jump_to(ch, off)
             app.mode = "reader"
             app.sync.moved[b.path] = nil
@@ -1935,7 +1937,7 @@ function app.sync_pull(how)
             -- Stay: this device's place wins, and is sent.
             on_no = function()
                 if book ~= b then return end
-                app.sync.checked[b.path] = true
+                app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
                 app.sync.pushed[b.path] = nil
                 app.sync_push()
             end })
@@ -1967,14 +1969,18 @@ function app.sync_push(now)
         if ok and type(r) == "table" and r.timestamp then app.sync.seen[b.path] = r.timestamp end
     end
     if now then
+        -- Waited for (the app may quit or sleep next), briefly, and not at all
+        -- when the server just failed: quitting mustn't hang on a dead server.
+        if app.sync.failed and love.timer.getTime() - app.sync.failed < 600 then return end
         local ok, status, body = pcall(require("net").call, job.method, job.url, { headers = job.headers, body = job.body, timeout = 4 })
         print("[sync] push " .. xp .. ": " .. tostring(status))
-        if ok then sent(status, body) end
+        if ok then sent(status, body) else app.sync.failed = love.timer.getTime() end
         return
     end
     shop.net_job(job, function(msg)
         print("[sync] push " .. xp .. ": " .. tostring(msg.status or msg.message))
-        if msg.kind == "done" then sent(msg.status, msg.body) end
+        if msg.kind == "done" then sent(msg.status, msg.body); app.sync.failed = nil
+        else app.sync.failed = love.timer.getTime() end
     end)
 end
 
@@ -5366,10 +5372,17 @@ function app.find_draw_left(f, x, w, status)
     y = y + ui.small:getHeight() + 18
     -- The paragraph, cut to a window around the match at spaces.
     local text = r.text
+    -- (at spaces, or at least between characters)
     local a = math.max(1, r.s0 - 450)
-    if a > 1 then a = (text:find(" ", a, true) or a) + 1 end
+    if a > 1 then
+        local sp = text:find(" ", a, true)
+        if sp and sp < r.s0 then a = sp + 1 else while a < r.s0 and text:byte(a) >= 0x80 and text:byte(a) < 0xC0 do a = a + 1 end end
+    end
     local b = math.min(#text, r.s1 + 700)
-    if b < #text then b = (text:sub(1, b):match(".*() ") or b + 1) - 1 end
+    if b < #text then
+        local sp = text:sub(1, b):match(".*() ")
+        if sp and sp > r.s1 then b = sp - 1 else while b > r.s1 and (text:byte(b + 1) or 0) >= 0x80 and (text:byte(b + 1) or 0) < 0xC0 do b = b - 1 end end
+    end
     local lead = a > 1 and "… " or ""
     local function squash(t) return (t:gsub("%s+", " ")) end
     local pre, mid = squash(text:sub(a, r.s0 - 1)), squash(text:sub(r.s0, r.s1))
@@ -6933,8 +6946,13 @@ function app.recv_open()
     love.thread.getChannel("recv_ctl"):clear()
     love.thread.getChannel("recv_out"):clear()
     local r = { ip = ip, files = {}, back = app.mode, books = 0, fonts = 0 }
+    local books, fonts = Store.download_dir(), Fonts.user_dir()
+    -- Uploads cut off by the app closing leave hidden .part files: tidy them.
+    for _, d in ipairs({ books, fonts }) do
+        if d then os.execute('rm -f "' .. d .. '"/.*.part 2>/dev/null') end
+    end
     r.thread = love.thread.newThread("receiver.lua")
-    r.thread:start({ books = Store.download_dir(), fonts = Fonts.user_dir(), version = VERSION })
+    r.thread:start({ books = books, fonts = fonts, version = VERSION })
     app.recv = r
     app.mode = "receive"
     redraw()

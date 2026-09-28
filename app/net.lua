@@ -247,9 +247,9 @@ end
 
 ---------------------------------------------------------------- HTTP
 
-local function connect(u, verify)
+local function connect(u, verify, limit)
     local sock = socket.tcp()
-    sock:settimeout(TIMEOUT)
+    sock:settimeout(limit or TIMEOUT)
     local ok, err = sock:connect(u.host, u.port)
     if not ok then
         sock:close()
@@ -352,7 +352,11 @@ end
 local function request(url, opts, auth, sink, first_byte)
     local u = M.parse_url(url)
     if not u or (u.scheme ~= "http" and u.scheme ~= "https") then error("not a web address: " .. tostring(url)) end
-    local conn = connect(u, opts.verify ~= false)
+    -- A short limit (opts.connect_timeout) also covers the TLS handshake.
+    wait_limit = opts.connect_timeout or TIMEOUT
+    local ok_c, conn = pcall(connect, u, opts.verify ~= false, opts.connect_timeout)
+    wait_limit = TIMEOUT
+    if not ok_c then error(conn, 0) end
     local ok, status, headers = pcall(function()
         local host = u.host
         if (u.scheme == "https" and u.port ~= 443) or (u.scheme == "http" and u.port ~= 80) then
@@ -446,7 +450,7 @@ end
 function M.call(method, url, opts)
     opts = opts or {}
     local o = { method = method, headers = opts.headers, body = opts.body, content_type = opts.content_type,
-        verify = opts.verify, any_status = true }
+        verify = opts.verify, any_status = true, connect_timeout = opts.timeout }
     for _ = 1, 5 do
         local parts = {}
         local status, headers = request(url, o, nil, function(d) parts[#parts + 1] = d end, opts.timeout or 10)

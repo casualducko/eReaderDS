@@ -18,6 +18,7 @@ M.SERVERS = { crosspoint = "https://sync.crosspointreader.com", koreader = "http
 M.SERVER_NAMES = { crosspoint = "CrossPoint", koreader = "KOReader", custom = "Your own" }
 M.DEFAULT_SERVER = M.SERVERS.crosspoint
 M.DEVICE = "RG DS Plus"
+M.TIMEOUT = 8        -- seconds to connect and to start answering (quitting waits for a request)
 
 local function md5hex(s) return love.data.encode("string", "hex", love.data.hash("md5", s)) end
 M.md5 = md5hex
@@ -62,18 +63,19 @@ end
 
 -- A network job (for shop.net_job) for each request.
 function M.auth_job(server, user, key)
-    return { kind = "call", method = "GET", url = M.server(server) .. "/users/auth", headers = M.headers(user, key) }
+    return { kind = "call", method = "GET", url = M.server(server) .. "/users/auth", headers = M.headers(user, key),
+        timeout = M.TIMEOUT }
 end
 
 function M.register_job(server, user, key)
     local h = { Accept = "application/vnd.koreader.v1+json" }
     return { kind = "call", method = "POST", url = M.server(server) .. "/users/create", headers = h,
-        body = require("json").encode({ username = user, password = key }) }
+        body = require("json").encode({ username = user, password = key }), timeout = M.TIMEOUT }
 end
 
 function M.get_job(server, user, key, doc)
     return { kind = "call", method = "GET", url = M.server(server) .. "/syncs/progress/" .. doc,
-        headers = M.headers(user, key) }
+        headers = M.headers(user, key), timeout = M.TIMEOUT }
 end
 
 -- metadata (optional, "Send book details"): { filename, title, authors },
@@ -82,7 +84,7 @@ function M.put_job(server, user, key, doc, progress, percentage, device_id, meta
     return { kind = "call", method = "PUT", url = M.server(server) .. "/syncs/progress", headers = M.headers(user, key),
         body = require("json").encode({ document = doc, progress = progress,
             percentage = math.floor(percentage * 10000 + 0.5) / 10000,
-            device = M.DEVICE, device_id = device_id, metadata = metadata }) }
+            device = M.DEVICE, device_id = device_id, metadata = metadata }), timeout = M.TIMEOUT }
 end
 
 return M
