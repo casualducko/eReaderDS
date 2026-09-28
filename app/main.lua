@@ -3850,7 +3850,13 @@ function app.fget_load()
         if not ok or type(data) ~= "table" or type(data.fonts) ~= "table" then
             g.error = "Couldn't read the list of fonts."
         else
-            g.list = data.fonts
+            -- Not the ones built in (a font can move into the app later).
+            local bundled = {}
+            for _, f in ipairs(Fonts.list()) do if f.bundled then bundled[f.name] = true end end
+            g.list = {}
+            for _, e in ipairs(data.fonts) do
+                if type(e) == "table" and e.name and not bundled[e.name] then g.list[#g.list + 1] = e end
+            end
             for _, e in ipairs(g.list) do app.fget_fetch_preview(e) end     -- small: get them all now
         end
         redraw()
