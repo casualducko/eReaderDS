@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Font** in Settings opens its own spread: the fonts on the touchscreen,
+  each in its own typeface, and a sample page on the other screen that
+  changes as you scroll. Left/right set the size; A or a second tap uses it.
 - **Seven more fonts:** EB Garamond, Lora, Merriweather, PT Serif, Spectral,
   Vollkorn and Andika (all SIL Open Font License), for 17 built in.
 - **Find in book** results stand out more: each one's chapter is in bold,

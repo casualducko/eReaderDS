@@ -1471,7 +1471,8 @@ local function menu_items()
             -- The font's name is drawn in the font itself: a preview, and the only way
             -- names in other scripts (e.g. Chinese firmware fonts) can display.
             { label = "Font", value = fonts.name or S.font,
-              value_font = Fonts.preview(fonts.name or S.font, UI_SIZE), adjust = function(d)
+              value_font = Fonts.preview(fonts.name or S.font, UI_SIZE),
+              act = function() app.font_open() end, adjust = function(d)
                 local list = Fonts.list()
                 local idx = 1
                 for k, f in ipairs(list) do if f.name == fonts.name then idx = k end end
@@ -2732,6 +2733,145 @@ function app.kb_draw(side)
     end
 end
 
+---------------------------------------------------------------- font picker
+
+-- Font, as a spread: the fonts on the right (the touchscreen), each name in
+-- its own face, and a sample page on the left in the highlighted one at the
+-- chosen size. Up/down pick a font, left/right the size; A (or tapping the
+-- chosen font again) uses them, B leaves things as they were.
+app.FONT_ROW_H = 58
+-- Rows that fit above the footer.
+function app.font_rows() return list_rows(app.FONT_ROW_H) - 1 end
+app.FONT_SAMPLE = {
+    { "h", "Chapter One" },
+    { "r", "It is a truth universally acknowledged, that a single man in possession of a good "
+        .. "fortune, must be in want of a wife. However little known the feelings or views of such "
+        .. "a man may be on his first entering a neighbourhood, this truth is so well fixed in the "
+        .. "minds of the surrounding families, that he is considered as the rightful property of "
+        .. "some one or other of their daughters." },
+    { "i", "“My dear Mr. Bennet,” said his lady to him one day, “have you heard that Netherfield "
+        .. "Park is let at last?”" },
+    { "r", "Mr. Bennet replied that he had not." },
+}
+
+function app.font_open()
+    local list = Fonts.list()
+    local fp = { list = list, sel = 1, top = 1, size = S.font_size }
+    for i, f in ipairs(list) do if f.name == fonts.name then fp.sel = i end end
+    app.font_pick = fp
+    app.mode = "fonts"
+    redraw()
+end
+
+-- The highlighted font's faces at the chosen size, loaded once; the previous
+-- ones are released so scrolling through fonts doesn't pile them up.
+function app.font_sample()
+    local fp = app.font_pick
+    local name = fp.list[fp.sel].name
+    local cur = fp.sample
+    if cur and cur.name == name and cur.size == fp.size then return cur.f end
+    if cur then for _, f in pairs(cur.f) do f:release() end end
+    local f = Fonts.load(name, fp.size)
+    fp.sample = { name = name, size = fp.size, f = f }
+    return f
+end
+
+function app.font_close(apply)
+    local fp = app.font_pick
+    if fp.sample then for _, f in pairs(fp.sample.f) do f:release() end end
+    if apply then
+        S.font, S.font_size = fp.list[fp.sel].name, fp.size
+        build_fonts()
+        goto_pos(pos.ch, pos.off)
+        Store.save_settings(S)
+    end
+    app.font_pick = nil
+    app.mode = "menu"
+    redraw()
+end
+
+function app.font_action(a)
+    local fp = app.font_pick
+    local n = #fp.list
+    if a == "up" then fp.sel = math.max(1, fp.sel - 1)
+    elseif a == "down" then fp.sel = math.min(n, fp.sel + 1)
+    elseif a == "left" or a == "prev" then fp.size = math.max(18, fp.size - 2)
+    elseif a == "right" or a == "next" then fp.size = math.min(64, fp.size + 2)
+    elseif a == "confirm" then app.font_close(true) return
+    elseif a == "back" or a == "menu" then app.font_close(false) return
+    end
+    redraw()
+end
+
+function app.font_tap(side, u, v)
+    if side ~= "right" then return end
+    local fp = app.font_pick
+    local idx = fp.top + math.floor((v - 160) / app.FONT_ROW_H)
+    if v < 160 or idx >= fp.top + app.font_rows() or not fp.list[idx] then return end
+    if idx == fp.sel then app.font_close(true) else fp.sel = idx; redraw() end
+end
+
+function app.font_draw(side)
+    local th = theme()
+    local fp = app.font_pick
+    if side == "left" then
+        -- A sample page, laid out roughly like the reader's.
+        local f = app.font_sample()
+        local m = margins()
+        local x, w = m.outer, PAGE_W - m.outer - m.inner
+        local lh = math.floor(math.max(f.r:getHeight(), fp.size * 1.4) * S.spacing + 0.5)
+        local y = vmargin() + 10
+        local limit = PAGE_H - vmargin()
+        for k, para in ipairs(app.FONT_SAMPLE) do
+            local font = f[para[1]]
+            love.graphics.setFont(font)
+            color(th.fg)
+            if para[1] == "h" then
+                love.graphics.printf(para[2], x, y, w, "center")
+                y = y + font:getHeight() * 1.6
+            else
+                font:setLineHeight(lh / font:getHeight())
+                local align = S.justify and "justify" or "left"
+                local _, lines = font:getWrap(para[2], w - (k > 2 and 40 or 0))
+                for li, line in ipairs(lines) do
+                    if y + lh > limit then break end
+                    local indent = (li == 1 and k > 2) and 40 or 0
+                    love.graphics.printf(line, x + indent, y, w - indent, li < #lines and align or "left")
+                    y = y + lh
+                end
+                font:setLineHeight(1)
+            end
+            if y + lh > limit then break end
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("Size " .. fp.size, x, PAGE_H - 70, w, "right")
+        return
+    end
+    local m = MARGINS[2]
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print("Font", x, 60)
+    local rows = app.font_rows()
+    if fp.sel < fp.top then fp.top = fp.sel end
+    if fp.sel >= fp.top + rows then fp.top = fp.sel - rows + 1 end
+    draw_list(side, fp.list, fp.sel, fp.top, rows, x, 160, w, app.FONT_ROW_H, function(it, _, rx, ry, rw)
+        local pf = Fonts.preview(it.name, UI_SIZE) or ui.font
+        love.graphics.setFont(pf)
+        color(th.fg)
+        love.graphics.print(fit_text(pf, it.name, rw - 40), rx, centered_y(pf, UI_SIZE, ry, app.FONT_ROW_H - 4))
+        if it.name == fonts.name then
+            love.graphics.setFont(ui.font)
+            love.graphics.printf("✓", rx, centered_y(ui.font, UI_SIZE, ry, app.FONT_ROW_H - 4), rw, "right")
+        end
+    end)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print("A use      B back      ‹ › size", x, PAGE_H - 70)
+    love.graphics.printf(fp.sel .. " / " .. #fp.list, x, PAGE_H - 70, w, "right")
+end
+
 ---------------------------------------------------------------- find in book
 
 -- Search the open book for a word or phrase (not case-sensitive). Runs a
@@ -2990,6 +3130,7 @@ local function render_canvases()
     elseif app.mode == "about" then painter = draw_about
     elseif app.mode == "help" then painter = app.draw_help
     elseif app.mode == "keyboard" then painter = app.kb_draw
+    elseif app.mode == "fonts" then painter = app.font_draw
     elseif app.mode == "find" then painter = app.find_draw
     elseif app.mode == "message" then painter = draw_message
     else painter = draw_library end
@@ -3529,6 +3670,7 @@ function handle_action(a)
     end
 
     if mode == "keyboard" then app.kb_action(a) return end
+    if mode == "fonts" then app.font_action(a) return end
     if mode == "find" then app.find_action(a) return end
 
     if mode == "about" or mode == "help" then
@@ -3754,6 +3896,8 @@ function app.on_tap(side, u, v)
         action("back")
     elseif mode == "keyboard" then
         app.kb_tap(side, u, v)
+    elseif mode == "fonts" then
+        app.font_tap(side, u, v)
     elseif mode == "find" then
         -- Like Contents: a tap on a result (right column) opens it.
         local f, rows = app.find, list_rows(96)
