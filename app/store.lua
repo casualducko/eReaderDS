@@ -26,6 +26,7 @@ local DEFAULTS = {
     night_to = 7,      -- ... until this one
     skip_version = "", -- a version the reader chose to skip (not mentioned again)
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)
+    lib_hide_finished = false, -- My Books leaves out the books marked finished
 }
 
 local function data_dir()
@@ -369,6 +370,34 @@ function M.save_meta(keep)
     write_atomic(path("library.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
 end
 
+-- finished.txt: books marked finished (by reaching the end, or by hand):
+-- path \t unix time.
+local finished
+local function load_finished()
+    if finished then return finished end
+    finished = {}
+    local f = io.open(path("finished.txt"), "rb")
+    if f then
+        for line in f:lines() do
+            local p, t = line:match("^(.-)\t(%d+)$")
+            if p then finished[p] = tonumber(t) end
+        end
+        f:close()
+    end
+    return finished
+end
+
+-- When the book was finished, or nil.
+function M.get_finished(p) return load_finished()[p] end
+
+function M.set_finished(p, on)
+    load_finished()[p] = on and os.time() or nil
+    local out = {}
+    for q, t in pairs(load_finished()) do out[#out + 1] = q .. "\t" .. t end
+    table.sort(out)
+    write_atomic(path("finished.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
+end
+
 -- Forget a deleted book: its progress, bookmarks and "last opened".
 function M.forget(p)
     load_progress()[p] = nil
@@ -376,6 +405,7 @@ function M.forget(p)
     M.set_bookmarks(p, {})
     if load_highlights()[p] then M.set_highlights(p, {}) end
     if load_opened()[p] then load_opened()[p] = nil; write_opened() end
+    if load_finished()[p] then M.set_finished(p, false) end
     if M.get_last() == p then
         os.remove(path("last.txt"))
         last_written[path("last.txt")] = nil

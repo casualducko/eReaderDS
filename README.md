@@ -83,7 +83,7 @@ Directions are as you hold it.
 | D-pad or stick | Turn pages (right/down forward) | Up/down move; left/right change a value, page through a list, or change the library's sort order |
 | A | Show the notes on these pages | Select |
 | B | Settings | Back |
-| Y | Look up (or highlight) a word | Delete (a book in the library, a bookmark or highlight in the list) |
+| Y | Look up (or highlight) a word | In My Books: options (mark finished, hide finished books, delete); in Bookmarks and Highlights: delete |
 | Select | Bookmark the page (again to remove) | Close; in the library: Get Books |
 | Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
 | Menu (Anbernic button) | Quit | Quit |
@@ -149,7 +149,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   inside it (a copied Calibre library works as it is), listed by the title and
   author inside each book (not the file name); covers and progress, sorted by
   recent, title, author (by last name) or
-  progress; delete books from it.
+  progress; each shows "Reading · 16%" or "Finished ✓". A book is marked
+  finished when you reach its last page (or by hand: **Y** in My Books, which
+  can also hide finished books, or delete a book).
 - **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in Book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
   and the words are marked on the page you open). Your place in every book is

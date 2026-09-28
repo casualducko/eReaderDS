@@ -354,9 +354,12 @@ local function next_spread()
     elseif spread.ch < #book.chapters then
         set_spread(spread.ch + 1, 1)
     else
+        -- Already on the last page: finished, if it wasn't yet.
+        if Store.get_finished(book.path) then app.toast("The end") else app.check_finished() end
         return
     end
     save_progress_soon()
+    app.check_finished()
 end
 
 local function prev_spread()
@@ -953,6 +956,22 @@ local function author_key(a, sort)
     return a:match("(%S+)$") or ""
 end
 
+-- The last spread of the book: mark it finished (once) and say so.
+function app.check_finished()
+    if not book or not spread or spread.ch < #book.chapters or spread.pi + 2 <= #spread.pages then return end
+    if not Store.get_finished(book.path) then
+        Store.set_finished(book.path, true)
+        app.toast("Finished!\nIt's marked as finished in My Books", 3)
+    end
+end
+
+-- "Finished ✓", "Reading · 16%", or nil for a book not started.
+function app.book_status(p)
+    if Store.get_finished(p) then return "Finished ✓" end
+    local pr = Store.get_progress(p)
+    if pr and pr.pct >= 0.005 then return "Reading  ·  " .. math.floor(pr.pct * 100 + 0.5) .. "%" end
+end
+
 function library.sort(items)
     local mode = S.lib_sort
     local key = {}
@@ -966,7 +985,7 @@ function library.sort(items)
             -- Books you're reading (most read first), then unread, then finished.
             local pr = Store.get_progress(it.path)
             local pct = pr and pr.pct or 0
-            k.group = (pct >= 0.99 and 3) or (pct > 0 and 1) or 2
+            k.group = (Store.get_finished(it.path) and 3) or (pct > 0 and 1) or 2
             k.pct = pct
         end
         key[it] = k
@@ -1077,6 +1096,13 @@ local function scan_library()
             end
         end
     end
+    -- "Hide finished books" (Y in My Books): leave them out, counting them.
+    library.hidden = 0
+    if S.lib_hide_finished then
+        for k = #items, 1, -1 do
+            if Store.get_finished(items[k].path) then table.remove(items, k); library.hidden = library.hidden + 1 end
+        end
+    end
     library.sort(items)
     library.pending = #pending > 0 and pending or nil
     library.seen = seen
@@ -1113,6 +1139,37 @@ function app.library_meta_step()
         Store.save_meta(library.seen)
     end
     redraw()
+end
+
+-- Y in My Books: what to do with the selected book, and the finished filter.
+function app.library_options(it)
+    local function hide(on)
+        S.lib_hide_finished = on
+        Store.save_settings(S)
+        scan_library()
+        if it then
+            for i, b in ipairs(library.items) do if b.path == it.path then library.sel = i end end
+        end
+    end
+    local opts = {}
+    if it then
+        local done = Store.get_finished(it.path)
+        opts[#opts + 1] = { done and "Mark as not finished" or "Mark as finished", function()
+            Store.set_finished(it.path, not done)
+            app.toast(done and "Marked as not finished" or "Marked as finished")
+            hide(S.lib_hide_finished)
+        end }
+    end
+    opts[#opts + 1] = { S.lib_hide_finished and "Show finished books" or "Hide finished books", function()
+        hide(not S.lib_hide_finished)
+    end }
+    if it then
+        opts[#opts + 1] = { "Delete from the SD card", function()
+            app.ask({ question = "Delete this book from the SD card?", detail = it.title,
+                yes = "Delete", on_yes = function() library.delete(it.path) end })
+        end }
+    end
+    app.choose({ title = it and it.title or "My Books", options = opts })
 end
 
 -- Change the order, keeping the same book selected.
@@ -2144,11 +2201,13 @@ function app.hints(x, y, list)
 end
 
 -- "3 / 12" at the right of a list's foot.
-function app.count(x, w, sel, n, more)
-    if n < 1 then return end
+function app.count(x, w, sel, n, more, note)
+    if n < 1 and not note then return end
     love.graphics.setFont(ui.small)
     color(theme().dim)
-    love.graphics.printf(sel .. " / " .. n .. (more and "+" or ""), x, PAGE_H - 70, w, "right")
+    local text = n > 0 and (sel .. " / " .. n .. (more and "+" or "")) or ""
+    if note then text = text .. (text ~= "" and "  ·  " or "") .. note end
+    love.graphics.printf(text, x, PAGE_H - 70, w, "right")
 end
 
 local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
@@ -2200,26 +2259,28 @@ local function draw_library(side)
                 local top = ui.font:getBaseline() - UI_SIZE * 0.68
                 local bottom = 40 + ui.small:getBaseline()
                 local ty = math.floor(ry + (row_h - 4) / 2 - (top + bottom) / 2 + 0.5)
-                love.graphics.print(fit_text(ui.font, it.title, rw - 90), rx, ty)
-                local pr = it.path and Store.get_progress(it.path)
+                love.graphics.print(fit_text(ui.font, it.title, rw), rx, ty)
+                -- The author, and where you are with it: Reading · 16% / Finished ✓.
+                local status = app.book_status(it.path)
+                local sw = status and ui.small:getWidth(status) + 24 or 0
                 love.graphics.setFont(ui.small)
                 color(th.dim)
-                love.graphics.print(fit_text(ui.small, it.author, rw - 90), rx, ty + 40)
-                if pr then
-                    love.graphics.printf(math.floor(pr.pct * 100 + 0.5) .. "%", rx,
-                        ty + ui.font:getBaseline() - ui.small:getBaseline(), rw, "right")
-                end
+                love.graphics.print(fit_text(ui.small, it.author, rw - sw), rx, ty + 40)
+                if status then love.graphics.printf(status, rx, ty + 40, rw, "right") end
             end)
         end
         local bx, by, bw, bh = library.get_books_button()
         -- Offline: an outline only, greyed out, saying why.
         local online = shop.online()
         app.button(bx, by, bw, bh, "Get Books", online and "Select" or "No Wi-Fi", online and "soft" or "off")
+        local hidden = (library.hidden or 0) > 0 and (library.hidden .. " finished hidden") or nil
         if #library.items > 0 then
-            app.hints(x, nil, book and { "A", "open", "Y", "delete", "‹ ›", "sort", "B", "back" }
-                or { "A", "open", "Y", "delete", "‹ ›", "sort" })
-            app.count(x, w, library.sel, #library.items)
+            app.hints(x, nil, book and { "A", "open", "Y", "options", "‹ ›", "sort", "B", "back" }
+                or { "A", "open", "Y", "options", "‹ ›", "sort" })
+        elseif hidden then
+            app.hints(x, nil, { "Y", "show finished books" })
         end
+        app.count(x, w, library.sel, #library.items, nil, hidden)
         return
     end
 
@@ -2229,6 +2290,16 @@ local function draw_library(side)
         color(th.fg)
         love.graphics.printf("eReaderDS v" .. app.upd.version .. " is available: "
             .. (book and "Settings → About eReaderDS" or "press Start"), x, PAGE_H - 110, w, "left")
+    end
+    if #library.items == 0 and (library.hidden or 0) > 0 then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("All finished", x, 60)
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.printf("Your " .. (library.hidden == 1 and "finished book is" or (library.hidden .. " finished books are"))
+            .. " hidden. Press Y to show " .. (library.hidden == 1 and "it" or "them") .. ".", x, 180, w, "left")
+        return
     end
     if #library.items == 0 then
         love.graphics.setFont(ui.title)
@@ -2271,7 +2342,12 @@ local function draw_library(side)
     color(th.dim)
     love.graphics.printf(pv.author or "", x, y, w, "center")
     local pr = Store.get_progress(pv.path)
-    if pr then
+    local done = Store.get_finished(pv.path)
+    if done then
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("✓  Finished " .. (os.date("%b %d, %Y", done):gsub(" 0", " ")), x, y + 60, w, "center")
+    elseif pr then
         y = y + 60
         local bw = w * 0.6
         local bx = x + (w - bw) / 2
@@ -3198,6 +3274,71 @@ function app.ask_tap(side, u, v)
         q.on_yes()
     end
     redraw()
+end
+
+-- A few choices on a card on the touchscreen: app.choose({ title, options =
+-- { { label, fn }, ... } }). Up/down and A, or tap one; B or a tap outside closes.
+function app.choose(c)
+    c.sel = 1
+    app.choosing = c
+    redraw()
+end
+
+-- Row i of the card: x, y, w, h on the right page.
+function app.choose_row(i)
+    local m = MARGINS[2]
+    local n = #app.choosing.options
+    local top = PAGE_H - 110 - n * 80
+    return m.inner, top + (i - 1) * 80, PAGE_W - m.outer - m.inner, 72
+end
+
+function app.choose_action(a)
+    local c = app.choosing
+    if not c or a == "quit" then return false end
+    if a == "up" then c.sel = math.max(1, c.sel - 1)
+    elseif a == "down" then c.sel = math.min(#c.options, c.sel + 1)
+    elseif a == "confirm" then
+        app.choosing = nil
+        c.options[c.sel][2]()
+    elseif a == "back" or a == "menu" or a == "toc" then
+        app.choosing = nil
+    end
+    redraw()
+    return true
+end
+
+function app.choose_tap(side, u, v)
+    local c = app.choosing
+    app.choosing = nil
+    if side == "right" then
+        for i, o in ipairs(c.options) do
+            local x, y, w, h = app.choose_row(i)
+            if u >= x - 14 and u <= x + w + 14 and v >= y and v < y + h + 8 then o[2]() break end
+        end
+    end
+    redraw()
+end
+
+function app.choose_draw()
+    local c = app.choosing
+    local th = theme()
+    local x, y0, w = app.choose_row(1)
+    local top = y0 - 76
+    color(th.bg)
+    love.graphics.rectangle("fill", x - 30, top - 20, w + 60, PAGE_H - top + 20, 16, 16)
+    color(th.sel)
+    love.graphics.rectangle("fill", x - 14, top, w + 28, PAGE_H - 96 - top, 14, 14)
+    love.graphics.setFont(ui.font)
+    color(th.dim)
+    love.graphics.printf(fit_text(ui.font, c.title, w - 20), x, top + 22, w, "center")
+    for i, o in ipairs(c.options) do
+        local rx, ry, rw, rh = app.choose_row(i)
+        color(i == c.sel and th.bg or th.sel)
+        love.graphics.rectangle("fill", rx, ry, rw, rh, 10, 10)
+        color(th.fg)
+        love.graphics.printf(o[1], rx, centered_y(ui.font, UI_SIZE, ry, rh), rw, "center")
+    end
+    app.hints(x, nil, { "A", "select", "B", "close" })
 end
 
 function app.ask_draw()
@@ -4850,6 +4991,7 @@ local function render_canvases()
         love.graphics.clear(bg[1], bg[2], bg[3], 1)
         love.graphics.origin()
         painter(side)
+        if side == "right" and app.choosing then app.choose_draw() end
         if side == "right" and app.asking then app.ask_draw() end
         if (app.mode == "menu" and menu.page ~= "status" or app.mode == "jump") and side == "left" then
             love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
@@ -5113,7 +5255,7 @@ local function touch_event(kind, sx, sy)
             local l, _, _, row_h = app.scroll_list()
             gesture.mode = "scroll"
             gesture.v0, gesture.top0, gesture.row_h = v, l.top or 1, row_h
-            app.asking = nil
+            app.asking, app.choosing = nil, nil
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
             -- Mostly vertical slide: brightness. Work in sqrt space so the
             -- dim end gets finer control.
@@ -5430,6 +5572,7 @@ function handle_action(a)
     if a == "stick" then a = mode == "reader" and "menu" or "confirm" end
     if a == "quit" then love.event.quit() return end
     if app.asking and app.ask_action(a) then return end
+    if app.choosing and app.choose_action(a) then return end
 
     if mode == "message" then
         if a == "confirm" or a == "back" then
@@ -5599,10 +5742,10 @@ function handle_action(a)
             elseif a == "confirm" then
                 open_book(library.items[library.sel].path)
             elseif a == "toc" then
-                local it = library.items[library.sel]
-                app.ask({ question = "Delete this book from the SD card?", detail = it.title,
-                    yes = "Delete", on_yes = function() library.delete(it.path) end })
+                app.library_options(library.items[library.sel])
             end
+        elseif a == "toc" and (library.hidden or 0) > 0 then
+            app.library_options(nil)                    -- all hidden: "Show finished books"
         end
         if a == "bookmark" then shop.start() end
         if a == "menu" and not book and app.upd.state == "available" then app.update_open() end
@@ -5639,6 +5782,7 @@ function app.on_tap(side, u, v)
         return
     end
     if app.asking then app.ask_tap(side, u, v) return end
+    if app.choosing then app.choose_tap(side, u, v) return end
     local mode = app.mode
     if mode == "reader" then
         local ref = side == "right" and note.hit(note.on_spread(), side, u, v)

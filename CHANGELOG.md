@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Finished books:** reaching the last page marks a book finished (once;
+  "Finished! It's marked as finished in My Books"); pressing on at the end
+  says "The end". My Books shows "Reading · 16%" or "Finished ✓" beside the
+  author, and the top screen "✓ Finished Sep 28, 2026". **Y** in My Books
+  opens an options card on the touchscreen (`app.choose`): Mark as finished /
+  not finished, Hide / Show finished books (the count says "· 3 finished
+  hidden"; if all are, the top screen says so and Y shows them), and Delete
+  from the SD card (still confirmed). Sorting by progress puts finished
+  books last. Stored in `.ereaderds/finished.txt` (path, time);
+  `lib_hide_finished` in settings.
+
 ## v1.5.0
 
 - **Books in folders, and their real titles** (from a tester coming from
