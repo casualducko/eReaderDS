@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **My Books scrolls with a finger:** sliding up/down on the touchscreen in
+  My Books scrolls the list (the selected book moves along at the edge, as
+  with the D-pad). Everywhere else a vertical slide is still brightness.
+
 ## v1.3.1
 
 - **Standard Ebooks: the full catalog.** Standard Ebooks has allowed

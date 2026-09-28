@@ -4729,6 +4729,12 @@ local function touch_event(kind, sx, sy)
             -- A press-and-hold (look-up) doesn't turn into a swipe or slide.
         elseif not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
             gesture.mode = "swipe"          -- mostly horizontal: page turn on release
+        elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5
+                and app.mode == "library" and gesture.side == "right" and #library.items > 0 then
+            -- My Books: a vertical slide scrolls the list (brightness everywhere else).
+            gesture.mode = "scroll"
+            gesture.v0, gesture.top0 = v, library.top
+            library.confirm = nil
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
             -- Mostly vertical slide: brightness. Work in sqrt space so the
             -- dim end gets finer control.
@@ -4736,6 +4742,7 @@ local function touch_event(kind, sx, sy)
             gesture.v0 = v
             gesture.p0 = S.extra_dim > 0 and (0.1 - S.extra_dim * 0.05) or math.sqrt(current_brightness() / 100)
         end
+        if gesture.mode == "scroll" then app.library_scroll(gesture.top0 + math.floor((gesture.v0 - v) / 96 + 0.5)) end
         if gesture.mode == "brightness" then
             local p = gesture.p0 + (gesture.v0 - v) / (PAGE_H * 0.8)
             -- Below 1% (p < 0.1) the slide continues into the extra dim levels.
@@ -4774,6 +4781,17 @@ local function touch_event(kind, sx, sy)
         end
         gesture = nil
     end
+end
+
+-- Scroll My Books so `top` is the first row shown, keeping the selected book
+-- on screen (it moves along at the edge, like the D-pad would).
+function app.library_scroll(top)
+    local rows = library.list_rows()
+    top = math.max(1, math.min(math.max(1, #library.items - rows + 1), top))
+    if top == library.top then return end
+    library.top = top
+    library.sel = math.max(top, math.min(top + rows - 1, library.sel))
+    redraw()
 end
 
 -- A short message popup (e.g. "Bookmark added").
