@@ -61,10 +61,10 @@ use **Settings → About eReaderDS** (or **Start** in the library with no book
 open). The update screen lists what's new in plain words; **Update now**
 downloads it, saves only the files that changed, and restarts. Your books,
 settings and progress are kept. After an update, a note offers to show
-**What's new** (also in Settings → About eReaderDS).
+**What's New** (also in Settings → About eReaderDS).
 
 To stop the automatic check and its notes, set **Update notices** to Off (same
-page); **Check for updates** still works. To pass on just one version, choose
+page); **Check for Updates** still works. To pass on just one version, choose
 **Skip this version** on the update screen; you'll still hear about the next.
 
 To update by hand, copy the same two items from a newer zip over the old ones
@@ -83,7 +83,7 @@ Directions are as you hold it.
 | A | Show the notes on these pages | Select |
 | B | Settings | Back |
 | Y | Look up (or highlight) a word | Delete (a book in the library, a bookmark or highlight in the list) |
-| Select | Bookmark the page (again to remove) | Close; in the library: Get books |
+| Select | Bookmark the page (again to remove) | Close; in the library: Get Books |
 | Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
 | Menu (Anbernic button) | Quit | Quit |
 
@@ -92,9 +92,9 @@ one-page summary of the buttons and touchscreen.
 
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
-  open Settings instead: **Settings → Reading & device → Tap**.)
+  open Settings instead: **Settings → Reading & Device → Tap**.)
 - Slide up/down to change brightness; keep going below 1% for Extra dim. (On
-  a list, such as My Books, Get books, Table of Contents or Fonts, sliding
+  a list, such as My Books, Get Books, Table of Contents or Fonts, sliding
   up/down scrolls it instead.)
 - Pinch with two fingers to make the text bigger or smaller.
 - Tap the top-right corner to bookmark the page.
@@ -102,12 +102,12 @@ one-page summary of the buttons and touchscreen.
 - Press and hold a word to look it up.
 - While highlighting (**Y**, then **Select**), tap a word to extend the
   highlight to it.
-- In the library and Get books, tap an entry to see it on the other screen,
+- In the library and Get Books, tap an entry to see it on the other screen,
   and tap it again to open (or download) it. The same goes for Table of
   Contents (the other screen shows where that chapter is in the book),
-  Bookmarks and Highlights (the whole passage) and Find in book (the whole
+  Bookmarks and Highlights (the whole passage) and Find in Book (the whole
   paragraph around the match).
-- Swipe (or tap) to turn the pages of What's new.
+- Swipe (or tap) to turn the pages of What's New.
 - Tap a note number, or the **Notes** button, to show footnotes.
 
 ## Settings
@@ -116,16 +116,16 @@ Press **B** (or Start, X, ↩) while reading. Settings has big rows on two
 pages: swipe left or right on the touchscreen, or keep pressing down past the
 last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
-1. **Table of Contents, Bookmarks and Highlights, Find in book, Jump to %,
+1. **Table of Contents, Bookmarks and Highlights, Find in Book, Jump to %,
    My Books** (your library); **Fonts** (its own page, [below](#fonts)),
    **Text size**, **Theme**, **Brightness**; **Help**. (**Update to v…** is at
    the top when one is waiting.)
 2. **Line spacing, Justify text, Hyphenation, Margins, Top/bottom margins**;
-   **Night theme** ([below](#night-theme)); **Status bar ›** (what the top
-   and bottom lines show, and the clock style), **Reading & device ›**
+   **Night Theme** ([below](#night-theme)); **Status Bar ›** (what the top
+   and bottom lines show, and the clock style), **Reading & Device ›**
    (page-turn animation, what a tap does, dictionary, closing the lid, time
-   zone), **About eReaderDS ›** (What's new, Check for updates, Update
-   notices, Report a problem, About & credits); **Quit**.
+   zone), **About eReaderDS ›** (What's New, Check for Updates, Update
+   notices, Report a Problem, About & Credits); **Quit**.
 
 ## Features
 
@@ -146,13 +146,13 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   ([below](#sending-books-from-a-phone-or-computer)).
 - **My Books** (the library): covers and progress, sorted by recent, title, author or
   progress; delete books from it.
-- **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in book**
+- **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in Book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
   and the words are marked on the page you open). Your place in every book is
   saved.
 - **Status bar:** book and chapter titles, pages left, time left in the chapter
   (learned from your reading speed), percent read, a progress bar, battery and a clock.
-  Choose what shows in **Settings → Status bar**. The clock follows the
+  Choose what shows in **Settings → Status Bar**. The clock follows the
   device's time; if it's off, pick your zone in **Settings → Reading &
   device → Time zone**.
 - **Battery-friendly:** the screen only redraws when something changes, and
@@ -168,9 +168,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 *Screenshots use public-domain books from Project Gutenberg.*
 
-## Night theme
+## Night Theme
 
-**Settings → Night theme** picks a second theme (Midnight, Amber and Dusk
+**Settings → Night Theme** picks a second theme (Midnight, Amber and Dusk
 are the darker ones) and the hours to use it, 9 PM to 7 AM to start. It
 switches on the hour by the device's clock, and the whole app changes with
 it. While picking, the touchscreen previews each theme. At night, the
@@ -179,8 +179,8 @@ theme is left alone.
 
 ## Sending books from a phone or computer
 
-In the library press **Select** (or tap **Get books**) and choose **Send from
-your phone or computer**. The screens show an address (such as
+In the library press **Select** (or tap **Get Books**) and choose **Send from
+Your Phone or Computer**. The screens show an address (such as
 `192.168.1.50:2045`) and a QR code. On a phone or computer on the same Wi-Fi,
 scan the code or type the address into a web browser, then tap **Choose
 files** (or drop files on the page). Books (`.epub`, `.txt`) go into the
@@ -192,7 +192,7 @@ This is the easy way to add books on ROCKNIX.
 ## Getting books over Wi-Fi
 
 Turn on Wi-Fi in the device's settings, then in the library press **Select**
-(or tap **Get books** on the touchscreen) and choose a catalog. Browse with
+(or tap **Get Books** on the touchscreen) and choose a catalog. Browse with
 the D-pad or by tapping, and press A on a book to download it to the `Ebook`
 folder. Books you already have are marked ✓. Without Wi-Fi the button is
 greyed out. **Search** (at the top of a catalog, when it supports searching,
@@ -238,7 +238,7 @@ English (WordNet) is built in. To add others, copy **StarDict** dictionaries
 (the files KOReader uses: `.ifo`, `.idx`, `.dict` or `.dict.dz`, and `.syn`
 if there is one) into `Ebook/Dictionaries`. By default every dictionary with
 the word is shown, yours first; pick a single one in
-**Settings → Reading & device → Dictionary**.
+**Settings → Reading & Device → Dictionary**.
 
 ## Fonts
 
@@ -252,7 +252,7 @@ Sans** at the top) narrow it. Up/down pick a font, A uses it.
 Vollkorn, Bitter, Atkinson Hyperlegible Next, Inter, Lexend, Andika and
 OpenDyslexic.
 
-**Get more fonts:** the **Get more fonts** button beside the title of the font page (or Y) downloads more over Wi-Fi:
+**Get More Fonts:** the **Get More Fonts** button beside the title of the font page (or Y) downloads more over Wi-Fi:
 Alegreya, Cardo, Gelasio, IBM Plex Serif, Libre Baskerville,
 Newsreader, Noticia Text, Zilla Slab, Alegreya Sans, Fira Sans, IBM Plex Sans,
 Lato and Source Sans 3 (free, SIL Open Font License, from Google Fonts; about
@@ -274,10 +274,10 @@ name) only shows one weight.
 | Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems). |
 | "No books found" | Put `.epub` or `.txt` files in the `Ebook` folder at the top of the card. |
 | A book won't open or looks wrong | Unusual EPUBs may not display well; DRM-protected books, PDF and MOBI aren't supported. |
-| Get books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
+| Get Books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
 | Pages upside down | Turn the device the other way, with the buttons on your right. |
 | Screen stays dim after quitting | Brightness is restored when the app quits; after a crash, set it in the system menu. |
-| The clock is wrong | Set **Settings → Reading & device → Time zone** (**Device clock** uses the system's own setting). |
+| The clock is wrong | Set **Settings → Reading & Device → Time zone** (**Device clock** uses the system's own setting). |
 | An update fails | Check Wi-Fi and choose **Try again**. Nothing is changed until an update is complete; you can also [update by hand](#install). |
 
 ## Reporting problems
@@ -287,7 +287,7 @@ quits when you press a button. The next time you open it, a note offers to
 report it: tap it for a QR code that opens a bug report on your phone with the
 version and what went wrong filled in (no book titles). Nothing is sent from
 the device; you read the report and send it yourself. **Settings → About
-eReaderDS → Report a problem** shows the same code any time.
+eReaderDS → Report a Problem** shows the same code any time.
 
 Or tell whoever sent you eReaderDS, or
 [open a bug report](https://github.com/casualducko/eReaderDS/issues/new?template=bug_report.yml).
@@ -316,7 +316,7 @@ their own licenses (below, and in the download's `LICENSES` folder).
 ## Credits
 
 eReaderDS is created by **casualducko** (also in **Settings → About eReaderDS →
-About & credits**).
+About & Credits**).
 
 - **Fonts**, all under the SIL Open Font License 1.1 (license files in
   `app/fonts/` and the download's `LICENSES` folder):

@@ -21,6 +21,10 @@
     shows two more books.
   - Settings shows the version on its main page only.
   - Find in book with no matches suggests fewer words or another spelling.
+  - Page names are in title case: Find in Book, Get Books, Get More Fonts,
+    What's New, Check for Updates, Report a Problem, About & Credits, Status
+    Bar, Reading & Device, Night Theme, Send Books over Wi-Fi, Send from Your
+    Phone or Computer, Add a Catalog (settings stay in sentence case).
 
 ## v1.4.0
 

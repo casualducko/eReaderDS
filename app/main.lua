@@ -984,10 +984,10 @@ function library.sort(items)
     end)
 end
 
--- Get books state (see "get books (OPDS)" below); declared here so the
+-- Get Books state (see "get books (OPDS)" below); declared here so the
 -- library scan can see whether a download is running.
 local net = { thread = nil, next_id = 0, handlers = {}, count = 0 }
--- The "Get books" screen. Its functions live on the table to stay under
+-- The "Get Books" screen. Its functions live on the table to stay under
 -- Lua's limit on local variables.
 local shop = { catalog = nil, stack = {}, covers = {}, cover_order = {}, dl = nil }
 
@@ -1039,7 +1039,7 @@ local function scan_library()
         end
     end
     library.sort(items)
-    -- Online catalogs from opds.txt, for "Get books" (Select, or the button
+    -- Online catalogs from opds.txt, for "Get Books" (Select, or the button
     -- on the right page).
     local ok, catalogs, opts = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
     if not ok then print("[opds] " .. tostring(catalogs)); catalogs, opts = {}, {} end
@@ -1114,11 +1114,11 @@ function library.delete(path)
     app.toast("Book deleted")
 end
 
--- The "Get books" button on the library's right page: x, y, w, h.
+-- The "Get Books" button on the library's right page: x, y, w, h.
 function library.get_books_button()
-    -- Beside the "My Books" title, like "Get more fonts" beside "Fonts".
+    -- Beside the "My Books" title, like "Get More Fonts" beside "Fonts".
     local key = shop.online() and "   Select" or "   No Wi-Fi"
-    local w, h = ui.font:getWidth("Get books") + ui.small:getWidth(key) + 44, 50
+    local w, h = ui.font:getWidth("Get Books") + ui.small:getWidth(key) + 44, 50
     local x = MARGINS[2].inner + ui.title:getWidth("My Books") + 24
     return x, math.floor(60 + (ui.title:getHeight() - h) / 2), w, h
 end
@@ -1254,7 +1254,7 @@ function shop.open(catalog)
     shop.push_page(catalog.name, catalog.url, true)
 end
 
--- "Get books" from the library: a list of catalogs (yours from opds.txt,
+-- "Get Books" from the library: a list of catalogs (yours from opds.txt,
 -- then the free built-in ones), and how to add your own.
 function shop.start()
     app.asking = nil
@@ -1264,7 +1264,7 @@ function shop.start()
     end
     shop.dir = nil
     for url, c in pairs(shop.covers) do if c == false then shop.covers[url] = nil end end
-    local entries = { { title = "Send from your phone or computer", author = "Over Wi-Fi, from a web browser",
+    local entries = { { title = "Send from Your Phone or Computer", author = "Over Wi-Fi, from a web browser",
         formats = {}, receive = true, summary = "Send your own books (.epub or .txt) to eReaderDS from a phone "
             .. "or computer on the same Wi-Fi: open the address it shows in a web browser and choose the files. "
             .. "Fonts (.ttf or .otf) can be sent the same way." } }
@@ -1273,12 +1273,12 @@ function shop.start()
         entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = c.about or "",
             formats = {}, catalog = c }
     end
-    entries[#entries + 1] = { title = "Add a catalog", author = "Calibre, Calibre-Web or any OPDS server",
+    entries[#entries + 1] = { title = "Add a Catalog", author = "Calibre, Calibre-Web or any OPDS server",
         formats = {}, info = true, summary = "Get books from your own library over Wi-Fi. Edit "
             .. Store.books_folder() .. "/.ereaderds/opds.txt"
             .. (select(2, Store.books_folder()) and " on the SD card" or "") .. " (it has examples), for example:\n\n"
             .. "name = Calibre\nurl = http://192.168.1.20:8080/opds\nuser = me\npassword = secret" }
-    shop.stack = { { title = "Get books", entries = entries, sel = 1, top = 1 } }
+    shop.stack = { { title = "Get Books", entries = entries, sel = 1, top = 1 } }
     app.mode = "shop"
     redraw()
 end
@@ -1624,20 +1624,20 @@ function app.about_items()
             { label = "Update to v" .. u.version, act = app.update_open },
         }) or {},
         section(u.state == "available" and "" or nil, {
-            { label = "What's new", act = app.whatsnew_open },
-            { label = "Check for updates",
+            { label = "What's New", act = app.whatsnew_open },
+            { label = "Check for Updates",
               value = app.update_status(), act = app.update_check_open },
             { label = "Update notices", value = S.update_notices and "On" or "Off", adjust = function()
                 S.update_notices = not S.update_notices
             end },
-            { label = "Report a problem", act = app.report_open },
-            { label = "About & credits", act = function() app.mode = "about" end },
+            { label = "Report a Problem", act = app.report_open },
+            { label = "About & Credits", act = function() app.mode = "about" end },
         }),
         section("", { { label = "Back", act = close_sub } })
     )
 end
 
--- Reading & device: page turns, look up, the lid and the time zone.
+-- Reading & Device: page turns, look up, the lid and the time zone.
 local function more_items()
     return join(
         section("Page turns", {
@@ -1689,7 +1689,7 @@ local function menu_items()
             end },
             { label = "Bookmarks and Highlights", value = tostring(#Store.get_bookmarks(book.path) + #Store.get_highlights(book.path)),
               act = function() open_bookmarks("menu") end },
-            { label = "Find in book", act = function() app.find_open() end },
+            { label = "Find in Book", act = function() app.find_open() end },
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
               act = function() app.open_jump() end },
             { label = "My Books", act = go_library },
@@ -1748,11 +1748,11 @@ local function menu_items()
             end },
         })),
         app.menu_on_page(2, section("Night", {
-            { label = "Night theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
+            { label = "Night Theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
         })),
         app.menu_on_page(2, section("Other", {
-            { label = "Status bar", value = "›", act = function() open_sub("status") end },
-            { label = "Reading & device", value = "›", act = function() open_sub("more") end },
+            { label = "Status Bar", value = "›", act = function() open_sub("status") end },
+            { label = "Reading & Device", value = "›", act = function() open_sub("more") end },
             { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
               value_bold = app.upd.state == "available" and "Update" or nil,
               act = function() open_sub("about") end },
@@ -2114,7 +2114,7 @@ local function draw_library(side)
     local w = PAGE_W - m.outer - m.inner
     if side == "right" then
         -- The touchscreen: the books (tap one to see it, again to open it),
-        -- with "Get books" (also Select) beside the title.
+        -- with "Get Books" (also Select) beside the title.
         love.graphics.setFont(ui.title)
         color(th.fg)
         love.graphics.print("My Books", x, 60)
@@ -2150,7 +2150,7 @@ local function draw_library(side)
         local bx, by, bw, bh = library.get_books_button()
         -- Offline: an outline only, greyed out, saying why.
         local online = shop.online()
-        app.button(bx, by, bw, bh, "Get books", online and "Select" or "No Wi-Fi", online and "soft" or "off")
+        app.button(bx, by, bw, bh, "Get Books", online and "Select" or "No Wi-Fi", online and "soft" or "off")
         if #library.items > 0 then
             app.hints(x, nil, book and { "A", "open", "Y", "delete", "‹ ›", "sort", "B", "back" }
                 or { "A", "open", "Y", "delete", "‹ ›", "sort" })
@@ -2174,7 +2174,7 @@ local function draw_library(side)
         color(th.dim)
         local folder, where = Store.books_folder()
         love.graphics.printf("Copy .epub or .txt files into the " .. folder .. " folder"
-            .. (where and (" " .. where) or "") .. ", or tap Get books to download some or send them from a phone or computer.", x, 180, w, "left")
+            .. (where and (" " .. where) or "") .. ", or tap Get Books to download some or send them from a phone or computer.", x, 180, w, "left")
         love.graphics.setFont(ui.small)
         app.hints(x, nil, { "Anbernic button", "quit" })
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
@@ -2498,7 +2498,7 @@ local function draw_menu_panel(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(({ status = "Status bar", more = "Reading & device", night = "Night theme",
+    love.graphics.print(({ status = "Status Bar", more = "Reading & Device", night = "Night Theme",
         about = "About eReaderDS" })[menu.page] or "Settings", x, 60)
     if menu.page == "main" then
         love.graphics.setFont(ui.font)               -- the version, on the title's baseline
@@ -3074,7 +3074,7 @@ function app.bm_delete(e, n)
 end
 
 -- A rounded button: its label, then the button that does the same in small
--- dimmed text ("Get books  Select", "Delete  A"). style: "strong" (dark),
+-- dimmed text ("Get Books  Select", "Delete  A"). style: "strong" (dark),
 -- "soft" (the selection colour), "plain" (the page colour) or "off" (an
 -- outline, greyed out).
 function app.button(bx, by, bw, bh, label, key, style)
@@ -3574,7 +3574,7 @@ function app.update_start()
     end)
 end
 
--- "Check for updates" (Settings): open what was found, even a
+-- "Check for Updates" (Settings): open what was found, even a
 -- skipped version, or check now.
 function app.update_check_open()
     local u = app.upd
@@ -3597,7 +3597,7 @@ function app.update_skip()
     if u.state ~= "available" then return end
     S.skip_version = u.version
     Store.save_settings(S)
-    -- Quiet from now on: no bold Update, no library line (Check for updates
+    -- Quiet from now on: no bold Update, no library line (Check for Updates
     -- still finds it).
     u.skipped, u.state, u.quiet = true, "none", true
     app.toast("Skipped v" .. u.version .. ". You'll hear about the next version.", 3)
@@ -3805,7 +3805,7 @@ function app.whatsnew_draw(side)
     if side == "left" and wn.spread == 1 then
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("What's new", x, 60)
+        love.graphics.print("What's New", x, 60)
         love.graphics.setFont(ui.font)
         color(th.dim)
         love.graphics.print("You have v" .. VERSION, x, 60 + ui.title:getHeight() + 6)
@@ -3886,9 +3886,9 @@ app.FONT_SAMPLE_SIZE = 38
 app.FONT_LIST_Y = 160                 -- the list, under the title
 function app.font_rows() return math.floor((PAGE_H - 90 - app.FONT_LIST_Y) / app.FONT_ROW_H) end
 
--- "Get more fonts", beside the "Fonts" title (always in view); Y does the same.
+-- "Get More Fonts", beside the "Fonts" title (always in view); Y does the same.
 function app.font_get_button()
-    local w, h = ui.font:getWidth("Get more fonts") + ui.small:getWidth("   Y") + 44, 50
+    local w, h = ui.font:getWidth("Get More Fonts") + ui.small:getWidth("   Y") + 44, 50
     local x = MARGINS[2].inner + ui.title:getWidth("Fonts") + 24
     return x, math.floor(60 + (ui.title:getHeight() - h) / 2), w, h
 end
@@ -4066,7 +4066,7 @@ function app.font_draw(side)
     if fp.sel < fp.top then fp.top = fp.sel end
     if fp.sel >= fp.top + rows then fp.top = fp.sel - rows + 1 end
     local bx, by, bw, bh = app.font_get_button()
-    app.button(bx, by, bw, bh, "Get more fonts", "Y", "soft")
+    app.button(bx, by, bw, bh, "Get More Fonts", "Y", "soft")
     draw_list(side, fp.list, fp.sel, fp.top, rows, x, app.FONT_LIST_Y, w, app.FONT_ROW_H, function(it, _, rx, ry, rw)
         local pf = Fonts.preview(it.name, UI_SIZE) or ui.font
         love.graphics.setFont(pf)
@@ -4309,7 +4309,7 @@ function app.fget_draw(side)
         local x = m.outer
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Get more fonts", x, 60)
+        love.graphics.print("Get More Fonts", x, 60)
         if not e then
             love.graphics.setFont(ui.font)
             color(th.dim)
@@ -4438,7 +4438,7 @@ end
 
 function app.find_keyboard(text)
     app.mode = "reader"
-    app.kb_open({ title = "Find in book", text = text,
+    app.kb_open({ title = "Find in Book", text = text,
         hint = "A word or phrase. Capitals don't matter.",
         submit = function(q) app.find_start(q) end })
 end
@@ -4570,7 +4570,7 @@ function app.find_draw(side)
     app.count(x, w, f.sel, #f.results)
 end
 
--- The left page of Find in book: what was searched for, then the selected
+-- The left page of Find in Book: what was searched for, then the selected
 -- match in its whole paragraph (around it, if long), the match marked.
 function app.find_draw_left(f, x, w, status)
     local th = theme()
@@ -4901,7 +4901,7 @@ local function compose()
     set_theme_shader(true)
     local th = theme()
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
-    -- Get books: the selected book's page (the left one) skips the E-ink
+    -- Get Books: the selected book's page (the left one) skips the E-ink
     -- filter, so covers stay in color whatever the theme.
     if app.mode == "shop" then set_theme_shader(false) end
     blit_page(canvases[1], "left")
@@ -6015,7 +6015,7 @@ function app.report_draw(side)
     if side == "left" then
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Report a problem", x, 60)
+        love.graphics.print("Report a Problem", x, 60)
         love.graphics.setFont(ui.font)
         color(th.fg)
         local text = "Scan the code on the other screen with your phone's camera. It opens a bug report "
@@ -6064,7 +6064,7 @@ end
 
 ---------------------------------------------------------------- send books over Wi-Fi
 
--- "Send books over Wi-Fi" (in Get books): while this screen is open, a small
+-- "Send Books over Wi-Fi" (in Get Books): while this screen is open, a small
 -- web server (receiver.lua, on its own thread) takes books and fonts from a
 -- phone or computer on the same network. The address and a QR code of it are
 -- on the screens; what arrives is listed as it comes in.
@@ -6202,7 +6202,7 @@ function app.recv_draw(side)
     if side == "left" then
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Send books over Wi-Fi", x, 60)
+        love.graphics.print("Send Books over Wi-Fi", x, 60)
         love.graphics.setFont(ui.font)
         if r.error then
             color(th.fg)
@@ -6271,7 +6271,7 @@ function app.recv_draw(side)
 
         return
     end
-    -- The QR code of the address, as on Report a problem: dark on white, with
+    -- The QR code of the address, as on Report a Problem: dark on white, with
     -- the quiet border scanners need.
     if r.qr then
         local n = #r.qr
@@ -6535,7 +6535,7 @@ function love.run()
         end
         if save_due and love.timer.getTime() >= save_due then save_progress() end
         if app.mode == "library" and not lid.closed then
-            -- Wi-Fi coming or going changes the Get books button.
+            -- Wi-Fi coming or going changes the Get Books button.
             local was = shop.online_v
             if shop.online() ~= was and was ~= nil then redraw() end
         end

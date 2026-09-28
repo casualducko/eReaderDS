@@ -87,7 +87,7 @@ footer { margin-top: 28px; font-size: 15px; color: var(--dim); text-align: cente
 </div>
 <div id="summary"></div>
 <ul id="list"></ul>
-<footer>Books go to My Books and fonts to Settings → Fonts.<br>Keep eReaderDS on its Send books screen until they're sent.</footer>
+<footer>Books go to My Books and fonts to Settings → Fonts.<br>Keep eReaderDS on its Send Books screen until they're sent.</footer>
 </main><script>
 var OK = /\.(epub|txt|ttf|otf)$/i, FONT = /\.(ttf|otf)$/i, queue = [], busy = false, have = {}, tally = { books: 0, fonts: 0, bad: 0 };
 var list = document.getElementById('list'), conn = document.getElementById('conn');
@@ -184,7 +184,7 @@ function next() {
     } else { tally.bad++; finish(li, false, r.error || ('Failed (' + x.status + ')')); }
     busy = false; next();
   };
-  x.onerror = function () { tally.bad++; finish(li, false, "Couldn't reach eReaderDS. Is its Send books screen still open?", job); busy = false; next(); };
+  x.onerror = function () { tally.bad++; finish(li, false, "Couldn't reach eReaderDS. Is its Send Books screen still open?", job); busy = false; next(); };
   x.send(job.f);
 }
 document.getElementById('pick').onchange = function () { add(this.files); this.value = ''; };
