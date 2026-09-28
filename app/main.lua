@@ -1643,8 +1643,12 @@ local function menu_items()
     if menu.page == "night" then return app.night_items() end
     if menu.page == "about" then return app.about_items() end
     local th = theme()
+    local u = app.upd
+    -- Three pages (swipe, or up/down past the end): the everyday things first.
     return join(
-        section(nil, {
+        app.menu_on_page(1, section(nil, join(
+            u.state == "available" and { { label = "Update to v" .. u.version, bold = true, act = app.update_open } } or {},
+            {
             { label = "Contents", act = function()
                 if #book.toc == 0 then return end
                 toc.sel = current_section() or 1
@@ -1657,40 +1661,21 @@ local function menu_items()
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
               act = function() app.open_jump() end },
             { label = "Library", act = go_library },
-        }),
-        section("Text", {
+            }))),
+        app.menu_on_page(1, section("Text and look", {
             -- The font's name is drawn in the font itself: a preview, and the only way
             -- names in other scripts (e.g. Chinese firmware fonts) can display.
             { label = "Font", value = fonts.name or S.font,
-              value_font = Fonts.preview(fonts.name or S.font, UI_SIZE),
-              act = function() app.font_open() end },     -- the font picker spread
+              value_font = Fonts.preview(fonts.name or S.font, app.MENU_SIZE),
+              act = function() app.font_open() end },
             { label = "Text size", value = tostring(S.font_size), adjust = function(d)
                 S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
-            end },
-            { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
-                S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
-                relayout()
-            end },
-            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
-                S.justify = not S.justify; relayout()
-            end },
-            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
-                S.hyphenate = not S.hyphenate; relayout()
-            end },
-        }),
-        section("Page", {
-            { label = "Margins", value = margins().name, adjust = function(d)
-                S.margins = (S.margins - 1 + d) % #MARGINS + 1; relayout()
-            end },
-            { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
-                S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
             end },
             -- Changes the theme on screen: at night, the night theme.
             { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), adjust = function(d)
                 local name = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
                 if app.night then S.night_theme = name else S.theme = name end
             end },
-            { label = "Night theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
                   or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
@@ -1708,16 +1693,39 @@ local function menu_items()
                       Backlight.set(S.brightness)
                   end
               end },
-        }),
-        section("", {
+        })),
+        app.menu_on_page(1, section("", {
+            { label = "Help", act = function() app.mode = "help" end },
+        })),
+        app.menu_on_page(2, section("Page", {
+            { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
+                S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
+                relayout()
+            end },
+            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
+                S.justify = not S.justify; relayout()
+            end },
+            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
+                S.hyphenate = not S.hyphenate; relayout()
+            end },
+            { label = "Margins", value = margins().name, adjust = function(d)
+                S.margins = (S.margins - 1 + d) % #MARGINS + 1; relayout()
+            end },
+            { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
+                S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
+            end },
+        })),
+        app.menu_on_page(2, section("Night", {
+            { label = "Night theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
+        })),
+        app.menu_on_page(3, section("", {
             { label = "Status bar", value = "›", act = function() open_sub("status") end },
             { label = "Reading & device", value = "›", act = function() open_sub("more") end },
             { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
               value_bold = app.upd.state == "available" and "Update" or nil,
               act = function() open_sub("about") end },
-            { label = "Help", act = function() app.mode = "help" end },
             { label = "Quit", act = function() love.event.quit() end },
-        })
+        }))
     )
 end
 
@@ -2356,54 +2364,98 @@ local MENU_HEADER_H, MENU_GAP_H = 27, 10
 
 -- Returns the visible rows ({ kind = "item"|"header"|"gap", y, h, idx, text })
 -- plus whether there is more above / below.
-local function menu_layout(items)
-    local rows, extra = {}, 0
-    for i, it in ipairs(items) do
-        if i > 1 and it.section ~= items[i - 1].section or (i == 1 and it.section and it.section ~= "") then
-            if it.section and it.section ~= "" then
-                rows[#rows + 1] = { kind = "header", text = it.section, h = MENU_HEADER_H }
-            else
-                rows[#rows + 1] = { kind = "gap", h = MENU_GAP_H }
-            end
-            extra = extra + rows[#rows].h
-        end
-        rows[#rows + 1] = { kind = "item", idx = i }
-    end
-    local avail = MENU_BOTTOM - MENU_TOP
-    local row_h = math.max(MENU_ROW_MIN, math.min(MENU_ROW_MAX, math.floor((avail - extra) / #items)))
-    local sel_r = 1
-    for r, row in ipairs(rows) do
-        if row.kind == "item" then row.h = row_h end
-        if row.idx == menu.sel then sel_r = r end
-    end
-    -- Scroll so the selection (with its header, if any) stays in view.
-    local top = menu.top or 1
-    if sel_r < top then top = sel_r end
-    if top > 1 and rows[top - 1].kind ~= "item" and top - 1 == sel_r - 1 then top = top - 1 end
-    local function height(from, to)
-        local h = 0
-        for r = from, to do h = h + rows[r].h end
-        return h
-    end
-    while height(top, sel_r) > avail do top = top + 1 end
-    menu.top = top
-    local visible, y = {}, MENU_TOP
-    local last = top - 1
-    for r = top, #rows do
-        if y + rows[r].h > MENU_TOP + avail then break end
-        local row = rows[r]
-        row.y = y
-        visible[#visible + 1] = row
-        y = y + row.h
-        last = r
-    end
-    return visible, top > 1, last < #rows
+-- Settings pages: the rows are big (easy to read and tap), so the items
+-- are spread over pages. The main page says which item goes on which page
+-- (app.menu_on_page); others are filled in order. The page shown is the one
+-- with the selected item. Returns the visible rows (with y), the page and
+-- the number of pages.
+app.MENU_ROW_BIG = 74
+app.MENU_SIZE = 36                   -- the Settings rows' text (UI_SIZE is 30)
+app.MENU_AVAIL = MENU_BOTTOM - 44 - MENU_TOP       -- room above the page dots
+
+function app.menu_on_page(n, items)
+    for _, it in ipairs(items) do it.page = n end
+    return items
 end
 
-local function scroll_arrow(x, y, up)
-    local s = 9
-    if up then love.graphics.polygon("fill", x - s, y + s, x + s, y + s, x, y - s + 2)
-    else love.graphics.polygon("fill", x - s, y - s, x + s, y - s, x, y + s - 2) end
+-- The extra height before item i: a section header or a gap (none at the top of a page).
+local function menu_extra(items, i, first_on_page)
+    local it = items[i]
+    if first_on_page then return (it.section and it.section ~= "") and MENU_HEADER_H or 0 end
+    if it.section ~= items[i - 1].section then
+        return (it.section and it.section ~= "") and MENU_HEADER_H or MENU_GAP_H
+    end
+    return 0
+end
+
+app.MENU_ROW_FIT = 58                -- rows can shrink to this to keep a page whole
+
+function app.menu_pages(items)
+    if items[1] and not items[1].page then
+        -- All on one page if it fits with slightly smaller rows...
+        local total = 0
+        for i = 1, #items do total = total + menu_extra(items, i, i == 1) + app.MENU_ROW_FIT end
+        if total <= app.MENU_AVAIL then
+            for _, it in ipairs(items) do it.page = 1 end
+            return 1
+        end
+        -- ...else spread over pages of big rows.
+        local page, used = 1, 0
+        for i, it in ipairs(items) do
+            local extra = menu_extra(items, i, used == 0)
+            if used > 0 and used + extra + app.MENU_ROW_BIG > app.MENU_AVAIL then
+                page, used = page + 1, 0
+                extra = menu_extra(items, i, true)
+            end
+            it.page = page
+            used = used + extra + app.MENU_ROW_BIG
+        end
+    end
+    local n = 1
+    for _, it in ipairs(items) do n = math.max(n, it.page) end
+    return n
+end
+
+local function menu_layout(items)
+    local pages = app.menu_pages(items)
+    menu.sel = math.max(1, math.min(menu.sel, #items))
+    local page = items[menu.sel] and items[menu.sel].page or 1
+    local rows, extra, n = {}, 0, 0
+    local prev
+    for i, it in ipairs(items) do
+        if it.page == page then
+            local e = menu_extra(items, i, prev == nil)
+            if e > 0 then
+                rows[#rows + 1] = (it.section and it.section ~= "") and { kind = "header", text = it.section, h = e }
+                    or { kind = "gap", h = e }
+                extra = extra + e
+            end
+            rows[#rows + 1] = { kind = "item", idx = i }
+            n = n + 1
+            prev = i
+        end
+    end
+    local row_h = math.min(app.MENU_ROW_BIG, math.floor((app.MENU_AVAIL - extra) / math.max(1, n)))
+    local y = MENU_TOP
+    for _, row in ipairs(rows) do
+        if row.kind == "item" then row.h = row_h end
+        row.y = y
+        y = y + row.h
+    end
+    return rows, page, pages
+end
+
+-- Turn the settings page: select the first item of the next / previous one.
+function app.menu_page(d)
+    local items = menu_items()
+    local pages = app.menu_pages(items)
+    local cur = items[menu.sel] and items[menu.sel].page or 1
+    local want = math.max(1, math.min(pages, cur + d))
+    if want == cur then return end
+    for i, it in ipairs(items) do
+        if it.page == want then menu.sel = i; break end
+    end
+    redraw()
 end
 
 local function draw_menu_panel(side)
@@ -2418,12 +2470,17 @@ local function draw_menu_panel(side)
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
     local items = menu_items()
-    local visible, more_up, more_down = menu_layout(items)
-    if more_up then color(th.dim); scroll_arrow(x + w / 2, MENU_TOP - 14, true) end
-    if more_down then
-        local last = visible[#visible]
-        color(th.dim); scroll_arrow(x + w / 2, last.y + last.h + 8, false)
+    local visible, page, pages = menu_layout(items)
+    if pages > 1 then
+        -- Which page: dots (swipe or up/down past the end for the others).
+        local gap, r = 26, 6
+        local cx = x + w / 2 - (pages - 1) * gap / 2
+        for k = 1, pages do
+            color(k == page and th.fg or th.dim, k == page and 1 or 0.45)
+            love.graphics.circle("fill", cx + (k - 1) * gap, MENU_BOTTOM - 16, r)
+        end
     end
+    local F, FB, FS = ui.menu, ui.menu_bold, app.MENU_SIZE
     for _, row in ipairs(visible) do
         if row.kind == "header" then
             -- Section header: small dimmed capitals and a hairline.
@@ -2444,40 +2501,43 @@ local function draw_menu_panel(side)
                 color(th.sel)
                 love.graphics.rectangle("fill", x - 14, ry, w + 28, row_h - 4, 10, 10)
             end
-            love.graphics.setFont(ui.font)
+            love.graphics.setFont(F)
             color(th.fg)
-            local ty = centered_y(ui.font, UI_SIZE, ry, row_h - 4)
+            local ty = centered_y(F, FS, ry, row_h - 4)
+            if it.bold then love.graphics.setFont(FB) end
             love.graphics.print(it.label, rx, ty)
+            love.graphics.setFont(F)
             local vf = it.value_font
             if vf and it.value and it.value ~= "" and vf:hasGlyphs(it.value) then
-                local room = rw - ui.font:getWidth(it.label) - 40
+                local room = rw - F:getWidth(it.label) - 40
                 -- "‹ name ›" when left/right change it; just the name when it
                 -- opens a page (Font).
                 local open, close = it.adjust and "‹  " or "", it.adjust and "  ›" or ""
-                local name = fit_text(vf, it.value, room - ui.font:getWidth(open .. close))
+                local name = fit_text(vf, it.value, room - F:getWidth(open .. close))
                 local right = rx + rw
-                local cw, nw = ui.font:getWidth(close), vf:getWidth(name)
+                local cw, nw = F:getWidth(close), vf:getWidth(name)
                 love.graphics.print(close, right - cw, ty)
-                love.graphics.print(open, right - cw - nw - ui.font:getWidth(open), ty)
+                love.graphics.print(open, right - cw - nw - F:getWidth(open), ty)
                 love.graphics.setFont(vf)
-                love.graphics.print(name, right - cw - nw, centered_y(vf, UI_SIZE, ry, row_h - 4))
-                love.graphics.setFont(ui.font)
+                love.graphics.print(name, right - cw - nw, centered_y(vf, FS, ry, row_h - 4))
+                love.graphics.setFont(F)
             elseif it.value_bold then
                 -- A word in bold, then the › of a row that opens a page ("Update ›").
                 local tail = "  ›"
-                local tw = ui.font:getWidth(tail)
+                local tw = F:getWidth(tail)
                 love.graphics.print(tail, rx + rw - tw, ty)
-                love.graphics.setFont(ui.bold)
-                love.graphics.print(it.value_bold, rx + rw - tw - ui.bold:getWidth(it.value_bold), ty)
-                love.graphics.setFont(ui.font)
+                love.graphics.setFont(FB)
+                love.graphics.print(it.value_bold, rx + rw - tw - FB:getWidth(it.value_bold), ty)
+                love.graphics.setFont(F)
             elseif it.value and it.value ~= "" then
-                local room = rw - ui.font:getWidth(it.label) - 40
+                local room = rw - F:getWidth(it.label) - 40
                 local v = it.value
                 if it.adjust then
-                    v = "‹  " .. fit_text(ui.font, v, room - ui.font:getWidth("‹    ›")) .. "  ›"
+                    v = "‹  " .. fit_text(F, v, room - F:getWidth("‹    ›")) .. "  ›"
+
                 elseif it.opens then
                     -- A row that opens a page, showing its setting: "Off  ›".
-                    v = fit_text(ui.font, v, room - ui.font:getWidth("  ›")) .. "  ›"
+                    v = fit_text(F, v, room - F:getWidth("  ›")) .. "  ›"
                 end
                 love.graphics.printf(v, rx, ty, rw, "right")
             elseif it.adjust then
@@ -4610,6 +4670,8 @@ local function touch_event(kind, sx, sy)
                 if du < 0 then turn(1, next_spread) else turn(-1, prev_spread) end
             elseif app.mode == "whatsnew" and math.abs(du) > 60 then
                 app.whatsnew_action(du < 0 and "next" or "prev")
+            elseif app.mode == "menu" and math.abs(du) > 60 then
+                app.menu_page(du < 0 and 1 or -1)           -- the next / previous settings page
             end
         elseif gesture.held then
             -- Already handled while the finger was down.
@@ -4888,8 +4950,8 @@ function handle_action(a)
             if it.adjust then
                 it.adjust(back and -1 or 1)
             elseif a == "left" or a == "right" then
-                -- Rows with nothing to change: left/right move the selection.
-                menu.sel = back and (menu.sel - 2) % #items + 1 or menu.sel % #items + 1
+                -- Rows with nothing to change: left/right turn the page.
+                app.menu_page(back and -1 or 1)
             end
         elseif a == "confirm" then
             local it = items[menu.sel]
@@ -5107,8 +5169,21 @@ function app.on_tap(side, u, v)
             if row.kind == "item" and v >= row.y and v < row.y + row.h then idx = row.idx end
         end
         if side == "right" and u >= m.inner - 14 and u <= PAGE_W - m.outer + 14 and idx then
+            local it = items[idx]
             menu.sel = idx
-            action("confirm")
+            if it.adjust then
+                -- Where ‹ and › are drawn: "‹  value  ›", right-aligned.
+                local F = ui.menu
+                local right = m.inner + PAGE_W - m.outer - m.inner
+                local plus = right - F:getWidth("  ›")
+                local minus = right - F:getWidth("‹  " .. tostring(it.value or "") .. "  ›")
+                if u >= plus - 30 then it.adjust(1)
+                elseif u >= minus - 30 and u <= minus + 50 then it.adjust(-1) end
+                Store.save_settings(S)
+                redraw()
+            else
+                action("confirm")
+            end
         elseif side == "left" then
             action("back")            -- tapped the dimmed book page: close
         end
@@ -5604,6 +5679,8 @@ function love.load()
     ui.small_bold = load_font("GentiumBookPlus-Bold.ttf", SMALL_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
     ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
+    ui.menu = load_font("GentiumBookPlus-Regular.ttf", app.MENU_SIZE)       -- Settings rows
+    ui.menu_bold = load_font("GentiumBookPlus-Bold.ttf", app.MENU_SIZE)
     -- Something on the screens straight away: loading the fonts and the
     -- book takes a moment.
     app.mode = "splash"

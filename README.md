@@ -108,18 +108,20 @@ one-page summary of the buttons and touchscreen.
 
 ## Settings
 
-Press **B** (or Start, X, ↩) while reading. One page, top to bottom:
+Press **B** (or Start, X, ↩) while reading. Settings has big rows and three
+pages: swipe left or right on the touchscreen, or keep pressing down past the
+last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
-- **Contents, Bookmarks and highlights, Find in book, Jump to %, Library**
-- **Text:** Font (its own page, [below](#fonts)), text size, line spacing,
-  justify, hyphenation
-- **Page:** margins, theme, **Night theme** ([below](#night-theme)), brightness
-- **Status bar ›** what the top and bottom lines show, and the clock style
-- **Reading & device ›** page-turn animation, what a tap does, dictionary,
-  closing the lid, time zone
-- **About eReaderDS ›** What's new, Check for updates, Update notices, Report
-  a problem, About & credits (and **Update to v…** when one is waiting; the row says **Update**)
-- **Help**, **Quit**
+1. **Contents, Bookmarks and highlights, Find in book, Jump to %, Library**;
+   **Font** (its own page, [below](#fonts)), **Text size**, **Theme**,
+   **Brightness**; **Help**. (**Update to v…** is at the top when one is
+   waiting.)
+2. **Line spacing, Justify text, Hyphenation, Margins, Top/bottom margins**;
+   **Night theme** ([below](#night-theme)).
+3. **Status bar ›** (what the top and bottom lines show, and the clock style),
+   **Reading & device ›** (page-turn animation, what a tap does, dictionary,
+   closing the lid, time zone), **About eReaderDS ›** (What's new, Check for
+   updates, Update notices, Report a problem, About & credits), **Quit**.
 
 ## Features
 
