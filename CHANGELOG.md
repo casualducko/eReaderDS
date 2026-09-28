@@ -10,6 +10,12 @@
   a book that has some but no file yet (highlights made before this). My
   Books skips the Highlights folder. The Bookmarks and Highlights page says
   where it is.
+- **Bookmarks and Highlights: All / Highlights / Bookmarks,** chosen with
+  left/right or a tap on the label at the top right (like My Books' order,
+  whose label can now be tapped too); All each time the page opens. The counts
+  moved under the title on the top screen. Y deletes the selected entry in
+  any view (it keyed on the row number, which broke without the "Bookmark
+  this page" row).
 
 ## v1.6.0
 

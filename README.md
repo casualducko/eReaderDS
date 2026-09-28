@@ -234,7 +234,8 @@ to the last word (the highlight grows as you go, across both pages), and press
 **Select**. Highlights show as a band behind the words in every theme, stay
 put when you change the font or text size, and are listed with your bookmarks
 in **Settings → Bookmarks and Highlights** (A goes there; Y deletes one after you
-confirm).
+confirm; left/right, or a tap on the label at the top, shows All, just
+Highlights or just Bookmarks).
 
 Your highlights and bookmarks are also saved as a file for each book, to read
 or copy on a computer (like a Kindle's "My Clippings"):

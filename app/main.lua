@@ -911,7 +911,7 @@ local function toggle_bookmark()
 end
 
 local function open_bookmarks(from)
-    bm.sel, bm.top, bm.from = 1, nil, from
+    bm.sel, bm.top, bm.from, bm.filter = 1, nil, from, "all"
     app.mode = "bookmarks"
     redraw()
 end
@@ -3167,11 +3167,28 @@ local function draw_jump_panel()
 end
 
 -- Bookmarks and highlights together, in reading order.
+-- What the page shows (left/right, like My Books' order): all, or just one kind.
+app.BM_FILTERS = { "all", "highlights", "bookmarks" }
+app.BM_FILTER_NAMES = { all = "All", highlights = "Highlights", bookmarks = "Bookmarks" }
+
+function app.bm_filter(d)
+    local i = 1
+    for k, f in ipairs(app.BM_FILTERS) do if f == (bm.filter or "all") then i = k end end
+    bm.filter = app.BM_FILTERS[(i - 1 + d) % #app.BM_FILTERS + 1]
+    bm.sel, bm.top = 1, 1
+    redraw()
+end
+
 local function bookmark_entries()
-    local entries = { { action = true } }
+    local f = bm.filter or "all"
+    local entries = f ~= "highlights" and { { action = true } } or {}
     local all = {}
-    for _, b in ipairs(Store.get_bookmarks(book.path)) do all[#all + 1] = { item = b, ch = b.ch, off = b.off } end
-    for _, h in ipairs(Store.get_highlights(book.path)) do all[#all + 1] = { item = h, ch = h.ch, off = h.s, hl = true } end
+    if f ~= "highlights" then
+        for _, b in ipairs(Store.get_bookmarks(book.path)) do all[#all + 1] = { item = b, ch = b.ch, off = b.off } end
+    end
+    if f ~= "bookmarks" then
+        for _, h in ipairs(Store.get_highlights(book.path)) do all[#all + 1] = { item = h, ch = h.ch, off = h.s, hl = true } end
+    end
     table.sort(all, function(x, y) return x.ch < y.ch or (x.ch == y.ch and x.off < y.off) end)
     for _, e in ipairs(all) do entries[#entries + 1] = e end
     return entries
@@ -3191,14 +3208,10 @@ local function draw_bookmarks(side)
     if bm.sel < bm.top then bm.top = bm.sel end
     if bm.sel >= bm.top + rows then bm.top = bm.sel - rows + 1 end
     if side == "left" then app.bm_draw_left(entries, x, w) return end
-    local nb, nh = 0, 0
-    for _, e in ipairs(entries) do
-        if e.hl then nh = nh + 1 elseif not e.action then nb = nb + 1 end
-    end
     love.graphics.setFont(ui.font)
     color(th.dim)
-    love.graphics.printf(nb .. (nb == 1 and " bookmark" or " bookmarks") .. "  ·  " .. nh
-        .. (nh == 1 and " highlight" or " highlights"), x, 60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
+    love.graphics.printf("‹ " .. app.BM_FILTER_NAMES[bm.filter or "all"] .. " ›", x,
+        60 + ui.title:getBaseline() - ui.font:getBaseline(), w, "right")
     draw_list(side, entries, bm.sel, bm.top, rows, x, 160, w, row_h, function(it, _, rx, ry, rw, selected)
         if it.action then
             -- The page you're on (the one this bookmarks), like the rows below:
@@ -3248,18 +3261,26 @@ local function draw_bookmarks(side)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
-    if #entries == 1 then
-        love.graphics.printf("No bookmarks or highlights yet. While reading, press Select or tap the "
-            .. "top-right corner of the page to bookmark it. To highlight, press Y, then Select at "
-            .. "the first word and again at the last.", x, 160 + row_h + 20, w, "left")
+    local real = 0
+    for _, e in ipairs(entries) do if not e.action then real = real + 1 end end
+    if real == 0 then
+        local how_b = "While reading, press Select or tap the top-right corner of the page to bookmark it."
+        local how_h = "To highlight, press Y, then Select at the first word and again at the last."
+        local f = bm.filter or "all"
+        love.graphics.printf((f == "highlights" and ("No highlights yet. " .. how_h))
+            or (f == "bookmarks" and ("No bookmarks yet. " .. how_b))
+            or ("No bookmarks or highlights yet. " .. how_b .. " " .. how_h),
+            x, 160 + (#entries > 0 and row_h or 0) + 20, w, "left")
     end
     local cur = entries[bm.sel]
     if cur and cur.action then
-        app.hints(x, nil, { "A", bookmark_here() and "remove its bookmark" or "bookmark this page", "B", "back" })
+        app.hints(x, nil, { "A", bookmark_here() and "remove its bookmark" or "bookmark this page", "‹ ›", "filter", "B", "back" })
+    elseif cur then
+        app.hints(x, nil, { "A", "go there", "Y", "delete", "‹ ›", "filter", "B", "back" })
     else
-        app.hints(x, nil, { "A", "go there", "Y", "delete", "B", "back" })
+        app.hints(x, nil, { "‹ ›", "filter", "B", "back" })
     end
-    if #entries > 1 then app.count(x, w, bm.sel, #entries) end
+    if real > 0 then app.count(x, w, bm.sel, #entries) end
 end
 
 -- The mark on Bookmarks and Highlights: an open book with a ribbon, drawn in
@@ -3304,7 +3325,8 @@ end
 -- selected entry in full (a highlight's whole passage, a bookmark's words).
 function app.bm_draw_left(entries, x, w)
     local th = theme()
-    if #entries > 1 then
+    local nb, nh = #Store.get_bookmarks(book.path), #Store.get_highlights(book.path)
+    if nb + nh > 0 then
         local folder, where = Store.books_folder()
         love.graphics.setFont(ui.small)
         color(th.dim)
@@ -3314,7 +3336,11 @@ function app.bm_draw_left(entries, x, w)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print("Bookmarks and Highlights", x, 60)
-    app.draw_book_art(x + w / 2, 250, 0.9)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print(nb .. (nb == 1 and " bookmark" or " bookmarks") .. "  ·  " .. nh
+        .. (nh == 1 and " highlight" or " highlights"), x, 60 + ui.title:getHeight() + 4)
+    app.draw_book_art(x + w / 2, 260, 0.9)
     local e = entries[bm.sel]
     if not e then return end
     local y, hint = 400, nil
@@ -5819,16 +5845,18 @@ function handle_action(a)
         local rows = list_rows(96)
         if a == "up" then bm.sel = math.max(1, bm.sel - 1)
         elseif a == "down" then bm.sel = math.min(n, bm.sel + 1)
-        elseif a == "left" or a == "prev" then bm.sel = math.max(1, bm.sel - rows)
-        elseif a == "right" or a == "next" then bm.sel = math.min(n, bm.sel + rows)
+        elseif a == "left" or a == "prev" or a == "right" or a == "next" then
+            app.bm_filter((a == "left" or a == "prev") and -1 or 1)
+            return
         elseif a == "confirm" then
             local e = entries[bm.sel]
-            if e.action then
+            if not e then
+            elseif e.action then
                 toggle_bookmark()
             else
                 app.jump_to(e.ch, e.off); app.mode = "reader"
             end
-        elseif a == "toc" and bm.sel > 1 then              -- Y: delete, once confirmed
+        elseif a == "toc" and entries[bm.sel] and not entries[bm.sel].action then   -- Y: delete, once confirmed
             local e = entries[bm.sel]
             app.ask({ question = e.hl and "Delete this highlight?" or "Delete this bookmark?",
                 detail = e.hl and ("“" .. e.item.text .. "”") or (e.item.title ~= "" and e.item.title or book.title),
@@ -6011,6 +6039,8 @@ function app.on_tap(side, u, v)
             shop.start()
             return
         end
+        -- The order at the top right (Recent, Title...): the next one.
+        if v < 140 and u > bx + bw + 20 and #library.items > 0 then library.cycle_sort(1); redraw(); return end
         -- The list: tap a book to see it on the top screen, again to open it.
         for _, r in ipairs((app.library_layout(library.top))) do
             if r.idx and v >= r.y and v < r.y + 96 then
@@ -6067,6 +6097,8 @@ function app.on_tap(side, u, v)
             if idx == f.sel then action("confirm") else f.sel = idx; redraw() end
         end
     elseif mode == "bookmarks" then
+        -- The All / Highlights / Bookmarks label at the top: the next one.
+        if side == "right" and v < 140 and u > PAGE_W / 2 then app.bm_filter(1) return end
         -- The list: tap one to see it on the other screen, again to go there.
         local rows = list_rows(96)
         local idx = (bm.top or 1) + math.floor((v - 160) / 96)
