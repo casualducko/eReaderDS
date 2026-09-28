@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Tapping anywhere but the **update** (or "what's new") note just dismisses
+  it, instead of also turning the page.
+
 ## v0.3.12
 
 - **What's new:** swipe to turn its pages, and the latest version stands out

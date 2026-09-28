@@ -4282,12 +4282,15 @@ end
 
 -- A quick tap on the touchscreen (page coordinates of the touched side).
 function app.on_tap(side, u, v)
-    -- A toast that does something when tapped (e.g. "Update available").
+    -- A toast that does something when tapped (e.g. "Update available"):
+    -- a tap on it does that; a tap anywhere else just dismisses it.
     local o = overlay
-    if o and o.on_tap and o.box and side == o.side and u >= o.box[1] - 10 and u <= o.box[1] + o.box[3] + 10
-            and v >= o.box[2] - 10 and v <= o.box[2] + o.box[4] + 10 then
+    if o and o.on_tap then
         overlay = nil
-        o.on_tap()
+        if o.box and side == o.side and u >= o.box[1] - 10 and u <= o.box[1] + o.box[3] + 10
+                and v >= o.box[2] - 10 and v <= o.box[2] + o.box[4] + 10 then
+            o.on_tap()
+        end
         redraw()
         return
     end
