@@ -340,50 +340,15 @@ local function save_progress_soon()
     if Touch.enabled then save_due = love.timer.getTime() + SAVE_DELAY else save_progress() end
 end
 
--- "Go back": where you were before the latest jump (Contents, Bookmarks,
--- Jump to %). Jumping again before reading keeps the original
--- spot. Going back uses it up; it's also forgotten once you've read on a few
--- spreads.
-local jump = nil                     -- { ch, off, turns }
-local JUMP_FORGET_AFTER = 5          -- spreads
-
-local function remember_jump()
-    if not spread then return end
-    if jump and jump.turns == 0 then return end
-    jump = { ch = pos.ch, off = pos.off, turns = 0 }
-end
-
--- Jump somewhere, remembering where you were so B can go back, unless the
--- jump didn't actually move (e.g. picking the chapter you're already in).
+-- Jump somewhere (Contents, bookmarks, highlights, Jump to %, Find).
 function app.jump_to(ch, off)
-    local from = spread and (spread.ch .. ":" .. spread.pi)
-    local had = jump
-    remember_jump()
-    goto_pos(ch, off)
-    if jump ~= had and spread and spread.ch .. ":" .. spread.pi == from then jump = had end
-    save_progress()
-end
-
-local function jump_turned()
-    if jump then
-        jump.turns = jump.turns + 1
-        if jump.turns >= JUMP_FORGET_AFTER then jump = nil end
-    end
-end
-
-local function go_back()
-    if not jump then return false end
-    local ch, off = jump.ch, jump.off
-    jump = nil
     goto_pos(ch, off)
     save_progress()
-    return true
 end
 
 local function next_spread()
     if not spread then return end
     learn_speed()
-    jump_turned()
     if spread.pi + 2 <= #spread.pages then
         set_spread(spread.ch, spread.pi + 2)
     elseif spread.ch < #book.chapters then
@@ -397,7 +362,6 @@ end
 local function prev_spread()
     if not spread then return end
     reading_pause()
-    jump_turned()
     if spread.pi - 2 >= 1 then
         set_spread(spread.ch, spread.pi - 2)
     elseif spread.ch > 1 then
@@ -433,7 +397,6 @@ local function current_section()
 end
 
 local function jump_section(dir)
-    remember_jump()
     if #book.toc == 0 then
         if dir > 0 and pos.ch < #book.chapters then set_spread(pos.ch + 1, 1)
         elseif dir < 0 then set_spread(math.max(1, spread.pi > 1 and pos.ch or pos.ch - 1), 1) end
@@ -963,7 +926,6 @@ local function open_book(path)
     if book and book ~= b then book:close() end
     -- Find results belong to one book; drop them (and the old book they hold).
     if app.find and app.find.book ~= b then app.find, app.find_mark = nil, nil end
-    jump = nil
     book = b
     clear_book_caches()
     local pr = Store.get_progress(path)
@@ -1138,7 +1100,7 @@ function library.delete(path)
     end
     if book and book.path == path then
         book:close()
-        book, jump, spread = nil, nil, nil
+        book, spread = nil, nil
         app.find, app.find_mark = nil, nil
         clear_book_caches()
     end
@@ -2056,19 +2018,6 @@ local function draw_reader_pages()
             end
         end
         draw_status(side, info)
-        if side == "right" and jump then
-            -- Replaces the bottom-right status text while a jump can be undone.
-            local m = margins()
-            local w = PAGE_W - m.outer - m.inner
-            local y = PAGE_H - 26 - ui.small:getHeight()
-            local th = theme()
-            love.graphics.setFont(ui.small)
-            color(th.bg)
-            love.graphics.rectangle("fill", m.inner + w * 0.35, y - 2, w * 0.65, ui.small:getHeight() + 4)
-            color(th.fg)
-            love.graphics.printf(string.format("‹ Back to %d%%  (B)", math.floor(book:fraction(jump.ch, jump.off) * 100 + 0.5)),
-                m.inner, y, w, "right")
-        end
     end
 end
 
@@ -2917,7 +2866,7 @@ app.HELP = {
     left = { "Buttons", {
         { "D-pad, stick", "Turn pages" },
         { "A", "Footnotes on these pages" },
-        { "B", "Settings, or back after a jump" },
+        { "B", "Settings" },
         { "X, Start", "Settings" },
         { "Curved arrow", "Settings (or press the stick)" },
         { "Y", "Look up a word" },
@@ -4616,7 +4565,6 @@ function handle_action(a)
         elseif a == "bookmark" then toggle_bookmark()
         elseif a == "next_section" then jump_section(1)
         elseif a == "prev_section" then jump_section(-1)
-        elseif a == "back" and go_back() then -- B: back to where you were
         elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil
         elseif a == "toc" then look.open()          -- Y: look up a word
         elseif a == "confirm" then note.open()
@@ -4668,7 +4616,6 @@ function handle_action(a)
             jp.pct = math.max(0, math.min(100, jp.pct + step))
         elseif a == "confirm" then
             if jp.pct ~= jp.here then
-                remember_jump()
                 goto_pos(book:locate(jp.pct / 100))
                 save_progress()
             end
@@ -4828,9 +4775,6 @@ function app.on_tap(side, u, v)
         elseif side == "right" and #note.on_spread() > 0 and u >= bx - 16 and u <= bx + bw + 16
             and v >= by - 16 and v <= by + bh + 16 then
             note.open()                       -- the Notes button
-        elseif jump and side == "right" and v > PAGE_H - 90
-            and u >= margins().inner + (PAGE_W - margins().outer - margins().inner) * 0.35 then
-            go_back()                         -- the "Back to ..." line
         elseif side == "right" and u > PAGE_W - 170 and v < 150 then
             toggle_bookmark()                 -- top-right corner, like a Kindle
         elseif side == "right" and v < 90 and u > PAGE_W - 230 then

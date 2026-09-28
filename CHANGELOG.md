@@ -10,6 +10,8 @@
   touchscreen ("Delete this highlight?" with its words, or the bookmark's
   chapter) with **Delete (A)** and **Keep (B)** buttons; tapping Delete
   deletes, a tap anywhere else or B keeps it.
+- No more "‹ Back to …% (B)" after a jump (Contents, a bookmark or
+  highlight, Jump to %, Find): B always opens Settings while reading.
 - Test hooks: an `untoast` script action clears a message (for screenshots);
   with READER_DEBUG the log notes when a message opens and closes.
 

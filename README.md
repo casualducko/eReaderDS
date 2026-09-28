@@ -57,7 +57,7 @@ Directions are as you hold it.
 |---|---|---|
 | D-pad or stick | Turn pages (right/down forward) | Up/down move; left/right change a value, page through a list, or change the library's sort order |
 | A | Show the notes on these pages | Select |
-| B | Settings, or go back after a jump | Back |
+| B | Settings | Back |
 | Y | Look up (or highlight) a word | Delete (a book in the library, a bookmark or highlight in the list) |
 | Select | Bookmark the page (again to remove) | Close; in the library: Get books |
 | Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
@@ -116,8 +116,8 @@ Press **B** (or Start, X, ↩) while reading. One page, top to bottom:
   progress; delete books from it.
 - **Finding your place:** bookmarks and highlights, Contents, Jump to %, **Find in book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
-  and the words are marked on the page you open), and "Back to …" after any
-  jump. Your place in every book is saved.
+  and the words are marked on the page you open). Your place in every book is
+  saved.
 - **Status bar:** book and chapter titles, pages left, time left in the chapter
   (learned from your reading speed), percent read, a progress bar, battery and a clock.
   Choose what shows in **Settings → Status bar**. The clock follows the
