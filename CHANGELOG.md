@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.10
 
 - The **"Update available"** note can be tapped to go straight to the update
   (it stays up a little longer, 8 seconds).
