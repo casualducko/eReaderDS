@@ -354,8 +354,7 @@ local function next_spread()
     elseif spread.ch < #book.chapters then
         set_spread(spread.ch + 1, 1)
     else
-        -- Already on the last page: finished, if it wasn't yet.
-        if Store.get_finished(book.path) then app.toast("The end") else app.check_finished() end
+        app.check_finished()                   -- already on the last page (a one-spread book)
         return
     end
     save_progress_soon()
