@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.22
 
 - An opening screen ("eReaderDS / Opening…", in your theme) appears as
   soon as the window is up, instead of nothing until the book is ready.
