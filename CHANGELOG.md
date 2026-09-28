@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.17
 
 - **Check for updates** on the About page too (tap it, or A), with where
   things stand ("Up to date", "v0.3.17 available", "v0.3.17 skipped").

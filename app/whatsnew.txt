@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.17
+Skip an update you don't want: choose Skip this version on the update screen. You'll still hear about the next one.
+Check for updates is on the About page too, so a skipped version is easy to find again.
+
 v0.3.16
 Before you update, you can read what's new in plain words, for every version you've missed.
 Updates handle Wi-Fi trouble gracefully: a clear message and a Try again button, and nothing half-finished left behind.
