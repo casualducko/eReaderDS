@@ -2206,8 +2206,9 @@ local function draw_menu_panel(side)
             local vf = it.value_font
             if vf and it.value and it.value ~= "" and vf:hasGlyphs(it.value) then
                 local room = rw - ui.font:getWidth(it.label) - 40
-                -- "‹ name ›" when left/right change it; "name ›" when it opens a page.
-                local open, close = it.adjust and "‹  " or "", "  ›"
+                -- "‹ name ›" when left/right change it; just the name when it
+                -- opens a page (Font).
+                local open, close = it.adjust and "‹  " or "", it.adjust and "  ›" or ""
                 local name = fit_text(vf, it.value, room - ui.font:getWidth(open .. close))
                 local right = rx + rw
                 local cw, nw = ui.font:getWidth(close), vf:getWidth(name)
