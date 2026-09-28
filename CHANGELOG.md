@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.25
 
 - **Night theme:** Settings → Page turns & device → Night → Night theme: pick a
   theme (e.g. Midnight or Amber) to use automatically between two hours (9 PM

@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.25
+Night theme: switch to a darker theme automatically in the evening. Set it up in Settings → Page turns & device.
+The Night theme is now called Midnight.
+The clock shows the right time on ROCKNIX.
+
 v0.3.24
 Future updates install much faster: only the parts that changed are saved to your SD card.
 
