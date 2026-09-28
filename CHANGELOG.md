@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.27
 
 - **Chapters that span several EPUB files:** pages left, time left, "Page x
   of y" and the chapter progress bar now cover the whole chapter (from its

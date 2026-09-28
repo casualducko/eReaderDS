@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v0.3.27
+Pages and time left in a chapter are right even when the book splits a chapter into several parts.
+If eReaderDS ever runs into a problem, it keeps your place and lets you report it from your phone: scan a code and the details are filled in for you.
+Report a problem any time in Settings → About eReaderDS.
+
 v0.3.26
 Settings are easier to find: Night theme sits next to Theme, reading options are under Reading & device, and What's new, updates and credits are under About eReaderDS.
 Picking a night theme previews it on the touchscreen.
