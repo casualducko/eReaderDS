@@ -1472,13 +1472,7 @@ local function menu_items()
             -- names in other scripts (e.g. Chinese firmware fonts) can display.
             { label = "Font", value = fonts.name or S.font,
               value_font = Fonts.preview(fonts.name or S.font, UI_SIZE),
-              act = function() app.font_open() end, adjust = function(d)
-                local list = Fonts.list()
-                local idx = 1
-                for k, f in ipairs(list) do if f.name == fonts.name then idx = k end end
-                S.font = list[(idx - 1 + d) % #list + 1].name
-                build_fonts(); goto_pos(pos.ch, pos.off)
-            end },
+              act = function() app.font_open() end },     -- the font picker spread
             { label = "Text size", value = tostring(S.font_size), adjust = function(d)
                 S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
             end },
@@ -2187,7 +2181,8 @@ local function draw_menu_panel(side)
             local vf = it.value_font
             if vf and it.value and it.value ~= "" and vf:hasGlyphs(it.value) then
                 local room = rw - ui.font:getWidth(it.label) - 40
-                local open, close = "‹  ", "  ›"
+                -- "‹ name ›" when left/right change it; "name ›" when it opens a page.
+                local open, close = it.adjust and "‹  " or "", "  ›"
                 local name = fit_text(vf, it.value, room - ui.font:getWidth(open .. close))
                 local right = rx + rw
                 local cw, nw = ui.font:getWidth(close), vf:getWidth(name)
