@@ -312,11 +312,16 @@ it through a KOReader sync server, so each picks up where the other left off.
 2. **Account:** the same user name and password as on the other device (a new
    name makes a new account). The eye at the end of the password field shows
    what you've typed (tap it, or press up from the top row of keys and A).
-3. Read. When you open a book, eReaderDS checks the server; if another device
-   has been reading it since, it asks **Continue from 45%?** (Jump or Stay).
-   It sends your place when you leave the book, close the lid, or the screens
-   go off, and every few minutes while reading (checking first that no other
-   device has moved on meanwhile).
+3. Read. What happens on its own is up to **Automatic sync**:
+   - **Ask when opening** (the default): when you open a book, eReaderDS
+     checks the server. If another device has been reading it since, it asks
+     **Continue from 45%?** (Jump or Stay); if the server is behind you, it
+     asks **Send your place to the sync server?**. Nothing is sent without
+     asking.
+   - **On:** as above, but your place is also sent on its own: when the book
+     opens, every few minutes while reading, and when you leave the book,
+     close the lid or the screens go off.
+   - **Off:** nothing happens unless you use the buttons below.
 
 **Sync with KOReader** (on the first page of Settings) works out which way
 to go, like CrossPoint's smart sync: if you've read on here since the last

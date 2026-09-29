@@ -36,6 +36,7 @@ local DEFAULTS = {
     kosync_user = "", kosync_key = "", kosync_server = "crosspoint", kosync_custom = "",
     kosync_custom_name = "",   -- your own server's name (empty: its address)
     kosync_match = "filename", kosync_meta = false, kosync_device = "",
+    kosync_auto = "ask",       -- automatic sync: "off", "ask" (when opening a book) or "on"
 }
 
 local function data_dir()
@@ -170,6 +171,7 @@ function M.load_settings()
         tap = { next = true, menu = true },
         anim = { flip = true, fade = true, off = true },
         kosync_match = { binary = true, filename = true },
+        kosync_auto = { off = true, ask = true, on = true },
     }
     for k, allowed in pairs(ENUMS) do
         if allowed and not allowed[s[k]] then s[k] = DEFAULTS[k] end

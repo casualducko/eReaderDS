@@ -1031,7 +1031,7 @@ end
 
 local function open_book(path)
     app.asking = nil
-    if book and book.path ~= path then app.sync_push() end    -- the book being left
+    if book and book.path ~= path then app.sync_auto_push() end    -- the book being left
     local ok, b, err = pcall(Book.open, path)
     if not ok or not b then
         show_message("Could not open this book.\n\n" .. tostring(ok and err or b))
@@ -1463,7 +1463,7 @@ end
 
 local function go_library()
     save_progress()
-    app.sync_push()
+    app.sync_auto_push()
     Store.flush()
     scan_library()
     for i, it in ipairs(library.items) do
@@ -2022,6 +2022,9 @@ end
 -- (Not by timestamp alone: devices' clocks disagree.)
 function app.sync_pull(how)
     how = how or "open"
+    -- On their own: on opening a book unless automatic sync is Off, the
+    -- regular check only when it's On.
+    if (how == "open" and app.sync_auto() == "off") or (how == "check" and app.sync_auto() ~= "on") then return end
     local now = how == "now" or how == "get"          -- (by hand: say what happens)
     local b = book
     if not (b and b.zip and app.sync_on()) then
@@ -2052,6 +2055,19 @@ function app.sync_pull(how)
         end)
     end
     fetch(1)
+end
+
+-- Automatic sync (Settings → KOReader Sync): "off" (only by hand), "ask"
+-- (on opening a book: offer the other device's place, or to send this one;
+-- nothing is sent without asking) or "on" (also sent as you read and when
+-- you leave the book, close the lid or the screens go off).
+function app.sync_auto() return S.kosync_auto or "ask" end
+app.SYNC_AUTO_NAMES = { off = "Off", ask = "Ask when opening", on = "On" }
+
+-- Leaving the book, the lid, the screens going off, quitting: sent only
+-- when automatic sync is On.
+function app.sync_auto_push(now)
+    if app.sync_auto() == "on" then app.sync_push(now) end
 end
 
 -- This device's place as sent: the paragraph and the percentage (a long
@@ -2164,6 +2180,25 @@ function app.sync_decide(b, how, docs, results)
     local function stands(send, note, head)
         app.sync.checked[b.path] = true
         local where = app.sync_where(pos.ch, pos.off) .. (note and (" · " .. note) or "")
+        if (moved or send) and not now and app.sync_auto() ~= "on" then
+            -- Ask when opening: offer to send, rather than sending on its own.
+            local last = own[1]
+            for _, e in ipairs(own) do
+                if (tonumber(e.r.timestamp) or 0) > (tonumber(last.r.timestamp) or 0) then last = e end
+            end
+            app.untoast()
+            app.ask({ question = "Send your place to the sync server?",
+                detail = "You're at " .. where .. " here. " .. app.sync_server_name() .. " has "
+                    .. (last and ("this device's place from " .. ago(last.r.timestamp) .. " (" .. math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5) .. "%).")
+                        or "nothing for this book yet."),
+                yes = "Send", no = "Not now", on_yes = function()
+                    if book ~= b then return end
+                    app.sync.pushed[b.path] = nil
+                    app.sync_push()
+                    app.sync_say("Sent your place to the sync server", where)
+                end })
+            return
+        end
         if moved or send then
             if send then app.sync.pushed[b.path] = nil end
             app.sync_push()
@@ -2247,13 +2282,16 @@ function app.sync_decide(b, how, docs, results)
         detail = (label ~= "" and label ~= b.title and (label .. ", ") or "") .. "where you were on " .. device .. " "
             .. ago(r.timestamp) .. ". You're at " .. here .. "% here.",
         yes = "Jump", no = "Stay", on_yes = go,
-        -- Stay: this device's place wins, and is sent.
+        -- Stay: this device's place wins (and is sent when automatic sync
+        -- is On; otherwise Send my place does that).
         on_no = function()
             if book ~= b then return end
             app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
             app.sync_set_seen(b.path, rdoc, r.timestamp)       -- dealt with
-            app.sync.pushed[b.path] = nil
-            app.sync_push()
+            if app.sync_auto() == "on" then
+                app.sync.pushed[b.path] = nil
+                app.sync_push()
+            end
         end })
 end
 
@@ -2402,7 +2440,8 @@ end
 -- if another device has moved on meanwhile); check if that hasn't happened yet.
 function app.sync_tick()
     if not (book and book.zip and app.sync_on()) then return end
-    app.sync.moved[book.path] = true
+    app.sync.moved[book.path] = true                -- (every mode: Sync with KOReader goes by it)
+    if app.sync_auto() ~= "on" then return end
     local t = love.timer.getTime()
     if app.sync.pulling or app.sync.asked[book.path] or not shop.online() then return end
     if not app.sync.checked[book.path] then
@@ -2430,6 +2469,14 @@ function app.sync_items()
           end },
         { label = "Send book details", value = S.kosync_meta and "On" or "Off", adjust = function()
               S.kosync_meta = not S.kosync_meta
+          end },
+        -- Off (only by hand) / Ask when opening a book / On (also as you read
+        -- and when you leave the book).
+        { label = "Automatic sync", value = app.SYNC_AUTO_NAMES[app.sync_auto()], adjust = function(d)
+              local order = { "off", "ask", "on" }
+              local i = 2
+              for k, v in ipairs(order) do if v == app.sync_auto() then i = k end end
+              S.kosync_auto = order[(i - 1 + d) % #order + 1]
           end },
     }
     if on then
@@ -6972,7 +7019,7 @@ local function lid_closed()
     gesture, app.idle_swallow = nil, nil
     if overlay and overlay.hide_at > love.timer.getTime() + 60 then overlay = nil end
     Backlight.power(false)
-    app.sync_push(true)
+    app.sync_auto_push(true)
     lid.since = love.timer.getTime()
     if S.lid == "sleep" then
         if not suspend() then S.lid_failed = true end
@@ -7040,7 +7087,7 @@ function app.idle_tick()
         Store.flush()
         Backlight.power(false)
         print("[idle] screens off")
-        app.sync_push()
+        app.sync_auto_push()
     end
 end
 
@@ -8165,7 +8212,7 @@ end
 
 function love.quit()
     if app.recv then app.recv_stop() end
-    app.sync_push(true)
+    app.sync_auto_push(true)
     if net.thread then
         -- Stop whatever is running (a download's .part file is removed) and the thread.
         love.thread.getChannel("net_cancel"):clear()

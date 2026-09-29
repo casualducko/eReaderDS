@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Automatic sync: Off / Ask when opening / On** (Settings → KOReader
+  Sync; default Ask when opening). Ask: opening a book checks the server and
+  asks, "Continue from 45%?" when another device is ahead, or "Send your place
+  to the sync server?" when the server is behind you (it used to send that on
+  its own); nothing is sent without asking, and Stay keeps your place without
+  sending it. On: the old behaviour (also sent every few minutes and when you
+  leave the book, close the lid, the screens go off or you quit). Off: only by
+  hand. Sync with KOReader, Send my place and Get my place work the same in
+  every mode, and page turns are still noted so Sync with KOReader knows
+  which way to go.
 - **Sync tells you your place is saved.** When the server already has this
   device's current place (often because it was sent on its own when the book
   opened), Sync with KOReader now says "Your place is saved on the sync
