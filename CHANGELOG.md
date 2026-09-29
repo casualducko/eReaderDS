@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.9.3
 
 - **Themes page:** tap Settings → Theme (or press A on it) for every theme on
   the touchscreen, each with a swatch in its colours and ✓ on the one in use,
