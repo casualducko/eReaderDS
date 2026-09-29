@@ -11,7 +11,9 @@
 - **Five more light themes:** **Gruvbox Light**, **Catppuccin Latte** and
   **Rosé Pine Dawn** (the light versions of favourite palettes), **Parchment**
   (warm, deeper cream) and **Sky** (pale blue: tinted pages some readers,
-  dyslexic readers especially, find easier than white). All 24 themes are on
+  dyslexic readers especially, find easier than white), and **Green** (the
+  Kindle app's light mint-green page, restful at low brightness; greener than
+  Sage). All 25 themes are on
   the Themes page (tap Theme in Settings) and can be the night theme.
 
 ## v1.10.1
