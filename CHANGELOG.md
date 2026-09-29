@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.14.0
 
 - **KOReader Sync checks both of a book's names.** A book is known on the
   server by an ID made from its file name or from its contents, and a device
@@ -28,6 +28,10 @@
   joiners (U+FEFF, U+2060) and zero-width spaces are left out when drawing
   (the fonts have no glyph for them). The text itself is unchanged, so places
   and highlights stay where they were.
+- **README:** new screenshots (reading, My Books, Contents, Settings, the
+  Themes page, looking up a word), an On-screen keyboard section, the Themes
+  page and pictured letters under Features, and a KOReader Sync
+  troubleshooting row.
 
 ## v1.13.1
 

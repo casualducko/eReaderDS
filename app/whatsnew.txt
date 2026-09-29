@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.14.0
+KOReader Sync now finds your place from any KOReader or CrossPoint device, whichever way it matches books (by file name or by file contents), and sends yours so both kinds can find it.
+Sync messages tell you more: the chapter and percentage, and where your other device was.
+Books from Standard Ebooks no longer show little boxes next to dashes.
+
 v1.13.1
 KOReader Sync remembers a place you've already jumped to (or chose to stay away from), even after restarting, so it isn't offered again. A newer one from your other device still is.
 If you read on while offline, your place is sent the next time you open the book.

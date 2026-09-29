@@ -160,8 +160,11 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   ink, so it sits on any theme instead of in a white box);
   justified text with optional hyphenation (English); 18 built-in fonts plus
   your own; 25 themes (Sepia by default, plus E-ink, Paper, Mint, Sky,
-  Midnight, Gruvbox, Nord, Red Night and more) that the whole app follows,
-  and Night Mode, another theme that switches on by itself in the evening; page-flip or fade animation.
+  Midnight, Gruvbox, Nord, Red Night and more), picked on a page that shows
+  your book in each, which the whole app follows; Night Mode, another theme
+  that switches on by itself in the evening; page-flip or fade animation.
+  Letters that some older books draw as tiny pictures (for characters their
+  fonts lacked) stay in the line and take the theme's ink.
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.
 - **Dictionary on the facing page:** press Y and move a cursor over the words;
@@ -202,11 +205,30 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 |---|---|
 | ![Library](docs/screenshots/library.png) | ![Contents](docs/screenshots/contents.png) |
 
-| Settings | Midnight theme |
+| Settings | Themes |
 |---|---|
-| ![Settings](docs/screenshots/settings.png) | ![Midnight theme](docs/screenshots/night.png) |
+| ![Settings](docs/screenshots/settings.png) | ![Themes, previewing Nord](docs/screenshots/themes.png) |
 
 *Screenshots use public-domain books from Project Gutenberg.*
+
+## On-screen keyboard
+
+Searching (Find in Book, Get Books) and signing in to KOReader Sync use a
+keyboard on the touchscreen. Tap the keys, or move with the D-pad and press
+A; **B** deletes (and closes the keyboard when the field is empty), **Y**
+types a space, and **Start** or **X** confirms. The top screen lists the
+buttons for the field you're in.
+
+- **Shift** (the arrow) capitalizes the next letter only; press it twice for
+  caps lock (a bar under the arrow), and again to turn it off. **#@** switches
+  to numbers and symbols.
+- **Moving in the text:** tap where you want the cursor, or press up from
+  the top row of keys to reach the text, then left/right; down goes back to
+  the keys. Typing, deleting and spaces happen at the cursor.
+- **Passwords** show as dots; the **eye** at the end of the field shows what
+  you've typed (tap it, or A while the D-pad is on the text).
+- **Web addresses** (your own sync server) get a row of **https://**,
+  **http://**, **www.**, **.com**, **:** and **/** keys.
 
 ## Night Mode
 
@@ -360,6 +382,8 @@ While reading, press **Y**: a cursor appears on a word. Left/right move it
 word by word and up/down line by line, across both pages, and the definition
 shows on the facing page (A for more of a long entry, B to close).
 
+![Looking up a word](docs/screenshots/lookup.png)
+
 English (WordNet) is built in. To add others, copy **StarDict** dictionaries
 (the files KOReader uses: `.ifo`, `.idx`, `.dict` or `.dict.dz`, and `.syn`
 if there is one) into `Ebook/Dictionaries`. By default every dictionary with
@@ -403,6 +427,7 @@ name) only shows one weight.
 | Get Books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
 | Pages upside down | Turn the device the other way, with the buttons on your right. |
 | Screen stays dim after quitting | Brightness is restored when the app quits; after a crash, set it in the system menu. |
+| KOReader Sync says "Already in sync" but the other device is ahead | Both must use the same server and account (Settings → KOReader Sync), and the book must be the same file or have the same file name on both. |
 | The clock is wrong | Set **Settings → Reading & Device → Time zone** (**Device clock** uses the system's own setting). |
 | An update fails | Check Wi-Fi and choose **Try again**. Nothing is changed until an update is complete; you can also [update by hand](#install). |
 
