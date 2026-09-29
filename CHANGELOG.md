@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **KOReader Sync checks both of a book's names.** A book is known on the
+  server by an ID made from its file name or from its contents, and a device
+  set to one never saw a place saved under the other: an Xteink X4 (file
+  name) at Chapter 5 and this device set to File contents gave "Already in
+  sync" at Chapter 4. Now each sync looks the book up under both IDs and
+  sends your place under both, so KOReader and CrossPoint devices stay in
+  step whatever they're set to. A place from another device that hasn't been
+  dealt with wins over one that has, under either ID; not by timestamp (the
+  X4's Chapter 5 carried an earlier time than this device's Chapter 4). What
+  has been dealt with is remembered per ID. A 404 counts as "nothing there
+  yet" (some servers answer that way). Checked end to end against a stand-in
+  server with the reported case and the book from it.
+
 ## v1.13.1
 
 - **KOReader sync remembers what it's dealt with.** The server's timestamp

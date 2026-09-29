@@ -320,22 +320,25 @@ details**.
 ### Match books by: File name or File contents
 
 The server never sees your files, so each device works out a short ID for a
-book, and both devices have to get the same ID for the same book. KOReader's
-protocol has two ways, and **every device syncing a book must use the same
-one**:
+book, and the devices find each other's place through that ID. KOReader's
+protocol has two ways of making it:
 
 - **File contents** (KOReader's default): the ID comes from small samples of
   the file itself. Renaming or moving the file doesn't matter, but both
-  copies must be exactly the same file. A copy downloaded from somewhere else,
+  copies must be exactly the same file (a copy downloaded from somewhere else,
   or one Calibre has rewritten while sending it to a device, gets a different
-  ID and silently won't sync.
+  ID).
 - **File name** (CrossPoint's default): the ID comes from the file's name,
   such as `Dune - Frank Herbert.epub`. Copies match as long as the names are
-  exactly the same, even if the files differ a little; renaming one on
-  either device breaks the match.
+  exactly the same, even if the files differ a little.
 
-Choosing a server picks its readers' usual way (CrossPoint: File name;
-KOReader: File contents); change it if your other device is set differently.
+Most readers use only one of them, so two devices set differently never see
+each other's place. **eReaderDS uses both:** it looks the book up under each
+ID and sends your place under each, so it keeps in step with a KOReader
+device and a CrossPoint device (an Xteink X4) whichever way each one is set.
+The setting only decides which ID it checks first. A place from another
+device that eReaderDS hasn't dealt with yet wins over one it has, whichever
+ID it came under; not by the time on it, since devices' clocks disagree.
 
 ### Send book details
 
@@ -347,9 +350,9 @@ see.
 
 ### With an Xteink X4 (CrossPoint)
 
-Server: **CrossPoint**; Match books by: **File name** (picking the server sets
-it); and give the book the same file name on both devices (copying the same
-`.epub` to both does that).
+Server: **CrossPoint** and the same account on both. Give the book the same
+file name on both devices (copying the same `.epub` to both does that); Match
+books by can stay at **File name**, which picking the server sets.
 
 ## Dictionaries
 
