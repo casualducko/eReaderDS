@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.11.0
 
 - **Eight more dark themes**, after what readers and programmers pick for
   long dark-screen sessions: **Dark Sepia** (warm brown paper at night),

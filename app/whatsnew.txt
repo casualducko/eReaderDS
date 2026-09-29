@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.11.0
+Fourteen new themes, 25 in all. Dark: Dark Sepia, Gruvbox, Nord, Solarized Dark, Dracula, Catppuccin, Everforest, and Red Night, red on black for reading in bed without losing your night vision.
+Light: Gruvbox Light, Catppuccin Latte, Rosé Pine Dawn, Parchment, Sky (a pale blue many readers find easier than white), and Mint, the pale green page of the Kindle app.
+Books that draw a few special letters as tiny pictures now keep them inside the words, instead of each one breaking the line.
+
 v1.10.1
 Fixed a crash when tapping the My Books options card, and a damaged book or dictionary can no longer crash the app.
 Your place, bookmarks and settings are safe even when the SD card is full, and two copies of the same book keep separate highlight files.
