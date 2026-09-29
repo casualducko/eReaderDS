@@ -12,7 +12,7 @@
   **Rosé Pine Dawn** (the light versions of favourite palettes), **Parchment**
   (warm, deeper cream) and **Sky** (pale blue: tinted pages some readers,
   dyslexic readers especially, find easier than white), and **Green** (the
-  Kindle app's pale mint page with near-black text, restful at low brightness;
+  Kindle app's pale mint page with dark gray-green text, restful at low brightness;
   greener than Sage). All 25 themes are on
   the Themes page (tap Theme in Settings) and can be the night theme.
 
