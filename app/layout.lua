@@ -10,6 +10,8 @@ local Hyphen = require("hyphen")
 local M = {}
 
 local function sanitize(s)
+    -- UTF-16 halves written as UTF-8 (ED A0..BF ..) pass utf8.len but can't be drawn.
+    if s:find("\237[\160-\191]") then s = s:gsub("\237[\160-\191][\128-\191]", "\239\191\189") end
     if utf8.len(s) then return s end
     -- Treat invalid bytes as Latin-1.
     return (s:gsub("[\128-\255]", function(c)
@@ -198,11 +200,42 @@ function M.paginate(chapter, ctx)
                         { frags = { { text = rest, font = fr.font, w = rw, link = fr.link, rise = fr.rise } }, w = rw, off = wd.off + best.at }
                 end
 
+                -- A word wider than a whole line (a web address, text with no
+                -- spaces such as Chinese or Japanese): break it between
+                -- characters, as much as fits in `room` (at least one).
+                local function hard_split(wd, room)
+                    if #wd.frags ~= 1 then return nil end
+                    local fr = wd.frags[1]
+                    local cuts = {}                  -- byte offsets where a character ends
+                    for p in fr.text:gmatch("()[\1-\127\192-\255][\128-\191]*") do
+                        if p > 1 then cuts[#cuts + 1] = p - 1 end
+                    end
+                    if #cuts == 0 then return nil end
+                    local lo, hi = 1, #cuts
+                    while lo < hi do
+                        local mid = math.ceil((lo + hi) / 2)
+                        if fr.font:getWidth(fr.text:sub(1, cuts[mid])) <= room then lo = mid else hi = mid - 1 end
+                    end
+                    local at = cuts[lo]
+                    local head, rest = fr.text:sub(1, at), fr.text:sub(at + 1)
+                    local hw, rw = fr.font:getWidth(head), fr.font:getWidth(rest)
+                    return { frags = { { text = head, font = fr.font, w = hw, link = fr.link, rise = fr.rise } }, w = hw, off = wd.off },
+                        { frags = { { text = rest, font = fr.font, w = rw, link = fr.link, rise = fr.rise } }, w = rw, off = wd.off + at }
+                end
+
                 local hyphen_run = 0      -- consecutive lines ending in a hyphen
+                local after_br = false    -- the line so far ended with a <br>
                 for _, wd in ipairs(words) do
                     if wd.br then
-                        emit(true)
+                        if #line == 0 and after_br and y > 0 then
+                            -- <br><br>: an empty line (a gap between verses)
+                            if y + lh > H then new_page() else y = y + lh end
+                        else
+                            emit(true)
+                        end
+                        after_br = true
                     else
+                        after_br = false
                         while wd do
                             local avail = W - (first and indent or 0) - (prefix and prefix.w or 0)
                             local need = (#line > 0) and (lw + space_w + wd.w) or wd.w
@@ -227,9 +260,16 @@ function M.paginate(chapter, ctx)
                                     emit(false)
                                     wd = tail
                                 elseif #line == 0 then
-                                    line[1] = wd              -- too wide for a line: let it overflow
-                                    lw = wd.w
-                                    wd = nil
+                                    head, tail = hard_split(wd, avail)
+                                    if head then
+                                        line[1], lw = head, head.w
+                                        emit(false)
+                                        wd = tail
+                                    else
+                                        line[1] = wd          -- mixed styles: let it overflow
+                                        lw = wd.w
+                                        wd = nil
+                                    end
                                 else
                                     hyphen_run = 0
                                     emit(false)

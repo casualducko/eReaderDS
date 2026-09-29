@@ -278,6 +278,18 @@ function M.lookup(word, only)
     if word == "" then return {} end
     local results = {}
     for _, d in ipairs(M.list or {}) do
+        -- A damaged dictionary is left out (from then on), not a crash.
+        local ok, err = pcall(M.lookup_in, d, word, only, results)
+        if not ok then
+            print("[dict] " .. d.name .. ": " .. tostring(err))
+            d.loaded, d.ok = true, false
+        end
+    end
+    return results
+end
+
+function M.lookup_in(d, word, only, results)
+    do
         if (not only or d.name == only) and ensure(d) then
             -- The word as written (if it's an entry), then its base form
             -- ("running": the adjective, then the verb "run").
@@ -306,7 +318,6 @@ function M.lookup(word, only)
             end
         end
     end
-    return results
 end
 
 return M

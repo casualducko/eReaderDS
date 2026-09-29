@@ -12,6 +12,8 @@ local M = {}
 ---------------------------------------------------------------- helpers
 
 local function utf8char(cp)
+    -- NUL, UTF-16 halves and beyond Unicode can't be drawn: U+FFFD instead.
+    if cp == 0 or (cp >= 0xD800 and cp <= 0xDFFF) or cp >= 0x110000 then return "\239\191\189" end
     if cp < 0x80 then return string.char(cp) end
     if cp < 0x800 then
         return string.char(0xC0 + math.floor(cp / 0x40), 0x80 + cp % 0x40)
@@ -20,12 +22,9 @@ local function utf8char(cp)
         return string.char(0xE0 + math.floor(cp / 0x1000),
             0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
     end
-    if cp < 0x110000 then
-        return string.char(0xF0 + math.floor(cp / 0x40000),
-            0x80 + math.floor(cp / 0x1000) % 0x40,
-            0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
-    end
-    return "?"
+    return string.char(0xF0 + math.floor(cp / 0x40000),
+        0x80 + math.floor(cp / 0x1000) % 0x40,
+        0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
 end
 
 local ENTITIES = {
@@ -38,7 +37,23 @@ local ENTITIES = {
     thinsp = " ", ensp = " ", emsp = " ", iexcl = "¡", iquest = "¿",
     frac12 = "½", frac14 = "¼", frac34 = "¾", sect = "§", para = "¶",
     dagger = "†", Dagger = "‡", prime = "′", Prime = "″",
+    euro = "€", minus = "−", rarr = "→", larr = "←", hairsp = " ", sbquo = "‚", bdquo = "„",
+    lsaquo = "‹", rsaquo = "›", permil = "‰", oelig = "œ", OElig = "Œ", scaron = "š", Scaron = "Š",
 }
+-- The rest of HTML's Latin-1 names (U+00A1 to U+00FF), in order.
+do
+    local cp = 0xA1
+    for name in ([[iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr deg
+        plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest
+        Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc
+        Iuml ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute
+        THORN szlig agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave
+        iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc
+        uuml yacute thorn yuml]]):gmatch("%S+") do
+        if ENTITIES[name] == nil then ENTITIES[name] = utf8char(cp) end
+        cp = cp + 1
+    end
+end
 
 local function decode(s)
     return (s:gsub("&(#?[xX]?)(%w+);", function(kind, v)
@@ -47,6 +62,7 @@ local function decode(s)
         elseif kind == "#x" or kind == "#X" then
             local n = tonumber(v, 16); return n and utf8char(n) or ""
         end
+        v = kind .. v                    -- "&xi;": a name that starts with x
         return ENTITIES[v] or ("&" .. v .. ";")
     end))
 end
@@ -59,7 +75,7 @@ end
 local function dirname(p) return p:match("^(.*/)") or "" end
 
 local function resolve(base, href)
-    href = urldecode(href:gsub("#.*$", ""))
+    href = urldecode((href:gsub("[#?].*$", "")))       -- (no #fragment or ?query in a file name)
     if href:sub(1, 1) == "/" then href = href:sub(2) else href = dirname(base) .. href end
     local parts = {}
     for seg in href:gmatch("[^/]+") do
@@ -91,13 +107,32 @@ local function style_props(body)
     end
     local ta = body:match("text%-align%s*:%s*([%w%-]+)")
     if ta == "center" then p.center = true elseif ta then p.center = false end
-    if body:match("display%s*:%s*none") then p.hidden = true end
+    local display = body:match("display%s*:%s*([%w%-]+)")
+    if display then p.hidden = display == "none" end     -- a later rule can show it again
     if body:match("vertical%-align%s*:%s*super") then p.sup = true end
     return p
 end
 
 local function parse_css(css, into)
     css = css:gsub("/%*.-%*/", "")
+    -- Leave out @media blocks (for other readers and screens: "@media
+    -- amzn-kf8 { .kindle-only {...} }"); their braces nest.
+    local out, pos = {}, 1
+    while true do
+        local s, e = css:find("@media[^{;]*{", pos)
+        if not s then break end
+        out[#out + 1] = css:sub(pos, s - 1)
+        local depth, i = 1, e + 1
+        while depth > 0 and i <= #css do
+            local c = css:find("[{}]", i)
+            if not c then i = #css + 1; break end
+            depth = depth + (css:sub(c, c) == "{" and 1 or -1)
+            i = c + 1
+        end
+        pos = i
+    end
+    out[#out + 1] = css:sub(pos)
+    css = table.concat(out)
     for sel, body in css:gmatch("([^{}]+){([^}]*)}") do
         local props = style_props(body)
         if next(props) then
@@ -145,7 +180,10 @@ local function parse_html(html, base, classes, show_notes)
 
     local function flush()
         if cur then
-            -- trim trailing whitespace; drop empty blocks
+            -- Join up the pieces of each run (see add_text); drop empty blocks.
+            for _, r in ipairs(cur.runs) do
+                if r.parts then r.text, r.parts, r.blank_free = table.concat(r.parts), nil, nil end
+            end
             local has = false
             for _, r in ipairs(cur.runs) do
                 if r.br or r.text:find("%S") then has = true; break end
@@ -179,14 +217,18 @@ local function parse_html(html, base, classes, show_notes)
         local runs = cur.runs
         local last = runs[#runs]
         if last and not last.br and last.i == s.i and last.b == s.b and last.link == s.link and last.sup == s.sup then
-            last.text = last.text .. t
+            -- Collected and joined once in flush: a paragraph of thousands of
+            -- <span>s would otherwise be copied over and over.
+            if not last.parts then last.parts = { last.text } end
+            last.parts[#last.parts + 1] = t
+            if not last.blank_free and t:find("%S") then last.blank_free = true end
         else
             if s.link and s.link.lead == nil then
                 -- A link at the very start of a paragraph is a note's own
                 -- label ("[1] The note..."), not a reference to a note.
                 local lead = true
                 for _, r in ipairs(runs) do
-                    if r.br or (r.text and r.text:find("%S")) then lead = false; break end
+                    if r.br or r.blank_free or (r.text and r.text:find("%S")) then lead = false; break end
                 end
                 s.link.lead = lead
             end
@@ -236,11 +278,12 @@ local function parse_html(html, base, classes, show_notes)
         if cls then
             for c in cls:gmatch("%S+") do
                 local p = classes[c]
-                if p then for k, v in pairs(p) do s[k] = v end end
+                -- (display other than none doesn't show what a parent hides)
+                if p then for k, v in pairs(p) do if k ~= "hidden" or v then s[k] = v end end end
             end
         end
         local st = attr(tag, "style")
-        if st then for k, v in pairs(style_props(st)) do s[k] = v end end
+        if st then for k, v in pairs(style_props(st)) do if k ~= "hidden" or v then s[k] = v end end end
         stack[#stack + 1] = s
         return s
     end
@@ -271,8 +314,19 @@ local function parse_html(html, base, classes, show_notes)
             local e = html:find("]]>", lt + 9, true) or len
             add_text(html:sub(lt + 9, e - 1))
             pos = e + 3
+        elseif not html:sub(lt + 1, lt + 1):match("[%a/!?]") then
+            add_text("<")                        -- a bare "<" in the text ("a < b")
+            pos = lt + 1
         else
             local gt = html:find(">", lt, true) or len
+            -- A ">" inside a quoted value (alt="a > b") doesn't end the tag.
+            local _, quotes = html:sub(lt, gt):gsub('"', "")
+            while quotes % 2 == 1 and gt < len do
+                local nxt = html:find(">", gt + 1, true)
+                if not nxt then break end
+                local _, more = html:sub(gt + 1, nxt):gsub('"', "")
+                quotes, gt = quotes + more, nxt
+            end
             local tag = html:sub(lt, gt)
             pos = gt + 1
             local closing, name = tag:match("^<(/?)([%w:%-]+)")
@@ -355,7 +409,7 @@ local function parse_ncx(xml, base)
             local src = attr(tag, "src")
             if src then
                 toc[#toc + 1] = { title = pending or "?", depth = depth,
-                    file = resolve(base, src), anchor = src:match("#(.+)$") }
+                    file = resolve(base, src), anchor = src:match("#(.+)$") and urldecode(src:match("#(.+)$")) }
                 pending = false
             end
         end
@@ -383,7 +437,7 @@ local function parse_nav(xhtml, base)
             local title = decode(s:sub(pos, e - 1):gsub("<[^>]+>", "")):gsub("%s+", " ")
             if href then
                 toc[#toc + 1] = { title = title, depth = depth, file = resolve(base, href),
-                    anchor = href:match("#(.+)$") }
+                    anchor = href:match("#(.+)$") and urldecode(href:match("#(.+)$")) }
             end
             pos = e
         end
@@ -404,7 +458,7 @@ end
 local function open_epub_zip(path, z)
     local container = z:read("META-INF/container.xml")
     if not container then return nil, "missing container.xml" end
-    local opf_path = container:match('full%-path%s*=%s*"([^"]+)"')
+    local opf_path = container:match('full%-path%s*=%s*"([^"]+)"') or container:match("full%-path%s*=%s*'([^']+)'")
     if not opf_path then return nil, "no rootfile" end
     local opf = z:read(opf_path)
     if not opf then return nil, "missing " .. opf_path end
@@ -455,13 +509,13 @@ local function open_epub_zip(path, z)
     book.total = math.max(total, 1)
     if #book.chapters == 0 then return nil, "empty spine" end
 
-    local index = {}
-    for i, c in ipairs(book.chapters) do index[c.file] = i end
+    local index, lower = {}, {}
+    for i, c in ipairs(book.chapters) do index[c.file] = i; lower[c.file:lower()] = lower[c.file:lower()] or i end
     local toc = {}
     if nav then local x = z:read(nav); if x then toc = parse_nav(x, nav) end end
     if #toc == 0 and ncx then local x = z:read(ncx); if x then toc = parse_ncx(x, ncx) end end
     for _, t in ipairs(toc) do
-        t.chapter = index[t.file]
+        t.chapter = index[t.file] or lower[t.file:lower()]   -- (hrefs whose case differs, as the zip allows)
         if t.chapter then book.toc[#book.toc + 1] = t end
     end
     return book
@@ -476,12 +530,48 @@ local function open_epub(path)
     return nil, ok and why or book
 end
 
+-- Windows-1252's 0x80..0x9F (curly quotes, dashes); the rest of the high
+-- bytes are Latin-1, the same code points.
+local CP1252 = { [0x80] = 0x20AC, [0x82] = 0x201A, [0x83] = 0x0192, [0x84] = 0x201E, [0x85] = 0x2026,
+    [0x86] = 0x2020, [0x87] = 0x2021, [0x88] = 0x02C6, [0x89] = 0x2030, [0x8A] = 0x0160, [0x8B] = 0x2039,
+    [0x8C] = 0x0152, [0x8E] = 0x017D, [0x91] = 0x2018, [0x92] = 0x2019, [0x93] = 0x201C, [0x94] = 0x201D,
+    [0x95] = 0x2022, [0x96] = 0x2013, [0x97] = 0x2014, [0x98] = 0x02DC, [0x99] = 0x2122, [0x9A] = 0x0161,
+    [0x9B] = 0x203A, [0x9C] = 0x0153, [0x9E] = 0x017E, [0x9F] = 0x0178 }
+
+-- A text file's contents as UTF-8: UTF-16 (with its BOM) and Windows
+-- files (not valid UTF-8) are converted, a UTF-8 BOM dropped.
+local function txt_to_utf8(text)
+    local b1, b2 = text:byte(1, 2)
+    if (b1 == 0xFF and b2 == 0xFE) or (b1 == 0xFE and b2 == 0xFF) then
+        local le, out, i = b1 == 0xFF, {}, 3
+        while i + 1 <= #text do
+            local x, y = text:byte(i, i + 1)
+            local u = le and (x + y * 256) or (x * 256 + y)
+            i = i + 2
+            if u >= 0xD800 and u <= 0xDBFF and i + 1 <= #text then   -- a pair: one character
+                local x2, y2 = text:byte(i, i + 1)
+                local lo = le and (x2 + y2 * 256) or (x2 * 256 + y2)
+                if lo >= 0xDC00 and lo <= 0xDFFF then u = 0x10000 + (u - 0xD800) * 1024 + (lo - 0xDC00); i = i + 2 end
+            end
+            out[#out + 1] = utf8char(u)
+        end
+        return table.concat(out)
+    end
+    if text:sub(1, 3) == "\239\187\191" then return text:sub(4) end
+    if not text:find("[\128-\255]") then return text end
+    local ok, utf8 = pcall(require, "utf8")
+    if ok and utf8.len(text) then return text end
+    return (text:gsub("[\128-\255]", function(c)
+        local b = c:byte()
+        return utf8char(CP1252[b] or b)
+    end))
+end
+
 local function open_txt(path)
     local f, err = io.open(path, "rb")
     if not f then return nil, err end
-    local text = f:read("*a"):gsub("\r\n?", "\n")
+    local text = txt_to_utf8(f:read("*a")):gsub("\r\n?", "\n")
     f:close()
-    if text:sub(1, 3) == "\239\187\191" then text = text:sub(4) end
     local book = setmetatable({ path = path, chapters = {}, toc = {}, classes = {},
         title = basename_title(path), author = "" }, Book)
     -- Split into ~64KB chapters at paragraph boundaries so layout stays fast.
@@ -495,7 +585,15 @@ local function open_txt(path)
         end
         blocks, off, size = {}, 0, 0
     end
-    for para in (text .. "\n\n"):gmatch("(.-)\n%s*\n") do
+    -- Paragraphs are separated by blank lines (lines wrapped at ~70
+    -- characters, as Project Gutenberg's are). A file whose lines are
+    -- long has a paragraph on each line instead.
+    local lines, chars = 0, 0
+    for l in text:gmatch("[^\n]+") do
+        if l:find("%S") then lines, chars = lines + 1, chars + #l end
+    end
+    local sep = (lines > 0 and chars / lines > 120) and "(.-)\n" or "(.-)\n%s*\n"
+    for para in (text .. "\n\n"):gmatch(sep) do
         local t = para:gsub("%s+", " "):gsub("^ ", "")
         if t ~= "" then
             blocks[#blocks + 1] = { kind = "text", off = off,
@@ -515,11 +613,12 @@ end
 -- (name and number) from an EPUB's package file, without opening the rest of
 -- the book: for the library list. nil if it can't be read.
 function M.meta(path)
-    local z = Zip.open(path)
-    if not z then return nil end
+    local okz, z = pcall(Zip.open, path)
+    if not okz or not z then return nil end
     local ok, res = pcall(function()
         local container = z:read("META-INF/container.xml")
-        local opf_path = container and container:match('full%-path%s*=%s*"([^"]+)"')
+        local opf_path = container and (container:match('full%-path%s*=%s*"([^"]+)"')
+            or container:match("full%-path%s*=%s*'([^']+)'"))
         local opf = opf_path and z:read(opf_path)
         if not opf then return nil end
         local function text(v)
@@ -534,7 +633,7 @@ function M.meta(path)
             t.sort = attr(tag, "opf:file-as") or attr(tag, "file-as")
             local id = attr(tag, "id")
             if not t.sort and id then
-                for m, v in opf:gmatch("(<meta[^>]*>)(.-)</meta>") do
+                for m, v in opf:gmatch("(<meta%s[^>]*[^/]>)(.-)</meta>") do   -- (not a self-closing <meta/>)
                     if attr(m, "refines") == "#" .. id and attr(m, "property") == "file-as" then t.sort = text(v) end
                 end
             end
@@ -630,12 +729,25 @@ function Book:resolve_xpointer(xp)
         steps[#steps + 1] = name:lower():gsub("^.*:", "") .. "[" .. (tonumber(n) or 1) .. "]"
     end
     -- Every element that starts a block (and its ancestors) -> first offset.
-    local first = {}
+    -- Paths are built from the parent's (remembered), and a walk up stops at
+    -- an element already seen (its ancestors were seen then too): linear even
+    -- when a file never closes its <p>s and they nest thousands deep.
+    local first, path_of = {}, {}
+    local function path(node)
+        local p = path_of[node]
+        if not p then
+            local seg = node.name .. "[" .. node.idx .. "]"
+            p = node.parent.parent and (path(node.parent) .. "/" .. seg) or seg
+            path_of[node] = p
+        end
+        return p
+    end
     for _, b in ipairs(c.blocks) do
         local node = b.node
         while node and node.parent do
-            local key = node_path(node, true)
-            if not first[key] then first[key] = b.off end
+            local key = path(node)
+            if first[key] then break end
+            first[key] = b.off
             node = node.parent
         end
     end
@@ -758,7 +870,7 @@ function Book:note(target)
             -- Drop "back to the text" links (↩, ↑, ^, "Back").
             local runs = {}
             for _, r in ipairs(b.runs) do
-                local t = r.text and r.text:gsub("%s", "") or ""
+                local t = r.text and r.text:gsub("%s", ""):gsub("\239\184[\142\143]", "") or ""   -- (pandoc's ↩︎)
                 if not (r.link and (t == "" or t:match("^[\226\128-\191%^]+$") or t:lower() == "back"
                         or t:lower() == "return")) then
                     runs[#runs + 1] = r

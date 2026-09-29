@@ -1,4 +1,5 @@
--- A small HTTP/1.1 client for OPDS catalogs: GET only, with redirects, Basic
+-- A small HTTP/1.1 client for OPDS catalogs (and M.call for the KOReader sync
+-- server): redirects, Basic
 -- and Digest logins, chunked bodies, and HTTPS through the system's OpenSSL
 -- (loaded with LuaJIT's FFI, since LÖVE's LuaSocket has no TLS). Blocking, so
 -- it runs on the download thread (networker.lua), never the UI thread.
@@ -19,10 +20,13 @@ function M.parse_url(url)
     if not scheme then return nil end
     scheme = scheme:lower()
     local authority, path = rest:match("^([^/?#]*)(.*)$")
+    authority = authority:match("@([^@]*)$") or authority     -- user:password@ isn't sent as the host
     local host, port = authority:match("^(.-):(%d+)$")
     host = host or authority
-    if path == "" then path = "/" end
     path = path:gsub("#.*$", "")
+    if path:sub(1, 1) ~= "/" then path = "/" .. path end      -- "" or "?query"
+    -- Spaces and control characters aren't allowed in a request line.
+    path = path:gsub("[%c ]", function(c) return string.format("%%%02X", c:byte()) end)
     return {
         scheme = scheme, host = host,
         port = tonumber(port) or (scheme == "https" and 443 or 80),
@@ -33,6 +37,7 @@ end
 -- Resolve an href found in a page at `base` (absolute, root-relative or relative).
 function M.resolve(base, href)
     if not href or href == "" then return base end
+    if href:sub(1, 1) == "#" then return (base:gsub("#.*$", "")) .. href end
     if href:match("^%a[%w+.-]*:") and not href:match("^%a:[\\/]") then return href end   -- has a scheme (http:, data:)
     local scheme, authority, path = base:match("^(%a[%w+.-]*://)([^/?#]*)([^?#]*)")
     if not scheme then return href end
@@ -76,6 +81,7 @@ local function load_ssl()
         const SSL_METHOD *TLS_client_method(void);
         SSL_CTX *SSL_CTX_new(const SSL_METHOD *meth);
         uint64_t SSL_CTX_set_options(SSL_CTX *ctx, uint64_t op);
+        long SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
         int SSL_CTX_set_default_verify_paths(SSL_CTX *ctx);
         int SSL_CTX_load_verify_locations(SSL_CTX *ctx, const char *file, const char *path);
         void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, void *cb);
@@ -118,7 +124,10 @@ local function ssl_context(verify)
     if ctx_cache[key] then return ctx_cache[key] end
     local ctx = ssl.SSL_CTX_new(ssl.TLS_client_method())
     if ctx == nil then error("could not start TLS") end
-    ssl.SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF)
+    -- (A function in OpenSSL 3; in 1.1 a macro over SSL_CTX_ctrl, SSL_CTRL_OPTIONS.)
+    if not pcall(function() ssl.SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF) end) then
+        pcall(function() ssl.SSL_CTX_ctrl(ctx, 32, SSL_OP_IGNORE_UNEXPECTED_EOF, nil) end)
+    end
     if verify then
         ssl.SSL_CTX_set_default_verify_paths(ctx)
         for _, f in ipairs(CA_FILES) do
@@ -135,10 +144,16 @@ end
 -- start (see request's first_byte).
 local wait_limit = TIMEOUT
 local SLOW_START = "the server was slow to answer"
+-- M.abort (set by the network thread): true when the app is quitting; it's
+-- looked at every second while waiting.
 local function wait(sock, writing)
-    local r, w = socket.select(not writing and { sock } or nil, writing and { sock } or nil, wait_limit)
-    if #(writing and w or r) == 0 then
-        error(wait_limit < TIMEOUT and SLOW_START or "the server stopped responding", 0)
+    local deadline = socket.gettime() + wait_limit
+    while true do
+        local left = deadline - socket.gettime()
+        if left <= 0 then error(wait_limit < TIMEOUT and SLOW_START or "the server stopped responding", 0) end
+        local r, w = socket.select(not writing and { sock } or nil, writing and { sock } or nil, math.min(1, left))
+        if #(writing and w or r) > 0 then return end
+        if M.abort and M.abort() then error("cancelled", 0) end
     end
 end
 
@@ -213,7 +228,14 @@ local function tls_wrap(sock, host, verify)
             end
         end
     end
-    function t.close() pcall(ssl.SSL_shutdown, s); sock:close() end
+    function t.close()
+        if s == nil then return end
+        pcall(ssl.SSL_shutdown, s)
+        ffi.gc(s, nil)                      -- freed now, not whenever the GC gets to it
+        ssl.SSL_free(s)
+        s = nil
+        sock:close()
+    end
     return t
 end
 
@@ -451,11 +473,20 @@ function M.call(method, url, opts)
     opts = opts or {}
     local o = { method = method, headers = opts.headers, body = opts.body, content_type = opts.content_type,
         verify = opts.verify, any_status = true, connect_timeout = opts.timeout }
-    for _ = 1, 5 do
+    local start = M.parse_url(url)
+    for _ = 1, 3 do
         local parts = {}
         local status, headers = request(url, o, nil, function(d) parts[#parts + 1] = d end, opts.timeout or 10)
         if (status == 301 or status == 302 or status == 307 or status == 308) and headers.location then
             url = M.resolve(url, headers.location)
+            local u = M.parse_url(url)
+            if u and start.scheme == "https" and u.scheme ~= "https" then error("the server redirected to an insecure address", 0) end
+            if u and (u.host ~= start.host or u.port ~= start.port) and o.headers then
+                -- The login (x-auth-user, x-auth-key) only goes to the server it's for.
+                local h = {}
+                for k, v in pairs(o.headers) do if not k:lower():match("^x%-auth") then h[k] = v end end
+                o.headers = h
+            end
         else
             return status, table.concat(parts)
         end
@@ -511,7 +542,12 @@ function M.get(url, opts)
             local chosen
             for _, c in ipairs(headers.challenges or {}) do
                 local scheme, params = parse_challenge(c)
-                if scheme == "digest" then chosen = { scheme = "digest", params = params }; break end
+                -- Digest as answered here: MD5 (the default), with a nonce. A
+                -- server may offer SHA-256 first; that one is skipped.
+                local alg = params and (params.algorithm or "MD5"):upper()
+                if scheme == "digest" and alg == "MD5" and params.nonce then
+                    chosen = { scheme = "digest", params = params }; break
+                end
                 if scheme == "basic" then chosen = chosen or { scheme = "basic", params = params } end
             end
             if not chosen then error("the server asked for a login this reader doesn't support") end

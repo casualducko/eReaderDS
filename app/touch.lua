@@ -18,14 +18,16 @@ function M.close() end
 local ok_ffi, ffi = pcall(require, "ffi")
 if not ok_ffi or ffi.os ~= "Linux" then return M end
 
-pcall(ffi.cdef, [[
-    int open(const char *path, int flags);
-    long read(int fd, void *buf, unsigned long count);
-    int close(int fd);
-    int ioctl(int fd, unsigned long request, ...);
-    struct rgds_input_event { long tv_sec; long tv_usec; unsigned short type; unsigned short code; int value; };
-    struct rgds_input_absinfo { int value, minimum, maximum, fuzz, flat, resolution; };
-]])
+-- One at a time: keyprobe.lua declares some of the same, and a repeat
+-- would stop the rest of a block being declared.
+for _, decl in ipairs({
+    "int open(const char *path, int flags);",
+    "long read(int fd, void *buf, unsigned long count);",
+    "int close(int fd);",
+    "int ioctl(int fd, unsigned long request, ...);",
+    "struct rgds_input_event { long tv_sec; long tv_usec; unsigned short type; unsigned short code; int value; };",
+    "struct rgds_input_absinfo { int value, minimum, maximum, fuzz, flat, resolution; };",
+}) do pcall(ffi.cdef, decl) end
 local C = ffi.C
 
 local O_NONBLOCK = 2048
@@ -37,6 +39,7 @@ local ABS_MT_SLOT, ABS_MT_X, ABS_MT_Y, ABS_MT_ID = 0x2f, 0x35, 0x36, 0x39
 local SCREEN_W, SCREEN_H = 1024, 768
 
 local fd, buf
+local dropped = false       -- after SYN_DROPPED, until the next report
 local range = { x = { 0, SCREEN_W }, y = { 0, SCREEN_H } }
 local slot = 0
 local slots = {}                                -- per slot: { x, y, down }
@@ -100,7 +103,14 @@ function M.poll(handler)
         for k = 0, math.floor(n / ffi.sizeof("struct rgds_input_event")) - 1 do
             local e = buf[k]
             local t, c, v = e.type, e.code, e.value
-            if t == EV_ABS then
+            if dropped then
+                -- The kernel dropped events (we fell behind): what's down is
+                -- unknown, so lift every finger and start again from the next report.
+                if t == EV_SYN and c == 0 then dropped = false end
+            elseif t == EV_SYN and c == 3 then
+                dropped = true
+                for _, s in pairs(slots) do s.down = false end
+            elseif t == EV_ABS then
                 if c == ABS_MT_SLOT then slot = v
                 elseif c == ABS_MT_X then slot_state(slot).x = v
                 elseif c == ABS_MT_Y then slot_state(slot).y = v

@@ -57,8 +57,15 @@ local function write_atomic(file, text)
     local tmp = file .. ".tmp"
     local f = io.open(tmp, "wb")
     if not f then return false end
+    -- A full card shows up at close (when the data is really written), and
+    -- a short file mustn't replace a good one.
     local ok = f:write(text)
-    f:close()
+    ok = f:close() and ok
+    if ok then
+        local chk = io.open(tmp, "rb")
+        ok = chk and chk:seek("end") == #text
+        if chk then chk:close() end
+    end
     if not ok then os.remove(tmp); return false end
     -- rename() replaces the old file in one step, so a power cut leaves either
     -- the old file or the new one. (Remove first only if a rename over an
@@ -74,11 +81,26 @@ local function write_atomic(file, text)
     return renamed
 end
 
+-- A file's lines without a Windows line ending (a file edited on a PC).
+local function lines(f)
+    return function()
+        local l = f:read("*l")
+        return l and (l:gsub("\r$", ""))
+    end
+end
+
+-- A fraction as stored: 0..1 (never -0.0000 or nan, which wouldn't read back).
+local function frac(x)
+    x = tonumber(x) or 0
+    if x ~= x then return 0 end
+    return math.max(0, math.min(1, x))
+end
+
 local function read_kv(file)
     local t = {}
     local f = io.open(file, "rb")
     if not f then return t end
-    for line in f:lines() do
+    for line in lines(f) do
         local k, v = line:match("^([%w_]+)=(.*)$")
         if k then t[k] = v end
     end
@@ -112,7 +134,14 @@ function M.books_folder()
 end
 
 -- Where downloaded books go: the first book folder that exists.
+local download_dir
 function M.download_dir()
+    if download_dir then return download_dir end
+    download_dir = M.find_download_dir()
+    return download_dir
+end
+
+function M.find_download_dir()
     local dirs = M.book_dirs()
     for _, d in ipairs(dirs) do
         local r = os.execute('[ -d "' .. d .. '" ]')
@@ -173,7 +202,7 @@ local function load_progress()
     progress = {}
     local f = io.open(path("progress.txt"), "rb")
     if f then
-        for line in f:lines() do
+        for line in lines(f) do
             local p, ch, off, pct = line:match("^(.-)\t(%d+)\t(%d+)\t([%d%.]+)$")
             if p then progress[p] = { ch = tonumber(ch), off = tonumber(off), pct = tonumber(pct) } end
         end
@@ -192,7 +221,7 @@ local function write_progress()
     local out = {}
     for _, k in ipairs(keys) do
         local v = all[k]
-        out[#out + 1] = string.format("%s\t%d\t%d\t%.4f", k, v.ch, v.off, v.pct)
+        out[#out + 1] = string.format("%s\t%d\t%d\t%.4f", k, v.ch, v.off, frac(v.pct))
     end
     write_atomic(path("progress.txt"), table.concat(out, "\n") .. "\n")
 end
@@ -210,7 +239,7 @@ local function load_bookmarks()
     bookmarks = {}
     local f = io.open(path("bookmarks.txt"), "rb")
     if f then
-        for line in f:lines() do
+        for line in lines(f) do
             local p, ch, off, pct, title, snippet = line:match("^(.-)\t(%d+)\t(%d+)\t([%d%.]+)\t(.-)\t(.*)$")
             if p then
                 local list = bookmarks[p] or {}
@@ -240,7 +269,7 @@ function M.set_bookmarks(p, list)
     local function clean(t) return ((t or ""):gsub("[\t\r\n]", " ")) end
     for _, k in ipairs(keys) do
         for _, b in ipairs(all[k]) do
-            out[#out + 1] = string.format("%s\t%d\t%d\t%.4f\t%s\t%s", k, b.ch, b.off, b.pct,
+            out[#out + 1] = string.format("%s\t%d\t%d\t%.4f\t%s\t%s", k, b.ch, b.off, frac(b.pct),
                 clean(b.title), clean(b.snippet))
         end
     end
@@ -255,7 +284,7 @@ local function load_highlights()
     highlights = {}
     local f = io.open(path("highlights.txt"), "rb")
     if f then
-        for line in f:lines() do
+        for line in lines(f) do
             local p, ch, s, e, pct, title, text = line:match("^(.-)\t(%d+)\t(%d+)\t(%d+)\t([%d%.]+)\t(.-)\t(.*)$")
             if p then
                 local list = highlights[p] or {}
@@ -285,7 +314,7 @@ function M.set_highlights(p, list)
     local function clean(t) return ((t or ""):gsub("[\t\r\n]", " ")) end
     for _, k in ipairs(keys) do
         for _, h in ipairs(all[k]) do
-            out[#out + 1] = string.format("%s\t%d\t%d\t%d\t%.4f\t%s\t%s", k, h.ch, h.s, h.e, h.pct,
+            out[#out + 1] = string.format("%s\t%d\t%d\t%d\t%.4f\t%s\t%s", k, h.ch, h.s, h.e, frac(h.pct),
                 clean(h.title), clean(h.text))
         end
     end
@@ -309,7 +338,7 @@ local function load_opened()
     opened = {}
     local f = io.open(path("opened.txt"), "rb")
     if f then
-        for line in f:lines() do
+        for line in lines(f) do
             local p, t = line:match("^(.-)\t(%d+)$")
             if p then opened[p] = tonumber(t) end
         end
@@ -347,7 +376,7 @@ local function load_meta()
     meta = {}
     local f = io.open(path("library.txt"), "rb")
     if f then
-        for line in f:lines() do
+        for line in lines(f) do
             local p, size, t, a, so, se, ix = line:match("^(.-)\t(%-?%d+)\t(.-)\t(.-)\t(.-)\t(.-)\t(.-)$")
             if p then
                 meta[p] = { size = tonumber(size), title = t ~= "" and t or nil, author = a, sort = so ~= "" and so or nil,
@@ -391,7 +420,7 @@ local function load_finished()
     finished = {}
     local f = io.open(path("finished.txt"), "rb")
     if f then
-        for line in f:lines() do
+        for line in lines(f) do
             local p, t = line:match("^(.-)\t(%d+)$")
             if p then finished[p] = tonumber(t) end
         end

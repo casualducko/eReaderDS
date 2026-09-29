@@ -1,10 +1,12 @@
 -- A small JSON decoder (objects, arrays, strings, numbers, true/false/null),
--- enough for GitHub's release list. null becomes nil.
+-- enough for GitHub's release list and the sync server (null becomes nil),
+-- and an encoder for what the sync server is sent.
 local M = {}
 
 local escapes = { ['"'] = '"', ["\\"] = "\\", ["/"] = "/", b = "\b", f = "\f", n = "\n", r = "\r", t = "\t" }
 
 local function utf8(cp)
+    if cp >= 0xD800 and cp <= 0xDFFF then return "\239\191\189" end   -- half a pair on its own: U+FFFD
     if cp < 0x80 then return string.char(cp) end
     if cp < 0x800 then return string.char(0xC0 + math.floor(cp / 64), 0x80 + cp % 64) end
     if cp < 0x10000 then
@@ -36,8 +38,10 @@ function M.decode(s)
                 -- A surrogate pair (characters outside the basic plane).
                 if cp >= 0xD800 and cp < 0xDC00 and s:sub(pos, pos + 1) == "\\u" then
                     local lo = tonumber(s:sub(pos + 2, pos + 5), 16) or 0
-                    cp = 0x10000 + (cp - 0xD800) * 1024 + (lo - 0xDC00)
-                    pos = pos + 6
+                    if lo >= 0xDC00 and lo <= 0xDFFF then
+                        cp = 0x10000 + (cp - 0xD800) * 1024 + (lo - 0xDC00)
+                        pos = pos + 6
+                    end
                 end
                 out[#out + 1] = utf8(cp)
             else
@@ -71,12 +75,13 @@ function M.decode(s)
                 if d ~= "," then fail("object") end
             end
         elseif c == "[" then
-            local arr = {}
+            local arr, n = {}, 0
             pos = pos + 1
             skip()
             if s:sub(pos, pos) == "]" then pos = pos + 1; return arr end
             while true do
-                arr[#arr + 1] = value()
+                n = n + 1
+                arr[n] = value()                       -- (a null keeps its place)
                 skip()
                 local d = s:sub(pos, pos)
                 pos = pos + 1
@@ -106,7 +111,7 @@ function M.encode(v)
     if t == "boolean" then return tostring(v) end
     if t == "number" then
         if v ~= v or v == math.huge or v == -math.huge then return "null" end
-        return v == math.floor(v) and string.format("%d", v) or string.format("%.14g", v)
+        return (v == math.floor(v) and math.abs(v) < 2 ^ 53) and string.format("%d", v) or string.format("%.14g", v)
     end
     if t == "string" then
         return '"' .. v:gsub('[%c"\\]', function(c)

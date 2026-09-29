@@ -43,11 +43,15 @@ apply_delta() {
     PORTS=$(dirname "$APP_DIR")
     [ -f "$U/READY" ] || return 1
     if [ -d "$U/eReaderDS" ]; then
-        while IFS= read -r rel; do
+        # The list first, then the moves (not moving files out of the folder
+        # find is still reading).
+        local files
+        mapfile -t files < <(cd "$U/eReaderDS" && find . -type f)
+        for rel in "${files[@]}"; do
             rel=${rel#./}
             [ "$rel" = launch.sh ] && continue
             mkdir -p "$APP_DIR/$(dirname "$rel")" && mv -f "$U/eReaderDS/$rel" "$APP_DIR/$rel" || return 1
-        done < <(cd "$U/eReaderDS" && find . -type f)
+        done
     fi
     if [ -f "$U/DELETE" ]; then
         while IFS= read -r rel; do

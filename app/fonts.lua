@@ -69,11 +69,12 @@ end
 -- Reads family / subfamily names from a TrueType/OpenType file.
 -- read(offset, length) returns bytes (offset 0-based).
 local function parse_names(read)
-    local head = read(0, 12)
+    local head = read(0, 16)
     if not head or #head < 12 then return nil end
     local base = 0
     if head:sub(1, 4) == "ttcf" then       -- collection: use the first font
-        base = u32(head, 9)
+        if #head < 16 then return nil end
+        base = u32(head, 13)                -- (after tag, version, count: the first offset)
         head = read(base, 12)
         if not head or #head < 12 then return nil end
     end
@@ -193,7 +194,12 @@ end
 local families, by_name
 -- Caches of loaded font files and name previews (see below); M.scan clears
 -- them, since fonts may have been added or removed.
-local filedata, filedata_order, previews = {}, {}, {}
+local filedata, filedata_order, previews, preview_order = {}, {}, {}, {}
+
+local function release_previews()
+    for _, f in pairs(previews) do if f then f:release() end end
+    previews, preview_order = {}, {}
+end
 
 local function add_face(path, bundled, fam, sub, kind)
     local weight, italic = classify(sub)
@@ -215,7 +221,8 @@ end
 
 function M.scan()
     families, by_name = {}, {}
-    previews, filedata, filedata_order = {}, {}, {}
+    release_previews()
+    filedata, filedata_order = {}, {}
     for _, file in ipairs(love.filesystem.getDirectoryItems(BUNDLED_DIR)) do
         if is_font(file) then
             local p = BUNDLED_DIR .. "/" .. file
@@ -299,6 +306,14 @@ function M.preview(name, size)
     if previews[key] == nil then
         local ok, font = pcall(new_font, M.find(name).r, size)
         previews[key] = ok and font or false
+        -- A pinch goes through every size from 18 to 64: keep the last few
+        -- dozen (more than any one screen shows at once).
+        preview_order[#preview_order + 1] = key
+        if #preview_order > 48 then
+            local old = table.remove(preview_order, 1)
+            if previews[old] then previews[old]:release() end
+            previews[old] = nil
+        end
     end
     return previews[key] or nil
 end

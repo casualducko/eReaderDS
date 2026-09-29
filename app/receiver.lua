@@ -21,6 +21,7 @@ local ctl = love.thread.getChannel("recv_ctl")
 local out = love.thread.getChannel("recv_out")
 
 local MAX_SIZE = 300 * 1024 * 1024
+local STALL = 20            -- seconds without data before giving up on a connection
 local CHUNK = 64 * 1024
 
 local PAGE = [==[<!doctype html>
@@ -127,6 +128,7 @@ function add(files) {
     li.querySelector('.t').innerHTML = title(f.name);
     list.insertBefore(li, list.firstChild);
     if (!OK.test(f.name)) { finish(li, false, 'Not a book or font (eReaderDS takes .epub, .txt, .ttf and .otf)'); tally.bad++; continue; }
+    if (f.size > 300 * 1024 * 1024) { finish(li, false, 'Too big (the limit is 300 MB)'); tally.bad++; continue; }
     var job = { f: f, li: li };
     wait(job);
     queue.push(job);
@@ -201,9 +203,17 @@ local STATUS = { [200] = "OK", [400] = "Bad Request", [404] = "Not Found", [411]
     [413] = "Payload Too Large", [415] = "Unsupported Media Type", [500] = "Internal Server Error" }
 
 local function send(client, code, ctype, body, cache)
-    client:send("HTTP/1.1 " .. code .. " " .. (STATUS[code] or "") .. "\r\nContent-Type: " .. ctype
+    local data = "HTTP/1.1 " .. code .. " " .. (STATUS[code] or "") .. "\r\nContent-Type: " .. ctype
         .. "\r\nContent-Length: " .. #body .. "\r\nCache-Control: " .. (cache or "no-store")
-        .. "\r\nConnection: close\r\n\r\n" .. body)
+        .. "\r\nConnection: close\r\n\r\n" .. body
+    -- A second at a time (see handle), until it's all gone or the phone stops taking it.
+    local i, moved = 1, love.timer.getTime()
+    while i <= #data do
+        local last, e, partial = client:send(data, i)
+        if last then return end
+        if (partial or 0) >= i then i, moved = partial + 1, love.timer.getTime() end
+        if e ~= "timeout" or ctl:peek() == "stop" or love.timer.getTime() - moved > STALL then return end
+    end
 end
 
 local function json_str(s)
@@ -286,7 +296,7 @@ local function upload(client, query, headers)
     end
     local dir = font and dirs.fonts or dirs.books
     if not dir then return reply(client, 500, false, { error = "There's no fonts folder" }) end
-    local total = tonumber(headers["content-length"] or "")
+    local total = tonumber((headers["content-length"] or ""):match("^%d+$") or "")
     if not total then return reply(client, 411, false, { error = "The browser didn't say how big it is" }) end
     if total > MAX_SIZE then return reply(client, 413, false, { error = "Too big (the limit is 300 MB)" }) end
 
@@ -296,6 +306,7 @@ local function upload(client, query, headers)
     if not f then return reply(client, 500, false, { error = "Couldn't write to the SD card" }) end
     out:push({ kind = "start", name = name, total = total })
     local got, last, err = 0, 0, nil
+    local moved = love.timer.getTime()
     while got < total do
         if ctl:peek() == "stop" then err = "eReaderDS stopped receiving"; break end
         local data, e, partial = client:receive(math.min(CHUNK, total - got))
@@ -303,8 +314,14 @@ local function upload(client, query, headers)
         if data and #data > 0 then
             if not f:write(data) then err = "The SD card is full"; break end
             got = got + #data
+            moved = love.timer.getTime()
         end
-        if e then err = e == "timeout" and "The connection stalled" or "The connection was lost"; break end
+        -- (Waits are a second at a time, so Done is never kept waiting.)
+        if e == "timeout" then
+            if love.timer.getTime() - moved > STALL then err = "The connection stalled"; break end
+        elseif e then
+            err = "The connection was lost"; break
+        end
         local now = love.timer.getTime()
         if now - last > 0.2 then
             last = now
@@ -315,8 +332,8 @@ local function upload(client, query, headers)
     if not err and ext == "epub" and not whole_epub(part) then err = "That isn't a whole EPUB file" end
     local replaced = exists(path)
     if not err then
-        os.remove(path)
-        if not os.rename(part, path) then err = "Couldn't save it on the SD card"
+        if not os.rename(part, path) and not (os.remove(path) and os.rename(part, path)) then
+            err = "Couldn't save it on the SD card"
         elseif file_size(path) ~= total then err = "It didn't save properly (is the SD card full?)"; os.remove(path) end
     end
     if err then
@@ -328,14 +345,25 @@ local function upload(client, query, headers)
     reply(client, 200, true, { name = name, replaced = replaced, size = total })
 end
 
+-- A line of the request, a second at a time until STALL (or "stop").
+local function receive_line(client)
+    local t0, got = love.timer.getTime(), ""
+    while true do
+        local line, e, partial = client:receive("*l")
+        if line then return got .. line end
+        got = got .. (partial or "")
+        if e ~= "timeout" or ctl:peek() == "stop" or love.timer.getTime() - t0 > STALL or #got > 16384 then return nil end
+    end
+end
+
 local function handle(client)
-    client:settimeout(20)
-    local line = client:receive("*l")
+    client:settimeout(1)
+    local line = receive_line(client)
     if not line then return end
     local method, target = line:match("^(%u+)%s+(%S+)")
     local headers, n = {}, 0
     while true do
-        local h = client:receive("*l")
+        local h = receive_line(client)
         if not h or h == "" then break end
         n = n + 1
         if n > 100 then return end

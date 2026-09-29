@@ -35,7 +35,7 @@ end
 function M.get()
     if dir == nil then dir = find() end
     if not dir then return nil end
-    local now = os.time()
+    local now = love.timer.getTime()          -- (not the clock, which can be set back)
     if not cache or now - cached_at >= 30 then
         local pct = tonumber(read(dir .. "/capacity"))
         local status = (read(dir .. "/status") or ""):lower()

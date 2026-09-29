@@ -34,15 +34,17 @@ function M.open(path)
 
     local count = u16(tail, eocd + 10)
     local cd_size, cd_off = u32(tail, eocd + 12), u32(tail, eocd + 16)
+    if cd_off + cd_size > size then f:close(); return nil, "damaged zip file" end
     f:seek("set", cd_off)
     local cd = f:read(cd_size) or ""
     local entries, lower = {}, {}
     local pos = 1
     for _ = 1, count do
-        if cd:sub(pos, pos + 3) ~= "PK\1\2" then break end
+        -- (A directory cut short ends the list rather than failing.)
+        if pos + 45 > #cd or cd:sub(pos, pos + 3) ~= "PK\1\2" then break end
         local nlen, xlen, clen = u16(cd, pos + 28), u16(cd, pos + 30), u16(cd, pos + 32)
         local name = cd:sub(pos + 46, pos + 45 + nlen)
-        local e = { name = name, method = u16(cd, pos + 10), csize = u32(cd, pos + 20),
+        local e = { method = u16(cd, pos + 10), csize = u32(cd, pos + 20),
             usize = u32(cd, pos + 24), offset = u32(cd, pos + 42) }
         entries[name] = e
         lower[name:lower()] = e
@@ -58,7 +60,7 @@ function M:read(name)
     if not f then return nil, "closed" end
     f:seek("set", e.offset)
     local hdr = f:read(30)
-    if not hdr or hdr:sub(1, 4) ~= "PK\3\4" then return nil, "bad local header" end
+    if not hdr or #hdr < 30 or hdr:sub(1, 4) ~= "PK\3\4" then return nil, "bad local header" end
     f:seek("cur", u16(hdr, 27) + u16(hdr, 29))
     local raw = e.csize > 0 and f:read(e.csize) or ""
     if e.method == 0 then return raw end

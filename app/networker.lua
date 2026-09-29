@@ -6,7 +6,8 @@
 --   { id, kind = "done", feed, url }        (feed: the catalog page, parsed
 --                                            here so a big one doesn't stall the screen)
 --   { id, kind = "error", message }
--- Pushing a download's job id to "net_cancel" stops that download.
+-- Pushing a download's job id to "net_cancel" stops that download; pushing
+-- true (on quitting) stops whatever is running.
 require("love.filesystem")
 require("love.data")
 require("love.timer")
@@ -16,6 +17,8 @@ local Opds = require("opds")
 local jobs = love.thread.getChannel("net_jobs")
 local out = love.thread.getChannel("net_out")
 local cancel = love.thread.getChannel("net_cancel")
+-- Quitting pushes true: stop waiting on any server at once.
+Net.abort = function() return cancel:peek() == true end
 
 local function run(job)
     local opts = { user = job.user, password = job.password, verify = job.verify }
@@ -75,8 +78,9 @@ local function run(job)
         end
     end
     if not ok then os.remove(part); error(e, 0) end
-    os.remove(job.dest)
-    if not os.rename(part, job.dest) then
+    -- rename() replaces an old copy in one step (removing it first only if
+    -- that isn't allowed), so a failure never leaves neither.
+    if not os.rename(part, job.dest) and not (os.remove(job.dest) and os.rename(part, job.dest)) then
         os.remove(part)
         error("couldn't save the book on the SD card", 0)
     end

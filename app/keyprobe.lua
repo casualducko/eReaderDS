@@ -9,12 +9,14 @@ function M.poll() return false end
 local ok_ffi, ffi = pcall(require, "ffi")
 if not ok_ffi or ffi.os ~= "Linux" then return M end
 
-pcall(ffi.cdef, [[
-    int open(const char *path, int flags);
-    long read(int fd, void *buf, unsigned long count);
-    int close(int fd);
-    struct rgds_input_event { long tv_sec; long tv_usec; unsigned short type; unsigned short code; int value; };
-]])
+-- One at a time: touch.lua declares the same, and a repeat would stop the
+-- rest of a block being declared.
+for _, decl in ipairs({
+    "int open(const char *path, int flags);",
+    "long read(int fd, void *buf, unsigned long count);",
+    "int close(int fd);",
+    "struct rgds_input_event { long tv_sec; long tv_usec; unsigned short type; unsigned short code; int value; };",
+}) do pcall(ffi.cdef, decl) end
 local C = ffi.C
 local O_NONBLOCK, EV_KEY, EV_SW = 2048, 1, 5
 

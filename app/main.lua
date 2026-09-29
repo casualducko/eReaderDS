@@ -124,13 +124,14 @@ local function redraw() app.dirty = true end
 local function fit_text(font, text, w)
     if font:getWidth(text) <= w then return text end
     local utf8 = require("utf8")
-    local n = utf8.len(text) or #text
-    while n > 0 do
-        local cut = text:sub(1, (utf8.offset(text, n + 1) or (#text + 1)) - 1) .. "…"
-        if font:getWidth(cut) <= w then return cut end
-        n = n - 1
+    local function cut(n) return text:sub(1, (utf8.offset(text, n + 1) or (#text + 1)) - 1) .. "…" end
+    -- The most characters that fit with "…" after them (halving, not one at a time).
+    local lo, hi = 0, (utf8.len(text) or #text) - 1
+    while lo < hi do
+        local mid = math.ceil((lo + hi) / 2)
+        if font:getWidth(cut(mid)) <= w then lo = mid else hi = mid - 1 end
     end
-    return "…"
+    return lo > 0 and cut(lo) or "…"
 end
 
 local function load_font(file, size)
@@ -218,7 +219,7 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
 }
 ]]
 
--- Decoded image for drawing (least recently used ones are released).
+-- Decoded image for drawing (the oldest ones are released).
 local function get_image(src)
     local img = images[src]
     if img == nil then
@@ -436,7 +437,7 @@ end
 -- TOC entries with resolved positions (chapter, offset).
 local function toc_pos(t)
     if t.off == nil then
-        local c = book:chapter(t.chapter)      -- nil if that file couldn't be read
+        local c = book:chapter(t.chapter)      -- (a file that can't be read comes back blank)
         t.off = (c and t.anchor and c.anchors[t.anchor]) or 0
     end
     return t.chapter, t.off
@@ -460,7 +461,9 @@ local function jump_section(dir)
     if #book.toc == 0 then
         if dir > 0 and pos.ch < #book.chapters then set_spread(pos.ch + 1, 1)
         elseif dir < 0 then set_spread(math.max(1, spread.pi > 1 and pos.ch or pos.ch - 1), 1) end
-        save_progress(); return
+        save_progress()
+        if app.sync then app.sync.moved[book.path] = true end     -- (for KOReader sync)
+        return
     end
     local cur = current_section() or 0
     local target
@@ -476,10 +479,7 @@ local function jump_section(dir)
             if ch == spread.ch and pi == spread.pi then target = book.toc[cur - 1] else target = t end
         end
     end
-    if target then
-        goto_pos(toc_pos(target))
-        save_progress()
-    end
+    if target then app.jump_to(toc_pos(target)) end
 end
 
 ---------------------------------------------------------------- footnotes
@@ -495,8 +495,10 @@ function note.is_ref(link, text)
     if link.noteref then return true end
     if link.lead or link.backlink or not link.target:find("#") then return false end
     local t = text:gsub("%s", "")
+    -- Only the marks * † ‡ § ¶ (not any character starting like them: — … →).
+    local marks = t:gsub("^%[", ""):gsub("%]$", ""):gsub("\226\128[\160\161]", ""):gsub("\194[\167\182]", "")
     return t:match("^%[?%(?%d+%)?%]?%.?$") ~= nil
-        or t:match("^%[?[%*\226\194]+[\128-\191]*%]?$") ~= nil      -- * † ‡ § ¶
+        or (t:match("^%[?[%*\226\194]") ~= nil and marks:gsub("%*", "") == "")
         or t:match("^%[%a%]$") ~= nil
         or (link.sup and #t <= 4)
 end
@@ -543,13 +545,15 @@ function note.on_spread()
     return note.spread_refs
 end
 
+app.BAR_PX = { 3, 6, 10 }        -- the progress bar's thicknesses (also BAR_PX further down)
+
 -- The "Notes" button at the bottom of the touchscreen's page, by the spine
 -- (bottom left of the right page; turned round, bottom right of the left):
 -- x, y, w, h.
 function note.button()
     local w, h = ui.small:getWidth("Notes") + 36, ui.small:getHeight() + 10
     -- Sit clear of the progress bar along the bottom edge.
-    local bar = (S.sb_show and S.sb_bar ~= "none") and (({ 3, 6, 10 })[S.sb_bar_size] or 6) or 0   -- BAR_PX
+    local bar = (S.sb_show and S.sb_bar ~= "none") and (app.BAR_PX[S.sb_bar_size] or 6) or 0
     local bottom = PAGE_H - 10 - bar - 8
     if app.touch_side() == "left" then return PAGE_W - margins().inner + 14 - w, bottom - h, w, h end
     return margins().inner - 14, bottom - h, w, h
@@ -557,13 +561,13 @@ end
 
 -- The selected note laid out as pages (cached per target).
 function note.pages(r)
+    local w, h = content_size()          -- margins, top/bottom margins, status bar
     local key = book.path .. "|" .. r.link.target .. "|" .. S.font_size .. "|" .. S.font .. "|"
-        .. S.spacing .. "|" .. S.margins .. "|" .. tostring(S.justify)
+        .. S.spacing .. "|" .. w .. "x" .. h .. "|" .. tostring(S.justify)
     local p = note.cache[key]
     if p == nil then
         local blocks = book:note(r.link.target)
         if blocks then
-            local w, h = content_size()
             p = Layout.paginate({ blocks = blocks }, {
                 fonts = fonts, size = S.font_size, w = w, h = h - 60, spacing = S.spacing,
                 justify = S.justify, indent = false, image_size = get_image_size,
@@ -831,11 +835,12 @@ end
 -- Bands behind the highlighted words of a page (drawn before the text). A
 -- band runs on across the space to the next highlighted word on its line.
 function app.hl_bands(page, ox, oy)
-    local marked = {}
+    local marked, seq, n = {}, {}, 0
     for _, it in ipairs(page.items) do
         if it.kind == "text" and it.off then
+            n = n + 1
             for _, r in ipairs(app.hl_active) do
-                if it.off >= r.s and it.off < r.e then marked[#marked + 1] = it; break end
+                if it.off >= r.s and it.off < r.e then marked[#marked + 1] = it; seq[#marked] = n; break end
             end
         end
     end
@@ -843,7 +848,7 @@ function app.hl_bands(page, ox, oy)
     color(theme().sel)
     for i, it in ipairs(marked) do
         local x2 = it.x + it.font:getWidth(it.text)
-        local nx = marked[i + 1]
+        local nx = seq[i + 1] == seq[i] + 1 and marked[i + 1]   -- only the very next word, not one further on
         if nx and nx.x > it.x and math.abs((nx.y + nx.font:getBaseline()) - (it.y + it.font:getBaseline())) < 4 then
             x2 = nx.x
         end
@@ -889,25 +894,39 @@ function app.hl_select()
     local span = app.hl_span()
     look.hl_start = nil
     if not span then return end
-    -- The words, with a word split over two lines joined back up.
-    local parts = {}
-    for k = span.a, span.b do
-        local t, prv = look.words[k].text, look.words[k - 1]
-        if k > span.a and prv.text:sub(-1) == "-" and look.words[k].line == prv.line + 1 then
-            parts[#parts] = parts[#parts]:sub(1, -2) .. t
-        else
-            parts[#parts + 1] = t
+    -- The words a..b, with a word split over two lines joined back up.
+    local function words_text(a, b)
+        local parts = {}
+        for k = a, b do
+            local t, prv = look.words[k].text, look.words[k - 1]
+            if k > a and prv.text:sub(-1) == "-" and look.words[k].line == prv.line + 1 then
+                parts[#parts] = parts[#parts]:sub(1, -2) .. t
+            else
+                parts[#parts + 1] = t
+            end
         end
+        return table.concat(parts, " ")
     end
-    local text = table.concat(parts, " ")
+    local text = words_text(span.a, span.b)
     -- Overlapping highlights become one.
-    local keep = {}
+    local keep, merged = {}, false
     for _, h in ipairs(list) do
         if h.ch == spread.ch and h.s < span.e and h.e > span.s then
-            if h.s < span.s then span.s, text = h.s, h.text .. " … " .. text end
-            if h.e > span.e then span.e, text = h.e, text .. " … " .. h.text end
+            if h.s < span.s then span.s, text, merged = h.s, h.text .. " … " .. text, true end
+            if h.e > span.e then span.e, text, merged = h.e, text .. " … " .. h.text, true end
         else
             keep[#keep + 1] = h
+        end
+    end
+    if merged then
+        -- All of it on this spread: its words, without the overlap twice.
+        local a, b
+        for k, w in ipairs(look.words) do
+            if w.off and w.off >= span.s and w.off < span.e then a = a or k; b = k end
+        end
+        local last = look.words[#look.words]
+        if a and look.words[a].off == span.s and (b < #look.words or (last.off and span.e <= last.off + #last.text)) then
+            text = words_text(a, b)
         end
     end
     keep[#keep + 1] = { ch = spread.ch, s = span.s, e = span.e, pct = book:fraction(spread.ch, span.s),
@@ -966,7 +985,7 @@ local function toggle_bookmark()
     end
     Store.set_bookmarks(book.path, list)
     app.export_notes()
-    if app.toast then app.toast(here and "Bookmark removed" or "Bookmark added") end
+    app.toast(here and "Bookmark removed" or "Bookmark added")
     redraw()
 end
 
@@ -980,6 +999,7 @@ end
 
 local function show_message(text)
     message = text
+    if app.mode ~= "message" then app.message_back = app.mode end
     app.mode = "message"
     redraw()
 end
@@ -994,7 +1014,7 @@ local function open_book(path)
     end
     if book and book ~= b then book:close() end
     -- Find results belong to one book; drop them (and the old book they hold).
-    if app.find and app.find.book ~= b then app.find, app.find_mark = nil, nil end
+    if app.find and app.find.book ~= b then app.find_stop(); app.find, app.find_mark = nil, nil end
     book = b
     clear_book_caches()
     local pr = Store.get_progress(path)
@@ -1021,7 +1041,26 @@ function app.notes_path(b)
         if #short + #ch > 120 then break end
         short = short .. ch
     end
-    return Store.download_dir() .. "/Highlights", short .. ".md"
+    -- Another copy of the same book (same title and author) keeps its own
+    -- file: the first line says whose file it is.
+    local dir = Store.download_dir() .. "/Highlights"
+    local owner = app.notes_owner(dir .. "/" .. short .. ".md")
+    local file = b.path:match("([^/]+)$") or b.path
+    if owner and owner ~= file then
+        short = short .. " (" .. file:gsub("%.[^.]*$", ""):gsub('[%c<>:"/\\|%?%*]', "") .. ")"
+    end
+    return dir, short .. ".md"
+end
+
+app.NOTES_MARK = "<!-- eReaderDS: "
+-- The book file a notes file was written for (nil: none, or an older file
+-- without the line, which is taken as this book's).
+function app.notes_owner(file)
+    local f = io.open(file, "rb")
+    if not f then return nil end
+    local first = f:read("*l") or ""
+    f:close()
+    return first:sub(1, #app.NOTES_MARK) == app.NOTES_MARK and first:sub(#app.NOTES_MARK + 1):gsub(" %-%->%s*$", "") or nil
 end
 
 function app.export_notes(only_if_missing)
@@ -1029,7 +1068,12 @@ function app.export_notes(only_if_missing)
     local dir, name = app.notes_path(book)
     local file = dir .. "/" .. name
     local hls, bms = Store.get_highlights(book.path), Store.get_bookmarks(book.path)
-    if #hls + #bms == 0 then os.remove(file) return end
+    if #hls + #bms == 0 then
+        -- Only a file this book wrote (an older one without the line: only
+        -- when its last note was just removed, not on opening the book).
+        if app.notes_owner(file) or not only_if_missing then os.remove(file) end
+        return
+    end
     if only_if_missing then
         local f = io.open(file, "rb")
         if f then f:close() return end
@@ -1039,7 +1083,7 @@ function app.export_notes(only_if_missing)
     for _, b in ipairs(bms) do all[#all + 1] = { ch = b.ch, off = b.off, pct = b.pct, title = b.title, text = b.snippet } end
     table.sort(all, function(x, y) return x.ch < y.ch or (x.ch == y.ch and x.off < y.off) end)
     local function n(k, one) return k .. " " .. one .. (k == 1 and "" or "s") end
-    local out = { "# " .. book.title, "" }
+    local out = { app.NOTES_MARK .. (book.path:match("([^/]+)$") or book.path) .. " -->", "# " .. book.title, "" }
     if (book.author or "") ~= "" then out[#out + 1] = "*" .. book.author .. "*"; out[#out + 1] = "" end
     out[#out + 1] = n(#hls, "highlight") .. " and " .. n(#bms, "bookmark") .. ", in reading order, from eReaderDS. "
         .. "This file is written again whenever they change, so anything added to it here is replaced."
@@ -1059,9 +1103,12 @@ function app.export_notes(only_if_missing)
             out[#out + 1] = "- Bookmark (" .. pct .. "): " .. ((e.text or "") ~= "" and (e.text .. "…") or "")
         end
     end
-    os.execute('mkdir -p "' .. dir .. '"')
     local f = io.open(file .. ".tmp", "wb")
-    if not f then return end
+    if not f then
+        os.execute('mkdir -p "' .. dir .. '"')
+        f = io.open(file .. ".tmp", "wb")
+        if not f then return end
+    end
     local ok = f:write(table.concat(out, "\n") .. "\n")
     f:close()
     if ok then os.remove(file); os.rename(file .. ".tmp", file) else os.remove(file .. ".tmp") end
@@ -1263,7 +1310,9 @@ function app.library_meta_step()
     local t0 = love.timer.getTime()
     while #q > 0 and love.timer.getTime() - t0 < 0.03 do
         local it = table.remove(q)
-        local m = Book.meta(it.path) or {}
+        local ok, m = pcall(Book.meta, it.path)      -- a damaged file mustn't stop the library
+        if not ok then print("[library] " .. tostring(m)) end
+        m = ok and m or {}
         Store.set_meta(it.path, it.size, m)
         if m.title then it.title, it.author, it.sort, it.series, it.index = m.title, m.author or "", m.sort, m.series, m.index end
     end
@@ -1315,7 +1364,7 @@ function library.cycle_sort(d)
     for k, v in ipairs(SORTS) do if v == S.lib_sort then i = k end end
     S.lib_sort = SORTS[(i - 1 + d) % #SORTS + 1]
     Store.save_settings(S)
-    scan_library()
+    library.sort(library.items)           -- the same books in a new order (no need to look at the SD card again)
     for k, it in ipairs(library.items) do
         if it.path and cur and it.path == cur.path then library.sel = k end
     end
@@ -1346,7 +1395,11 @@ local function library_preview()
     end
     previews[it.path] = pv
     preview_order[#preview_order + 1] = it.path
-    if #preview_order > 6 then previews[table.remove(preview_order, 1)] = nil end
+    if #preview_order > 6 then
+        local old = table.remove(preview_order, 1)
+        if previews[old].cover then previews[old].cover:release() end   -- big textures: don't wait for the GC
+        previews[old] = nil
+    end
     return pv
 end
 
@@ -1364,7 +1417,10 @@ function library.delete(path)
         app.find, app.find_mark = nil, nil
         clear_book_caches()
     end
-    previews[path] = nil
+    if previews[path] then
+        previews[path] = nil
+        for i, p in ipairs(preview_order) do if p == path then table.remove(preview_order, i) break end end
+    end
     Store.forget(path)
     Store.flush()
     scan_library()
@@ -1398,6 +1454,13 @@ end
 -- from the main loop by job id.
 
 function shop.net_job(job, handler)
+    if net.thread and not net.thread:isRunning() then
+        shop.net_poll()                    -- fails anything still waiting on it
+        if net.thread then print("[net] " .. (net.thread:getError() or "network thread stopped")) end
+        net.thread = nil
+        love.thread.getChannel("net_jobs"):clear()
+        love.thread.getChannel("net_cancel"):clear()
+    end
     if not net.thread then
         net.thread = love.thread.newThread("networker.lua")
         net.thread:start()
@@ -1434,8 +1497,9 @@ function shop.net_poll()
         love.thread.getChannel("net_jobs"):clear()
         love.thread.getChannel("net_out"):clear()
         love.thread.getChannel("net_cancel"):clear()
-        for id, h in pairs(net.handlers) do h({ id = id, kind = "error", message = err }) end
+        local waiting = net.handlers   -- a handler may start a new job
         net.handlers, net.count = {}, 0
+        for id, h in pairs(waiting) do h({ id = id, kind = "error", message = err }) end
         got = true
     end
     if got then redraw() end
@@ -1459,7 +1523,14 @@ function shop.load_page(pg, url, append)
     shop.net_job(shop.catalog_opts({ kind = "feed", url = url }), function(msg)
         pg.loading = false
         if msg.kind == "error" then
-            pg.error = shop.online(true) and msg.message or "Not connected to Wi-Fi."
+            local err = shop.online(true) and msg.message or "Not connected to Wi-Fi."
+            if append then
+                -- The list so far stays; reaching its end again tries again.
+                pg.next = url
+                app.toast("Couldn't load more: " .. err)
+            else
+                pg.error = err
+            end
             return
         end
         local feed = msg.feed
@@ -1593,9 +1664,7 @@ function shop.cover(it)
             local data = love.data.decode("string", "base64", url:match("^data:[^,]*;base64,(.*)$"))
             return love.graphics.newImage(love.filesystem.newFileData(data, "cover"))
         end)
-        shop.covers[url] = ok and img or false
-        shop.cover_order[#shop.cover_order + 1] = url
-        if #shop.cover_order > 12 then shop.covers[table.remove(shop.cover_order, 1)] = nil end
+        shop.keep_cover(url, ok and img or false)
         return ok and img or nil
     end
     if net.count == 0 then
@@ -1606,11 +1675,22 @@ function shop.cover(it)
             local ok, img = pcall(function()
                 return love.graphics.newImage(love.filesystem.newFileData(msg.body, "cover"))
             end)
-            if not ok then return end
-            shop.covers[url] = img
-            shop.cover_order[#shop.cover_order + 1] = url
-            if #shop.cover_order > 12 then shop.covers[table.remove(shop.cover_order, 1)] = nil end
+            if ok then shop.keep_cover(url, img) end
         end)
+    end
+end
+
+-- The last dozen covers are kept; older ones are let go.
+function shop.keep_cover(url, img)
+    for i, u in ipairs(shop.cover_order) do
+        if u == url then table.remove(shop.cover_order, i) break end
+    end
+    shop.covers[url] = img
+    shop.cover_order[#shop.cover_order + 1] = url
+    if #shop.cover_order > 12 then
+        local old = table.remove(shop.cover_order, 1)
+        if shop.covers[old] then shop.covers[old]:release() end
+        shop.covers[old] = nil
     end
 end
 
@@ -1652,8 +1732,8 @@ function shop.confirm()
     local pg = shop.page()
     if not pg then return end
     if pg.error and (#pg.entries == 0 or not (pg.entries[pg.sel] or {}).book) then
-        local r = pg.retry or (pg.url and { url = pg.url })
-        if r then shop.load_page(pg, r.url, r.append) end
+        if pg.redo then pg.redo()
+        elseif pg.retry then shop.load_page(pg, pg.retry.url, pg.retry.append) end
         return
     end
     local it = pg.entries[pg.sel]
@@ -1691,11 +1771,14 @@ function shop.search(pg, q)
         if not found then
             res.loading = false
             res.error = msg.kind == "error" and msg.message or "This catalog's search can't be used."
+            res.redo = function()
+                if shop.page() == res then table.remove(shop.stack) end
+                shop.search(pg, q)
+            end
             return
         end
         c.search_tpl = found
-        res.url = Opds.search_url(found, q)
-        shop.load_page(res, res.url)
+        shop.load_page(res, Opds.search_url(found, q))
     end)
     redraw()
 end
@@ -1708,7 +1791,6 @@ function shop.move(d)
     if pg.sel >= #pg.entries - 2 and pg.next and not pg.loading and not pg.error then
         local url = pg.next
         pg.next = nil
-        pg.more = true
         shop.load_page(pg, url, true)
     end
 end
@@ -1722,7 +1804,6 @@ local SB = {
     bar = { "none", "chapter", "book" },
     bar_size = { 1, 2, 3 },
     clock = { "off", "12", "24" },
-    time = { "off", "chapter", "book", "both" },
 }
 local SB_NAMES = {
     title = { none = "None", book = "Book", chapter = "Chapter", both = "Both" },
@@ -1730,7 +1811,6 @@ local SB_NAMES = {
     bar = { none = "None", chapter = "Chapter", book = "Book" },
     bar_size = { [1] = "Thin", [2] = "Medium", [3] = "Thick" },
     clock = { off = "Off", ["12"] = "12-hour", ["24"] = "24-hour" },
-    time = { off = "Off", chapter = "Chapter", book = "Book", both = "Both" },
 }
 
 -- Current time for the status bar, or nil when the clock is off.
@@ -1742,7 +1822,7 @@ local function clock_text()
         return os.date("%H:%M")
     end
 end
-local BAR_PX = { 3, 6, 10 }
+local BAR_PX = app.BAR_PX
 
 local function cycle(list, cur, d)
     local idx = 1
@@ -1767,9 +1847,7 @@ end
 
 local function relayout() clear_pages(); goto_pos(pos.ch, pos.off) end
 
--- Time left is stored as one setting (off / chapter / book / both) but shown
--- as two Show/Hide rows.
--- Time left is only shown for the chapter: it's worked out from the text on
+-- Time left (S.sb_time: "chapter" or "off"; older settings may say "both") is only shown for the chapter: it's worked out from the text on
 -- the pages, while a whole-book estimate had to guess at chapters not yet
 -- opened and was often well off. The book shows its percentage instead.
 local function time_shown(which)
@@ -2037,12 +2115,13 @@ function app.sync_push(now)
         if app.sync.failed and love.timer.getTime() - app.sync.failed < 600 then return end
         local ok, status, body = pcall(require("net").call, job.method, job.url, { headers = job.headers, body = job.body, timeout = 4 })
         print("[sync] push " .. xp .. ": " .. tostring(status))
-        if ok then sent(status, body) else app.sync.failed = love.timer.getTime() end
+        if ok and status < 500 then sent(status, body) else app.sync.failed = love.timer.getTime() end
         return
     end
     shop.net_job(job, function(msg)
         print("[sync] push " .. xp .. ": " .. tostring(msg.status or msg.message))
-        if msg.kind == "done" then sent(msg.status, msg.body); app.sync.failed = nil
+        -- (A server error, 5xx, counts as failing too.)
+        if msg.kind == "done" and (msg.status or 500) < 500 then sent(msg.status, msg.body); app.sync.failed = nil
         else app.sync.failed = love.timer.getTime() end
     end)
 end
@@ -2522,9 +2601,9 @@ local function draw_status(side, info)
     end
 end
 
--- "4 h 10 min", or compact "4h 10m".
-local function format_time(seconds, compact)
-    local H, M = compact and "h" or " h", compact and "m" or " min"
+-- "4h 10m".
+local function format_time(seconds)
+    local H, M = "h", "m"
     local m = seconds / 60
     if m < 1 then return "<1" .. M end
     if m < 60 then return string.format("%d%s", math.floor(m + 0.5), M) end
@@ -2553,7 +2632,7 @@ function app.section_extent(cur, nxt)
     if e_ch == ch then e_ch, e_off = ch + 1, 0 end         -- ends in this file
     if s_ch == ch and e_ch == ch + 1 and e_off == 0 then return 0, 0, 0 end
     local span = 0
-    for i = s_ch, math.min(e_ch, #book.chapters) do span = span + book.chapters[i].weight end
+    for i = s_ch, math.min(e_off > 0 and e_ch or e_ch - 1, #book.chapters) do span = span + book.chapters[i].weight end
     if span > book.total * 0.5 then return nil end
     local text, bytes = 0, 0
     for _, c in ipairs(book.chapters) do
@@ -2644,7 +2723,7 @@ local function draw_reader_pages()
         if nxt and nxt.chapter == spread.ch then section_end = select(2, toc_pos(nxt)) end
         local left = section_end - end_off + after_chars
         if left > 0 then
-            local t = format_time(left / S.read_cps, true)
+            local t = format_time(left / S.read_cps)
             info.pages_text = info.pages_text and (info.pages_text .. " (" .. t .. ")") or (t .. " left in chapter")
         end
     end
@@ -2911,7 +2990,7 @@ local function draw_library(side)
             end
             for _, r in ipairs(rows) do
                 if r.header then
-                    -- A group (sorted by progress): small capitals and a hairline, as in Settings.
+                    -- A group (sorted by progress or series): small capitals and a hairline, as in Settings.
                     love.graphics.setFont(ui.small)
                     color(th.dim)
                     local ty = r.y + app.LIB_HEADER_H - ui.small:getHeight() - 8
@@ -3088,11 +3167,11 @@ function shop.draw(side)
                 if e.book then
                     mark = (shop.dl and shop.dl.item == e) and "…"
                         or (e.have or shop.have(e)) and "✓" or nil
-                elseif e.href or e.catalog or e.receive then
+                elseif e.href or e.catalog or e.receive or e.search then
                     mark = "›"
                 end
                 love.graphics.setFont(ui.font)
-                color((e.book or e.href or e.catalog or e.receive) and th.fg or th.dim)
+                color((e.book or e.href or e.catalog or e.receive or e.search) and th.fg or th.dim)
                 love.graphics.print(fit_text(ui.font, e.title, rw - 60), rx, ty)
                 if mark then love.graphics.printf(mark, rx, ty, rw, "right") end
                 if sub ~= "" then
@@ -3140,7 +3219,7 @@ function shop.draw(side)
     end
 
     -- Status and action, pinned near the bottom; the summary fills the gap.
-    local status, action_text, frac
+    local status, frac
     if it.book then
         local dl = shop.dl
         if dl and dl.item == it then
@@ -3163,11 +3242,6 @@ function shop.draw(side)
     local bottom = PAGE_H - 70
     local foot_y = bottom
     love.graphics.setFont(ui.small)
-    if action_text then
-        color(th.fg)
-        love.graphics.printf(action_text, x, foot_y, w, "center")
-        foot_y = foot_y - 50
-    end
     if frac then
         local bw = w * 0.7
         local bx = x + (w - bw) / 2
@@ -3517,6 +3591,10 @@ function app.toc_rows() return math.floor((PAGE_H - 250) / 58) end
 
 -- The open book's cover, loaded once (nil if it has none).
 function app.book_cover()
+    if app.cover_img and app.cover_for ~= (book and book.path) then
+        app.cover_img:release()             -- the last book's
+        app.cover_for, app.cover_img = nil, nil
+    end
     if not book or not book.cover then return nil end
     if app.cover_for ~= book.path then
         app.cover_for, app.cover_img = book.path, nil
@@ -3799,7 +3877,9 @@ local function draw_bookmarks(side)
     else
         app.hints(x, nil, { "‹ ›", "filter", "B", "back" })
     end
-    if real > 0 then app.count(x, w, bm.sel, #entries) end
+    -- (Counting the bookmarks and highlights, not the "this page" row.)
+    local skip = entries[1] and entries[1].action and 1 or 0
+    if real > 0 then app.count(x, w, math.max(1, bm.sel - skip), real) end
 end
 
 -- The mark on Bookmarks and Highlights: an open book with a ribbon, drawn in
@@ -3862,7 +3942,7 @@ function app.bm_draw_left(entries, x, w)
     app.draw_book_art(x + w / 2, 260, 0.9)
     local e = entries[bm.sel]
     if not e then return end
-    local y, hint = 400, nil
+    local y = 400
     local label, title, pct, body
     if e.action then
         local sec = current_section()
@@ -3870,14 +3950,12 @@ function app.bm_draw_left(entries, x, w)
         title = sec and book.toc[sec].title or book.title or ""
         pct = book:fraction(pos.ch, pos.off)
         body = page_snippet()
-        hint = nil
     else
         local it = e.item
         label = e.hl and "HIGHLIGHT" or "BOOKMARK"
         title = it.title ~= "" and it.title or book.title
         pct = it.pct
         body = (e.hl and it.text or it.snippet) or ""
-        hint = nil
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
@@ -3965,10 +4043,12 @@ end
 -- A key while the card is up: true if it was the card's.
 function app.ask_action(a)
     local q = app.asking
-    if not q or a == "quit" then return false end
+    if not q then return false end
+    -- Only A or B answer; other keys (a page turn out of habit) leave it up.
+    if a ~= "confirm" and a ~= "back" then return true end
     app.asking = nil
     if a == "confirm" then q.on_yes()
-    elseif a == "back" and q.on_no then q.on_no() end
+    elseif q.on_no then q.on_no() end
     redraw()
     return true
 end
@@ -3978,7 +4058,7 @@ function app.ask_tap(side, u, v)
     app.asking = nil
     local function hit(which)
         local bx, by, bw, bh = app.ask_button(which)
-        return side == "right" and u >= bx - 12 and u <= bx + bw + 12 and v >= by - 12 and v <= by + bh + 12
+        return side == app.touch_side() and u >= bx - 12 and u <= bx + bw + 12 and v >= by - 12 and v <= by + bh + 12
     end
     if hit("yes") then q.on_yes()
     elseif hit("no") and q.on_no then q.on_no() end
@@ -3994,16 +4074,16 @@ function app.choose(c)
 end
 
 -- Row i of the card: x, y, w, h on the right page.
-function app.choose_row(i)
+function app.choose_row(i, n)
     local m = MARGINS[2]
-    local n = #app.choosing.options
+    n = n or #app.choosing.options
     local top = PAGE_H - 110 - n * 80
     return m.inner, top + (i - 1) * 80, PAGE_W - m.outer - m.inner, 72
 end
 
 function app.choose_action(a)
     local c = app.choosing
-    if not c or a == "quit" then return false end
+    if not c then return false end
     if a == "up" then c.sel = math.max(1, c.sel - 1)
     elseif a == "down" then c.sel = math.min(#c.options, c.sel + 1)
     elseif a == "confirm" then
@@ -4019,9 +4099,9 @@ end
 function app.choose_tap(side, u, v)
     local c = app.choosing
     app.choosing = nil
-    if side == "right" then
+    if side == app.touch_side() then
         for i, o in ipairs(c.options) do
-            local x, y, w, h = app.choose_row(i)
+            local x, y, w, h = app.choose_row(i, #c.options)
             if u >= x - 14 and u <= x + w + 14 and v >= y and v < y + h + 8 then o[2]() break end
         end
     end
@@ -4352,7 +4432,7 @@ function app.kb_draw(side)
             color(th.fg)
             love.graphics.print(app.keys_text(row[1]), x, y)
             color(th.dim)
-            love.graphics.print(row[2], x + 150, y)
+            love.graphics.print(app.keys_text(row[2]), x + 150, y)
             y = y + ui.font:getHeight() + 14
         end
         return
@@ -4431,13 +4511,16 @@ end
 
 function app.update_check(by_hand)
     local u = app.upd
-    if u.state == "checking" or u.state == "downloading" or u.state == "unpacking" or u.state == "ready" then return end
+    if u.state == "checking" then u.by_hand = u.by_hand or by_hand return end   -- asked while the launch check runs
+    if u.state == "downloading" or u.state == "unpacking" or u.state == "ready" then return end
     if not shop.online(true) then
         if by_hand then app.upd = { state = "error", message = "Not connected to Wi-Fi." } end
         return
     end
-    app.upd = { state = "checking" }
+    local checking = { state = "checking", by_hand = by_hand }
+    app.upd = checking
     shop.net_job({ kind = "fetch", url = app.Updater.RELEASES }, function(msg)
+        by_hand = checking.by_hand
         if msg.kind == "error" then
             -- Checked on launch: stay quiet. Checked by hand: say why.
             app.upd = { state = by_hand and "error" or "none", message = by_hand and app.update_error(msg.message) }
@@ -4501,6 +4584,8 @@ function app.update_start()
             end
             u.state, u.frac, u.saving = "unpacking", 0, nil
             -- Unpack a file at a time between frames (the screen stays live).
+            app.find_stop()                                -- the update comes first
+            app.task_kind = "update"
             app.task = coroutine.create(function()
                 local ok, err = pcall(function()
                     local co = coroutine.create(app.Updater.unpack)
@@ -4567,7 +4652,7 @@ function app.update_action(a)
     if a == "toc" then app.update_skip() return end               -- Y
     if a == "confirm" then
         if u.state == "available" or (u.state == "error" and u.url) then app.update_start()
-        elseif u.state == "error" then app.update_check(true)
+        elseif u.state == "error" or (u.state == "none" and not u.checked) then app.update_check(true)
         elseif u.state == "ready" then love.event.quit(app.UPDATE_EXIT) end
     elseif a == "back" or a == "menu" then
         if u.state == "downloading" and u.job then
@@ -4664,8 +4749,10 @@ function app.update_draw(side)
         status = "Checking for updates…"
     elseif u.state == "error" then
         status, button = "Couldn't update: " .. (u.message or "unknown error"), "Try again"
-    else
+    elseif u.checked then
         status = "eReaderDS v" .. VERSION .. " is up to date."
+    else
+        status, button = "eReaderDS v" .. VERSION, "Check for updates"
     end
     love.graphics.setFont(ui.font)
     color(th.fg)
@@ -4805,7 +4892,10 @@ function app.whatsnew_draw(side)
             end
             goto continue
         end
-        local bullet, rest = text:match("^(•?)\t(.*)$")
+        -- "•\t..." starts an item, "\t..." continues one ("•?" would make only
+        -- the bullet's last byte optional).
+        local bullet, rest = text:match("^(•)\t(.*)$")
+        if not bullet then rest = text:match("^\t(.*)$"); bullet = rest and "" end
         if bullet then
             if bullet ~= "" then color(th.dim); love.graphics.print("•", x, it[4]); color(th.fg) end
             love.graphics.print(rest, x + 34, it[4])
@@ -4907,7 +4997,7 @@ end
 function app.font_close(apply)
     local fp = app.font_pick
     if fp.sample then for _, f in pairs(fp.sample.f) do f:release() end end
-    if apply and fp.list[fp.sel] then
+    if apply and fp.list[fp.sel] and fp.list[fp.sel].name ~= S.font then   -- (the same font: nothing to redo)
         S.font = fp.list[fp.sel].name
         build_fonts()
         goto_pos(pos.ch, pos.off)
@@ -5077,7 +5167,12 @@ function app.fget_load()
             for _, f in ipairs(Fonts.list()) do if f.bundled then bundled[f.name] = true end end
             g.all = {}
             for _, e in ipairs(data.fonts) do
-                if type(e) == "table" and e.name and not bundled[e.name] then g.all[#g.all + 1] = e end
+                -- (Whole entries only: zip becomes a file name, preview an address.)
+                if type(e) == "table" and type(e.name) == "string" and not bundled[e.name]
+                        and type(e.zip) == "string" and not e.zip:find("[/\\]") and not e.zip:find("..", 1, true)
+                        and type(e.preview) == "string" then
+                    g.all[#g.all + 1] = e
+                end
             end
             table.sort(g.all, function(a, b) return a.name:lower() < b.name:lower() end)
             app.fget_filter(g.filter or "all")
@@ -5170,7 +5265,7 @@ function app.fget_unpack(zip, dir)
             local data = assert(z:read(name))
             local f = assert(io.open(dir .. "/" .. name, "wb"))
             local wrote = f:write(data)
-            f:close()
+            wrote = f:close() and wrote        -- a full card shows up at close
             assert(wrote, "write failed")
         end
     end
@@ -5383,10 +5478,11 @@ end
 -- unloaded again. { query, book, results, sel, top, done, pct, capped }
 app.FIND_MAX = 300
 function app.find_open()
-    if app.task then app.toast("Installing an update…"); return end
+    if app.task_kind == "update" then app.toast("Installing an update…"); return end
     local f = app.find
-    if f and f.book == book and f.done then
+    if f and f.book == book and (f.done or f.next) then
         app.mode = "find"                       -- last results, B to search again
+        if not f.done then app.find_start(f.query, f) end   -- left part way: go on from there
     else
         app.find_keyboard(f and f.book == book and f.query or "")
     end
@@ -5414,22 +5510,24 @@ function app.find_label(r)
     return r.label
 end
 
-function app.find_start(query)
-    local f = { query = query, book = book, results = {}, sel = 1, top = 1, pct = 0 }
+-- resume: a search left part way (f.next is the file it had got to).
+function app.find_start(query, resume)
+    local f = resume or { query = query, book = book, results = {}, sel = 1, top = 1, pct = 0 }
     app.find = f
     app.mode = "find"
     local needle = query:lower()
+    app.task_kind = "find"
     app.task = coroutine.create(function()
         local t0 = love.timer.getTime()
         local n = #book.chapters
-        for i = 1, n do
+        for i = f.next or 1, n do
             local c = book.chapters[i]
             local loaded = c.blocks ~= nil
             book:chapter(i)
             for _, t in ipairs(book.toc) do
                 if t.chapter == i then toc_pos(t) end
             end
-            for _, b in ipairs(c.blocks) do
+            for _, b in ipairs(c.blocks or {}) do
                 if b.kind == "text" then
                     local parts = {}
                     for _, r in ipairs(b.runs) do if r.text then parts[#parts + 1] = r.text end end
@@ -5447,7 +5545,7 @@ function app.find_start(query)
             end
             -- Free what only the search needed (the open chapter stays).
             if not loaded and i ~= pos.ch then c.blocks, c.anchors = nil, nil end
-            f.pct = i / n
+            f.pct, f.next = i / n, i + 1
             if #f.results >= app.FIND_MAX then f.capped = true; break end
             if love.timer.getTime() - t0 > 0.03 then
                 coroutine.yield()
@@ -5463,10 +5561,12 @@ function app.task_step()
     local ok, err = coroutine.resume(app.task)
     if not ok then
         print("[task] " .. tostring(err))
-        if app.find and not app.find.done then app.find.done, app.find.error = true, true end
+        if app.task_kind == "find" and app.find and not app.find.done then app.find.done, app.find.error = true, true end
     end
-    if coroutine.status(app.task) == "dead" then app.task = nil end
-    redraw()
+    if coroutine.status(app.task) == "dead" then app.task, app.task_kind = nil, nil end
+    -- Progress shows ten times a second; each step needn't redraw both screens.
+    local now = love.timer.getTime()
+    if not app.task or now - (app.task_drawn or 0) > 0.1 then app.task_drawn = now; redraw() end
 end
 
 -- A result's text: a little before the match, the match, the rest.
@@ -5618,22 +5718,24 @@ function app.find_action(a)
     elseif a == "right" or a == "next" then f.sel = math.min(math.max(n, 1), f.sel + rows)
     elseif a == "confirm" and f.results[f.sel] then
         local r = f.results[f.sel]
-        app.task = nil
-        f.done = true
+        app.find_stop()
         app.jump_to(r.ch, r.off)
         app.mode = "reader"
         -- Mark the words on the spread it lands on.
         app.find_mark = { query = f.query, at = spread and (spread.ch .. ":" .. spread.pi) }
     elseif a == "back" then
-        app.task = nil
-        if not f.done then f.done = true end
+        app.find_stop()
         app.find_keyboard(f.query)
     elseif a == "menu" or a == "toc" then
-        app.task = nil
-        if not f.done then f.done = true end
+        app.find_stop()
         app.mode = "reader"
     end
     redraw()
+end
+
+-- Pause a running search (Find in Book goes on from there next time).
+function app.find_stop()
+    if app.task_kind == "find" then app.task, app.task_kind = nil, nil end
 end
 
 -- The found words, outlined on the spread a result opened (until it's left).
@@ -5649,7 +5751,8 @@ function app.find_highlight(side)
         end
         mk.words = {}
         for _, w in ipairs(look.collect()) do
-            local t = w.text:lower():gsub("^[%p]+", ""):gsub("[%p]+$", ""):gsub("\226\128[\152-\157]", "")
+            -- (Curly quotes first: they aren't %p, and "“word,”" must become "word".)
+            local t = w.text:lower():gsub("\226\128[\152-\157]", ""):gsub("^[%p]+", ""):gsub("[%p]+$", "")
             if want[t] and (n == 1 or #t > 2) then mk.words[#mk.words + 1] = w end
         end
     end
@@ -5755,8 +5858,8 @@ local function render_canvases()
         love.graphics.clear(bg[1], bg[2], bg[3], 1)
         love.graphics.origin()
         painter(side)
-        if side == "right" and app.choosing then app.choose_draw() end
-        if side == "right" and app.asking then app.ask_draw() end
+        if side == app.touch_side() and app.choosing then app.choose_draw() end
+        if side == app.touch_side() and app.asking then app.ask_draw() end
         if (app.mode == "menu" and menu.page ~= "status" or app.mode == "jump") and side == "left" then
             love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
             love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
@@ -5907,7 +6010,6 @@ end
 
 -- Draw the two page canvases onto the physical screens.
 local function compose()
-    set_theme_shader(true)
     local th = theme()
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
     -- Get Books: the selected book's page (the left one) skips the E-ink
@@ -5973,12 +6075,13 @@ end
 local function turn(dir, fn)
     app.anim = nil
     if S.anim == "off" or app.mode ~= "reader" or not spread then fn(); redraw(); return end
-    render_canvases()                           -- what is on screen right now
+    if app.dirty then render_canvases() end     -- what is on screen right now (already there unless changed)
     local ch, pi = spread.ch, spread.pi
     canvases, old_canvases = old_canvases, canvases
     fn()
     if spread.ch == ch and spread.pi == pi then     -- start/end of book: nothing to animate
         canvases, old_canvases = old_canvases, canvases
+        redraw()                                    -- (a turn cut short needs its last frame)
         return
     end
     render_canvases()
@@ -5989,7 +6092,7 @@ end
 ---------------------------------------------------------------- touch brightness
 
 -- Brightness popup shown while sliding a finger on the touchscreen.
-local overlay = nil        -- { side, pct, hide_at }
+local overlay = nil        -- { pct or pinch or text, hide_at } (on the touchscreen's page)
 function app.untoast() overlay = nil; redraw() end
 local gesture = nil        -- current touch: { side, u0, v0, mode, p0 }
 
@@ -6025,7 +6128,7 @@ local function touch_event(kind, sx, sy)
             local ratio = math.sqrt(math.max(1, sx) / gesture.d0)
             local size = math.max(18, math.min(64, math.floor(gesture.size0 * ratio + 0.5)))
             gesture.size = size
-            overlay = { side = app.touch_side(), pinch = size, pct = math.floor(size / gesture.size0 * 100 + 0.5),
+            overlay = { pinch = size, pct = math.floor(size / gesture.size0 * 100 + 0.5),
                 hide_at = now + 1e9 }
             redraw()
         end
@@ -6091,7 +6194,7 @@ local function touch_event(kind, sx, sy)
                 S.brightness = pct
                 Backlight.set(pct)
             end
-            overlay = { side = gesture.side, pct = Backlight.available() and pct or nil, extra = extra, hide_at = now + 1e9 }
+            overlay = { pct = Backlight.available() and pct or nil, extra = extra, hide_at = now + 1e9 }
             redraw()
         end
     elseif kind == "up" and gesture then
@@ -6154,7 +6257,7 @@ end
 -- A short message popup (e.g. "Bookmark added").
 -- on_tap: what tapping the toast does (it's on the touchscreen), if anything.
 function app.toast(text, secs, on_tap)
-    overlay = { side = app.touch_side(), text = text, hide_at = love.timer.getTime() + (secs or 1.2), on_tap = on_tap }
+    overlay = { text = text, hide_at = love.timer.getTime() + (secs or 1.2), on_tap = on_tap }
     if os.getenv("READER_DEBUG") then print(string.format("[debug] message %q at %.2f", text, love.timer.getTime())) end
     redraw()
 end
@@ -6162,7 +6265,7 @@ end
 local function draw_overlay()
     if not overlay then return end
     love.graphics.push()
-    page_transform(overlay.side)
+    page_transform(app.touch_side())          -- (where the touchscreen's page is now: the mode may have changed)
     if overlay.pinch then
         -- Pinching: the size it will become, and a sample at that size.
         local w, h = 560, 200
@@ -6285,8 +6388,6 @@ function love.mousereleased(x, y)
     if gesture and not Touch.enabled then touch_event("up", x / app.scale - SCREEN_W, y / app.scale) end
 end
 
----------------------------------------------------------------- input
-
 ---------------------------------------------------------------- lid
 
 -- The RG DS Plus reports its lid through the power-key device: key 110 when it
@@ -6316,7 +6417,12 @@ local function lid_closed()
     save_progress()
     Store.save_settings(S)
     Store.flush()
-    lid.pct = S.brightness >= 0 and S.brightness or Backlight.get() or 50
+    -- Dimmed or off from being left alone: the level from before that.
+    lid.pct = app.idle.state and app.idle.pct or (S.brightness >= 0 and S.brightness) or Backlight.get() or 50
+    app.idle.state = nil                    -- so a press with the lid shut can't turn the screens on
+    -- A touch cut off by the lid never gets its "up".
+    gesture, app.idle_swallow = nil, nil
+    if overlay and overlay.hide_at > love.timer.getTime() + 60 then overlay = nil end
     Backlight.power(false)
     app.sync_push(true)
     lid.since = love.timer.getTime()
@@ -6439,7 +6545,9 @@ function handle_action(a)
 
     if mode == "message" then
         if a == "confirm" or a == "back" then
-            app.mode = app.message_back or (book and "reader" or "library")
+            -- Back to My Books or Get Books if that's where it came from.
+            local back = app.message_back
+            app.mode = (back == "library" or back == "shop") and back or (book and "reader" or "library")
             app.message_back = nil
             redraw()
         end
@@ -6523,7 +6631,7 @@ function handle_action(a)
         local n = #entries
         local rows = list_rows(96)
         if a == "up" then bm.sel = math.max(1, bm.sel - 1)
-        elseif a == "down" then bm.sel = math.min(n, bm.sel + 1)
+        elseif a == "down" then bm.sel = math.max(1, math.min(n, bm.sel + 1))
         elseif a == "left" or a == "prev" or a == "right" or a == "next" then
             app.bm_filter((a == "left" or a == "prev") and -1 or 1)
             return
@@ -6624,7 +6732,7 @@ end
 
 -- Pressing and holding on the touchscreen: look up the word under the finger.
 function app.on_hold(side, u, v)
-    if app.mode ~= "reader" and app.mode ~= "lookup" then return end
+    if app.mode ~= "reader" and app.mode ~= "lookup" or app.asking or app.choosing then return end
     -- In look-up mode the other page is the definition: holds there do nothing.
     local cur = look.words[look.sel]
     if app.mode == "lookup" and cur and side ~= cur.side then return end
@@ -6641,7 +6749,7 @@ function app.on_tap(side, u, v)
     local o = overlay
     if o and o.on_tap then
         overlay = nil
-        if o.box and side == o.side and u >= o.box[1] - 10 and u <= o.box[1] + o.box[3] + 10
+        if o.box and side == app.touch_side() and u >= o.box[1] - 10 and u <= o.box[1] + o.box[3] + 10
                 and v >= o.box[2] - 10 and v <= o.box[2] + o.box[4] + 10 then
             o.on_tap()
         end
@@ -6913,8 +7021,6 @@ function love.keypressed(key, scancode, isrepeat)
     if a then action(a) end
 end
 
----------------------------------------------------------------- main loop
-
 ---------------------------------------------------------------- crashes
 
 -- When something goes wrong: a plain screen instead of LÖVE's error text,
@@ -6926,8 +7032,10 @@ app.REPORT_URL = "https://github.com/casualducko/eReaderDS/issues/new"
 -- The error and where it happened, without paths or book file names.
 function app.crash_clean(text)
     text = tostring(text or "")
-    text = text:gsub("[^\n\"']-%.[eE][pP][uU][bB]", "<book>"):gsub("[^\n\"']-%.[tT][xX][tT]", "<file>")
     text = text:gsub("[%w%./_%-]*/app/", "")             -- /…/eReaderDS/app/main.lua -> main.lua
+    -- Book and file paths (someone's library) go; the message around them stays.
+    text = ("\n" .. text):gsub("([%s\"'(=:])/[^\n\"']-%.[eE][pP][uU][bB]", "%1<book>")
+        :gsub("([%s\"'(=:])/[^\n\"']-%.[tT][xX][tT]", "%1<file>"):sub(2)
     return text
 end
 
@@ -6961,6 +7069,11 @@ function love.errorhandler(msg)
     print("[crash] " .. msg .. "\n" .. trace)
     pcall(app.crash_save, msg, trace)
     pcall(function() if book then save_progress() end; Store.flush() end)   -- keep the place
+    -- Screens left off or dimmed (idle, the lid): on again, to show this.
+    pcall(function()
+        if app.idle.state == "off" or lid.closed then Backlight.power(true, app.idle.pct or lid.pct or 50)
+        elseif app.idle.state == "dim" then Backlight.set(app.idle.pct) end
+    end)
     pcall(love.graphics.reset)
     pcall(love.graphics.setCanvas)
     local th = (pcall(theme) and theme()) or { bg = { 0.957, 0.925, 0.847 }, fg = { 0.357, 0.275, 0.212 }, dim = { 0.6, 0.52, 0.44 } }
@@ -7181,6 +7294,7 @@ function app.recv_ip()
 end
 
 function app.recv_open()
+    if app.recv then app.mode = "receive"; redraw(); return end   -- already running
     if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
     local ip = app.recv_ip()
     if not ip then app.toast("Couldn't find this device's address on the network"); return end
@@ -7209,7 +7323,20 @@ function app.recv_stop()
     app.recv_poll()
     app.recv = nil
     love.thread.getChannel("recv_out"):clear()
-    if r.fonts > 0 then Fonts.scan() end
+    if r.fonts > 0 then
+        Fonts.scan()
+        build_fonts()                   -- a font in use may have been replaced
+        if book and spread then goto_pos(pos.ch, pos.off) end
+    end
+    if r.reopen and book then
+        -- The open book was replaced: let go of the old copy (it opens
+        -- afresh, at the same place, from My Books).
+        save_progress()
+        book:close()
+        book, spread = nil, nil
+        app.find_stop(); app.find, app.find_mark = nil, nil
+        clear_book_caches()
+    end
     if r.books > 0 then
         Store.flush()
         scan_library()
@@ -7257,6 +7384,7 @@ function app.recv_poll()
                 elseif msg.kind == "done" then
                     f.done, f.replaced, f.font = true, msg.replaced, msg.font
                     if msg.font then r.fonts = r.fonts + 1 else r.books, r.last = r.books + 1, msg.path end
+                    if msg.replaced and book and msg.path == book.path then r.reopen = true end
                 elseif msg.kind == "failed" then
                     f.failed = msg.message
                 end
@@ -7488,8 +7616,9 @@ function love.quit()
     if app.recv then app.recv_stop() end
     app.sync_push(true)
     if net.thread then
-        -- Stop a download (its .part file is removed) and the network thread.
-        if shop.dl then love.thread.getChannel("net_cancel"):push(shop.dl.id) end
+        -- Stop whatever is running (a download's .part file is removed) and the thread.
+        love.thread.getChannel("net_cancel"):clear()
+        love.thread.getChannel("net_cancel"):push(true)
         love.thread.getChannel("net_jobs"):clear()
         love.thread.getChannel("net_jobs"):push({ kind = "quit" })
         net.thread:wait()
@@ -7518,7 +7647,7 @@ local function run_test_script()
                 elseif what == "end" then touch_event("pinch_end")
                 else touch_event("pinch", tonumber(a:match("([%d.]+)$"))) end
             elseif a == "poll" then shop.net_poll()
-            elseif a:match("^type:") then app.kb_type(a:sub(6):gsub("_", " "))
+            elseif a:match("^type:") then app.kb_type((a:sub(6):gsub("_", " ")))
             elseif a == "update" then app.update_open()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
@@ -7584,6 +7713,9 @@ local function run_test_script()
     end
 end
 
+-- Screens that show the status bar's clock.
+app.CLOCK_MODES = { reader = true, menu = true, lookup = true, note = true, jump = true, themes = true }
+
 -- Event-driven loop: sleep until input arrives and only redraw on change.
 function love.run()
     love.load(love.arg.parseGameArguments(arg), arg)
@@ -7619,7 +7751,7 @@ function love.run()
         end
         if Touch.enabled and Touch.poll(lid.closed and function() end or touch_event) then got = true end
         if KeyProbe.enabled and KeyProbe.poll() then got = true end
-        if gesture and not gesture.mode and not gesture.held and gesture.moved < 30
+        if gesture and not lid.closed and not gesture.mode and not gesture.held and gesture.moved < 30
             and love.timer.getTime() - gesture.t0 > 0.6 then
             gesture.held = true                -- press and hold
             app.on_hold(gesture.side, gesture.u0, gesture.v0)
@@ -7639,23 +7771,27 @@ function love.run()
             if shop.online() ~= was and was ~= nil then redraw() end
         end
         app.idle_tick()
-        if app.idle.state == "off" and not lid.closed then
+        if app.idle.state == "off" and not lid.closed and not (app.task or library.pending) then
             love.timer.sleep(0.1)               -- screens off: check for a press now and then
         end
         if lid.closed then
             lid_tick()
             love.timer.sleep(0.25)              -- screens are off: check rarely
         end
-        local minute = os.date("%H%M")
-        if minute ~= app.clock_minute then
-            app.clock_minute = minute
-            app.night_check()                  -- the night theme's hours
-            if S.sb_show and S.sb_clock ~= "off" and (app.mode == "reader" or app.mode == "menu") then redraw() end
+        local second = os.time()                -- (the clock is looked at once a second, not every frame)
+        if second ~= app.clock_second then
+            app.clock_second = second
+            local minute = os.date("%H%M")
+            if minute ~= app.clock_minute then
+                app.clock_minute = minute
+                app.night_check()              -- the night theme's hours
+                if S.sb_show and S.sb_clock ~= "off" and app.CLOCK_MODES[app.mode] then redraw() end
+            end
         end
         if app.anim or app.task or library.pending then
             love.timer.sleep(0.001)            -- animating or working: next frame
-        elseif Touch.enabled or overlay or net.count > 0 or app.recv then
-            -- Touch events don't wake love.event.wait(), so poll at a gentle rate.
+        elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or (S.idle_min or 0) > 0 then
+            -- Touch, the lid and the timers don't wake love.event.wait(), so poll at a gentle rate.
             if not got and not app.dirty then love.timer.sleep(gesture and 0.008 or 0.025) end
         elseif not got then
             local r = handle(love.event.wait())

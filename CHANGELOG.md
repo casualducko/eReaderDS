@@ -1,5 +1,65 @@
 # Changelog
 
+## Unreleased
+
+Full code review (every module), fixes only:
+
+- **Crashes and hangs:** tapping the options card (My Books, Y) crashed
+  (`choose_row` read the card after it closed). A damaged EPUB could crash the
+  library scan on every start (unchecked zip directory; `Book.meta` now
+  protected); a damaged dictionary crashed look-up (now left out). Quitting
+  could wait minutes on an update or font download or a slow catalog (the
+  network thread now stops at once, `Net.abort`); Done on Send Books could
+  freeze for 20 s while a browser held a connection open (1 s waits).
+- **Data safety:** a full SD card could replace progress, bookmarks or
+  settings with an empty file (errors show at `close`, which wasn't checked;
+  the written size is now verified), and an update could install cut-off
+  files the same way. Two copies of one book (same title and author) shared
+  a Highlights file and one could delete the other's; each file now says
+  which book it belongs to. Settings edited on Windows (CRLF) are read
+  correctly. Update zips with odd paths are refused; pre-releases skipped.
+- **Turned round:** question cards (e.g. KOReader sync's "Continue from…")
+  and the options card are drawn and tapped on the touchscreen; toasts
+  follow the touchscreen when the screen changes.
+- **Closing the lid** while idle had dimmed or turned off the screens: a
+  button press could turn the backlight on inside the closed lid, and
+  opening restored the dim level. A touch cut off by the lid no longer opens
+  the word cursor or leaves a popup up.
+- **Books:** a `>` inside an attribute (`alt="a > b"`) or a bare `<` in text
+  no longer swallows text; `@media` blocks (Kindle-only rules) no longer hide
+  paragraphs; a later `display:block` shows a class again; more named
+  characters (&ntilde;, &euro; …); invalid character codes become U+FFFD
+  instead of crashing the text drawing; long words, web addresses and text
+  without spaces (Chinese, Japanese) wrap instead of running off the page;
+  `<br><br>` leaves a blank line (verse); TXT files with a paragraph per
+  line, UTF-16 and Windows-1252 files read properly; TOC entries whose file
+  name case differs are kept; the author sort name is found in EPUB 3 files
+  that also have a cover `<meta/>`; `.ttc` fonts get their names.
+- **Speed:** a chapter of thousands of `<span>`s parses in a fraction of the
+  time (no repeated string copies); KOReader positions resolve in linear
+  time (a file with unclosed `<p>`s took seconds); changing the My Books
+  order no longer rescans the SD card; titles are shortened by halving;
+  background work redraws ten times a second, not every step; the clock is
+  looked at once a second.
+- **Memory:** covers dropped from the library, Get Books and Contents caches
+  are released at once; font previews (pinch) are capped; TLS objects are
+  freed when a connection closes.
+- **Smaller fixes:** Find in Book left part way carries on from there instead
+  of showing partial results as complete, and one unreadable file no longer
+  stops it; the update page no longer says "up to date" when the check
+  failed; Get Books search and "load more" failures can be retried; section
+  jumps count as moving for KOReader sync, and a sync server error (5xx)
+  counts as failing; What's New's wrapped lines line up; the Search row
+  looks selectable; the bookmarks count leaves out the "this page" row;
+  footnote marks are matched exactly (not — or …); crash reports keep the
+  error text while hiding book paths; a book replaced over Wi-Fi while open
+  is reopened fresh; web addresses with spaces, `?query` or `user@` work;
+  HTTPS redirects never downgrade or carry the sync login to another host;
+  Digest logins pick an MD5 challenge; the launcher lists an update's files
+  before moving them.
+- Dead code removed (`SB.time`, `action_text`, `pg.more`, …) and stale
+  comments corrected.
+
 ## v1.10.0
 
 - **Hold it the other way round:** Settings → Reading & Device → **Hold it

@@ -45,7 +45,7 @@ function M.parse(body, current)
     if not ok or type(list) ~= "table" then return nil, "couldn't read the release list" end
     local best
     for _, r in ipairs(list) do
-        local v = type(r) == "table" and not r.draft and tostring(r.tag_name or ""):match("^v?(%d[%d%.]*)$")
+        local v = type(r) == "table" and not r.draft and not r.prerelease and tostring(r.tag_name or ""):match("^v?(%d[%d%.]*)$")
         if v and M.newer(v, current) and (not best or M.newer(v, best.version)) then
             for _, a in ipairs(r.assets or {}) do
                 if tostring(a.name or ""):match("^eReaderDS%-v.*%.zip$") and a.browser_download_url then
@@ -91,6 +91,19 @@ local function sync_yielding()
     while t:isRunning() do coroutine.yield(1, "saving") end
 end
 
+-- Write a file and check it's all there (a full card shows up at close).
+local function write_file(path, data)
+    local f = io.open(path, "wb")
+    if not f then return false end
+    local ok = f:write(data)
+    ok = f:close() and ok
+    if not ok then return false end
+    local chk = io.open(path, "rb")
+    local size = chk and chk:seek("end")
+    if chk then chk:close() end
+    return size == #data
+end
+
 local function read_file(path)
     local f = io.open(path, "rb")
     if not f then return nil end
@@ -115,6 +128,10 @@ function M.unpack(zip_path, dest, version)
     local names = {}
     for name in pairs(z.entries) do
         if name:match("^Ports/") and not name:match("/$") and not name:match("/%._") then
+            -- Only plain paths inside Ports/ (they go into shell commands too).
+            if name:match("%.%.") or name:find("[%c\\\"`$]") then
+                z:close(); error("the download has a file with a strange name", 0)
+            end
             names[#names + 1] = name
         end
     end
@@ -139,13 +156,10 @@ function M.unpack(zip_path, dest, version)
             local out = dest .. "/" .. rel
             local dir = out:match("^(.*)/")
             if not made[dir] then mkdir(dir); made[dir] = true end
-            local f = io.open(out, "wb")
-            if not f or not f:write(data) then
-                if f then f:close() end
+            if not write_file(out, data) then
                 z:close()
                 error("couldn't write to the SD card (is it full?)", 0)
             end
-            f:close()
         end
         coroutine.yield(i / #names)
     end
@@ -160,20 +174,16 @@ function M.unpack(zip_path, dest, version)
         ls:close()
     end
     if #gone > 0 then
-        local f = io.open(dest .. "/DELETE", "wb")
-        if not f then error("couldn't write to the SD card", 0) end
-        f:write(table.concat(gone, "\n") .. "\n")
-        f:close()
+        if not write_file(dest .. "/DELETE", table.concat(gone, "\n") .. "\n") then
+            error("couldn't write to the SD card", 0)
+        end
     end
     -- The zip first, so its unsaved data needn't be written to the card at all.
     os.remove(zip_path)
     -- The files, then the marker that tells the launcher they're complete
     -- (so it never finds the marker without them).
     sync_yielding()
-    local f = io.open(dest .. "/READY", "wb")
-    if not f then error("couldn't write to the SD card", 0) end
-    f:write(version .. "\n")
-    f:close()
+    if not write_file(dest .. "/READY", version .. "\n") then error("couldn't write to the SD card", 0) end
     sync_yielding()
 end
 
