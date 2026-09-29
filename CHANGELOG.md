@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Themes page:** tap Settings → Theme (or press A on it) for every theme on
+  the touchscreen, each with a swatch in its colours and ✓ on the one in use,
+  and your book's page on the other screen in the one highlighted (E-ink's
+  grain included), like the Fonts page. A or a second tap uses it; ‹ › on
+  the Settings row still steps through them. With the night theme on, it
+  chooses the night theme.
+
 ## v1.9.2
 
 - **Line art on the page, not in a white box** (from a beta tester's Star

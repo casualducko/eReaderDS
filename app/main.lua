@@ -2195,7 +2195,10 @@ function app.night_preview(side)
     if side == "right" and app.mode == "menu" and menu.page == "night" and S.night_theme ~= "off" then
         return S.night_theme
     end
+    -- The Themes page: the book's page in the theme highlighted.
+    if side == "left" and app.mode == "themes" then return THEMES[app.themes.sel].name end
 end
+
 
 -- The Night theme page.
 function app.night_items()
@@ -2310,7 +2313,7 @@ local function menu_items()
                 S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
             end },
             -- Changes the theme on screen: at night, the night theme.
-            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), adjust = function(d)
+            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), act = app.theme_open, adjust = function(d)
                 local name = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
                 if app.night then S.night_theme = name else S.theme = name end
             end },
@@ -2718,6 +2721,88 @@ local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
 end
 
 local function list_rows(row_h) return math.floor((PAGE_H - 200) / row_h) end
+
+---------------------------------------------------------------- themes page
+
+-- Settings → Theme (tap the row, or A): every theme on the touchscreen, each
+-- with a swatch in its own colours, and your book's page on the other screen
+-- in the one highlighted, to see it before choosing. A (or a second tap) uses
+-- it. While the night theme is on, this chooses the night theme.
+app.themes = { sel = 1, top = 1 }
+app.THEME_ROW_H = 70
+
+function app.theme_current() return app.night and S.night_theme or S.theme end
+
+function app.theme_open()
+    app.themes.sel, app.themes.top = 1, 1
+    for i, t in ipairs(THEMES) do if t.name == app.theme_current() then app.themes.sel = i end end
+    app.mode = "themes"
+    redraw()
+end
+
+function app.theme_use()
+    local t = THEMES[app.themes.sel]
+    if app.night then S.night_theme = t.name else S.theme = t.name end
+    Store.save_settings(S)
+    app.mode = "menu"
+    redraw()
+end
+
+function app.theme_action(a)
+    local T = app.themes
+    if a == "up" then T.sel = math.max(1, T.sel - 1)
+    elseif a == "down" then T.sel = math.min(#THEMES, T.sel + 1)
+    elseif a == "confirm" then app.theme_use() return
+    elseif a == "back" or a == "menu" then app.mode = "menu" end
+    redraw()
+end
+
+function app.theme_tap(side, u, v)
+    if side ~= "right" then return end
+    local T = app.themes
+    local rows = list_rows(app.THEME_ROW_H)
+    local idx = T.top + math.floor((v - 160) / app.THEME_ROW_H)
+    if v >= 160 and idx < T.top + rows and THEMES[idx] then
+        if idx == T.sel then app.theme_use() else T.sel = idx; redraw() end
+    end
+end
+
+function app.theme_draw(side)
+    local th = theme()
+    local T = app.themes
+    local m = MARGINS[2]
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    local row_h = app.THEME_ROW_H
+    local rows = list_rows(row_h)
+    if T.sel < T.top then T.top = T.sel end
+    if T.sel >= T.top + rows then T.top = T.sel - rows + 1 end
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print(app.night and "Night Theme" or "Themes", x, 60)
+    local cur = app.theme_current()
+    draw_list(side, THEMES, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw)
+        local h = row_h - 4
+        -- A swatch: the theme's page with "Aa" in its ink.
+        local sw, sh = 96, h - 16
+        local sy = ry + 8
+        love.graphics.setColor(t.bg[1], t.bg[2], t.bg[3])
+        love.graphics.rectangle("fill", rx, sy, sw, sh, 8, 8)
+        color(th.dim, 0.6)
+        love.graphics.setLineWidth(1)
+        love.graphics.rectangle("line", rx, sy, sw, sh, 8, 8)
+        love.graphics.setFont(ui.font)
+        love.graphics.setColor(t.fg[1], t.fg[2], t.fg[3])
+        love.graphics.printf("Aa", rx, centered_y(ui.font, UI_SIZE, sy, sh), sw, "center")
+        color(th.fg)
+        love.graphics.print(t.name, rx + sw + 24, centered_y(ui.font, UI_SIZE, ry, h))
+        if t.name == cur then
+            color(th.dim)
+            love.graphics.printf("✓", rx, centered_y(ui.font, UI_SIZE, ry, h), rw, "right")
+        end
+    end)
+    app.hints(x, nil, { "A", "use", "B", "back" })
+    app.count(x, w, T.sel, #THEMES)
+end
 
 -- Sorted by progress or by series, My Books has a header over each group:
 -- the group's key and its header (nil when this order has no groups).
@@ -5618,6 +5703,11 @@ local function render_canvases()
     elseif app.mode == "help" then painter = app.draw_help
     elseif app.mode == "keyboard" then painter = app.kb_draw
     elseif app.mode == "fonts" then painter = app.font_draw
+    elseif app.mode == "themes" then
+        local reader = draw_reader_pages()
+        painter = function(side)
+            if side == "right" then app.theme_draw(side) elseif book then reader(side) end
+        end
     elseif app.mode == "update" then painter = app.update_draw
     elseif app.mode == "whatsnew" then painter = app.whatsnew_draw
     elseif app.mode == "find" then painter = app.find_draw
@@ -5753,6 +5843,8 @@ local function compose()
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
     -- Get Books: the selected book's page (the left one) skips the E-ink
     -- filter, so covers stay in color whatever the theme.
+    app.preview_theme = app.night_preview("left")         -- (the Themes page's preview)
+    set_theme_shader(true)
     if app.mode == "shop" then set_theme_shader(false) end
     blit_page(canvases[1], "left")
     app.preview_theme = app.night_preview("right")        -- its E-ink filter, if any
@@ -5968,6 +6060,7 @@ function app.scroll_list()
     elseif m == "toc" and book then l, n, row_h = toc, #book.toc, 58; shown = app.toc_rows()
     elseif m == "bookmarks" and book then l, n, shown = bm, #bookmark_entries(), list_rows(96)
     elseif m == "find" and app.find then l, n, shown = app.find, #app.find.results, list_rows(96)
+    elseif m == "themes" then l, n, shown, row_h = app.themes, #THEMES, list_rows(app.THEME_ROW_H), app.THEME_ROW_H
     elseif m == "fonts" and app.font_pick then
         l, n, shown, row_h = app.font_pick, #app.font_pick.list, app.font_rows(), app.FONT_ROW_H
     elseif m == "fontget" and app.fget.list then
@@ -6324,6 +6417,7 @@ function handle_action(a)
 
     if mode == "keyboard" then app.kb_action(a) return end
     if mode == "fonts" then app.font_action(a) return end
+    if mode == "themes" then app.theme_action(a) return end
     if mode == "update" then app.update_action(a) return end
     if mode == "whatsnew" then app.whatsnew_action(a) return end
     if mode == "find" then app.find_action(a) return end
@@ -6596,6 +6690,8 @@ function app.on_tap(side, u, v)
         app.kb_tap(side, u, v)
     elseif mode == "fonts" then
         app.font_tap(side, u, v)
+    elseif mode == "themes" then
+        app.theme_tap(side, u, v)
     elseif mode == "fontget" then
         app.fget_tap(side, u, v)
     elseif mode == "receive" then
