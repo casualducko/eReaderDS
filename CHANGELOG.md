@@ -14,6 +14,11 @@
   `page_transform`, `touch_to_page`, the gamepad mapping), not screen by
   screen. The code for the old "Flip for other hand" (removed in v0.3) was the
   starting point.
+- Turned round, while reading the face buttons turn pages like the D-pad: A
+  and X forward, B and Y back (as printed); Start or the curved arrow opens
+  Settings, a held word looks it up. In menus they keep their jobs by
+  position, and a question card still takes its answer from them. Help shows
+  the buttons (and the bookmark's top-left corner) for this grip.
 
 ## v1.9.3
 

@@ -4126,6 +4126,17 @@ end
 
 -- Help: the buttons on the left page, the touchscreen (the bottom screen,
 -- where this is drawn) on the right. Kept to what fits on one page each.
+-- The buttons, held the other way round (Hold it with buttons: On the left).
+app.HELP_FLIPPED = { "Buttons", {
+    { "D-pad, stick", "Turn pages" },
+    { "A, X", "Next page" },
+    { "B, Y", "Previous page" },
+    { "Start", "Settings (or press the stick)" },
+    { "Curved arrow", "Settings" },
+    { "Select", "Bookmark the page" },
+    { "Hold a word", "Look it up; Select there to highlight" },
+    { "Anbernic", "Quit" },
+} }
 app.HELP = {
     left = { "Buttons", {
         { "D-pad, stick", "Turn pages" },
@@ -4155,6 +4166,9 @@ function app.draw_help(side)
     local x = side == "left" and m.outer or m.inner
     local w = PAGE_W - m.outer - m.inner
     local page = app.HELP[side]
+    -- Turned round, the buttons do other things while reading (as printed).
+    local literal = side == "left" and app.flipped()
+    if literal then page = app.HELP_FLIPPED end
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(page[1], x, 60)
@@ -4164,7 +4178,9 @@ function app.draw_help(side)
         if row[1] == "Tap or swipe" and S.tap == "menu" then desc = "Swipe: turn pages. Tap: Settings" end
         love.graphics.setFont(ui.help)
         color(th.fg)
-        love.graphics.print(app.keys_text(row[1]), x, y)
+        local key = row[1]
+        if key == "Top-right corner" and app.flipped() then key = "Top-left corner" end    -- (turned round)
+        love.graphics.print(literal and key or app.keys_text(key), x, y)
         color(th.dim)
         love.graphics.printf(desc, x + key_w, y, w - key_w, "left")
         local _, lines = ui.help:getWrap(desc, w - key_w)
@@ -6780,6 +6796,12 @@ end
 function love.gamepadpressed(_, button)
     local d = button:match("^dp(%a+)$")
     if d then dpad(d) return end
+    if app.flipped() and app.mode == "reader" and not app.asking and not app.choosing then
+        -- Turned round, while reading the face buttons turn pages like the
+        -- D-pad: A and X forward, B and Y back (as printed on them).
+        if button == "a" or button == "x" then action("next") return end
+        if button == "b" or button == "y" then action("prev") return end
+    end
     local a = BUTTON[app.flipped() and app.FLIP_KEYS[button] or button]
     if a then action(a) end
 end
