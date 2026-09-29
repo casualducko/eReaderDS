@@ -76,7 +76,8 @@ whole `Ports` folder: on a Mac, replacing `Ports` deletes your other ports.)
 ## Controls
 
 Hold the device turned counter-clockwise, buttons under your right hand.
-Directions are as you hold it.
+Directions are as you hold it. (To hold it the other way round, see
+[below](#holding-it-the-other-way-round).)
 
 | Button | While reading | In lists and menus |
 |---|---|---|
@@ -90,6 +91,25 @@ Directions are as you hold it.
 
 The L/R and L2/R2 shoulder buttons aren't used. **Help** in Settings is a
 one-page summary of the buttons and touchscreen.
+
+### Holding it the other way round
+
+Settings → Reading & Device → **Hold it with buttons** → **On the left** turns
+everything 180°, for holding the device clockwise with the buttons under your
+left hand. Pages keep their reading order, so the first page is on the
+touchscreen; menus and lists stay on the touchscreen too. The face buttons
+work as a second D-pad (held this way: Y on top, A at the bottom, X on the
+right, B on the left):
+
+| | Y | A | X | B | Select |
+|---|---|---|---|---|---|
+| Reading | page back | page forward | page forward | page back | bookmark |
+| Menus and lists | up | down | OK | back | delete, options, keyboard space |
+
+While reading, **D-pad up** opens the word cursor (look up, and Select at the
+first and last word to highlight); **Start** or the curved arrow opens
+Settings. The bookmark corner is the touchscreen's top left. Hints and Help
+show the buttons for this grip.
 
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap

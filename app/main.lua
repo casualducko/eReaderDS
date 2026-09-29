@@ -543,13 +543,15 @@ function note.on_spread()
     return note.spread_refs
 end
 
--- The "Notes" button at the bottom left of the right page (the touchscreen):
+-- The "Notes" button at the bottom of the touchscreen's page, by the spine
+-- (bottom left of the right page; turned round, bottom right of the left):
 -- x, y, w, h.
 function note.button()
     local w, h = ui.small:getWidth("Notes") + 36, ui.small:getHeight() + 10
     -- Sit clear of the progress bar along the bottom edge.
     local bar = (S.sb_show and S.sb_bar ~= "none") and (({ 3, 6, 10 })[S.sb_bar_size] or 6) or 0   -- BAR_PX
     local bottom = PAGE_H - 10 - bar - 8
+    if app.touch_side() == "left" then return PAGE_W - margins().inner + 14 - w, bottom - h, w, h end
     return margins().inner - 14, bottom - h, w, h
 end
 
@@ -2260,6 +2262,12 @@ local function more_items()
             end },
         }),
         section("Device", {
+            -- The grip: buttons under the right hand (the usual), or turned
+            -- round with them under the left (everything turns 180°).
+            { label = "Hold it with buttons", value = app.flipped() and "On the left" or "On the right", adjust = function()
+                S.orient = app.flipped() and "left" or "right"
+                app.toast(app.flipped() and "Turned round: buttons on the left" or "Buttons on the right", 2)
+            end },
             { label = "Screens off after", value = S.idle_min > 0 and (S.idle_min .. " min") or "Never", adjust = function(d)
                 S.idle_min = cycle(app.IDLE_CHOICES, S.idle_min, d)
             end },
@@ -2454,6 +2462,9 @@ local function draw_status(side, info)
     -- the hinge, title, and the outer corner kept clear for the bookmark
     -- ribbon when there is one. The title fits in [title_x, title_x + title_w].
     local title_x, title_w = outer_x, w
+    if side == "left" and info.marked and app.touch_side() == "left" then
+        title_x, title_w = title_x + RIBBON_ROOM, title_w - RIBBON_ROOM      -- (turned round)
+    end
     if side == "left" and info.battery then
         local bw = draw_battery(0, 0, info.battery, true)
         draw_battery(outer_x + w - bw, head_y, info.battery)
@@ -2465,7 +2476,7 @@ local function draw_status(side, info)
             local cw = ui.small:getWidth(info.clock) + 24
             title_x, title_w = title_x + cw, title_w - cw
         end
-        if info.marked then title_w = title_w - RIBBON_ROOM end
+        if info.marked and app.touch_side() == "right" then title_w = title_w - RIBBON_ROOM end
     end
 
     -- Titles: the left page shows the book title (or the chapter title when
@@ -2653,6 +2664,8 @@ local function draw_reader_pages()
         else
             draw_page(right, "right")
             app.hl_active = nil
+        end
+        if side == app.touch_side() then
             if app.mode == "reader" and #note.on_spread() > 0 then
                 -- Notes on this spread: a button to show them (same as A).
                 local bx, by, bw, bh = note.button()
@@ -2664,9 +2677,9 @@ local function draw_reader_pages()
                 love.graphics.printf("Notes", bx, centered_y(ui.small, SMALL_SIZE, by, bh), bw, "center")
             end
             if info.marked then
-                -- A ribbon hanging in the top-right corner, where a tap removes it.
+                -- A ribbon hanging in the outer top corner, where a tap removes it.
                 local w, h = 24, 66
-                local x = PAGE_W - 30 - w
+                local x = side == "left" and 30 or PAGE_W - 30 - w
                 love.graphics.setColor(0.72, 0.22, 0.20, 0.95)
                 love.graphics.polygon("fill", x, 0, x + w, 0, x + w, h, x + w / 2, h - 10, x, h)
             end
@@ -2682,10 +2695,11 @@ function app.hints(x, y, list)
     local th = theme()
     y = y or PAGE_H - 70
     for i = 1, #list, 2 do
+        local key = app.key(list[i])
         love.graphics.setFont(ui.small_bold)
         color(th.fg)
-        love.graphics.print(list[i], x, y)
-        x = x + ui.small_bold:getWidth(list[i]) + 9
+        love.graphics.print(key, x, y)
+        x = x + ui.small_bold:getWidth(key) + 9
         love.graphics.setFont(ui.small)
         color(th.dim)
         love.graphics.print(list[i + 1], x, y)
@@ -2920,7 +2934,9 @@ local function draw_library(side)
         local bx, by, bw, bh = library.get_books_button()
         -- Offline: an outline only, greyed out, saying why.
         local online = shop.online()
-        app.button(bx, by, bw, bh, "Get Books", online and "Select" or "No Wi-Fi", online and "soft" or "off")
+        local key = online and "Select" or "No Wi-Fi"
+        if online and app.flipped() then key = nil end   -- (turned round, Select does Y's job)
+        app.button(bx, by, bw, bh, "Get Books", key, online and "soft" or "off")
         local hidden = (library.hidden or 0) > 0 and (library.hidden .. " finished hidden") or nil
         if #library.items > 0 then
             app.hints(x, nil, book and { "A", "open", "Y", "options", "‹ ›", "sort", "B", "back" }
@@ -2946,7 +2962,7 @@ local function draw_library(side)
         love.graphics.setFont(ui.font)
         color(th.dim)
         love.graphics.printf("Your " .. (library.hidden == 1 and "finished book is" or (library.hidden .. " finished books are"))
-            .. " hidden. Press Y to show " .. (library.hidden == 1 and "it" or "them") .. ".", x, 180, w, "left")
+            .. " hidden. Press " .. app.key("Y") .. " to show " .. (library.hidden == 1 and "it" or "them") .. ".", x, 180, w, "left")
         return
     end
     if #library.items == 0 then
@@ -3916,7 +3932,7 @@ function app.button(bx, by, bw, bh, label, key, style)
         color(style == "strong" and th.fg or style == "plain" and th.bg or th.sel)
         love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
     end
-    local k = key and ("   " .. key) or ""
+    local k = key and ("   " .. app.key(key)) or ""
     local lx = bx + (bw - ui.font:getWidth(label) - ui.small:getWidth(k)) / 2
     local ly = centered_y(ui.font, UI_SIZE, by, bh)
     love.graphics.setFont(ui.font)
@@ -4112,6 +4128,17 @@ end
 
 -- Help: the buttons on the left page, the touchscreen (the bottom screen,
 -- where this is drawn) on the right. Kept to what fits on one page each.
+-- The buttons, held the other way round (Hold it with buttons: On the left).
+app.HELP_FLIPPED = { "Buttons", {
+    { "D-pad, stick", "Turn pages" },
+    { "D-pad up", "Look up or highlight a word" },
+    { "A, X", "Next page" },
+    { "B, Y", "Previous page" },
+    { "Select", "Bookmark the page" },
+    { "Start", "Settings (or press the stick)" },
+    { "In menus", "Y up, A down, X select, B back; Select deletes or shows options" },
+    { "Anbernic", "Quit" },
+} }
 app.HELP = {
     left = { "Buttons", {
         { "D-pad, stick", "Turn pages" },
@@ -4141,6 +4168,9 @@ function app.draw_help(side)
     local x = side == "left" and m.outer or m.inner
     local w = PAGE_W - m.outer - m.inner
     local page = app.HELP[side]
+    -- Turned round, the buttons do other things while reading (as printed).
+    local literal = side == "left" and app.flipped()
+    if literal then page = app.HELP_FLIPPED end
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(page[1], x, 60)
@@ -4150,7 +4180,9 @@ function app.draw_help(side)
         if row[1] == "Tap or swipe" and S.tap == "menu" then desc = "Swipe: turn pages. Tap: Settings" end
         love.graphics.setFont(ui.help)
         color(th.fg)
-        love.graphics.print(row[1], x, y)
+        local key = row[1]
+        if key == "Top-right corner" and app.flipped() then key = "Top-left corner" end    -- (turned round)
+        love.graphics.print(literal and key or app.keys_text(key), x, y)
         color(th.dim)
         love.graphics.printf(desc, x + key_w, y, w - key_w, "left")
         local _, lines = ui.help:getWrap(desc, w - key_w)
@@ -4318,7 +4350,7 @@ function app.kb_draw(side)
         for _, row in ipairs({ { "Type", "Tap the keys, or D-pad and A" }, { "B", "Delete" }, { "Y", "Space" },
                 { "Start, X", "Search" } }) do
             color(th.fg)
-            love.graphics.print(row[1], x, y)
+            love.graphics.print(app.keys_text(row[1]), x, y)
             color(th.dim)
             love.graphics.print(row[2], x + 150, y)
             y = y + ui.font:getHeight() + 14
@@ -5736,14 +5768,53 @@ end
 
 -- Transform so drawing happens in page coordinates (0..PAGE_W, 0..PAGE_H)
 -- on the screen that shows the given side of the spread.
+-- Held the other way round (Settings → Reading & Device → Hold it: turned
+-- clockwise, buttons under the left hand): everything turns 180°. Pages
+-- keep their reading order, so while reading the first page is on the
+-- touchscreen; menus and lists keep their touch side on the touchscreen.
+-- The face buttons work as a second D-pad (held this way: Y top, A bottom,
+-- X right, B left): reading, X and A go forward, B and Y back; elsewhere Y is
+-- up, A down, X OK and B back, and Select does Y's usual job (delete,
+-- options, space). Hints show the buttons to press.
+function app.flipped() return S.orient == "right" end
+app.READING_MODES = { reader = true, lookup = true, note = true }
+-- The page on the touchscreen: the right one, or turned round while
+-- reading, the first (left) one.
+function app.touch_side()
+    if app.flipped() and app.READING_MODES[app.mode] then return "left" end
+    return "right"
+end
+-- A hint's button, turned round: A's job is on X, Y's on Select, X's
+-- (Settings, close) on Start; B stays B.
+app.FLIP_KEYS = { A = "X", B = "B", Y = "Select", X = "Start" }
+function app.key(k) return app.flipped() and app.FLIP_KEYS[k] or k end
+function app.keys_text(s)
+    if not app.flipped() then return s end
+    s = s:gsub("%f[%w]([ABXY])%f[%W]", app.FLIP_KEYS)
+    return (s:gsub("Start, Start", "Start"))
+end
+
+-- What a face button (or Select) does, turned round; nil: as usual.
+function app.flip_button(button)
+    if app.mode == "reader" and not app.asking and not app.choosing then
+        if button == "a" or button == "x" then return "next" end
+        if button == "b" or button == "y" then return "prev" end
+        return nil
+    end
+    local pad = { y = "up", a = "down", x = "confirm", b = "back" }
+    if pad[button] then return pad[button] end
+    -- Select (SDL's "back") takes Y's job, except in the word cursor (highlight).
+    if button == "back" and app.mode ~= "lookup" then return "toc" end
+end
+
 local function page_transform(side)
-    if S.orient == "left" then
+    if not app.flipped() then
         -- Device turned counter-clockwise: top screen on the left.
         love.graphics.translate(side == "left" and SCREEN_W or SCREEN_W * 2, 0)
         love.graphics.rotate(math.pi / 2)
     else
-        -- Device turned clockwise: bottom screen on the left.
-        love.graphics.translate(side == "left" and SCREEN_W or 0, SCREEN_H)
+        -- Turned the other way round: the touch side's page on the bottom screen.
+        love.graphics.translate(side == app.touch_side() and SCREEN_W or 0, SCREEN_H)
         love.graphics.rotate(-math.pi / 2)
     end
 end
@@ -5924,8 +5995,8 @@ local gesture = nil        -- current touch: { side, u0, v0, mode, p0 }
 
 -- Bottom-screen native coordinates (0..1024 x 0..768) -> page side + page coords.
 local function touch_to_page(sx, sy)
-    if S.orient == "left" then return "right", sy, SCREEN_W - sx end
-    return "left", SCREEN_H - sy, sx
+    if not app.flipped() then return "right", sy, SCREEN_W - sx end
+    return app.touch_side(), SCREEN_H - sy, sx
 end
 
 local function current_brightness()
@@ -5954,7 +6025,7 @@ local function touch_event(kind, sx, sy)
             local ratio = math.sqrt(math.max(1, sx) / gesture.d0)
             local size = math.max(18, math.min(64, math.floor(gesture.size0 * ratio + 0.5)))
             gesture.size = size
-            overlay = { side = "right", pinch = size, pct = math.floor(size / gesture.size0 * 100 + 0.5),
+            overlay = { side = app.touch_side(), pinch = size, pct = math.floor(size / gesture.size0 * 100 + 0.5),
                 hide_at = now + 1e9 }
             redraw()
         end
@@ -6083,7 +6154,7 @@ end
 -- A short message popup (e.g. "Bookmark added").
 -- on_tap: what tapping the toast does (it's on the touchscreen), if anything.
 function app.toast(text, secs, on_tap)
-    overlay = { side = "right", text = text, hide_at = love.timer.getTime() + (secs or 1.2), on_tap = on_tap }
+    overlay = { side = app.touch_side(), text = text, hide_at = love.timer.getTime() + (secs or 1.2), on_tap = on_tap }
     if os.getenv("READER_DEBUG") then print(string.format("[debug] message %q at %.2f", text, love.timer.getTime())) end
     redraw()
 end
@@ -6377,6 +6448,7 @@ function handle_action(a)
 
     if mode == "reader" then
         if a == "next" or a == "right" or a == "down" then turn(1, next_spread)
+        elseif a == "up" and app.flipped() then look.open()   -- turned round: D-pad up does Y's job
         elseif a == "prev" or a == "left" or a == "up" then turn(-1, prev_spread)
         elseif a == "bookmark" then toggle_bookmark()
         elseif a == "next_section" then jump_section(1)
@@ -6580,19 +6652,23 @@ function app.on_tap(side, u, v)
     if app.choosing then app.choose_tap(side, u, v) return end
     local mode = app.mode
     if mode == "reader" then
-        local ref = side == "right" and note.hit(note.on_spread(), side, u, v)
+        -- (The touchscreen's page: the right one, or turned round the left;
+        -- its outer corner is top right, or top left.)
+        local touch = side == app.touch_side()
+        local outer = side == "left" and (PAGE_W - u) or u    -- distance from the spine
+        local ref = touch and note.hit(note.on_spread(), side, u, v)
         local bx, by, bw, bh = note.button()
         if ref then
-            note.open(ref)                    -- a note number: show the note on the left page
-        elseif side == "right" and #note.on_spread() > 0 and u >= bx - 16 and u <= bx + bw + 16
+            note.open(ref)                    -- a note number: show the note on the other page
+        elseif touch and #note.on_spread() > 0 and u >= bx - 16 and u <= bx + bw + 16
             and v >= by - 16 and v <= by + bh + 16 then
             note.open()                       -- the Notes button
-        elseif side == "right" and u > PAGE_W - 170 and v < 150 then
-            toggle_bookmark()                 -- top-right corner, like a Kindle
-        elseif side == "right" and v < 90 and u > PAGE_W - 230 then
+        elseif touch and outer > PAGE_W - 170 and v < 150 then
+            toggle_bookmark()                 -- the outer top corner, like a Kindle
+        elseif touch and v < 90 and outer > PAGE_W - 230 then
             -- A gap between the bookmark corner and the status bar strip, so a
             -- slightly-off bookmark tap does nothing rather than the wrong thing.
-        elseif side == "right" and v < 90 then
+        elseif touch and v < 90 then
             -- The top edge (left of the bookmark corner): show or hide all
             -- the status bars.
             S.sb_show = not S.sb_show
@@ -6740,6 +6816,10 @@ end
 function love.gamepadpressed(_, button)
     local d = button:match("^dp(%a+)$")
     if d then dpad(d) return end
+    if app.flipped() then
+        local fa = app.flip_button(button)
+        if fa then action(fa) return end
+    end
     local a = BUTTON[button]
     if a then action(a) end
 end
@@ -7442,6 +7522,7 @@ local function run_test_script()
             elseif a == "update" then app.update_open()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
+            elseif a:match("^btn:") then love.gamepadpressed(nil, a:sub(5))   -- a button as pressed (a, b, x, y, back, start)
             elseif a == "report" then app.report_open()
             elseif a == "receive" then app.recv_open()
             elseif a == "recvpoll" then app.recv_poll()

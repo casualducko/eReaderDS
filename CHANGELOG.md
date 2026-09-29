@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.10.0
+
+- **Hold it the other way round:** Settings → Reading & Device → **Hold it
+  with buttons** ‹ On the right / On the left ›. On the left, everything turns
+  180° (the device turned clockwise). Pages keep their reading order, so while
+  reading the first page is on the touchscreen (tap its right half to go on,
+  its outer top corner, now top left, to bookmark; the Notes button and the
+  ribbon follow it); menus and lists stay on the touchscreen, now on the left.
+  The face buttons act by where they are, like the D-pad: the button where A
+  was does A's job (A↔Y, B↔X), and every hint shows the letter on the button
+  to press. Done at the edges (`app.flipped`, `app.touch_side`, `app.key`,
+  `page_transform`, `touch_to_page`, the gamepad mapping), not screen by
+  screen. The code for the old "Flip for other hand" (removed in v0.3) was the
+  starting point.
+- Turned round, while reading the face buttons turn pages like the D-pad: A
+  and X forward, B and Y back (as printed); Start or the curved arrow opens
+  Settings, a held word looks it up. In menus they keep their jobs by
+  position, and a question card still takes its answer from them. Help shows
+  the buttons (and the bookmark's top-left corner) for this grip.
+- Turned round, D-pad up (as you hold it) does what Y does normally: the
+  word cursor, to look a word up or highlight (Select at the first and last
+  word). Left, right and down still turn pages.
+- Turned round, the face buttons are a second D-pad everywhere (held that
+  way: Y top, A bottom, X right, B left): in menus Y is up, A down, X OK and
+  B back, and Select does Y's usual job (delete, options, the keyboard's
+  space); in the word cursor Select still highlights. Hints and Help show
+  these buttons (`app.flip_button`, `app.FLIP_KEYS`). A `btn:` test action
+  presses a button as the gamepad would.
+
 ## v1.9.3
 
 - **Themes page:** tap Settings → Theme (or press A on it) for every theme on
