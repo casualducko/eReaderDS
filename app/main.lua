@@ -2013,15 +2013,16 @@ end
 --   new there, not moved     -> go there (asked on opening a book)
 --   new there and moved here -> ask: Jump, or Stay (and send this one)
 -- how: "open" (opening a book: ask), "check" (before the regular send:
--- send if nothing's new there, else ask), "now" (Sync this book now: say
--- what happened; go there without asking when only the other moved).
+-- send if nothing's new there, else ask), "now" (Sync with KOReader: say
+-- what happened; go there without asking when only the other moved), "get"
+-- (Get my place from the server: app.sync_get_decide).
 -- The book is looked up under both of its names (by file name and by file
 -- contents: app.sync_docs), so a device matching books the other way is
 -- found too; a place new from another device wins over one seen before.
 -- (Not by timestamp alone: devices' clocks disagree.)
 function app.sync_pull(how)
     how = how or "open"
-    local now = how == "now"
+    local now = how == "now" or how == "get"          -- (by hand: say what happens)
     local b = book
     if not (b and b.zip and app.sync_on()) then
         if now then
@@ -2038,6 +2039,7 @@ function app.sync_pull(how)
     end
     app.sync.pulling, app.sync.last_try = true, love.timer.getTime()
     if how == "now" then app.toast("Syncing with " .. app.sync_server_name() .. "…", 10) end
+    if how == "get" then app.toast("Getting your place from " .. app.sync_server_name() .. "…", 10) end
     -- One request per name, one after another; then decide.
     local results = {}
     local function fetch(i)
@@ -2046,7 +2048,7 @@ function app.sync_pull(how)
             if i < #docs and msg.kind == "done" and (msg.status == 200 or msg.status == 404) then fetch(i + 1) return end
             app.sync.pulling = nil
             if book ~= b then return end
-            app.sync_decide(b, how, docs, results)
+            if how == "get" then app.sync_get_decide(b, docs, results) else app.sync_decide(b, how, docs, results) end
         end)
     end
     fetch(1)
@@ -2070,8 +2072,8 @@ function app.sync_say(head, detail, secs)
     app.toast(detail and detail ~= "" and (head .. "\n" .. detail) or head, secs or (detail and 4 or 2))
 end
 
-function app.sync_decide(b, how, docs, results)
-    local now = how == "now"
+-- The server's answers usable? Says why not when asked by hand (now).
+function app.sync_results_ok(results, now)
     for _, msg in ipairs(results) do
         if msg.kind ~= "done" then
             print("[sync] pull failed: " .. tostring(msg.message))
@@ -2093,7 +2095,12 @@ function app.sync_decide(b, how, docs, results)
         end
     end
     app.sync.failed = nil
-    -- The places there: { r, doc }. Ours, others' seen before, others' new.
+    return true
+end
+
+-- The places there, as { r, doc }: this device's own, other devices' seen
+-- before, and other devices' new.
+function app.sync_records(b, docs, results)
     local own, old, new = {}, {}, {}
     for i, msg in ipairs(results) do
         local ok, r = pcall(require("json").decode, msg.status == 200 and msg.body or "")
@@ -2104,6 +2111,42 @@ function app.sync_decide(b, how, docs, results)
             else new[#new + 1] = e end
         end
     end
+    return own, old, new
+end
+
+-- Where a place from the server is here: the paragraph, else its chapter and
+-- percentage (CrossPoint often sends just its chapter, so the percentage
+-- decides). ch, off, fraction.
+function app.sync_target(b, r)
+    local frac = math.max(0, math.min(1, tonumber(r.percentage) or 0))
+    local ch, off = b:resolve_xpointer(r.progress)
+    if not off then
+        local lc, loff = b:locate(frac)
+        if not ch or lc == ch then ch, off = lc, loff else off = 0 end
+    end
+    return ch, off, frac
+end
+
+-- Go to another device's place (r, under the name rdoc): it's dealt with,
+-- and it's sent under the book's other name too, so devices matching books
+-- the other way follow.
+function app.sync_go(b, r, rdoc, ch, off)
+    if book ~= b then return end
+    local device = (r.device and r.device ~= "") and r.device or "another device"
+    app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
+    app.sync_set_seen(b.path, rdoc, r.timestamp)
+    app.jump_to(ch, off)
+    app.mode = "reader"
+    app.sync.moved[b.path] = nil
+    app.sync.pushed[b.path] = nil
+    app.sync_push(nil, rdoc)
+    app.sync_say("Moved to where you were on " .. device, app.sync_where(ch, off) .. " · " .. ago(r.timestamp))
+end
+
+function app.sync_decide(b, how, docs, results)
+    local now = how == "now"
+    if not app.sync_results_ok(results, now) then return end
+    local own, old, new = app.sync_records(b, docs, results)
     local moved = app.sync.moved[b.path]
     local here = math.floor(b:fraction(pos.ch, pos.off) * 100 + 0.5)
     local xp_here = b:xpointer(pos.ch, pos.off)
@@ -2149,14 +2192,7 @@ function app.sync_decide(b, how, docs, results)
     local r, rdoc = pick.r, pick.doc
     local new_there = #new > 0
     local seen = app.sync_seen(b.path, rdoc)
-    -- Where that is here: the paragraph, else its chapter and percentage.
-    -- (CrossPoint often sends just its chapter, so the percentage decides.)
-    local frac = math.max(0, math.min(1, tonumber(r.percentage) or 0))
-    local ch, off = b:resolve_xpointer(r.progress)
-    if not off then
-        local lc, loff = b:locate(frac)
-        if not ch or lc == ch then ch, off = lc, loff else off = 0 end
-    end
+    local ch, off, frac = app.sync_target(b, r)
     -- The same place means on the spread you're looking at.
     local sp = spread
     local same = sp and ch == sp.ch and off >= sp.pages[sp.pi].off and off < spread_end_off(sp)
@@ -2180,19 +2216,7 @@ function app.sync_decide(b, how, docs, results)
         -- you haven't.
         if moved or not now then return stands(stale, device .. " was at " .. there) end
     end
-    local function go()
-        if book ~= b then return end
-        app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
-        app.sync_set_seen(b.path, rdoc, r.timestamp)           -- dealt with
-        app.jump_to(ch, off)
-        app.mode = "reader"
-        app.sync.moved[b.path] = nil
-        -- Send it under the other name too, so devices matching books the
-        -- other way follow (the server already has it under this one).
-        app.sync.pushed[b.path] = nil
-        app.sync_push(nil, rdoc)
-        app.sync_say("Moved to where you were on " .. device, app.sync_where(ch, off) .. " · " .. ago(r.timestamp))
-    end
+    local function go() app.sync_go(b, r, rdoc, ch, off) end
     if now and not moved then go() return end
     -- Until it's answered, nothing is sent for this book (not even on quitting).
     app.sync.checked[b.path] = nil
@@ -2211,6 +2235,97 @@ function app.sync_decide(b, how, docs, results)
             app.sync.pushed[b.path] = nil
             app.sync_push()
         end })
+end
+
+-- "Get my place from the server": the latest place another device saved
+-- (a new one first), gone to even if you've read past it here; going back
+-- more than a few pages asks first.
+function app.sync_get_decide(b, docs, results)
+    if not app.sync_results_ok(results, true) then return end
+    local own, old, new = app.sync_records(b, docs, results)
+    local function latest(list)
+        local best
+        for _, e in ipairs(list) do
+            if not best or (tonumber(e.r.timestamp) or 0) > (tonumber(best.r.timestamp) or 0) then best = e end
+        end
+        return best
+    end
+    local pick = latest(new) or latest(old)
+    if not pick then
+        app.sync_say("No other device's place for this book",
+            #own > 0 and ("The server has this device's own place (" .. math.floor(tonumber(own[1].r.percentage) * 100 + 0.5) .. "%).")
+                or "Nothing's been saved for it yet. Your other device sends it when you sync there.", 4)
+        return
+    end
+    local r, rdoc = pick.r, pick.doc
+    local ch, off, frac = app.sync_target(b, r)
+    local device = (r.device and r.device ~= "") and r.device or "another device"
+    local sp = spread
+    if sp and ch == sp.ch and off >= sp.pages[sp.pi].off and off < spread_end_off(sp) then
+        app.sync_set_seen(b.path, rdoc, r.timestamp)
+        app.sync_say("You're already there", app.sync_where(ch, off) .. " · where you were on " .. device)
+        return
+    end
+    local here = b:fraction(pos.ch, pos.off)
+    if b:fraction(ch, off) < here - 0.005 then
+        -- Backwards: make sure.
+        local label = #b.toc > 0 and app.find_label({ ch = ch, off = off }) or ""
+        app.untoast()
+        app.ask({ question = "Go back to " .. math.floor(frac * 100 + 0.5) .. "%?",
+            detail = (label ~= "" and label ~= b.title and (label .. ", ") or "") .. "where you were on " .. device .. " "
+                .. ago(r.timestamp) .. ". You're at " .. math.floor(here * 100 + 0.5) .. "% here.",
+            yes = "Go back", no = "Stay", on_yes = function() app.sync_go(b, r, rdoc, ch, off) end })
+        return
+    end
+    app.sync_go(b, r, rdoc, ch, off)
+end
+
+-- "Send my place": this device's place goes to the server under each of
+-- the book's names, over whatever is there.
+function app.sync_send()
+    local b = book
+    if not (b and b.zip and app.sync_on()) then
+        if b and not b.zip then app.sync_say("KOReader Sync is for EPUB books", "This book's places can't be shared with KOReader.")
+        else app.sync_say("Log in to KOReader Sync first", "Settings → KOReader Sync → Account") end
+        return
+    end
+    if not shop.online() then app.sync_say("Not connected to Wi-Fi", "Try again when you're online.") return end
+    local docs = app.sync_docs(b)
+    local xp = b:xpointer(pos.ch, pos.off)
+    if #docs == 0 or not xp then return end
+    local meta = S.kosync_meta and { filename = b.path:match("([^/]+)$"), title = b.title, authors = b.author } or nil
+    local frac = b:fraction(pos.ch, pos.off)
+    local where = app.sync_where(pos.ch, pos.off)
+    app.toast("Sending your place to " .. app.sync_server_name() .. "…", 10)
+    local left, ok_count, err = #docs, 0, nil
+    for _, doc in ipairs(docs) do
+        local job = app.KOSync.put_job(app.sync_url(), S.kosync_user, S.kosync_key, doc, xp, frac,
+            app.sync_device_id(), meta)
+        shop.net_job(job, function(msg)
+            left = left - 1
+            if msg.kind == "done" and (msg.status or 500) < 300 then
+                ok_count = ok_count + 1
+                local okj, r = pcall(require("json").decode, msg.body or "")
+                if okj and type(r) == "table" and r.timestamp then app.sync_set_seen(b.path, doc, r.timestamp) end
+            else
+                err = msg.kind ~= "done" and tostring(msg.message)
+                    or (msg.status == 401 and "didn't accept your password" or ("answered " .. tostring(msg.status)))
+            end
+            if left > 0 then return end
+            print("[sync] send " .. xp .. ": " .. ok_count .. " of " .. #docs .. (err and (", " .. err) or ""))
+            if ok_count > 0 then
+                if book == b then
+                    app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
+                    app.sync.pushed[b.path], app.sync.moved[b.path] = xp, nil
+                end
+                app.sync.failed = nil
+                app.sync_say("Sent your place to the sync server", where .. " · " .. app.sync_server_name())
+            else
+                app.sync.failed = love.timer.getTime()
+                app.sync_say("Couldn't send your place", app.sync_server_name() .. ": " .. tostring(err), 4)
+            end
+        end)
+    end
 end
 
 -- Send where the open book is up to, under each of its names. now: leaving
@@ -2296,8 +2411,14 @@ function app.sync_items()
           end },
     }
     if on then
-        items[#items + 1] = { label = "Sync this book now", act = function()
-            if not book then app.toast("Open a book first") else app.sync_pull("now") end
+        -- By hand, one way: this device's place to the server, or the other
+        -- device's place here (Sync with KOReader, on Settings' first page,
+        -- works out which way on its own).
+        items[#items + 1] = { label = "Send my place", act = function()
+            if not book then app.toast("Open a book first") else app.sync_send() end
+        end }
+        items[#items + 1] = { label = "Get my place from the server", act = function()
+            if not book then app.toast("Open a book first") else app.sync_pull("get") end
         end }
         items[#items + 1] = { label = "Log out", act = function()
             app.ask({ question = "Log out of KOReader Sync?", detail = S.kosync_user .. " on " .. shown,

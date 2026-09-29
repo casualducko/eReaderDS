@@ -318,12 +318,21 @@ it through a KOReader sync server, so each picks up where the other left off.
    go off, and every few minutes while reading (checking first that no other
    device has moved on meanwhile).
 
-**Sync with KOReader** (on the first page of Settings; also **Sync this
-book now** in Settings → KOReader Sync) works out which way to go,
-like CrossPoint's smart sync: if you've read on here since the last sync, it
-sends your place; if only the other device has read on, it goes there; if
-both have, it asks. It never sends an older place over a newer one without
-asking.
+**Sync with KOReader** (on the first page of Settings) works out which way
+to go, like CrossPoint's smart sync: if you've read on here since the last
+sync, it sends your place; if only the other device has read on, it goes
+there; if both have, it asks. It never sends an older place over a newer one
+without asking.
+
+To choose the direction yourself, like KOReader's Push and Pull, use
+**Settings → KOReader Sync**:
+
+- **Send my place:** this device's place goes to the server, over whatever
+  is there (for example after rereading a chapter you don't want sent, the
+  other way round).
+- **Get my place from the server:** goes to where your other device got to,
+  even if you've read past it here; going back more than a few pages asks
+  first ("Go back to 20%?").
 
 Places are matched to the paragraph (you may land a page or so from where the
 other device was, since screens differ). EPUB books only. A place you've

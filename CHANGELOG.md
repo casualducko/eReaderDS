@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **Send my place / Get my place from the server** (Settings → KOReader
+  Sync), like KOReader's Push and Pull, for choosing the direction yourself;
+  they replace "Sync this book now". **Send** puts this device's place on the
+  server under both of the book's names, over whatever is there. **Get** goes
+  to the latest place another device saved (a new one first), even if you've
+  read past it here; going back more than half a percent asks first ("Go back
+  to 20%?"). Both say what happened ("Sent your place to the sync server ·
+  22% · VII: The Way of Love · CrossPoint"). **Sync with KOReader** on
+  Settings' first page stays the one-button smart sync. (The shared steps,
+  checking the server's answers, reading its places, finding a place in the
+  book and going there, are now one function each.)
+
 ## v1.14.0
 
 - **KOReader Sync checks both of a book's names.** A book is known on the
