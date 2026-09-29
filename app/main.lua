@@ -4129,12 +4129,12 @@ end
 -- The buttons, held the other way round (Hold it with buttons: On the left).
 app.HELP_FLIPPED = { "Buttons", {
     { "D-pad, stick", "Turn pages" },
+    { "D-pad up", "Look up or highlight a word" },
     { "A, X", "Next page" },
     { "B, Y", "Previous page" },
     { "Start", "Settings (or press the stick)" },
     { "Curved arrow", "Settings" },
     { "Select", "Bookmark the page" },
-    { "Hold a word", "Look it up; Select there to highlight" },
     { "Anbernic", "Quit" },
 } }
 app.HELP = {
@@ -6429,6 +6429,7 @@ function handle_action(a)
 
     if mode == "reader" then
         if a == "next" or a == "right" or a == "down" then turn(1, next_spread)
+        elseif a == "up" and app.flipped() then look.open()   -- turned round: D-pad up does Y's job
         elseif a == "prev" or a == "left" or a == "up" then turn(-1, prev_spread)
         elseif a == "bookmark" then toggle_bookmark()
         elseif a == "next_section" then jump_section(1)

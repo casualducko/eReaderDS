@@ -19,6 +19,9 @@
   Settings, a held word looks it up. In menus they keep their jobs by
   position, and a question card still takes its answer from them. Help shows
   the buttons (and the bookmark's top-left corner) for this grip.
+- Turned round, D-pad up (as you hold it) does what Y does normally: the
+  word cursor, to look a word up or highlight (Select at the first and last
+  word). Left, right and down still turn pages.
 
 ## v1.9.3
 
