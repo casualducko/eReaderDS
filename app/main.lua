@@ -1922,6 +1922,7 @@ local function open_sub(page)
 end
 
 local function close_sub()
+    if menu.page == "server" then app.server_close() return end       -- a page of KOReader Sync
     menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
 end
 
@@ -2176,18 +2177,8 @@ function app.sync_items()
     end
     local items = {
         { label = "Account", value = on and S.kosync_user or "Log in", act = app.sync_login },
-        -- ‹ › CrossPoint / KOReader / your own; A types your own address.
-        { label = "Server", value = shown, act = app.sync_server_edit, adjust = function(d)
-              local order = { "crosspoint", "koreader", "custom" }
-              local i = 1
-              for k, v in ipairs(order) do if v == server then i = k end end
-              local to = order[(i - 1 + d) % #order + 1]
-              if to == "custom" and S.kosync_custom == "" then
-                  app.sync_server_edit()
-              else
-                  app.sync_set_server(to)
-              end
-          end },
+        -- Its own page (tap or A): CrossPoint, KOReader, or your own address.
+        { label = "Server", value = shown, opens = true, act = function() app.server_open() end },
         { label = "Match books by", value = S.kosync_match == "filename" and "File name" or "File contents",
           adjust = function()
               S.kosync_match = S.kosync_match == "filename" and "binary" or "filename"
@@ -2209,6 +2200,36 @@ function app.sync_items()
         end }
     end
     return join(section(nil, items), section("", { { label = "Back", act = close_sub } }))
+end
+
+-- The Sync Server page, opened from KOReader Sync (B goes back there).
+function app.server_open()
+    menu.page, menu.sel, menu.top = "server", 1, nil
+    local cur = app.KOSync.SERVERS[S.kosync_server] and S.kosync_server or "custom"
+    for i, k in ipairs({ "crosspoint", "koreader", "custom" }) do if k == cur then menu.sel = i end end
+end
+
+function app.server_items()
+    local cur = app.KOSync.SERVERS[S.kosync_server] and S.kosync_server or "custom"
+    local function pick(key)
+        return function()
+            app.sync_set_server(key)
+            app.server_close()
+        end
+    end
+    local own = S.kosync_custom ~= "" and app.KOSync.server("custom", S.kosync_custom):gsub("^https?://", "") or "Type an address"
+    return join(section(nil, {
+        { label = "CrossPoint", value = cur == "crosspoint" and "✓" or "", act = pick("crosspoint") },
+        { label = "KOReader", value = cur == "koreader" and "✓" or "", act = pick("koreader") },
+        -- Your own: type (or change) its address; empty goes back to CrossPoint.
+        { label = "Your own", value = (cur == "custom" and "✓  " or "") .. own, act = function()
+            app.sync_server_edit(app.server_close)
+        end },
+    }), section("", { { label = "Back", act = function() app.server_close() end } }))
+end
+
+function app.server_close()
+    menu.page, menu.sel, menu.top = "sync", 2, nil          -- (the Server row)
 end
 
 function app.sync_login()
@@ -2262,13 +2283,14 @@ function app.sync_register(user, key)
 end
 
 -- Your own server's address (A on the Server row).
-function app.sync_server_edit()
+function app.sync_server_edit(done)
     app.kb_open({ title = "Your own sync server", text = S.kosync_custom, ok = "Save", allow_empty = true,
         hint = "The address of a KOReader sync server, such as https://sync.example.com or "
             .. "http://192.168.1.20:7200. Empty: back to CrossPoint's.",
         submit = function(t)
             S.kosync_custom = t
             app.sync_set_server(t ~= "" and "custom" or "crosspoint")
+            if done then done() end
         end })
 end
 
@@ -2290,7 +2312,7 @@ function app.hour_label(h)
     return ((h + 11) % 12 + 1) .. (h < 12 and " AM" or " PM")
 end
 
--- The Night theme row on the main page: "Off" or "Dusk · 9 PM–7 AM".
+-- The Night Mode row on the main page: "Off" or "Dusk · 9 PM–7 AM".
 function app.night_summary()
     if S.night_theme == "off" then return "Off" end
     return S.night_theme .. "  ·  " .. app.hour_label(S.night_from) .. "–" .. app.hour_label(S.night_to)
@@ -2306,12 +2328,12 @@ function app.night_preview(side)
 end
 
 
--- The Night theme page.
+-- The Night Mode page: which theme, and when.
 function app.night_items()
     local names = { "off" }
     for _, t in ipairs(THEMES) do names[#names + 1] = t.name end
     local rows = {
-        { label = "Night theme", value = S.night_theme == "off" and "Off" or S.night_theme,
+        { label = "Theme", value = S.night_theme == "off" and "Off" or S.night_theme,
           adjust = function(d)
             S.night_theme = cycle(names, S.night_theme, d); app.night_check()
         end },
@@ -2395,6 +2417,7 @@ local function menu_items()
     if menu.page == "night" then return app.night_items() end
     if menu.page == "about" then return app.about_items() end
     if menu.page == "sync" then return app.sync_items() end
+    if menu.page == "server" then return app.server_items() end
     local th = theme()
     local u = app.upd
     -- Two pages (swipe, or up/down past the end). The first holds what a
@@ -2473,7 +2496,7 @@ local function menu_items()
             end },
         })),
         app.menu_on_page(2, section("More settings", {
-            { label = "Night Theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
+            { label = "Night Mode", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
             { label = "Status Bar", value = "›", act = function() open_sub("status") end },
             { label = "Reading & Device", value = "›", act = function() open_sub("more") end },
             { label = "KOReader Sync", value = app.sync_on() and "On" or "Off", opens = true, act = function() open_sub("sync") end },
@@ -2901,7 +2924,7 @@ function app.theme_draw(side)
     if T.sel >= T.top + rows then T.top = T.sel - rows + 1 end
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(app.night and "Night Theme" or "Themes", x, 60)
+    love.graphics.print(app.night and "Night Mode Theme" or "Themes", x, 60)
     local cur = app.theme_current()
     draw_list(side, THEMES, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw)
         local h = row_h - 4
@@ -3415,8 +3438,8 @@ local function draw_menu_panel(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(({ status = "Status Bar", more = "Reading & Device", night = "Night Theme",
-        about = "About eReaderDS", sync = "KOReader Sync" })[menu.page] or "Settings", x, 60)
+    love.graphics.print(({ status = "Status Bar", more = "Reading & Device", night = "Night Mode",
+        about = "About eReaderDS", sync = "KOReader Sync", server = "Sync Server" })[menu.page] or "Settings", x, 60)
     if menu.page == "main" then
         love.graphics.setFont(ui.font)               -- the version, on the title's baseline
         color(th.dim)
@@ -4311,7 +4334,7 @@ end
 -- touchscreen), what the buttons do on the left. Tap a key, or move with the
 -- D-pad and press A. B deletes (or cancels when empty), Y types a space,
 -- Start or X searches.
--- Three layers: small letters, capitals ("Aa") and symbols ("#@"), for
+-- Three layers: small letters, capitals (the shift arrow) and symbols ("#@"), for
 -- searches as well as user names, passwords and web addresses.
 app.KB_LAYERS = {
     lower = { "1234567890", "qwertyuiop", "asdfghjkl'", "zxcvbnm,.-" },
@@ -4327,7 +4350,7 @@ function app.kb_layer(layer)
     end
     -- One bottom row, its keys lined up with the columns above.
     app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "cancel", label = "Cancel", span = 2 },
-        { key = "shift", label = "Aa", span = 1 }, { key = "symbols", label = layer == "symbols" and "abc" or "#@", span = 1 },
+        { key = "shift", label = "", span = 1 }, { key = "symbols", label = layer == "symbols" and "abc" or "#@", span = 1 },
         { key = "space", label = "Space", span = 2 }, { key = "del", label = "Delete", span = 2 },
         { key = "ok", label = "Search", span = 2 } }
     if app.kb then app.kb.layer = layer end
@@ -4405,15 +4428,26 @@ function app.kb_action(a)
         redraw()
         return
     end
-    if a == "left" or a == "prev" then kb.c = (kb.c - 2) % #rows[kb.r] + 1
+    if kb.r == 0 and (a == "left" or a == "prev" or a == "right" or a == "next") then
+        -- (the eye is alone on its row)
+    elseif a == "left" or a == "prev" then kb.c = (kb.c - 2) % #rows[kb.r] + 1
     elseif a == "right" or a == "next" then kb.c = kb.c % #rows[kb.r] + 1
     elseif a == "up" or a == "down" then
-        -- Keep to the same column: the key under the middle of this one.
-        local c0, c1 = app.kb_cols(kb.r, kb.c)
-        kb.r = (kb.r - 1 + (a == "down" and 1 or -1)) % #rows + 1
-        kb.c = app.kb_key_at(kb.r, (c0 + c1) / 2 - 0.01)
+        -- Keep to the same column: the key under the middle of this one. For
+        -- a password, the eye (row 0) sits above the top row.
+        if kb.r == 0 then
+            kb.r = a == "down" and 1 or #rows
+            kb.c = app.kb_key_at(kb.r, 9)
+        elseif kb.secret and ((a == "up" and kb.r == 1) or (a == "down" and kb.r == #rows)) then
+            kb.r = 0
+        else
+            local c0, c1 = app.kb_cols(kb.r, kb.c)
+            kb.r = (kb.r - 1 + (a == "down" and 1 or -1)) % #rows + 1
+            kb.c = app.kb_key_at(kb.r, (c0 + c1) / 2 - 0.01)
+        end
     elseif a == "confirm" then
-        if kb.r then app.kb_press(rows[kb.r][kb.c].key) end
+        if kb.r == 0 then kb.reveal = not kb.reveal
+        elseif kb.r then app.kb_press(rows[kb.r][kb.c].key) end
     elseif a == "back" then
         if kb.text == "" then app.kb_press("cancel") else app.kb_press("del") end
     elseif a == "toc" then app.kb_press("space")
@@ -4431,6 +4465,14 @@ end
 
 function app.kb_tap(side, u, v)
     if side ~= "right" then return end
+    if app.kb.secret then
+        local ex, ey, ew, eh = app.kb_eye_box()
+        if u >= ex - 16 and u <= ex + ew + 16 and v >= ey - 16 and v <= ey + eh + 16 then
+            app.kb.reveal = not app.kb.reveal
+            redraw()
+            return
+        end
+    end
     local x0, unit = app.kb_geom()
     local r = math.floor((v - app.KB_TOP) / app.KB_ROW_H) + 1
     if r < 1 or r > #app.KB_ROWS or u < x0 - 10 or u > x0 + unit * 10 + 10 then return end
@@ -4439,6 +4481,44 @@ function app.kb_tap(side, u, v)
     local c = app.kb_key_at(r, col)
     if kb.r then kb.r, kb.c = r, c end              -- follow taps only once the D-pad is in use
     app.kb_press(app.KB_ROWS[r][c].key)
+end
+
+-- The eye button at the end of a password field: x, y, w, h.
+function app.kb_eye_box()
+    local x0 = app.kb_geom()
+    local m = MARGINS[2]
+    local w = PAGE_W - m.outer - m.inner
+    return x0 + w - 76, 160, 76, 76
+end
+
+-- An eye (open: the password shows; struck through: hidden), in colour c.
+function app.kb_eye_icon(cx, cy, open, c)
+    color(c)
+    love.graphics.setLineWidth(3)
+    local pts = {}
+    for i = 0, 16 do                                    -- the upper lid, then the lower
+        local t = i / 16
+        pts[#pts + 1] = cx - 24 + 48 * t
+        pts[#pts + 1] = cy - 14 * math.sin(math.pi * t)
+    end
+    love.graphics.line(pts)
+    for i = 1, #pts, 2 do pts[i + 1] = cy + (cy - pts[i + 1]) end
+    love.graphics.line(pts)
+    love.graphics.circle("fill", cx, cy, 6)
+    if not open then love.graphics.line(cx - 20, cy + 18, cx + 20, cy - 18) end
+end
+
+-- The shift key's arrow: an outline, filled while capitals are on.
+function app.kb_shift_icon(cx, cy, on)
+    local s = 16
+    local pts = { cx, cy - s * 1.25, cx + s, cy - s * 0.1, cx + s * 0.45, cy - s * 0.1,
+        cx + s * 0.45, cy + s, cx - s * 0.45, cy + s, cx - s * 0.45, cy - s * 0.1, cx - s, cy - s * 0.1 }
+    if on then        -- (not convex, so filled as triangles)
+        for _, t in ipairs(love.math.triangulate(pts)) do love.graphics.polygon("fill", t) end
+    else
+        love.graphics.setLineWidth(3)
+        love.graphics.polygon("line", pts)
+    end
 end
 
 function app.kb_draw(side)
@@ -4476,8 +4556,17 @@ function app.kb_draw(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     local shown = kb.text
-    if kb.secret then shown = string.rep("•", #kb.text:gsub("[\128-\191]", "")) end
-    while ui.title:getWidth(shown .. "|") > w - 20 and #shown > 0 do
+    local tw = w - 20
+    if kb.secret then
+        -- The eye at the field's end shows or hides what's typed.
+        local ex, ey, ew, eh = app.kb_eye_box()
+        if kb.r == 0 then color(th.fg); love.graphics.rectangle("fill", ex, ey, ew, eh, 10, 10) end
+        app.kb_eye_icon(ex + ew / 2, ey + eh / 2, kb.reveal, kb.r == 0 and th.bg or th.fg)
+        color(th.fg)
+        tw = tw - ew - 12
+        if not kb.reveal then shown = string.rep("•", #kb.text:gsub("[\128-\191]", "")) end
+    end
+    while ui.title:getWidth(shown .. "|") > tw and #shown > 0 do
         shown = shown:sub(2):gsub("^[\128-\191]+", "")
     end
     love.graphics.print(shown .. "|", x0 + 8, 150 + (96 - ui.title:getHeight()) / 2)
@@ -4502,10 +4591,14 @@ function app.kb_draw(side)
                 love.graphics.rectangle("line", kx, ky, kw, kh, 10, 10)
                 color(th.fg)
             end
-            local label = k.key == "ok" and (kb.ok or "Search") or k.label
-            local f = #label > 1 and ui.font or ui.title
-            love.graphics.setFont(f)
-            love.graphics.printf(label, kx, ky + (kh - f:getHeight()) / 2, kw, "center")
+            if k.key == "shift" then
+                app.kb_shift_icon(kx + kw / 2, ky + kh / 2, kb.layer == "upper")
+            else
+                local label = k.key == "ok" and (kb.ok or "Search") or k.label
+                local f = #label > 1 and ui.font or ui.title
+                love.graphics.setFont(f)
+                love.graphics.printf(label, kx, ky + (kh - f:getHeight()) / 2, kw, "center")
+            end
         end
     end
 end
@@ -6618,7 +6711,7 @@ function handle_action(a)
             local it = items[menu.sel]
             if it.act then it.act() elseif it.adjust then it.adjust(1) end
         elseif a == "back" and menu.page ~= "main" then
-            menu.page = "main"; menu.sel = menu.parent_row or 1; menu.top = nil
+            close_sub()
         elseif a == "back" or a == "menu" then app.mode = "reader"; menu.page = "main" end
         Store.save_settings(S)
         redraw()

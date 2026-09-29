@@ -144,8 +144,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
    in each), **Fonts** (its own page, [below](#fonts)). Then **My Books**
    (your library). (**Update to v…** is at the top when one is waiting.)
 2. What's set once. **Page layout:** Line spacing, Margins, Top/bottom
-   margins, Justify text, Hyphenation. **More settings:** **Night Theme**
-   ([below](#night-theme)), **Status Bar ›** (what the top and bottom lines
+   margins, Justify text, Hyphenation. **More settings:** **Night Mode**
+   ([below](#night-mode)), **Status Bar ›** (what the top and bottom lines
    show, and the clock style), **Reading & Device ›** (page-turn animation,
    what a tap does, dictionary, which hand holds the buttons, screens off
    after a while, closing the lid, time zone), **KOReader Sync ›**
@@ -160,8 +160,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   ink, so it sits on any theme instead of in a white box);
   justified text with optional hyphenation (English); 18 built-in fonts plus
   your own; 25 themes (Sepia by default, plus E-ink, Paper, Mint, Sky,
-  Midnight, Gruvbox, Nord, Red Night and more) that the whole app follows, and a night theme that switches on by
-  itself in the evening; page-flip or fade animation.
+  Midnight, Gruvbox, Nord, Red Night and more) that the whole app follows,
+  and Night Mode, another theme that switches on by itself in the evening; page-flip or fade animation.
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.
 - **Dictionary on the facing page:** press Y and move a cursor over the words;
@@ -208,9 +208,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 *Screenshots use public-domain books from Project Gutenberg.*
 
-## Night Theme
+## Night Mode
 
-**Settings → Night Theme** picks a second theme (a dark one such as
+**Settings → Night Mode** picks a second theme (a dark one such as
 Midnight, Dark Sepia, Gruvbox or Red Night) and the hours to use it, 9 PM to
 7 AM to start. It switches on the hour by the device's clock, and the whole
 app changes with it. While picking, the touchscreen previews each theme. At night, the
@@ -280,14 +280,15 @@ If you also read in **KOReader** or **CrossPoint** (on a phone, Kobo, Kindle,
 PocketBook, or an Xteink X4), eReaderDS can share your place in a book with
 it through a KOReader sync server, so each picks up where the other left off.
 
-1. **Settings → KOReader Sync → Server:** the same server as your other
-   device. **CrossPoint** (`sync.crosspointreader.com`, CrossPoint's default
+1. **Settings → KOReader Sync → Server** (tap it or press A for its page):
+   the same server as your other device. **CrossPoint** (`sync.crosspointreader.com`, CrossPoint's default
    and ours), **KOReader** (`sync.koreader.rocks`, KOReader's default), or
-   **Your own** (press A to type its address, such as
+   **Your own** (type its address, such as
    `http://192.168.1.20:7200`: Kavita, Komga, Calibre-Web, BookLore and others
    can be sync servers).
 2. **Account:** the same user name and password as on the other device (a new
-   name makes a new account).
+   name makes a new account). The eye at the end of the password field shows
+   what you've typed (tap it, or press up from the top row of keys and A).
 3. Read. When you open a book, eReaderDS checks the server; if another device
    has been reading it since, it asks **Continue from 45%?** (Jump or Stay).
    It sends your place when you leave the book, close the lid, or the screens

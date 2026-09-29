@@ -12,6 +12,14 @@
   (Night Theme, which had a group to itself, Status Bar, Reading & Device,
   KOReader Sync), then Help (moved off page 1), About and Quit. The vague
   "Main" and "Other" groups are gone.
+- **Night Theme is now Night Mode** (the row, its page, and the Themes page
+  while choosing for night); inside, the row is just **Theme**.
+- **KOReader Sync → Server** opens its own page (tap or A): CrossPoint,
+  KOReader or Your own, the current one ticked; picking one goes back.
+  ‹ › no longer changes it (two presses used to land on typing an address).
+- **On-screen keyboard:** the shift key is an up arrow (filled while capitals
+  are on) instead of "Aa"; a password field has an **eye** at its end to show
+  or hide what's typed: tap it, or press up from the top row of keys and A.
 
 ## v1.11.0
 
