@@ -2314,7 +2314,7 @@ local function menu_items()
             end },
             -- Changes the theme on screen: at night, the night theme.
             -- Opens the Themes page (tap or A), which shows each on your book.
-            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), opens = true, act = app.theme_open },
+            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), act = app.theme_open },
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
                   or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
