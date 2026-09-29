@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.9.0
+KOReader Sync: carry your place in a book between eReaderDS and KOReader or CrossPoint (a phone, Kobo, Kindle, Xteink X4...). Set it up in Settings → KOReader Sync.
+When you open a book another device has read further, it asks if you want to jump there.
+The on-screen keyboard has capitals and symbols.
+
 v1.8.0
 Put it down and it saves the battery: after 10 minutes with nothing pressed, the screens dim, then turn off. Press any button or touch the screen to bring them back. Change the time, or turn it off, in Settings → Reading & Device.
 

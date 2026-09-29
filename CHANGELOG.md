@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.9.0
 
 - **Review of everything since v1.2.0** (Send Books, Standard Ebooks,
   scrolling lists, the new list screens, My Books folders, titles, finished
