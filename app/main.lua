@@ -2397,9 +2397,14 @@ local function menu_items()
     if menu.page == "sync" then return app.sync_items() end
     local th = theme()
     local u = app.upd
-    -- Two pages (swipe, or up/down past the end): the everyday things first.
+    -- Two pages (swipe, or up/down past the end). The first holds what a
+    -- reader opens Settings for in the middle of a book: getting around it,
+    -- and making the page comfortable right now (brightness first: the
+    -- change most often wanted, at night). My Books, leaving the book, is
+    -- last. The second holds what's set once: the page's layout, the other
+    -- settings pages, and help.
     return join(
-        app.menu_on_page(1, section("Main", join(
+        app.menu_on_page(1, section("This book", join(
             u.state == "available" and { { label = "Update to v" .. u.version, bold = true, act = app.update_open } } or {},
             {
             { label = "Table of Contents", act = function()
@@ -2413,20 +2418,10 @@ local function menu_items()
             { label = "Find in Book", act = function() app.find_open() end },
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
               act = function() app.open_jump() end },
-            { label = "My Books", act = go_library },
-            }))),
-        app.menu_on_page(1, section("Text and look", {
-            -- The font's name is drawn in the font itself: a preview, and the only way
-            -- names in other scripts (e.g. Chinese firmware fonts) can display.
-            { label = "Fonts", value = fonts.name or S.font,
-              value_font = Fonts.preview(fonts.name or S.font, app.MENU_SIZE),
-              act = function() app.font_open() end },
-            { label = "Text size", value = tostring(S.font_size), adjust = function(d)
-                S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
-            end },
-            -- Changes the theme on screen: at night, the night theme.
-            -- Opens the Themes page (tap or A), which shows each on your book.
-            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), act = app.theme_open },
+            },
+            -- KOReader sync users: fetch another device's place (or send this one) now.
+            app.sync_on() and { { label = "Sync with KOReader", act = function() app.sync_pull("now") end } } or {}))),
+        app.menu_on_page(1, section("Reading", {
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
                   or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
@@ -2444,20 +2439,25 @@ local function menu_items()
                       Backlight.set(S.brightness)
                   end
               end },
+            { label = "Text size", value = tostring(S.font_size), adjust = function(d)
+                S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
+            end },
+            -- Changes the theme on screen: at night, the night theme.
+            -- Opens the Themes page (tap or A), which shows each on your book.
+            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), act = app.theme_open },
+            -- The font's name is drawn in the font itself: a preview, and the only way
+            -- names in other scripts (e.g. Chinese firmware fonts) can display.
+            { label = "Fonts", value = fonts.name or S.font,
+              value_font = Fonts.preview(fonts.name or S.font, app.MENU_SIZE),
+              act = function() app.font_open() end },
         })),
         app.menu_on_page(1, section("", {
-            { label = "Help", act = function() app.mode = "help" end },
+            { label = "My Books", act = go_library },
         })),
-        app.menu_on_page(2, section("Page", {
+        app.menu_on_page(2, section("Page layout", {
             { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
                 S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
                 relayout()
-            end },
-            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
-                S.justify = not S.justify; relayout()
-            end },
-            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
-                S.hyphenate = not S.hyphenate; relayout()
             end },
             { label = "Margins", value = margins().name, adjust = function(d)
                 S.margins = (S.margins - 1 + d) % #MARGINS + 1; relayout()
@@ -2465,14 +2465,21 @@ local function menu_items()
             { label = "Top/bottom margins", value = (VMARGINS[S.vmargins] or VMARGINS[2]).name, adjust = function(d)
                 S.vmargins = (S.vmargins - 1 + d) % #VMARGINS + 1; relayout()
             end },
+            { label = "Justify text", value = S.justify and "On" or "Off", adjust = function()
+                S.justify = not S.justify; relayout()
+            end },
+            { label = "Hyphenation", value = S.hyphenate and "On" or "Off", adjust = function()
+                S.hyphenate = not S.hyphenate; relayout()
+            end },
         })),
-        app.menu_on_page(2, section("Night", {
+        app.menu_on_page(2, section("More settings", {
             { label = "Night Theme", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
-        })),
-        app.menu_on_page(2, section("Other", {
             { label = "Status Bar", value = "›", act = function() open_sub("status") end },
             { label = "Reading & Device", value = "›", act = function() open_sub("more") end },
             { label = "KOReader Sync", value = app.sync_on() and "On" or "Off", opens = true, act = function() open_sub("sync") end },
+        })),
+        app.menu_on_page(2, section("", {
+            { label = "Help", act = function() app.mode = "help" end },
             { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
               value_bold = app.upd.state == "available" and "Update" or nil,
               act = function() open_sub("about") end },

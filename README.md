@@ -137,18 +137,21 @@ Press **B** (or Start, X, ↩) while reading. Settings has big rows on two
 pages: swipe left or right on the touchscreen, or keep pressing down past the
 last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
-1. **Table of Contents, Bookmarks and Highlights, Find in Book, Jump to %,
-   My Books** (your library); **Fonts** (its own page, [below](#fonts)),
-   **Text size**, **Theme** (tap it or press A: a page of all the themes, your
-   book previewed in each), **Brightness**; **Help**. (**Update to v…** is at
-   the top when one is waiting.)
-2. **Line spacing, Justify text, Hyphenation, Margins, Top/bottom margins**;
-   **Night Theme** ([below](#night-theme)); **Status Bar ›** (what the top
-   and bottom lines show, and the clock style), **Reading & Device ›**
-   (page-turn animation, what a tap does, dictionary, screens off after a
-   while, closing the lid, time zone), **KOReader Sync ›**
-   ([below](#koreader-sync)), **About eReaderDS ›** (What's New, Check for
-   Updates, Update notices, Report a Problem, About & Credits); **Quit**.
+1. What you open Settings for while reading. **This book:** Table of
+   Contents, Bookmarks and Highlights, Find in Book, Jump to %, and **Sync
+   with KOReader** when sync is on. **Reading:** Brightness, Text size,
+   **Theme** (tap it or press A: a page of all the themes, your book previewed
+   in each), **Fonts** (its own page, [below](#fonts)). Then **My Books**
+   (your library). (**Update to v…** is at the top when one is waiting.)
+2. What's set once. **Page layout:** Line spacing, Margins, Top/bottom
+   margins, Justify text, Hyphenation. **More settings:** **Night Theme**
+   ([below](#night-theme)), **Status Bar ›** (what the top and bottom lines
+   show, and the clock style), **Reading & Device ›** (page-turn animation,
+   what a tap does, dictionary, which hand holds the buttons, screens off
+   after a while, closing the lid, time zone), **KOReader Sync ›**
+   ([below](#koreader-sync)). Then **Help**, **About eReaderDS ›** (What's
+   New, Check for Updates, Update notices, Report a Problem, About &
+   Credits) and **Quit**.
 
 ## Features
 
@@ -156,8 +159,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   (line art such as chapter numbers and ornaments is drawn in the page's own
   ink, so it sits on any theme instead of in a white box);
   justified text with optional hyphenation (English); 18 built-in fonts plus
-  your own; 11 themes (Sepia by default, plus E-ink, Paper, Midnight, Amber
-  and more) that the whole app follows, and a night theme that switches on by
+  your own; 25 themes (Sepia by default, plus E-ink, Paper, Mint, Sky,
+  Midnight, Gruvbox, Nord, Red Night and more) that the whole app follows, and a night theme that switches on by
   itself in the evening; page-flip or fade animation.
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.
@@ -207,10 +210,10 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 ## Night Theme
 
-**Settings → Night Theme** picks a second theme (Midnight, Amber and Dusk
-are the darker ones) and the hours to use it, 9 PM to 7 AM to start. It
-switches on the hour by the device's clock, and the whole app changes with
-it. While picking, the touchscreen previews each theme. At night, the
+**Settings → Night Theme** picks a second theme (a dark one such as
+Midnight, Dark Sepia, Gruvbox or Red Night) and the hours to use it, 9 PM to
+7 AM to start. It switches on the hour by the device's clock, and the whole
+app changes with it. While picking, the touchscreen previews each theme. At night, the
 **Theme** row changes the night theme (it says "(night)"), so your daytime
 theme is left alone.
 
@@ -291,7 +294,8 @@ it through a KOReader sync server, so each picks up where the other left off.
    go off, and every few minutes while reading (checking first that no other
    device has moved on meanwhile).
 
-**Sync this book now** (Settings → KOReader Sync) works out which way to go,
+**Sync with KOReader** (on the first page of Settings; also **Sync this
+book now** in Settings → KOReader Sync) works out which way to go,
 like CrossPoint's smart sync: if you've read on here since the last sync, it
 sends your place; if only the other device has read on, it goes there; if
 both have, it asks. It never sends an older place over a newer one without

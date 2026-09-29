@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Settings reorganised around why you open it mid-book.** Page 1, **This
+  book:** Table of Contents, Bookmarks and Highlights, Find in Book, Jump to
+  %, and **Sync with KOReader** when sync is on (it used to be three levels
+  down); **Reading:** Brightness first (the change most often wanted, at
+  night), Text size, Theme, Fonts; then **My Books**, leaving the book, on its
+  own at the end. Page 2 holds what's set once: **Page layout** (Line spacing,
+  the two margin rows together, Justify, Hyphenation), **More settings**
+  (Night Theme, which had a group to itself, Status Bar, Reading & Device,
+  KOReader Sync), then Help (moved off page 1), About and Quit. The vague
+  "Main" and "Other" groups are gone.
+
 ## v1.11.0
 
 - **Eight more dark themes**, after what readers and programmers pick for
