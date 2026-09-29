@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.9.1
 
 - **KOReader Sync with CrossPoint:** after saving on an Xteink X4 a page or two
   further on, "Sync this book now" here said "Already in sync". The X4 sends

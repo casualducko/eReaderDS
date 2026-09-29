@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.9.1
+KOReader Sync: "Sync this book now" goes to where your other device is, even when it's only a page or two ahead.
+
 v1.9.0
 KOReader Sync: carry your place in a book between eReaderDS and KOReader or CrossPoint (a phone, Kobo, Kindle, Xteink X4...). Set it up in Settings → KOReader Sync.
 When you open a book another device has read further, it asks if you want to jump there.
