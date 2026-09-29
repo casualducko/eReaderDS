@@ -119,8 +119,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 1. **Table of Contents, Bookmarks and Highlights, Find in Book, Jump to %,
    My Books** (your library); **Fonts** (its own page, [below](#fonts)),
-   **Text size**, **Theme** (‹ › steps through them; tap it for a page of all
-   the themes, your book previewed in each), **Brightness**; **Help**. (**Update to v…** is at
+   **Text size**, **Theme** (tap it or press A: a page of all the themes, your
+   book previewed in each), **Brightness**; **Help**. (**Update to v…** is at
    the top when one is waiting.)
 2. **Line spacing, Justify text, Hyphenation, Margins, Top/bottom margins**;
    **Night Theme** ([below](#night-theme)); **Status Bar ›** (what the top

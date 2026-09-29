@@ -2313,10 +2313,8 @@ local function menu_items()
                 S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
             end },
             -- Changes the theme on screen: at night, the night theme.
-            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), act = app.theme_open, adjust = function(d)
-                local name = THEMES[(theme_index() - 1 + d) % #THEMES + 1].name
-                if app.night then S.night_theme = name else S.theme = name end
-            end },
+            -- Opens the Themes page (tap or A), which shows each on your book.
+            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), opens = true, act = app.theme_open },
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
                   or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),

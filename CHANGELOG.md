@@ -5,9 +5,10 @@
 - **Themes page:** tap Settings → Theme (or press A on it) for every theme on
   the touchscreen, each with a swatch in its colours and ✓ on the one in use,
   and your book's page on the other screen in the one highlighted (E-ink's
-  grain included), like the Fonts page. A or a second tap uses it; ‹ › on
-  the Settings row still steps through them. With the night theme on, it
-  chooses the night theme.
+  grain included), like the Fonts page. A or a second tap uses it. The
+  Settings row ("Sepia ›") only opens the page now: no ‹ › (with them, a tap
+  on the row did nothing). With the night theme on, it chooses the night
+  theme.
 
 ## v1.9.2
 
