@@ -151,9 +151,9 @@ function M.load_settings()
     s.night_from, s.night_to = math.floor(s.night_from) % 24, math.floor(s.night_to) % 24
     -- The old default "UTC" meant "the device's time as it is".
     if s.tz == "UTC" then s.tz = "Device clock" end
-    -- The flipped grip was removed (the buttons end up under the wrong hand), so
-    -- anyone who had it set goes back to the normal one.
-    s.orient = "left"
+    -- "left": turned counter-clockwise (buttons on the right, the usual);
+    -- "right": turned the other way round (Settings → Reading & Device → Hold it).
+    if s.orient ~= "right" then s.orient = "left" end
     return s
 end
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased (rotate-180 branch: a test build)
+
+- **Hold it the other way round:** Settings → Reading & Device → **Hold it
+  with buttons** ‹ On the right / On the left ›. On the left, everything turns
+  180° (the device turned clockwise). Pages keep their reading order, so while
+  reading the first page is on the touchscreen (tap its right half to go on,
+  its outer top corner, now top left, to bookmark; the Notes button and the
+  ribbon follow it); menus and lists stay on the touchscreen, now on the left.
+  The face buttons act by where they are, like the D-pad: the button where A
+  was does A's job (A↔Y, B↔X), and every hint shows the letter on the button
+  to press. Done at the edges (`app.flipped`, `app.touch_side`, `app.key`,
+  `page_transform`, `touch_to_page`, the gamepad mapping), not screen by
+  screen. The code for the old "Flip for other hand" (removed in v0.3) was the
+  starting point.
+
 ## v1.9.3
 
 - **Themes page:** tap Settings → Theme (or press A on it) for every theme on
