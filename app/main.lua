@@ -2172,9 +2172,7 @@ function app.sync_items()
     local on = app.sync_on()
     local server = app.KOSync.SERVERS[S.kosync_server] and S.kosync_server or "custom"
     local shown = app.KOSync.SERVER_NAMES[server]
-    if server == "custom" and S.kosync_custom ~= "" then
-        shown = app.KOSync.server("custom", S.kosync_custom):gsub("^https?://", "")
-    end
+    if server == "custom" and S.kosync_custom ~= "" then shown = app.sync_own_name() end
     local items = {
         { label = "Account", value = on and S.kosync_user or "Log in", act = app.sync_login },
         -- Its own page (tap or A): CrossPoint, KOReader, or your own address.
@@ -2217,15 +2215,82 @@ function app.server_items()
             app.server_close()
         end
     end
-    local own = S.kosync_custom ~= "" and app.KOSync.server("custom", S.kosync_custom):gsub("^https?://", "") or "Type an address"
-    return join(section(nil, {
+    local rows = {
         { label = "CrossPoint", value = cur == "crosspoint" and "✓" or "", act = pick("crosspoint") },
         { label = "KOReader", value = cur == "koreader" and "✓" or "", act = pick("koreader") },
-        -- Your own: type (or change) its address; empty goes back to CrossPoint.
-        { label = "Your own", value = (cur == "custom" and "✓  " or "") .. own, act = function()
-            app.sync_server_edit(app.server_close)
+    }
+    -- Your own: its name; A (or a tap) to use, edit, rename or delete it.
+    if S.kosync_custom ~= "" then
+        rows[#rows + 1] = { label = app.sync_own_name(), value = cur == "custom" and "✓" or "",
+            act = function() app.server_own_options() end }
+    else
+        rows[#rows + 1] = { label = "Add your own server", act = function() app.server_add() end }
+    end
+    return join(section(nil, rows), section("", { { label = "Back", act = function() app.server_close() end } }))
+end
+
+-- Your own server's address as shown (no https://).
+function app.sync_own_address()
+    return (app.KOSync.server("custom", S.kosync_custom):gsub("^https?://", ""))
+end
+
+-- Its name: the one you gave it, or its address.
+function app.sync_own_name()
+    return S.kosync_custom_name ~= "" and S.kosync_custom_name or app.sync_own_address()
+end
+
+-- Type an address (a new server, or a change to yours); done(address).
+function app.server_address(title, ok, done)
+    app.kb_open({ title = title, text = S.kosync_custom, ok = ok,
+        hint = "The address of a KOReader sync server, such as https://sync.example.com or "
+            .. "http://192.168.1.20:7200 (Kavita, Komga, Calibre-Web, BookLore and others can be one).",
+        submit = done })
+end
+
+function app.server_name(text, done)
+    app.kb_open({ title = "Name this server", text = text, ok = "Save", allow_empty = true,
+        hint = "What to call it in Settings. Empty: its address.", submit = done })
+end
+
+-- Add your own: its address, then a name; then it's the one used.
+function app.server_add()
+    app.server_address("Your own sync server", "Next", function(addr)
+        S.kosync_custom, S.kosync_custom_name = addr, ""
+        app.server_name("", function(name)
+            S.kosync_custom_name = name
+            app.sync_set_server("custom")
+            app.server_close()
+        end)
+    end)
+end
+
+-- A card for your own server: use it, change its address, rename, delete.
+function app.server_own_options()
+    local name = app.sync_own_name()
+    app.choose({ title = name, options = {
+        { "Use this server", function() app.sync_set_server("custom"); app.server_close() end },
+        { "Edit address", function()
+            app.server_address("Address of " .. name, "Save", function(addr)
+                S.kosync_custom = addr
+                if S.kosync_server == "custom" then app.sync_set_server("custom") else Store.save_settings(S) end
+                app.toast("Address saved")
+            end)
         end },
-    }), section("", { { label = "Back", act = function() app.server_close() end } }))
+        { "Rename", function()
+            app.server_name(name, function(n) S.kosync_custom_name = n; Store.save_settings(S) end)
+        end },
+        { "Delete", function()
+            app.ask({ question = "Delete " .. name .. "?",
+                detail = S.kosync_server == "custom" and "Sync goes back to CrossPoint." or app.sync_own_address(),
+                yes = "Delete", on_yes = function()
+                    if S.kosync_server == "custom" then app.sync_set_server("crosspoint") end
+                    S.kosync_custom, S.kosync_custom_name = "", ""
+                    Store.save_settings(S)
+                    menu.sel = 1
+                    app.toast("Server deleted")
+                end })
+        end },
+    } })
 end
 
 function app.server_close()
@@ -2282,19 +2347,7 @@ function app.sync_register(user, key)
     end)
 end
 
--- Your own server's address (A on the Server row).
-function app.sync_server_edit(done)
-    app.kb_open({ title = "Your own sync server", text = S.kosync_custom, ok = "Save", allow_empty = true,
-        hint = "The address of a KOReader sync server, such as https://sync.example.com or "
-            .. "http://192.168.1.20:7200. Empty: back to CrossPoint's.",
-        submit = function(t)
-            S.kosync_custom = t
-            app.sync_set_server(t ~= "" and "custom" or "crosspoint")
-            if done then done() end
-        end })
-end
-
--- Night theme: another theme, used automatically between two hours (by
+-- Night Mode: another theme, used automatically between two hours (by
 -- the device's clock, like the status bar). app.night says whether it's on
 -- now; checked once a minute.
 function app.night_check()

@@ -34,6 +34,7 @@ local DEFAULTS = {
     -- goes with file names, KOReader's with file contents, as they default),
     -- sending the book's details, and this device's id there.
     kosync_user = "", kosync_key = "", kosync_server = "crosspoint", kosync_custom = "",
+    kosync_custom_name = "",   -- your own server's name (empty: its address)
     kosync_match = "filename", kosync_meta = false, kosync_device = "",
 }
 

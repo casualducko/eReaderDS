@@ -17,6 +17,11 @@
 - **KOReader Sync → Server** opens its own page (tap or A): CrossPoint,
   KOReader or Your own, the current one ticked; picking one goes back.
   ‹ › no longer changes it (two presses used to land on typing an address).
+  **Your own server** has a name as well as an address: **Add your own
+  server** asks for the address, then a name (empty: the address). Once
+  saved it's listed by name; A (or a tap) opens a card to **Use this
+  server**, **Edit address**, **Rename** or **Delete** it (deleting the one in
+  use goes back to CrossPoint).
 - **On-screen keyboard:** the shift key is an up arrow (filled while capitals
   are on) instead of "Aa"; a password field has an **eye** at its end to show
   or hide what's typed: tap it, or press up from the top row of keys and A.

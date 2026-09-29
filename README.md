@@ -281,11 +281,12 @@ PocketBook, or an Xteink X4), eReaderDS can share your place in a book with
 it through a KOReader sync server, so each picks up where the other left off.
 
 1. **Settings → KOReader Sync → Server** (tap it or press A for its page):
-   the same server as your other device. **CrossPoint** (`sync.crosspointreader.com`, CrossPoint's default
-   and ours), **KOReader** (`sync.koreader.rocks`, KOReader's default), or
-   **Your own** (type its address, such as
-   `http://192.168.1.20:7200`: Kavita, Komga, Calibre-Web, BookLore and others
-   can be sync servers).
+   the same server as your other device. **CrossPoint**
+   (`sync.crosspointreader.com`, CrossPoint's default and ours), **KOReader**
+   (`sync.koreader.rocks`, KOReader's default), or your own: **Add your own
+   server** asks for its address (such as `http://192.168.1.20:7200`; Kavita,
+   Komga, Calibre-Web, BookLore and others can be sync servers) and a name.
+   A on it later uses it, edits its address, renames or deletes it.
 2. **Account:** the same user name and password as on the other device (a new
    name makes a new account). The eye at the end of the password field shows
    what you've typed (tap it, or press up from the top row of keys and A).
