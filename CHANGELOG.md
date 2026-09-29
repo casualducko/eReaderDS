@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.12.0
 
 - **Settings reorganised around why you open it mid-book.** Page 1, **This
   book:** Table of Contents, Bookmarks and Highlights, Find in Book, Jump to

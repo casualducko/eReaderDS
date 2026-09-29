@@ -2,6 +2,13 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.12.0
+Settings is laid out around what you need while reading: your book (contents, bookmarks, find, jump) and how the page looks (brightness first, then text size, theme and font) on the first page; things you set once on the second.
+If you use KOReader Sync, "Sync with KOReader" is now on the first page of Settings.
+Night Theme is now called Night Mode.
+Your own sync server has a name, and you can change its address, rename it or delete it. The server list opens as its own page.
+Typing a password, tap the eye to see what you've typed. The shift key is now an arrow.
+
 v1.11.0
 Fourteen new themes, 25 in all. Dark: Dark Sepia, Gruvbox, Nord, Solarized Dark, Dracula, Catppuccin, Everforest, and Red Night, red on black for reading in bed without losing your night vision.
 Light: Gruvbox Light, Catppuccin Latte, Rosé Pine Dawn, Parchment, Sky (a pale blue many readers find easier than white), and Mint, the pale green page of the Kindle app.
