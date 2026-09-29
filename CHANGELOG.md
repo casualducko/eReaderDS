@@ -22,6 +22,12 @@
 - Turned round, D-pad up (as you hold it) does what Y does normally: the
   word cursor, to look a word up or highlight (Select at the first and last
   word). Left, right and down still turn pages.
+- Turned round, the face buttons are a second D-pad everywhere (held that
+  way: Y top, A bottom, X right, B left): in menus Y is up, A down, X OK and
+  B back, and Select does Y's usual job (delete, options, the keyboard's
+  space); in the word cursor Select still highlights. Hints and Help show
+  these buttons (`app.flip_button`, `app.FLIP_KEYS`). A `btn:` test action
+  presses a button as the gamepad would.
 
 ## v1.9.3
 

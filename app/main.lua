@@ -2934,7 +2934,9 @@ local function draw_library(side)
         local bx, by, bw, bh = library.get_books_button()
         -- Offline: an outline only, greyed out, saying why.
         local online = shop.online()
-        app.button(bx, by, bw, bh, "Get Books", online and "Select" or "No Wi-Fi", online and "soft" or "off")
+        local key = online and "Select" or "No Wi-Fi"
+        if online and app.flipped() then key = nil end   -- (turned round, Select does Y's job)
+        app.button(bx, by, bw, bh, "Get Books", key, online and "soft" or "off")
         local hidden = (library.hidden or 0) > 0 and (library.hidden .. " finished hidden") or nil
         if #library.items > 0 then
             app.hints(x, nil, book and { "A", "open", "Y", "options", "‹ ›", "sort", "B", "back" }
@@ -4132,9 +4134,9 @@ app.HELP_FLIPPED = { "Buttons", {
     { "D-pad up", "Look up or highlight a word" },
     { "A, X", "Next page" },
     { "B, Y", "Previous page" },
-    { "Start", "Settings (or press the stick)" },
-    { "Curved arrow", "Settings" },
     { "Select", "Bookmark the page" },
+    { "Start", "Settings (or press the stick)" },
+    { "In menus", "Y up, A down, X select, B back; Select deletes or shows options" },
     { "Anbernic", "Quit" },
 } }
 app.HELP = {
@@ -5770,8 +5772,10 @@ end
 -- clockwise, buttons under the left hand): everything turns 180°. Pages
 -- keep their reading order, so while reading the first page is on the
 -- touchscreen; menus and lists keep their touch side on the touchscreen.
--- The face buttons act by where they are, like the D-pad: A↔Y, B↔X (and the
--- hints show the letter on the button to press).
+-- The face buttons work as a second D-pad (held this way: Y top, A bottom,
+-- X right, B left): reading, X and A go forward, B and Y back; elsewhere Y is
+-- up, A down, X OK and B back, and Select does Y's usual job (delete,
+-- options, space). Hints show the buttons to press.
 function app.flipped() return S.orient == "right" end
 app.READING_MODES = { reader = true, lookup = true, note = true }
 -- The page on the touchscreen: the right one, or turned round while
@@ -5780,12 +5784,27 @@ function app.touch_side()
     if app.flipped() and app.READING_MODES[app.mode] then return "left" end
     return "right"
 end
-app.FLIP_KEYS = { A = "Y", Y = "A", B = "X", X = "B", a = "y", y = "a", b = "x", x = "b" }
--- A button's letter as printed on the one to press ("A" is Y turned round).
+-- A hint's button, turned round: A's job is on X, Y's on Select, X's
+-- (Settings, close) on Start; B stays B.
+app.FLIP_KEYS = { A = "X", B = "B", Y = "Select", X = "Start" }
 function app.key(k) return app.flipped() and app.FLIP_KEYS[k] or k end
 function app.keys_text(s)
     if not app.flipped() then return s end
-    return (s:gsub("%f[%w]([ABXY])%f[%W]", app.FLIP_KEYS))
+    s = s:gsub("%f[%w]([ABXY])%f[%W]", app.FLIP_KEYS)
+    return (s:gsub("Start, Start", "Start"))
+end
+
+-- What a face button (or Select) does, turned round; nil: as usual.
+function app.flip_button(button)
+    if app.mode == "reader" and not app.asking and not app.choosing then
+        if button == "a" or button == "x" then return "next" end
+        if button == "b" or button == "y" then return "prev" end
+        return nil
+    end
+    local pad = { y = "up", a = "down", x = "confirm", b = "back" }
+    if pad[button] then return pad[button] end
+    -- Select (SDL's "back") takes Y's job, except in the word cursor (highlight).
+    if button == "back" and app.mode ~= "lookup" then return "toc" end
 end
 
 local function page_transform(side)
@@ -6797,13 +6816,11 @@ end
 function love.gamepadpressed(_, button)
     local d = button:match("^dp(%a+)$")
     if d then dpad(d) return end
-    if app.flipped() and app.mode == "reader" and not app.asking and not app.choosing then
-        -- Turned round, while reading the face buttons turn pages like the
-        -- D-pad: A and X forward, B and Y back (as printed on them).
-        if button == "a" or button == "x" then action("next") return end
-        if button == "b" or button == "y" then action("prev") return end
+    if app.flipped() then
+        local fa = app.flip_button(button)
+        if fa then action(fa) return end
     end
-    local a = BUTTON[app.flipped() and app.FLIP_KEYS[button] or button]
+    local a = BUTTON[button]
     if a then action(a) end
 end
 
@@ -7505,6 +7522,7 @@ local function run_test_script()
             elseif a == "update" then app.update_open()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
+            elseif a:match("^btn:") then love.gamepadpressed(nil, a:sub(5))   -- a button as pressed (a, b, x, y, back, start)
             elseif a == "report" then app.report_open()
             elseif a == "receive" then app.recv_open()
             elseif a == "recvpoll" then app.recv_poll()
