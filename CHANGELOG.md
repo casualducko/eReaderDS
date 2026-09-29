@@ -10,6 +10,10 @@
   says B cancels when the field is empty, and on a password explains the
   eye. Titles are in Title Case like the app's pages: **KOReader Sync
   Account**, **Your Own Sync Server**, **Server Address**, **Server Name**.
+- **Web address keys:** typing a server address, a row above the numbers
+  holds **https://**, **http://**, **www.**, **.com**, **:** and **/**. The
+  first two set the address's start (replacing one already there), **www.**
+  goes in after it, and the rest type at the end, so no trip to the #@ layer.
 
 ## v1.12.0
 

@@ -2241,7 +2241,7 @@ end
 
 -- Type an address (a new server, or a change to yours); done(address).
 function app.server_address(title, ok, done)
-    app.kb_open({ title = title, text = S.kosync_custom, ok = ok,
+    app.kb_open({ title = title, text = S.kosync_custom, ok = ok, url = true,
         hint = "The address of a KOReader sync server, such as https://sync.example.com or "
             .. "http://192.168.1.20:7200 (Kavita, Komga, Calibre-Web, BookLore and others can be one).",
         submit = done })
@@ -4397,6 +4397,12 @@ app.KB_LAYERS = {
 }
 function app.kb_layer(layer)
     app.KB_ROWS = {}
+    -- Typing a web address: a row of its usual pieces on top.
+    if app.kb and app.kb.url then
+        app.KB_ROWS[1] = { { key = "scheme:https://", label = "https://", span = 2 },
+            { key = "scheme:http://", label = "http://", span = 2 }, { key = "www", label = "www.", span = 2 },
+            { key = ".com", label = ".com", span = 2 }, { key = ":", label = ":", span = 1 }, { key = "/", label = "/", span = 1 } }
+    end
     for _, row in ipairs(app.KB_LAYERS[layer]) do
         local keys = {}
         for ch in row:gmatch(".") do keys[#keys + 1] = { key = ch, label = ch, span = 1 } end
@@ -4414,12 +4420,13 @@ app.KB_TOP, app.KB_ROW_H = 300, 112          -- keys area on the right page
 app.KB_MAX = 120                             -- characters
 
 -- Open the keyboard. opts: title, hint, text, submit(text), cancel(),
--- ok (the confirm key's label, "Search" by default), secret (show dots).
+-- ok (the confirm key's label, "Search" by default), secret (show dots),
+-- url (a web address: https:// and the like on keys of their own).
 function app.kb_open(opts)
     -- No key is highlighted until the D-pad is used (r, c = nil).
     app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "",
         submit = opts.submit, cancel = opts.cancel, back = app.mode, ok = opts.ok, secret = opts.secret,
-        allow_empty = opts.allow_empty }
+        allow_empty = opts.allow_empty, url = opts.url }
     app.kb_layer("lower")
     app.mode = "keyboard"
     redraw()
@@ -4461,6 +4468,14 @@ function app.kb_press(key)
         app.kb_layer(kb.layer == "upper" and "lower" or "upper")
     elseif key == "symbols" then
         app.kb_layer(kb.layer == "symbols" and "lower" or "symbols")
+    elseif key:match("^scheme:") then
+        -- https:// or http:// at the start, in place of the one there.
+        kb.text = (key:sub(8) .. kb.text:gsub("^%a+://", "")):sub(1, app.KB_MAX)
+    elseif key == "www" then
+        -- After the scheme (if any), unless it's there already.
+        local scheme, rest = kb.text:match("^(%a+://)(.*)$")
+        scheme, rest = scheme or "", rest or kb.text
+        if not rest:match("^www%.") then kb.text = (scheme .. "www." .. rest):sub(1, app.KB_MAX) end
     elseif key == "ok" then
         local q = kb.text:gsub("^%s+", ""):gsub("%s+$", "")
         if q == "" and not kb.allow_empty then return end
@@ -4478,7 +4493,7 @@ function app.kb_action(a)
     local rows = app.KB_ROWS
     local dir = a == "left" or a == "prev" or a == "right" or a == "next" or a == "up" or a == "down"
     if dir and not kb.r then
-        kb.r, kb.c = 2, 1                           -- the first press shows where you are
+        kb.r, kb.c = kb.url and 3 or 2, 1           -- the first press shows where you are (on "q")
         redraw()
         return
     end
