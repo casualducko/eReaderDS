@@ -186,7 +186,10 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   hand: **Y** in My Books, which can also hide finished books, or delete a
   book).
 - **KOReader Sync:** carry your place between eReaderDS and KOReader or
-  CrossPoint (a phone, Kobo, Kindle, Xteink X4...) ([below](#koreader-sync)).
+  CrossPoint (a phone, Kobo, Kindle, Xteink X4 or X3...): one smart Sync
+  button, or Send my place and Get my place; opening a book asks before
+  anything is sent, or set Automatic sync to On or Off
+  ([below](#koreader-sync)).
 - **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in Book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
   and the words are marked on the page you open). Your place in every book is
@@ -299,8 +302,9 @@ It's written again whenever they change, so add your own notes elsewhere.
 ## KOReader Sync
 
 If you also read in **KOReader** or **CrossPoint** (on a phone, Kobo, Kindle,
-PocketBook, or an Xteink X4), eReaderDS can share your place in a book with
-it through a KOReader sync server, so each picks up where the other left off.
+PocketBook, or an Xteink X4 or X3), eReaderDS can share your place in a book
+with it through a KOReader sync server, so each picks up where the other left
+off.
 
 1. **Settings → KOReader Sync → Server** (tap it or press A for its page):
    the same server as your other device. **CrossPoint**
@@ -315,7 +319,10 @@ it through a KOReader sync server, so each picks up where the other left off.
 3. Read. What happens on its own is up to **Automatic sync**:
    - **Ask when opening** (the default): when you open a book, eReaderDS
      checks the server. If another device has been reading it since, it asks
-     **Continue from 45%?** (Jump or Stay); if the server is behind you, it
+     **Continue from your Kobo?** (Jump or Stay), with where that is and when
+     it was saved: "3 pages ahead, in Chapter 10 · Saved on Kobo 3 minutes
+     ago" (in the chapter you're reading it counts pages; elsewhere it gives
+     the chapter and percentage beside yours). If the server is behind you, it
      asks **Send your place to the sync server?**. Nothing is sent without
      asking.
    - **On:** as above, but your place is also sent on its own: when the book
@@ -327,7 +334,8 @@ it through a KOReader sync server, so each picks up where the other left off.
 to go, like CrossPoint's smart sync: if you've read on here since the last
 sync, it sends your place; if only the other device has read on, it goes
 there; if both have, it asks. It never sends an older place over a newer one
-without asking.
+without asking. If there's nothing to do, it says **Your place is saved on
+the sync server** and when it was sent.
 
 To choose the direction yourself, like KOReader's Push and Pull, use
 **Settings → KOReader Sync**:
@@ -337,7 +345,7 @@ To choose the direction yourself, like KOReader's Push and Pull, use
   other way round).
 - **Get my place from the server:** goes to where your other device got to,
   even if you've read past it here; going back more than a few pages asks
-  first ("Go back to 20%?").
+  first ("Go back to where you were on Kobo?").
 
 Places are matched to the paragraph (you may land a page or so from where the
 other device was, since screens differ). EPUB books only. A place you've
@@ -384,11 +392,14 @@ server ignores them; other servers can use them to show which book a record
 is. Syncing works the same either way: it only changes what the server can
 see.
 
-### With an Xteink X4 (CrossPoint)
+### With an Xteink X4 or X3 (CrossPoint)
 
 Server: **CrossPoint** and the same account on both. Give the book the same
 file name on both devices (copying the same `.epub` to both does that); Match
-books by can stay at **File name**, which picking the server sets.
+books by can stay at **File name**, which picking the server sets. Watch for
+names that are nearly the same: `Ken Follett - The Pillars of the Earth.epub`
+and `The Pillars of the Earth - Ken Follett.epub` are different books to the
+server.
 
 ## Dictionaries
 
@@ -441,7 +452,7 @@ name) only shows one weight.
 | Get Books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
 | Pages upside down | Turn the device the other way, with the buttons on your right. |
 | Screen stays dim after quitting | Brightness is restored when the app quits; after a crash, set it in the system menu. |
-| KOReader Sync says "Already in sync" but the other device is ahead | Both must use the same server and account (Settings → KOReader Sync), and the book must be the same file or have the same file name on both. |
+| KOReader Sync says your place is saved, but the other device is ahead | Both must use the same server and account (Settings → KOReader Sync), and the book must be the same file, or have exactly the same file name, on both ("Author - Title" and "Title - Author" don't match). Keep only one edition of a book under a name. |
 | The clock is wrong | Set **Settings → Reading & Device → Time zone** (**Device clock** uses the system's own setting). |
 | An update fails | Check Wi-Fi and choose **Try again**. Nothing is changed until an update is complete; you can also [update by hand](#install). |
 
