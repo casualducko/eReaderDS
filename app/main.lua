@@ -2248,13 +2248,13 @@ function app.server_address(title, ok, done)
 end
 
 function app.server_name(text, done)
-    app.kb_open({ title = "Name this server", text = text, ok = "Save", allow_empty = true,
+    app.kb_open({ title = "Server Name", text = text, ok = "Save", allow_empty = true,
         hint = "What to call it in Settings. Empty: its address.", submit = done })
 end
 
 -- Add your own: its address, then a name; then it's the one used.
 function app.server_add()
-    app.server_address("Your own sync server", "Next", function(addr)
+    app.server_address("Your Own Sync Server", "Next", function(addr)
         S.kosync_custom, S.kosync_custom_name = addr, ""
         app.server_name("", function(name)
             S.kosync_custom_name = name
@@ -2270,7 +2270,7 @@ function app.server_own_options()
     app.choose({ title = name, options = {
         { "Use this server", function() app.sync_set_server("custom"); app.server_close() end },
         { "Edit address", function()
-            app.server_address("Address of " .. name, "Save", function(addr)
+            app.server_address("Server Address", "Save", function(addr)
                 S.kosync_custom = addr
                 if S.kosync_server == "custom" then app.sync_set_server("custom") else Store.save_settings(S) end
                 app.toast("Address saved")
@@ -2298,8 +2298,8 @@ function app.server_close()
 end
 
 function app.sync_login()
-    app.kb_open({ title = "KOReader sync: user name", text = S.kosync_user, ok = "Next",
-        hint = "Your KOReader progress sync account (KOReader: Tools → Progress sync). A new name makes a new account.",
+    app.kb_open({ title = "KOReader Sync Account", text = S.kosync_user, ok = "Next",
+        hint = "Your user name, as in KOReader (Tools → Progress sync). A new name makes a new account.",
         submit = function(user)
             app.kb_open({ title = "Password for " .. user, secret = true, ok = "Log in",
                 hint = "The password for " .. user .. " on the sync server.",
@@ -4593,8 +4593,11 @@ function app.kb_draw(side)
             local _, lines = ui.font:getWrap(kb.hint, w)
             y = y + #lines * ui.font:getHeight() + 40
         end
-        for _, row in ipairs({ { "Type", "Tap the keys, or D-pad and A" }, { "B", "Delete" }, { "Y", "Space" },
-                { "Start, X", "Search" } }) do
+        -- The same list on every keyboard, with its own confirm key's name.
+        local rows = { { "Type", "Tap the keys, or D-pad and A" }, { "B", "Delete (cancel when empty)" },
+            { "Y", "Space" }, { "Start, X", kb.ok or "Search" } }
+        if kb.secret then rows[#rows + 1] = { "Eye", "Show or hide it (tap, or D-pad up)" } end
+        for _, row in ipairs(rows) do
             color(th.fg)
             love.graphics.print(app.keys_text(row[1]), x, y)
             color(th.dim)

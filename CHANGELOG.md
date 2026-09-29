@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Keyboards made consistent.** All six text fields (Find in Book, Get
+  Books search, the KOReader account, password, server address and name)
+  already shared one keyboard; now what's around it matches too. The button
+  list on the top screen names the confirm key each field really has (it
+  said "Start, X: Search" even where the key read Next, Log in or Save),
+  says B cancels when the field is empty, and on a password explains the
+  eye. Titles are in Title Case like the app's pages: **KOReader Sync
+  Account**, **Your Own Sync Server**, **Server Address**, **Server Name**.
+
 ## v1.12.0
 
 - **Settings reorganised around why you open it mid-book.** Page 1, **This
