@@ -44,8 +44,8 @@ local THEMES = {
     { name = "Rosé Pine Dawn",   bg = { 0.980, 0.957, 0.929 }, fg = { 0.341, 0.322, 0.475 }, dim = { 0.596, 0.576, 0.647 }, sel = { 0.918, 0.875, 0.839 } },
     { name = "Parchment",        bg = { 0.929, 0.878, 0.769 }, fg = { 0.227, 0.180, 0.125 }, dim = { 0.490, 0.420, 0.322 }, sel = { 0.863, 0.796, 0.651 } },
     { name = "Sky",              bg = { 0.894, 0.925, 0.957 }, fg = { 0.118, 0.165, 0.220 }, dim = { 0.369, 0.431, 0.502 }, sel = { 0.792, 0.843, 0.898 } },
-    -- The Kindle app's green page: a light mint green, restful at low brightness.
-    { name = "Green",            bg = { 0.784, 0.894, 0.761 }, fg = { 0.110, 0.169, 0.102 }, dim = { 0.337, 0.420, 0.318 }, sel = { 0.678, 0.827, 0.647 } },
+    -- The Kindle app's green page: pale mint, near-black text; restful at low brightness.
+    { name = "Green",            bg = { 0.804, 0.902, 0.816 }, fg = { 0.137, 0.149, 0.137 }, dim = { 0.369, 0.431, 0.376 }, sel = { 0.702, 0.835, 0.718 } },
     -- Dark palettes readers and programmers like for long sessions (Gruvbox,
     -- Nord, Solarized, Dracula, Catppuccin, Everforest), a warm dark sepia,
     -- and red on black, which keeps eyes used to the dark.
