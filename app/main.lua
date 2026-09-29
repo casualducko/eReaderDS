@@ -2024,16 +2024,20 @@ function app.sync_pull(how)
     local now = how == "now"
     local b = book
     if not (b and b.zip and app.sync_on()) then
-        if now then app.toast(b and not b.zip and "KOReader sync is for EPUB books" or "Log in to KOReader sync first") end
+        if now then
+            if b and not b.zip then app.sync_say("KOReader Sync is for EPUB books", "This book's places can't be shared with KOReader.")
+            else app.sync_say("Log in to KOReader Sync first", "Settings → KOReader Sync → Account") end
+        end
         return
     end
     local docs = app.sync_docs(b)
     if #docs == 0 then return end
     if not shop.online() then
-        if now then app.toast("Not connected to Wi-Fi") end
+        if now then app.sync_say("Not connected to Wi-Fi", "Your place is sent when you're back online.") end
         return
     end
     app.sync.pulling, app.sync.last_try = true, love.timer.getTime()
+    if how == "now" then app.toast("Syncing with " .. app.sync_server_name() .. "…", 10) end
     -- One request per name, one after another; then decide.
     local results = {}
     local function fetch(i)
@@ -2048,22 +2052,43 @@ function app.sync_pull(how)
     fetch(1)
 end
 
+-- The server as it's called in Settings ("CrossPoint", or your own's name).
+function app.sync_server_name()
+    if app.KOSync.SERVERS[S.kosync_server] then return app.KOSync.SERVER_NAMES[S.kosync_server] end
+    return S.kosync_custom ~= "" and app.sync_own_name() or app.KOSync.SERVER_NAMES.crosspoint
+end
+
+-- A place in the open book, for messages: "24% · V: The Weissen Rössl".
+function app.sync_where(ch, off)
+    local pct = math.floor(book:fraction(ch, off) * 100 + 0.5) .. "%"
+    local label = #book.toc > 0 and app.find_label({ ch = ch, off = off }) or ""
+    return label ~= "" and label ~= book.title and (pct .. " · " .. label) or pct
+end
+
+-- A sync message: what happened in bold, then the details.
+function app.sync_say(head, detail, secs)
+    app.toast(detail and detail ~= "" and (head .. "\n" .. detail) or head, secs or (detail and 4 or 2))
+end
+
 function app.sync_decide(b, how, docs, results)
     local now = how == "now"
     for _, msg in ipairs(results) do
         if msg.kind ~= "done" then
             print("[sync] pull failed: " .. tostring(msg.message))
             app.sync.failed = love.timer.getTime()
-            if now then app.toast("Couldn't reach the sync server", 3) end
+            if now then app.sync_say("Couldn't reach the sync server", app.sync_server_name() .. ": " .. tostring(msg.message)) end
             return
         end
         if msg.status == 401 then
-            if now then app.toast("The sync server didn't accept your user name and password", 3) end
+            if now then
+                app.sync_say("The sync server didn't accept your password",
+                    S.kosync_user .. " on " .. app.sync_server_name() .. ". Log in again in Settings → KOReader Sync.", 5)
+            end
             return
         end
         if msg.status ~= 200 and msg.status ~= 404 then        -- (404: some servers' "nothing yet")
             print("[sync] pull: status " .. tostring(msg.status))
-            if now then app.toast("The sync server answered " .. tostring(msg.status), 3) end
+            if now then app.sync_say("The sync server had a problem", app.sync_server_name() .. " answered " .. tostring(msg.status) .. ". Try again later.") end
             return
         end
     end
@@ -2084,15 +2109,17 @@ function app.sync_decide(b, how, docs, results)
     local xp_here = b:xpointer(pos.ch, pos.off)
     -- This device's place stands: mark the book checked (sends may go from
     -- now on) and send it if it has moved here, or if the server's out of
-    -- date for it (send).
-    local function stands(say, send)
+    -- date for it (send). note: about the other device, for the message.
+    local function stands(send, note)
         app.sync.checked[b.path] = true
+        local where = app.sync_where(pos.ch, pos.off) .. (note and (" · " .. note) or "")
         if moved or send then
             if send then app.sync.pushed[b.path] = nil end
             app.sync_push()
-            say = "Sent your place (" .. here .. "%) to the sync server"
+            if now then app.sync_say("Sent your place to the sync server", where) end
+        elseif now then
+            app.sync_say("Already in sync", where)
         end
-        if now then app.toast(say) end
     end
     local function latest(list)
         local best
@@ -2117,7 +2144,7 @@ function app.sync_decide(b, how, docs, results)
     if not pick then
         -- Nothing from another device: our own place(s), or nothing yet.
         print("[sync] pull: " .. (#own > 0 and "this device's place" or "nothing there yet") .. (stale and ", sending" or ""))
-        return stands("Already in sync", stale)
+        return stands(stale, #own == 0 and "the first time for this book" or nil)
     end
     local r, rdoc = pick.r, pick.doc
     local new_there = #new > 0
@@ -2137,21 +2164,22 @@ function app.sync_decide(b, how, docs, results)
         tostring(r.device), frac * 100, tostring(r.progress), ch, off, new_there and "new" or "seen before",
         tostring(moved), tostring(same), tostring(r.timestamp), tostring(seen),
         rdoc == docs[1] and "first name" or "other name", #docs))
+    local device = (r.device and r.device ~= "") and r.device or "another device"
+    local there = math.floor(frac * 100 + 0.5) .. "%"
     if same then
         -- Nothing to do; the server's place counts as this one until you read on.
         app.sync_set_seen(b.path, rdoc, r.timestamp)
         moved = false
         app.sync.moved[b.path] = nil
         app.sync.pushed[b.path] = xp_here
-        return stands("Already in sync")
+        return stands(false, "same as " .. device)
     end
     if not new_there then
         -- Seen before (you went there, chose Stay, or it was checked already):
         -- what you've read here since goes out; asked by hand, go to it if
         -- you haven't.
-        if moved or not now then return stands("Already in sync", stale) end
+        if moved or not now then return stands(stale, device .. " was at " .. there) end
     end
-    local device = (r.device and r.device ~= "") and r.device or "another device"
     local function go()
         if book ~= b then return end
         app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
@@ -2163,15 +2191,17 @@ function app.sync_decide(b, how, docs, results)
         -- other way follow (the server already has it under this one).
         app.sync.pushed[b.path] = nil
         app.sync_push(nil, rdoc)
-        app.toast("Moved to " .. math.floor(frac * 100 + 0.5) .. "%, where you were on " .. device, 3)
+        app.sync_say("Moved to where you were on " .. device, app.sync_where(ch, off) .. " · " .. ago(r.timestamp))
     end
     if now and not moved then go() return end
     -- Until it's answered, nothing is sent for this book (not even on quitting).
     app.sync.checked[b.path] = nil
     app.sync.asked[b.path] = true           -- (not asked again on its own this time)
-    app.ask({ question = "Continue from " .. math.floor(frac * 100 + 0.5) .. "%?",
-        detail = "Where you were on " .. device .. ", " .. ago(r.timestamp)
-            .. (moved and (". Here you're at " .. here .. "%.") or ""),
+    local label = #b.toc > 0 and app.find_label({ ch = ch, off = off }) or ""
+    app.untoast()                           -- ("Syncing…")
+    app.ask({ question = "Continue from " .. there .. "?",
+        detail = (label ~= "" and label ~= b.title and (label .. ", ") or "") .. "where you were on " .. device .. " "
+            .. ago(r.timestamp) .. ". You're at " .. here .. "% here.",
         yes = "Jump", no = "Stay", on_yes = go,
         -- Stay: this device's place wins, and is sent.
         on_no = function()
@@ -2391,14 +2421,17 @@ end
 
 function app.sync_auth(user, key)
     if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
-    app.toast("Logging in…", 20)
+    app.toast("Logging in to " .. app.sync_server_name() .. "…", 20)
     shop.net_job(app.KOSync.auth_job(app.sync_url(), user, key), function(msg)
-        if msg.kind ~= "done" then app.toast("Couldn't reach the sync server", 3) return end
+        if msg.kind ~= "done" then
+            app.sync_say("Couldn't reach the sync server", app.sync_server_name() .. ": " .. tostring(msg.message))
+            return
+        end
         if msg.status == 200 then
             S.kosync_user, S.kosync_key = user, key
             Store.save_settings(S)
             app.sync.checked, app.sync.pushed = {}, {}
-            app.toast("Logged in as " .. user)
+            app.sync_say("Logged in as " .. user, "on " .. app.sync_server_name() .. ". Your place syncs as you read.")
             app.sync_pull()
         elseif msg.status == 401 then
             app.untoast()
@@ -2406,25 +2439,28 @@ function app.sync_auth(user, key)
                 .. "If it is yours, check the password instead.", yes = "Make it", no = "Cancel",
                 on_yes = function() app.sync_register(user, key) end })
         else
-            app.toast("The sync server answered " .. tostring(msg.status), 3)
+            app.sync_say("The sync server had a problem", app.sync_server_name() .. " answered " .. tostring(msg.status) .. ". Try again later.")
         end
     end)
 end
 
 function app.sync_register(user, key)
-    app.toast("Making the account…", 20)
+    app.toast("Making the account on " .. app.sync_server_name() .. "…", 20)
     shop.net_job(app.KOSync.register_job(app.sync_url(), user, key), function(msg)
-        if msg.kind ~= "done" then app.toast("Couldn't reach the sync server", 3) return end
+        if msg.kind ~= "done" then
+            app.sync_say("Couldn't reach the sync server", app.sync_server_name() .. ": " .. tostring(msg.message))
+            return
+        end
         if msg.status == 201 then
             S.kosync_user, S.kosync_key = user, key
             Store.save_settings(S)
             app.sync.checked, app.sync.pushed = {}, {}
-            app.toast("Account made. Logged in as " .. user, 3)
+            app.sync_say("Account made. Logged in as " .. user, "on " .. app.sync_server_name() .. ". Use the same name and password on your other device.", 5)
             app.sync_pull()
         elseif msg.status == 402 then
-            app.toast("That name is taken: if it's yours, check the password", 4)
+            app.sync_say("That name is taken", "If it's yours, check the password and log in again.", 4)
         else
-            app.toast("The sync server answered " .. tostring(msg.status), 3)
+            app.sync_say("The sync server had a problem", app.sync_server_name() .. " answered " .. tostring(msg.status) .. ". Try again later.")
         end
     end)
 end
@@ -4337,7 +4373,12 @@ function app.ask_draw()
     if q.detail and q.detail ~= "" then
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.printf(fit_text(ui.small, q.detail, w - 40), x + 20, top + 80, w - 40, "center")
+        -- Up to three lines (the last shortened if it runs on).
+        local _, lines = ui.small:getWrap(q.detail, w - 40)
+        if #lines > 3 then lines[3] = fit_text(ui.small, lines[3] .. " …", w - 40) end
+        for i = 1, math.min(3, #lines) do
+            love.graphics.printf(lines[i], x + 20, top + 76 + (i - 1) * (ui.small:getHeight() + 2), w - 40, "center")
+        end
     end
     local bx, by, bw, bh = app.ask_button("yes")
     app.button(bx, by, bw, bh, q.yes or "Yes", "A", "strong")

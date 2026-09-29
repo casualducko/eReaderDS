@@ -14,6 +14,20 @@
   has been dealt with is remembered per ID. A 404 counts as "nothing there
   yet" (some servers answer that way). Checked end to end against a stand-in
   server with the reported case and the book from it.
+- **Sync messages say more.** Each leads with what happened, then where:
+  "Already in sync · 10% · IV: The Clouded Moon", "Sent your place to the
+  sync server · 22% · VII: The Way of Love · CrossPoint was at 20%", "Moved to
+  where you were on CrossPoint · 21% · VII: The Way of Love · just now". The
+  question names the chapter too ("V: The Weissen Rössl, where you were on
+  CrossPoint 8 minutes ago. You're at 10% here."), and a question card's
+  detail now wraps to three lines instead of being cut off. Syncing by hand
+  shows "Syncing with CrossPoint…"; problems name the server and the reason
+  (and a refused password says to log in again); logging in or making an
+  account says which server.
+- **No more boxes by dashes** in Standard Ebooks books: their invisible word
+  joiners (U+FEFF, U+2060) and zero-width spaces are left out when drawing
+  (the fonts have no glyph for them). The text itself is unchanged, so places
+  and highlights stay where they were.
 
 ## v1.13.1
 

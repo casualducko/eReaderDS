@@ -9,7 +9,12 @@ local Hyphen = require("hyphen")
 
 local M = {}
 
+-- Invisible characters the fonts don't have (drawn as boxes): word joiners
+-- (Standard Ebooks puts one, U+FEFF or U+2060, before each dash) and the
+-- zero-width space. Only left out when drawing, so places in the text stay
+-- the same.
 local function sanitize(s)
+    if s:find("[\226\239]") then s = s:gsub("\226\129\160", ""):gsub("\226\128\139", ""):gsub("\239\187\191", "") end
     -- UTF-16 halves written as UTF-8 (ED A0..BF ..) pass utf8.len but can't be drawn.
     if s:find("\237[\160-\191]") then s = s:gsub("\237[\160-\191][\128-\191]", "\239\191\189") end
     if utf8.len(s) then return s end
