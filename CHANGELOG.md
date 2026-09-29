@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.10.1
 
 Full code review (every module), fixes only:
 

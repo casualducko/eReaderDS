@@ -2,6 +2,14 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.10.1
+Fixed a crash when tapping the My Books options card, and a damaged book or dictionary can no longer crash the app.
+Your place, bookmarks and settings are safe even when the SD card is full, and two copies of the same book keep separate highlight files.
+Quitting and closing Send Books no longer freeze while something is downloading or a phone is connected.
+Held the other way round, question cards and messages now appear on the touchscreen where you can tap them.
+Books look better: long web addresses and Chinese or Japanese text wrap properly, poems keep their blank lines, and plain text files read correctly.
+Find in Book carries on where it stopped, and many smaller fixes and speed-ups throughout.
+
 v1.10.0
 Hold it the other way round: in Settings → Reading & Device, set "Hold it with buttons" to "On the left" and everything turns around, for holding it with the buttons under your left hand.
 Held that way, the A, B, X and Y buttons work like a second D-pad: they turn pages while reading, and move and select in menus.
