@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.16.0
 
 - **Automatic sync: Off / Ask when opening / On** (Settings → KOReader
   Sync; default Ask when opening). Ask: opening a book checks the server and

@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.16.0
+KOReader Sync no longer sends your place without asking: when you open a book, it asks whether to continue from your other device or send your place. Choose Off, Ask when opening or On in Settings → KOReader Sync → Automatic sync.
+When your place is already on the sync server, Sync with KOReader says so, and when it was sent.
+
 v1.15.0
 KOReader Sync can go one way when you want it to: Settings → KOReader Sync has Send my place (puts your place on the server) and Get my place from the server (goes to where your other device got to, asking first if that's going back).
 Sync with KOReader on the first page of Settings still works out which way to go by itself.
