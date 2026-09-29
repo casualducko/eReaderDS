@@ -36,6 +36,17 @@ local THEMES = {
     { name = "Midnight",  bg = { 0.07, 0.07, 0.07 },    fg = { 0.78, 0.77, 0.74 }, dim = { 0.45, 0.44, 0.42 }, sel = { 0.22, 0.22, 0.22 } },
     { name = "Amber",     bg = { 0.075, 0.055, 0.035 }, fg = { 0.90, 0.64, 0.33 }, dim = { 0.55, 0.40, 0.22 }, sel = { 0.20, 0.14, 0.08 } },
     { name = "Black",     bg = { 0, 0, 0 },             fg = { 0.62, 0.62, 0.62 }, dim = { 0.36, 0.36, 0.36 }, sel = { 0.16, 0.16, 0.16 } },
+    -- Dark palettes readers and programmers like for long sessions (Gruvbox,
+    -- Nord, Solarized, Dracula, Catppuccin, Everforest), a warm dark sepia,
+    -- and red on black, which keeps eyes used to the dark.
+    { name = "Dark Sepia",     bg = { 0.169, 0.133, 0.098 }, fg = { 0.851, 0.780, 0.655 }, dim = { 0.561, 0.482, 0.376 }, sel = { 0.275, 0.220, 0.165 } },
+    { name = "Gruvbox",        bg = { 0.157, 0.157, 0.157 }, fg = { 0.922, 0.859, 0.698 }, dim = { 0.573, 0.514, 0.455 }, sel = { 0.235, 0.220, 0.212 } },
+    { name = "Nord",           bg = { 0.180, 0.204, 0.251 }, fg = { 0.847, 0.871, 0.914 }, dim = { 0.482, 0.533, 0.631 }, sel = { 0.263, 0.298, 0.369 } },
+    { name = "Solarized Dark", bg = { 0.000, 0.169, 0.212 }, fg = { 0.576, 0.631, 0.631 }, dim = { 0.396, 0.482, 0.514 }, sel = { 0.039, 0.271, 0.333 } },
+    { name = "Dracula",        bg = { 0.157, 0.165, 0.212 }, fg = { 0.902, 0.902, 0.875 }, dim = { 0.478, 0.525, 0.722 }, sel = { 0.267, 0.278, 0.353 } },
+    { name = "Catppuccin",     bg = { 0.118, 0.118, 0.180 }, fg = { 0.804, 0.839, 0.957 }, dim = { 0.498, 0.518, 0.612 }, sel = { 0.212, 0.220, 0.314 } },
+    { name = "Everforest",     bg = { 0.176, 0.208, 0.231 }, fg = { 0.827, 0.776, 0.667 }, dim = { 0.522, 0.573, 0.537 }, sel = { 0.263, 0.310, 0.333 } },
+    { name = "Red Night",      bg = { 0.000, 0.000, 0.000 }, fg = { 0.753, 0.224, 0.169 }, dim = { 0.431, 0.165, 0.133 }, sel = { 0.180, 0.059, 0.043 } },
 }
 -- Themes used to be saved as a number (their position in the original list).
 -- Listed alphabetically in Settings.

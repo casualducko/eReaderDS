@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Eight more dark themes**, after what readers and programmers pick for
+  long dark-screen sessions: **Dark Sepia** (warm brown paper at night),
+  **Gruvbox**, **Nord**, **Solarized Dark**, **Dracula**, **Catppuccin**,
+  **Everforest**, and **Red Night** (red on black, which keeps your eyes used
+  to the dark). Their text is a little softer than the originals' for
+  reading. All 19 themes are on the Themes page (tap Theme in Settings) and
+  can be the night theme.
+
 ## v1.10.1
 
 Full code review (every module), fixes only:
