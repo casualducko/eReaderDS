@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.13.1
+KOReader Sync remembers a place you've already jumped to (or chose to stay away from), even after restarting, so it isn't offered again. A newer one from your other device still is.
+If you read on while offline, your place is sent the next time you open the book.
+
 v1.13.0
 The on-screen keyboard: shift now capitalizes just the next letter (press it twice for caps lock), and you can move around in what you've typed: tap the text, or press up to it and use left and right.
 Typing a server address, keys for https://, http://, www. and .com save a trip to the symbols.

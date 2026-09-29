@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.13.1
 
 - **KOReader sync remembers what it's dealt with.** The server's timestamp
   for a place you've jumped to, stayed away from, or sent is now saved per
