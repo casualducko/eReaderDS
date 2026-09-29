@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **KOReader Sync's question is easier to read:** the line under "Continue from 53%?" (and under every other question card) is now the same size and colour as the question, and the card grows to fit it. A Kobo running KOReader is called "Kobo" instead of its model code ("Kobo_io").
+
 ## v1.16.0
 
 - **Automatic sync: Off / Ask when opening / On** (Settings → KOReader

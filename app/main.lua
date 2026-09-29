@@ -1986,6 +1986,15 @@ function app.sync_docs(b)
 end
 
 -- This device's id on the server: made once, kept in the settings.
+-- The other device's name for messages. KOReader on a Kobo sends its model
+-- code ("Kobo_io" on a Libra 2), so that's shown as just "Kobo".
+function app.sync_device_name(r)
+    local d = r.device or ""
+    if d == "" then return "another device" end
+    if d:match("^Kobo_") then return "Kobo" end
+    return d
+end
+
 function app.sync_device_id()
     if S.kosync_device == "" then
         local t = {}
@@ -2155,7 +2164,7 @@ end
 -- the other way follow.
 function app.sync_go(b, r, rdoc, ch, off)
     if book ~= b then return end
-    local device = (r.device and r.device ~= "") and r.device or "another device"
+    local device = app.sync_device_name(r)
     app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
     app.sync_set_seen(b.path, rdoc, r.timestamp)
     app.jump_to(ch, off)
@@ -2253,7 +2262,7 @@ function app.sync_decide(b, how, docs, results)
         tostring(r.device), frac * 100, tostring(r.progress), ch, off, new_there and "new" or "seen before",
         tostring(moved), tostring(same), tostring(r.timestamp), tostring(seen),
         rdoc == docs[1] and "first name" or "other name", #docs))
-    local device = (r.device and r.device ~= "") and r.device or "another device"
+    local device = app.sync_device_name(r)
     local there = math.floor(frac * 100 + 0.5) .. "%"
     if same then
         -- Nothing to do; the server's place counts as this one until you read on.
@@ -2317,7 +2326,7 @@ function app.sync_get_decide(b, docs, results)
     end
     local r, rdoc = pick.r, pick.doc
     local ch, off, frac = app.sync_target(b, r)
-    local device = (r.device and r.device ~= "") and r.device or "another device"
+    local device = app.sync_device_name(r)
     local sp = spread
     if sp and ch == sp.ch and off >= sp.pages[sp.pi].off and off < spread_end_off(sp) then
         app.sync_set_seen(b.path, rdoc, r.timestamp)
@@ -4552,25 +4561,28 @@ function app.ask_draw()
     local th = theme()
     local m = MARGINS[2]
     local x, w = m.inner, PAGE_W - m.outer - m.inner
-    local top = PAGE_H - 440
+    -- The detail, in the same size as the question so it's easy to read: up
+    -- to three lines (the last shortened if it runs on). The card grows
+    -- upwards to fit them above the buttons.
+    local lines, lh = {}, ui.font:getHeight() + 2
+    if q.detail and q.detail ~= "" then
+        local _
+        _, lines = ui.font:getWrap(q.detail, w - 20)
+        if #lines > 3 then lines[3] = fit_text(ui.font, lines[3] .. " …", w - 20) end
+    end
+    local n = math.min(3, #lines)
+    local bx, by, bw, bh = app.ask_button("yes")
+    local top = by - 34 - n * lh - (n > 0 and 84 or 70)
     color(th.bg)
     love.graphics.rectangle("fill", x - 30, top - 20, w + 60, PAGE_H - top + 20, 16, 16)
     color(th.sel)
-    love.graphics.rectangle("fill", x - 14, top, w + 28, 320, 14, 14)
+    love.graphics.rectangle("fill", x - 14, top, w + 28, by + bh + 50 - top, 14, 14)
     love.graphics.setFont(ui.font)
     color(th.fg)
-    love.graphics.printf(q.question, x, top + 26, w, "center")
-    if q.detail and q.detail ~= "" then
-        love.graphics.setFont(ui.small)
-        color(th.dim)
-        -- Up to three lines (the last shortened if it runs on).
-        local _, lines = ui.small:getWrap(q.detail, w - 40)
-        if #lines > 3 then lines[3] = fit_text(ui.small, lines[3] .. " …", w - 40) end
-        for i = 1, math.min(3, #lines) do
-            love.graphics.printf(lines[i], x + 20, top + 76 + (i - 1) * (ui.small:getHeight() + 2), w - 40, "center")
-        end
+    love.graphics.printf(q.question, x, top + 24, w, "center")
+    for i = 1, n do
+        love.graphics.printf(lines[i], x + 10, top + 84 + (i - 1) * lh, w - 20, "center")
     end
-    local bx, by, bw, bh = app.ask_button("yes")
     app.button(bx, by, bw, bh, q.yes or "Yes", "A", "strong")
     bx, by, bw, bh = app.ask_button("no")
     app.button(bx, by, bw, bh, q.no or "Keep", "B", "plain")
