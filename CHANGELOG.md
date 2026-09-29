@@ -14,6 +14,16 @@
   holds **https://**, **http://**, **www.**, **.com**, **:** and **/**. The
   first two set the address's start (replacing one already there), **www.**
   goes in after it, and the rest type at the end, so no trip to the #@ layer.
+- **Shift is for one letter**, then it's back to small letters, as on a
+  phone; press it again for caps lock (a bar under the arrow), and again to
+  turn it off.
+- **A cursor:** tap in the typed text to put it there, or press D-pad up
+  from the top row of keys to reach the text, then left/right move it (down
+  goes back to the keys). Typing, Delete and Space work at the cursor, and
+  the text scrolls to keep it in view. On a password, A there shows or hides
+  it, like the eye. (A `draw` test action draws the screen mid-script, so
+  scripted taps have something to measure.)
+- **Log out** of KOReader Sync asks first ("Log out of KOReader Sync?").
 
 ## v1.12.0
 

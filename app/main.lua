@@ -2191,10 +2191,13 @@ function app.sync_items()
             if not book then app.toast("Open a book first") else app.sync_pull("now") end
         end }
         items[#items + 1] = { label = "Log out", act = function()
-            S.kosync_user, S.kosync_key = "", ""
-            Store.save_settings(S)
-            app.sync.checked, app.sync.pushed = {}, {}
-            app.toast("Logged out of KOReader sync")
+            app.ask({ question = "Log out of KOReader Sync?", detail = S.kosync_user .. " on " .. shown,
+                yes = "Log out", no = "Stay", on_yes = function()
+                    S.kosync_user, S.kosync_key = "", ""
+                    Store.save_settings(S)
+                    app.sync.checked, app.sync.pushed = {}, {}
+                    app.toast("Logged out of KOReader sync")
+                end })
         end }
     end
     return join(section(nil, items), section("", { { label = "Back", act = close_sub } }))
@@ -4426,7 +4429,7 @@ function app.kb_open(opts)
     -- No key is highlighted until the D-pad is used (r, c = nil).
     app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "",
         submit = opts.submit, cancel = opts.cancel, back = app.mode, ok = opts.ok, secret = opts.secret,
-        allow_empty = opts.allow_empty, url = opts.url }
+        allow_empty = opts.allow_empty, url = opts.url, pos = #(opts.text or "") }
     app.kb_layer("lower")
     app.mode = "keyboard"
     redraw()
@@ -4448,34 +4451,63 @@ function app.kb_key_at(r, col)
     return #app.KB_ROWS[r]
 end
 
+-- The text is edited at the cursor, kb.pos: the number of bytes before it
+-- (always between characters). These step over one character.
+function app.kb_prev(s, i)
+    i = i - 1
+    while i > 0 and (s:byte(i + 1) or 0) >= 0x80 and s:byte(i + 1) < 0xC0 do i = i - 1 end
+    return math.max(0, i)
+end
+function app.kb_next(s, i)
+    i = i + 1
+    while i < #s and s:byte(i + 1) >= 0x80 and s:byte(i + 1) < 0xC0 do i = i + 1 end
+    return math.min(#s, i)
+end
+
 function app.kb_type(t)
     local kb = app.kb
-    if kb then kb.text = (kb.text .. t):sub(1, app.KB_MAX); redraw() end
+    if not kb or #kb.text + #t > app.KB_MAX then return end
+    kb.text = kb.text:sub(1, kb.pos) .. t .. kb.text:sub(kb.pos + 1)
+    kb.pos = kb.pos + #t
+    redraw()
 end
 
 function app.kb_press(key)
     local kb = app.kb
     if not kb then return end
     if key == "del" then
-        kb.text = kb.text:sub(1, -2)
+        -- The character before the cursor.
+        local p = app.kb_prev(kb.text, kb.pos)
+        kb.text, kb.pos = kb.text:sub(1, p) .. kb.text:sub(kb.pos + 1), p
     elseif key == "space" then
-        if kb.text ~= "" and kb.text:sub(-1) ~= " " then app.kb_type(" ") end
+        -- (not at the start, nor a second one)
+        if kb.pos > 0 and kb.text:sub(kb.pos, kb.pos) ~= " " then app.kb_type(" ") end
     elseif key == "cancel" then
         app.mode = kb.back
         app.kb = nil
         if kb.cancel then kb.cancel() end
     elseif key == "shift" then
-        app.kb_layer(kb.layer == "upper" and "lower" or "upper")
+        -- Once: the next letter is a capital. Twice: caps lock. Again: off.
+        if kb.layer ~= "upper" then app.kb_layer("upper"); kb.caps = false
+        elseif not kb.caps then kb.caps = true
+        else app.kb_layer("lower"); kb.caps = false end
     elseif key == "symbols" then
         app.kb_layer(kb.layer == "symbols" and "lower" or "symbols")
+        kb.caps = false
     elseif key:match("^scheme:") then
         -- https:// or http:// at the start, in place of the one there.
-        kb.text = (key:sub(8) .. kb.text:gsub("^%a+://", "")):sub(1, app.KB_MAX)
+        local old = #(kb.text:match("^%a+://") or "")
+        local new = key:sub(8)
+        kb.text = (new .. kb.text:sub(old + 1)):sub(1, app.KB_MAX)
+        kb.pos = math.min(#kb.text, kb.pos <= old and #new or kb.pos - old + #new)
     elseif key == "www" then
         -- After the scheme (if any), unless it's there already.
         local scheme, rest = kb.text:match("^(%a+://)(.*)$")
         scheme, rest = scheme or "", rest or kb.text
-        if not rest:match("^www%.") then kb.text = (scheme .. "www." .. rest):sub(1, app.KB_MAX) end
+        if not rest:match("^www%.") and #kb.text + 4 <= app.KB_MAX then
+            kb.text = scheme .. "www." .. rest
+            if kb.pos >= #scheme then kb.pos = kb.pos + 4 end
+        end
     elseif key == "ok" then
         local q = kb.text:gsub("^%s+", ""):gsub("%s+$", "")
         if q == "" and not kb.allow_empty then return end
@@ -4484,6 +4516,8 @@ function app.kb_press(key)
         kb.submit(q)
     else
         app.kb_type(key)
+        -- Shift is for one letter (unless caps lock is on).
+        if kb.layer == "upper" and not kb.caps and key:match("^%a$") then app.kb_layer("lower") end
     end
     redraw()
 end
@@ -4498,16 +4532,18 @@ function app.kb_action(a)
         return
     end
     if kb.r == 0 and (a == "left" or a == "prev" or a == "right" or a == "next") then
-        -- (the eye is alone on its row)
+        -- In the text field: move the cursor.
+        local back = a == "left" or a == "prev"
+        kb.pos = back and app.kb_prev(kb.text, kb.pos) or app.kb_next(kb.text, kb.pos)
     elseif a == "left" or a == "prev" then kb.c = (kb.c - 2) % #rows[kb.r] + 1
     elseif a == "right" or a == "next" then kb.c = kb.c % #rows[kb.r] + 1
     elseif a == "up" or a == "down" then
-        -- Keep to the same column: the key under the middle of this one. For
-        -- a password, the eye (row 0) sits above the top row.
+        -- Keep to the same column: the key under the middle of this one. The
+        -- text field (row 0) sits above the top row.
         if kb.r == 0 then
             kb.r = a == "down" and 1 or #rows
-            kb.c = app.kb_key_at(kb.r, 9)
-        elseif kb.secret and ((a == "up" and kb.r == 1) or (a == "down" and kb.r == #rows)) then
+            kb.c = app.kb_key_at(kb.r, 4.5)
+        elseif (a == "up" and kb.r == 1) or (a == "down" and kb.r == #rows) then
             kb.r = 0
         else
             local c0, c1 = app.kb_cols(kb.r, kb.c)
@@ -4515,7 +4551,7 @@ function app.kb_action(a)
             kb.c = app.kb_key_at(kb.r, (c0 + c1) / 2 - 0.01)
         end
     elseif a == "confirm" then
-        if kb.r == 0 then kb.reveal = not kb.reveal
+        if kb.r == 0 then kb.reveal = kb.secret and not kb.reveal     -- (a password's eye)
         elseif kb.r then app.kb_press(rows[kb.r][kb.c].key) end
     elseif a == "back" then
         if kb.text == "" then app.kb_press("cancel") else app.kb_press("del") end
@@ -4542,6 +4578,18 @@ function app.kb_tap(side, u, v)
             return
         end
     end
+    -- In the text: the cursor goes to the nearest gap between characters.
+    local kb = app.kb
+    if kb.hit and v >= 140 and v <= 256 then
+        local best, bd = kb.pos, math.huge
+        for _, b in ipairs(kb.hit) do
+            local d = math.abs(u - b[1])
+            if d < bd then best, bd = b[2], d end
+        end
+        kb.pos = best
+        redraw()
+        return
+    end
     local x0, unit = app.kb_geom()
     local r = math.floor((v - app.KB_TOP) / app.KB_ROW_H) + 1
     if r < 1 or r > #app.KB_ROWS or u < x0 - 10 or u > x0 + unit * 10 + 10 then return end
@@ -4550,6 +4598,40 @@ function app.kb_tap(side, u, v)
     local c = app.kb_key_at(r, col)
     if kb.r then kb.r, kb.c = r, c end              -- follow taps only once the D-pad is in use
     app.kb_press(app.KB_ROWS[r][c].key)
+end
+
+-- The typed text from x, at most w wide, with the cursor: scrolled so the
+-- cursor shows. Remembers where each gap between characters is (kb.hit), for
+-- taps. A hidden password shows a dot per character.
+function app.kb_draw_text(kb, x, y, w, th)
+    local F = ui.title
+    local chars = {}                                     -- { shown, byte position after it }
+    local hide = kb.secret and not kb.reveal
+    for p, ch in kb.text:gmatch("()([%z\1-\127\194-\244][\128-\191]*)") do
+        chars[#chars + 1] = { hide and "•" or ch, p + #ch - 1 }
+    end
+    local cur = 0                                        -- characters before the cursor
+    for i, c in ipairs(chars) do if c[2] <= kb.pos then cur = i end end
+    -- The first character shown: as far left as leaves the cursor in view.
+    local first, wid = cur + 1, 0
+    while first > 1 and wid + F:getWidth(chars[first - 1][1]) <= w - 6 do
+        first = first - 1
+        wid = wid + F:getWidth(chars[first][1])
+    end
+    local cx, hit = x, { { x, first > 1 and chars[first - 1][2] or 0 } }
+    local cursor_x = x
+    for i = first, #chars do
+        local cw = F:getWidth(chars[i][1])
+        if cx + cw > x + w then break end
+        love.graphics.print(chars[i][1], cx, y)
+        cx = cx + cw
+        hit[#hit + 1] = { cx, chars[i][2] }
+        if i == cur then cursor_x = cx end
+    end
+    kb.hit = hit
+    color(th.fg)
+    love.graphics.setLineWidth(3)
+    love.graphics.line(cursor_x + 1, y + F:getHeight() * 0.12, cursor_x + 1, y + F:getHeight() * 0.88)
 end
 
 -- The eye button at the end of a password field: x, y, w, h.
@@ -4577,9 +4659,14 @@ function app.kb_eye_icon(cx, cy, open, c)
     if not open then love.graphics.line(cx - 20, cy + 18, cx + 20, cy - 18) end
 end
 
--- The shift key's arrow: an outline, filled while capitals are on.
-function app.kb_shift_icon(cx, cy, on)
+-- The shift key's arrow: an outline; filled for the next letter; with a bar
+-- under it for caps lock.
+function app.kb_shift_icon(cx, cy, on, lock)
     local s = 16
+    if lock then
+        cy = cy - 4
+        love.graphics.rectangle("fill", cx - s * 0.45, cy + s + 5, s * 0.9, 4)
+    end
     local pts = { cx, cy - s * 1.25, cx + s, cy - s * 0.1, cx + s * 0.45, cy - s * 0.1,
         cx + s * 0.45, cy + s, cx - s * 0.45, cy + s, cx - s * 0.45, cy - s * 0.1, cx - s, cy - s * 0.1 }
     if on then        -- (not convex, so filled as triangles)
@@ -4611,7 +4698,8 @@ function app.kb_draw(side)
         -- The same list on every keyboard, with its own confirm key's name.
         local rows = { { "Type", "Tap the keys, or D-pad and A" }, { "B", "Delete (cancel when empty)" },
             { "Y", "Space" }, { "Start, X", kb.ok or "Search" } }
-        if kb.secret then rows[#rows + 1] = { "Eye", "Show or hide it (tap, or D-pad up)" } end
+        rows[#rows + 1] = { "Cursor", "Tap the text, or D-pad up to it and left/right" }
+        if kb.secret then rows[#rows + 1] = { "Eye", "Show or hide it (tap it, or A on the text)" } end
         for _, row in ipairs(rows) do
             color(th.fg)
             love.graphics.print(app.keys_text(row[1]), x, y)
@@ -4625,9 +4713,13 @@ function app.kb_draw(side)
     local x0, unit = app.kb_geom()
     color(th.sel)
     love.graphics.rectangle("fill", x0 - 8, 150, w + 16, 96, 12, 12)
+    if kb.r == 0 then                                   -- the D-pad is on the text
+        color(th.fg)
+        love.graphics.setLineWidth(3)
+        love.graphics.rectangle("line", x0 - 8, 150, w + 16, 96, 12, 12)
+    end
     love.graphics.setFont(ui.title)
     color(th.fg)
-    local shown = kb.text
     local tw = w - 20
     if kb.secret then
         -- The eye at the field's end shows or hides what's typed.
@@ -4636,12 +4728,8 @@ function app.kb_draw(side)
         app.kb_eye_icon(ex + ew / 2, ey + eh / 2, kb.reveal, kb.r == 0 and th.bg or th.fg)
         color(th.fg)
         tw = tw - ew - 12
-        if not kb.reveal then shown = string.rep("•", #kb.text:gsub("[\128-\191]", "")) end
     end
-    while ui.title:getWidth(shown .. "|") > tw and #shown > 0 do
-        shown = shown:sub(2):gsub("^[\128-\191]+", "")
-    end
-    love.graphics.print(shown .. "|", x0 + 8, 150 + (96 - ui.title:getHeight()) / 2)
+    app.kb_draw_text(kb, x0 + 8, 150 + (96 - ui.title:getHeight()) / 2, tw, th)
     -- The keys.
     love.graphics.setLineWidth(2)
     for r, row in ipairs(app.KB_ROWS) do
@@ -4664,7 +4752,7 @@ function app.kb_draw(side)
                 color(th.fg)
             end
             if k.key == "shift" then
-                app.kb_shift_icon(kx + kw / 2, ky + kh / 2, kb.layer == "upper")
+                app.kb_shift_icon(kx + kw / 2, ky + kh / 2, kb.layer == "upper", kb.caps)
             else
                 local label = k.key == "ok" and (kb.ok or "Search") or k.label
                 local f = #label > 1 and ui.font or ui.title
@@ -7851,6 +7939,7 @@ local function run_test_script()
             elseif a == "update" then app.update_open()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
+            elseif a == "draw" then render_canvases()           -- draw now (what taps measure against)
             elseif a:match("^btn:") then love.gamepadpressed(nil, a:sub(5))   -- a button as pressed (a, b, x, y, back, start)
             elseif a == "report" then app.report_open()
             elseif a == "receive" then app.recv_open()
