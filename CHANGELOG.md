@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Sync tells you your place is saved.** When the server already has this
+  device's current place (often because it was sent on its own when the book
+  opened), Sync with KOReader now says "Your place is saved on the sync
+  server · 53% · Chapter 25 · sent 2 minutes ago" instead of "Already in
+  sync"; that stays for when the other device is at the same place. A place
+  also counts as new when only the percentage moved (a long paragraph can
+  span pages), so reading on inside one is sent too.
+
 ## v1.15.0
 
 - **Send my place / Get my place from the server** (Settings → KOReader

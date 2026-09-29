@@ -2054,6 +2054,13 @@ function app.sync_pull(how)
     fetch(1)
 end
 
+-- This device's place as sent: the paragraph and the percentage (a long
+-- paragraph spans pages, so the percentage says you've moved on in it).
+function app.sync_place(b)
+    local xp = b:xpointer(pos.ch, pos.off)
+    return xp and (xp .. "|" .. string.format("%.3f", b:fraction(pos.ch, pos.off)))
+end
+
 -- The server as it's called in Settings ("CrossPoint", or your own's name).
 function app.sync_server_name()
     if app.KOSync.SERVERS[S.kosync_server] then return app.KOSync.SERVER_NAMES[S.kosync_server] end
@@ -2153,7 +2160,8 @@ function app.sync_decide(b, how, docs, results)
     -- This device's place stands: mark the book checked (sends may go from
     -- now on) and send it if it has moved here, or if the server's out of
     -- date for it (send). note: about the other device, for the message.
-    local function stands(send, note)
+    -- head: what to say when nothing needed sending ("Already in sync").
+    local function stands(send, note, head)
         app.sync.checked[b.path] = true
         local where = app.sync_where(pos.ch, pos.off) .. (note and (" · " .. note) or "")
         if moved or send then
@@ -2161,7 +2169,7 @@ function app.sync_decide(b, how, docs, results)
             app.sync_push()
             if now then app.sync_say("Sent your place to the sync server", where) end
         elseif now then
-            app.sync_say("Already in sync", where)
+            app.sync_say(head or "Already in sync", where)
         end
     end
     local function latest(list)
@@ -2182,12 +2190,22 @@ function app.sync_decide(b, how, docs, results)
     for _, d in ipairs(docs) do
         if not mine[d] then stale = true end
     end
-    for _, e in ipairs(own) do if e.r.progress ~= xp_here then stale = true end end
+    local frac_here = b:fraction(pos.ch, pos.off)
+    local own_ts = 0
+    for _, e in ipairs(own) do
+        if e.r.progress ~= xp_here or math.abs((tonumber(e.r.percentage) or 0) - frac_here) > 0.001 then stale = true end
+        own_ts = math.max(own_ts, tonumber(e.r.timestamp) or 0)
+    end
+    -- Nothing to send, and the server has this device's place: say so, and
+    -- when it went (it may have gone on its own, on opening the book).
+    local saved = #own > 0 and not stale and not moved
+    local saved_head = saved and "Your place is saved on the sync server" or nil
+    local saved_note = saved and ("sent " .. ago(own_ts)) or nil
     local pick = latest(new) or latest(old)
     if not pick then
         -- Nothing from another device: our own place(s), or nothing yet.
         print("[sync] pull: " .. (#own > 0 and "this device's place" or "nothing there yet") .. (stale and ", sending" or ""))
-        return stands(stale, #own == 0 and "the first time for this book" or nil)
+        return stands(stale, #own == 0 and "the first time for this book" or saved_note, saved_head)
     end
     local r, rdoc = pick.r, pick.doc
     local new_there = #new > 0
@@ -2207,14 +2225,16 @@ function app.sync_decide(b, how, docs, results)
         app.sync_set_seen(b.path, rdoc, r.timestamp)
         moved = false
         app.sync.moved[b.path] = nil
-        app.sync.pushed[b.path] = xp_here
+        app.sync.pushed[b.path] = app.sync_place(b)
         return stands(false, "same as " .. device)
     end
     if not new_there then
         -- Seen before (you went there, chose Stay, or it was checked already):
         -- what you've read here since goes out; asked by hand, go to it if
         -- you haven't.
-        if moved or not now then return stands(stale, device .. " was at " .. there) end
+        if moved or not now then
+            return stands(stale, (saved_note and (saved_note .. " · ") or "") .. device .. " was at " .. there, saved_head)
+        end
     end
     local function go() app.sync_go(b, r, rdoc, ch, off) end
     if now and not moved then go() return end
@@ -2296,6 +2316,7 @@ function app.sync_send()
     local meta = S.kosync_meta and { filename = b.path:match("([^/]+)$"), title = b.title, authors = b.author } or nil
     local frac = b:fraction(pos.ch, pos.off)
     local where = app.sync_where(pos.ch, pos.off)
+    local place = app.sync_place(b)
     app.toast("Sending your place to " .. app.sync_server_name() .. "…", 10)
     local left, ok_count, err = #docs, 0, nil
     for _, doc in ipairs(docs) do
@@ -2316,7 +2337,7 @@ function app.sync_send()
             if ok_count > 0 then
                 if book == b then
                     app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
-                    app.sync.pushed[b.path], app.sync.moved[b.path] = xp, nil
+                    app.sync.pushed[b.path], app.sync.moved[b.path] = place, nil
                 end
                 app.sync.failed = nil
                 app.sync_say("Sent your place to the sync server", where .. " · " .. app.sync_server_name())
@@ -2341,14 +2362,15 @@ function app.sync_push(now, skip)
     end
     local docs = app.sync_docs(b)
     local xp = #docs > 0 and b:xpointer(pos.ch, pos.off)
-    if not xp or app.sync.pushed[b.path] == xp or not shop.online() then return end
+    local place = app.sync_place(b)
+    if not xp or app.sync.pushed[b.path] == place or not shop.online() then return end
     local meta = S.kosync_meta and { filename = b.path:match("([^/]+)$"), title = b.title, authors = b.author } or nil
     local frac = b:fraction(pos.ch, pos.off)
     app.sync.last_push = love.timer.getTime()
     -- Sent: the server's timestamp for it is the one we've "seen" now.
     local function sent(doc, status, body)
         if not (status and status < 300) then return end
-        app.sync.pushed[b.path], app.sync.moved[b.path] = xp, nil
+        app.sync.pushed[b.path], app.sync.moved[b.path] = place, nil
         local ok, r = pcall(require("json").decode, body or "")
         if ok and type(r) == "table" and r.timestamp then app.sync_set_seen(b.path, doc, r.timestamp) end
     end
