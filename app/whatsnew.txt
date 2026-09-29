@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.13.0
+The on-screen keyboard: shift now capitalizes just the next letter (press it twice for caps lock), and you can move around in what you've typed: tap the text, or press up to it and use left and right.
+Typing a server address, keys for https://, http://, www. and .com save a trip to the symbols.
+The keyboard's instructions now match each field, and logging out of KOReader Sync asks first.
+
 v1.12.0
 Settings is laid out around what you need while reading: your book (contents, bookmarks, find, jump) and how the page looks (brightness first, then text size, theme and font) on the first page; things you set once on the second.
 If you use KOReader Sync, "Sync with KOReader" is now on the first page of Settings.

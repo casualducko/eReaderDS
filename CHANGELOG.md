@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.13.0
 
 - **Keyboards made consistent.** All six text fields (Find in Book, Get
   Books search, the KOReader account, password, server address and name)
