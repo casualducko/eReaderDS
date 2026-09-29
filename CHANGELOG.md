@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Line art on the page, not in a white box** (from a beta tester's Star
+  Wars and Ranger's Apprentice books): images that are mostly grayscale and
+  white with a pale edge (chapter numbers, ornaments, title pages, drawings)
+  are drawn in the theme's text colour, white becoming clear
+  (`app.is_line_art` samples ~4000 pixels when the image loads;
+  `app.INK_SHADER`), so they sit on Sepia, dark themes and E-ink like the
+  text. Photos and colour pictures are drawn as they are.
+
 ## v1.9.1
 
 - **KOReader Sync with CrossPoint:** after saving on an Xteink X4 a page or two

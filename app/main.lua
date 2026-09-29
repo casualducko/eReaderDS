@@ -95,6 +95,7 @@ app.page_offs = {}
 local function clear_book_caches()
     for _, img in pairs(images) do if img then img:release() end end
     images, images_order, image_dims = {}, {}, {}
+    app.image_ink = {}
     clear_pages()
 end
 local pos = { ch = 1, off = 0 }  -- reading position (start of left page)
@@ -168,6 +169,55 @@ end
 
 ---------------------------------------------------------------- images
 
+-- Line art (chapter numbers, ornaments, drawings, title pages): mostly
+-- grayscale and white, with a pale edge. Drawn in the page's ink instead of
+-- as a white box, so it sits on any theme like the text (photos and colour
+-- pictures are drawn as they are). A sample of pixels decides.
+app.image_ink = {}
+function app.is_line_art(id)
+    local w, h = id:getDimensions()
+    local step = math.max(1, math.floor(math.sqrt(w * h / 4096)))
+    local n, white, sat = 0, 0, 0
+    for y = 0, h - 1, step do
+        for x = 0, w - 1, step do
+            local r, g, b, a = id:getPixel(x, y)
+            n = n + 1
+            if a < 0.2 or math.min(r, g, b) > 0.88 then white = white + 1 end
+            sat = sat + (math.max(r, g, b) - math.min(r, g, b)) * a
+        end
+    end
+    local edge, pale = 0, 0
+    local function look(x, y)
+        local r, g, b, a = id:getPixel(x, y)
+        edge = edge + 1
+        if a < 0.2 or math.min(r, g, b) > 0.85 then pale = pale + 1 end
+    end
+    for x = 0, w - 1, math.max(1, math.floor(w / 64)) do look(x, 0); look(x, h - 1) end
+    for y = 0, h - 1, math.max(1, math.floor(h / 64)) do look(0, y); look(w - 1, y) end
+    return n > 0 and sat / n < 0.05 and white / n >= 0.4 and pale / edge >= 0.6
+end
+
+-- The shader, made once (nil if the GPU won't have it: then a white box).
+function app.ink_shader()
+    if app.ink_sh == nil then
+        local ok, sh = pcall(love.graphics.newShader, app.INK_SHADER)
+        app.ink_sh = ok and sh or false
+        if not ok then print("[images] ink shader unavailable: " .. tostring(sh)) end
+    end
+    return app.ink_sh or nil
+end
+
+-- Draws line art in the ink colour: dark becomes ink, white becomes clear.
+app.INK_SHADER = [[
+extern vec3 ink;
+vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
+    vec4 p = Texel(tex, tc);
+    float lum = dot(p.rgb, vec3(0.299, 0.587, 0.114));
+    float a = clamp((0.94 - lum) / 0.94, 0.0, 1.0) * p.a;
+    return vec4(ink, a * color.a);
+}
+]]
+
 -- Decoded image for drawing (least recently used ones are released).
 local function get_image(src)
     local img = images[src]
@@ -176,7 +226,12 @@ local function get_image(src)
         local data = book and book:read_resource(src)
         if data then
             local ok, res = pcall(function()
-                return love.graphics.newImage(love.filesystem.newFileData(data, src))
+                local id = love.image.newImageData(love.filesystem.newFileData(data, src))
+                local okl, line = pcall(app.is_line_art, id)
+                app.image_ink[src] = okl and line or nil
+                local image = love.graphics.newImage(id)
+                id:release()
+                return image
             end)
             if ok then img = res end
         end
@@ -185,7 +240,7 @@ local function get_image(src)
         if #images_order > IMAGES_KEEP then
             local old = table.remove(images_order, 1)
             if images[old] then images[old]:release() end
-            images[old] = nil
+            images[old], app.image_ink[old] = nil, nil
         end
     end
     return img or nil
@@ -2332,7 +2387,13 @@ local function draw_page(page, side, top)
             if img then
                 love.graphics.setColor(1, 1, 1)
                 local iw, ih = img:getDimensions()
+                local ink = app.image_ink[it.src] and app.ink_shader()
+                if ink then
+                    ink:send("ink", { th.fg[1], th.fg[2], th.fg[3] })
+                    love.graphics.setShader(ink)
+                end
                 love.graphics.draw(img, ox + it.x, oy + it.y, 0, it.w / iw, it.h / ih)
+                if ink then love.graphics.setShader() end
             end
         elseif it.kind == "rule" then
             color(th.dim)

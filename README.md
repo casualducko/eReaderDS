@@ -131,7 +131,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 ## Features
 
-- **Reading:** EPUB and plain text with italics, headings, images and covers;
+- **Reading:** EPUB and plain text with italics, headings, images and covers
+  (line art such as chapter numbers and ornaments is drawn in the page's own
+  ink, so it sits on any theme instead of in a white box);
   justified text with optional hyphenation (English); 18 built-in fonts plus
   your own; 11 themes (Sepia by default, plus E-ink, Paper, Midnight, Amber
   and more) that the whole app follows, and a night theme that switches on by
