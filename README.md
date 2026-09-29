@@ -8,7 +8,7 @@ to its full potential.
 eReaderDS is a two-page ebook reader for the **Anbernic RG DS Plus**. Hold the
 device sideways like an open book: each screen shows one page.
 
-![Reading, held sideways](docs/screenshots/reading.png)
+![eReaderDS on the RG DS Plus: My Books, turning pages, a bookmark, brightness and text size by touch, Settings and the Themes page, looking up and highlighting a word, the bookmarks and highlights list, and syncing with KOReader](docs/demo.gif)
 
 > For the **RG DS Plus on its stock firmware or ROCKNIX** (not the original RG
 > DS, and not other custom firmware such as KNULLI). Found a problem? Please
