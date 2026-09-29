@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.9.2
+Drawings in books, like chapter numbers and ornaments, now sit on the page in the text's colour instead of in a white box, on every theme.
+
 v1.9.1
 KOReader Sync: "Sync this book now" goes to where your other device is, even when it's only a page or two ahead.
 

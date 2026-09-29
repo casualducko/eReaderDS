@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.9.2
 
 - **Line art on the page, not in a white box** (from a beta tester's Star
   Wars and Ranger's Apprentice books): images that are mostly grayscale and
