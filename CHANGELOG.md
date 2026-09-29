@@ -7,8 +7,12 @@
   **Gruvbox**, **Nord**, **Solarized Dark**, **Dracula**, **Catppuccin**,
   **Everforest**, and **Red Night** (red on black, which keeps your eyes used
   to the dark). Their text is a little softer than the originals' for
-  reading. All 19 themes are on the Themes page (tap Theme in Settings) and
-  can be the night theme.
+  reading.
+- **Five more light themes:** **Gruvbox Light**, **Catppuccin Latte** and
+  **Rosé Pine Dawn** (the light versions of favourite palettes), **Parchment**
+  (warm, deeper cream) and **Sky** (pale blue: tinted pages some readers,
+  dyslexic readers especially, find easier than white). All 24 themes are on
+  the Themes page (tap Theme in Settings) and can be the night theme.
 
 ## v1.10.1
 

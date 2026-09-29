@@ -36,6 +36,14 @@ local THEMES = {
     { name = "Midnight",  bg = { 0.07, 0.07, 0.07 },    fg = { 0.78, 0.77, 0.74 }, dim = { 0.45, 0.44, 0.42 }, sel = { 0.22, 0.22, 0.22 } },
     { name = "Amber",     bg = { 0.075, 0.055, 0.035 }, fg = { 0.90, 0.64, 0.33 }, dim = { 0.55, 0.40, 0.22 }, sel = { 0.20, 0.14, 0.08 } },
     { name = "Black",     bg = { 0, 0, 0 },             fg = { 0.62, 0.62, 0.62 }, dim = { 0.36, 0.36, 0.36 }, sel = { 0.16, 0.16, 0.16 } },
+    -- Light versions of dark palettes listed below (Gruvbox, Catppuccin
+    -- Latte, Rosé Pine Dawn), a warm parchment, and a pale blue (tinted pages
+    -- some readers, dyslexic readers especially, find easier than white).
+    { name = "Gruvbox Light",    bg = { 0.984, 0.945, 0.780 }, fg = { 0.235, 0.220, 0.212 }, dim = { 0.486, 0.435, 0.392 }, sel = { 0.902, 0.851, 0.682 } },
+    { name = "Catppuccin Latte", bg = { 0.937, 0.945, 0.961 }, fg = { 0.298, 0.310, 0.412 }, dim = { 0.549, 0.561, 0.631 }, sel = { 0.835, 0.851, 0.890 } },
+    { name = "Rosé Pine Dawn",   bg = { 0.980, 0.957, 0.929 }, fg = { 0.341, 0.322, 0.475 }, dim = { 0.596, 0.576, 0.647 }, sel = { 0.918, 0.875, 0.839 } },
+    { name = "Parchment",        bg = { 0.929, 0.878, 0.769 }, fg = { 0.227, 0.180, 0.125 }, dim = { 0.490, 0.420, 0.322 }, sel = { 0.863, 0.796, 0.651 } },
+    { name = "Sky",              bg = { 0.894, 0.925, 0.957 }, fg = { 0.118, 0.165, 0.220 }, dim = { 0.369, 0.431, 0.502 }, sel = { 0.792, 0.843, 0.898 } },
     -- Dark palettes readers and programmers like for long sessions (Gruvbox,
     -- Nord, Solarized, Dracula, Catppuccin, Everforest), a warm dark sepia,
     -- and red on black, which keeps eyes used to the dark.
