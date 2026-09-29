@@ -11,7 +11,9 @@
   the two margin rows together, Justify, Hyphenation), **More settings**
   (Night Theme, which had a group to itself, Status Bar, Reading & Device,
   KOReader Sync), then Help (moved off page 1), About and Quit. The vague
-  "Main" and "Other" groups are gone.
+  "Main" and "Other" groups are gone. Every Settings page now uses one row
+  height (58 px; rows used to be 74 px on roomy pages and shrink on full
+  ones, so page 1's text looked bigger than page 2's).
 - **Night Theme is now Night Mode** (the row, its page, and the Themes page
   while choosing for night); inside, the row is just **Theme**.
 - **KOReader Sync → Server** opens its own page (tap or A): CrossPoint,

@@ -3385,7 +3385,9 @@ local MENU_HEADER_H, MENU_GAP_H = 27, 10
 -- (app.menu_on_page); others are filled in order. The page shown is the one
 -- with the selected item. Returns the visible rows (with y), the page and
 -- the number of pages.
-app.MENU_ROW_BIG = 74
+-- One row height on every Settings page, so the text looks the same size
+-- throughout (the fullest page, the second, needs this to fit).
+app.MENU_ROW = 58
 app.MENU_SIZE = 36                   -- the Settings rows' text (UI_SIZE is 30)
 app.MENU_AVAIL = MENU_BOTTOM - 44 - MENU_TOP       -- room above the page dots
 
@@ -3404,27 +3406,25 @@ local function menu_extra(items, i, first_on_page)
     return 0
 end
 
-app.MENU_ROW_FIT = 58                -- rows can shrink to this to keep a page whole
-
 function app.menu_pages(items)
     if items[1] and not items[1].page then
-        -- All on one page if it fits with slightly smaller rows...
+        -- All on one page if it fits...
         local total = 0
-        for i = 1, #items do total = total + menu_extra(items, i, i == 1) + app.MENU_ROW_FIT end
+        for i = 1, #items do total = total + menu_extra(items, i, i == 1) + app.MENU_ROW end
         if total <= app.MENU_AVAIL then
             for _, it in ipairs(items) do it.page = 1 end
             return 1
         end
-        -- ...else spread over pages of big rows.
+        -- ...else spread over pages.
         local page, used = 1, 0
         for i, it in ipairs(items) do
             local extra = menu_extra(items, i, used == 0)
-            if used > 0 and used + extra + app.MENU_ROW_BIG > app.MENU_AVAIL then
+            if used > 0 and used + extra + app.MENU_ROW > app.MENU_AVAIL then
                 page, used = page + 1, 0
                 extra = menu_extra(items, i, true)
             end
             it.page = page
-            used = used + extra + app.MENU_ROW_BIG
+            used = used + extra + app.MENU_ROW
         end
     end
     local n = 1
@@ -3453,7 +3453,8 @@ local function menu_layout(items)
     end
     -- Page 1 of the main page keeps a row's room for "Swipe for more options".
     local slots = n + ((menu.page == "main" and page == 1 and pages > 1) and 1 or 0)
-    local row_h = math.min(app.MENU_ROW_BIG, math.floor((app.MENU_AVAIL - extra) / math.max(1, slots)))
+    -- (smaller only if a page somehow holds more than fits)
+    local row_h = math.min(app.MENU_ROW, math.floor((app.MENU_AVAIL - extra) / math.max(1, slots)))
     local y = MENU_TOP
     for _, row in ipairs(rows) do
         if row.kind == "item" then row.h = row_h end
