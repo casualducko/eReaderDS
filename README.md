@@ -304,15 +304,52 @@ both have, it asks. It never sends an older place over a newer one without
 asking.
 
 Places are matched to the paragraph (you may land a page or so from where the
-other device was, since screens differ). EPUB books only.
+other device was, since screens differ). EPUB books only. A place you've
+already dealt with (jumped to, or chose Stay) isn't offered again, even after
+restarting; a newer one from the other device is. If a server is down,
+eReaderDS simply tries again later.
 
-**The same book on both devices:** **Match books by** must be the same on
-both. Choosing CrossPoint's server sets **File name** (CrossPoint's default:
-give the files the same name on both), KOReader's sets **File contents**
-(KOReader's default: both need the same file; Calibre can change a book when
-it sends it to a device). **Send book details** (off by default) adds the
-book's title, author and file name to what's sent, as KOReader and CrossPoint
-can. If a server is down, eReaderDS simply tries again later.
+### How it works
+
+The sync server keeps one small record per book for your account: **where
+you are** (a position KOReader understands, like "chapter 12, paragraph 37",
+plus a percentage), **which device** saved it, and **when**. It never gets
+the book itself, or anything else about it unless you turn on **Send book
+details**.
+
+### Match books by: File name or File contents
+
+The server never sees your files, so each device works out a short ID for a
+book, and both devices have to get the same ID for the same book. KOReader's
+protocol has two ways, and **every device syncing a book must use the same
+one**:
+
+- **File contents** (KOReader's default): the ID comes from small samples of
+  the file itself. Renaming or moving the file doesn't matter, but both
+  copies must be exactly the same file. A copy downloaded from somewhere else,
+  or one Calibre has rewritten while sending it to a device, gets a different
+  ID and silently won't sync.
+- **File name** (CrossPoint's default): the ID comes from the file's name,
+  such as `Dune - Frank Herbert.epub`. Copies match as long as the names are
+  exactly the same, even if the files differ a little; renaming one on
+  either device breaks the match.
+
+Choosing a server picks its readers' usual way (CrossPoint: File name;
+KOReader: File contents); change it if your other device is set differently.
+
+### Send book details
+
+Off by default. When on, each update also carries the book's **file name,
+title and author**, as KOReader (2026.05 and later) can. KOReader's own
+server ignores them; other servers can use them to show which book a record
+is. Syncing works the same either way: it only changes what the server can
+see.
+
+### With an Xteink X4 (CrossPoint)
+
+Server: **CrossPoint**; Match books by: **File name** (picking the server sets
+it); and give the book the same file name on both devices (copying the same
+`.epub` to both does that).
 
 ## Dictionaries
 

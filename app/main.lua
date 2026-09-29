@@ -456,7 +456,7 @@ local function prev_spread()
         return
     end
     save_progress_soon()
-    if app.sync then app.sync.moved[book.path] = true end
+    app.sync_tick()                            -- (KOReader sync: moved; the regular check)
 end
 
 -- TOC entries with resolved positions (chapter, offset).
@@ -1050,7 +1050,7 @@ local function open_book(path)
     save_progress()
     app.export_notes(true)                 -- highlights from before there were files
     app.sync.checked[path], app.sync.pushed[path], app.sync.asked[path] = nil, nil, nil
-    app.sync.seen[path], app.sync.moved[path] = nil, nil
+    app.sync.moved[path] = nil                 -- (what's been seen there is kept: app.sync_seen)
     app.sync_pull("open")                  -- where another device has got to
 end
 
@@ -1942,10 +1942,16 @@ end
 --    whose paragraph can't be found goes by its chapter and percentage.
 -- EPUB only: KOReader marks places in other kinds of file differently.
 app.KOSync = require("kosync")
-app.sync = { checked = {}, pushed = {}, docs = {}, asked = {}, seen = {}, moved = {}, last_push = 0, last_try = 0 }
+app.sync = { checked = {}, pushed = {}, docs = {}, asked = {}, moved = {}, last_push = 0, last_try = 0 }
 
 function app.sync_on() return S.kosync_user ~= "" and S.kosync_key ~= "" end
 function app.sync_url() return app.KOSync.server(S.kosync_server, S.kosync_custom) end
+
+-- The server's timestamp for a book's place that we've dealt with already
+-- (saved, per account and server, so a restart doesn't forget it).
+function app.sync_account() return S.kosync_user .. "@" .. app.sync_url() end
+function app.sync_seen(path) return Store.get_sync_seen(app.sync_account(), path) end
+function app.sync_set_seen(path, ts) Store.set_sync_seen(app.sync_account(), path, ts) end
 
 -- A new server: log in again there; match books the way its readers do.
 function app.sync_set_server(key)
@@ -2050,12 +2056,13 @@ function app.sync_pull(how)
             print("[sync] pull: nothing there yet")
             return stands(nil, true)
         end
-        local seen = app.sync.seen[b.path]
-        local new_there = r.device_id ~= S.kosync_device and (seen == nil or r.timestamp ~= seen)
-        app.sync.seen[b.path] = r.timestamp
+        local seen = app.sync_seen(b.path)
+        local new_there = r.device_id ~= S.kosync_device and (seen == nil or tostring(r.timestamp) ~= seen)
         if r.device_id == S.kosync_device then
+            -- Our own place: send this one if it's moved on since (read offline, say).
+            app.sync_set_seen(b.path, r.timestamp)
             print("[sync] pull: it's this device's place (" .. tostring(r.timestamp) .. ")")
-            return stands("Already in sync")
+            return stands("Already in sync", r.progress ~= b:xpointer(pos.ch, pos.off))
         end
         -- Where that is here: the paragraph, else its chapter and percentage.
         -- (CrossPoint often sends just its chapter, so the percentage decides.)
@@ -2073,20 +2080,23 @@ function app.sync_pull(how)
             tostring(moved), tostring(same), tostring(r.timestamp), tostring(seen)))
         if same then
             -- Nothing to do; the server's place counts as this one until you read on.
+            app.sync_set_seen(b.path, r.timestamp)
             moved = false
             app.sync.moved[b.path] = nil
             app.sync.pushed[b.path] = b:xpointer(pos.ch, pos.off)
             return stands("Already in sync")
         end
         if not new_there then
-            -- Seen before (you chose Stay, or it was checked already): what you've
-            -- read here since goes out; asked by hand, go to it if you haven't.
+            -- Seen before (you went there, chose Stay, or it was checked already):
+            -- what you've read here since goes out; asked by hand, go to it if
+            -- you haven't.
             if moved or not now then return stands("Already in sync") end
         end
         local device = (r.device and r.device ~= "") and r.device or "another device"
         local function go()
             if book ~= b then return end
             app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
+            app.sync_set_seen(b.path, r.timestamp)             -- dealt with
             app.jump_to(ch, off)
             app.mode = "reader"
             app.sync.moved[b.path] = nil
@@ -2105,6 +2115,7 @@ function app.sync_pull(how)
             on_no = function()
                 if book ~= b then return end
                 app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
+                app.sync_set_seen(b.path, r.timestamp)         -- dealt with
                 app.sync.pushed[b.path] = nil
                 app.sync_push()
             end })
@@ -2133,7 +2144,7 @@ function app.sync_push(now)
         if not (status and status < 300) then return end
         app.sync.pushed[b.path], app.sync.moved[b.path] = xp, nil
         local ok, r = pcall(require("json").decode, body or "")
-        if ok and type(r) == "table" and r.timestamp then app.sync.seen[b.path] = r.timestamp end
+        if ok and type(r) == "table" and r.timestamp then app.sync_set_seen(b.path, r.timestamp) end
     end
     if now then
         -- Waited for (the app may quit or sleep next), briefly, and not at all

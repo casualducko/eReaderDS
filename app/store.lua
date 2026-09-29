@@ -441,6 +441,44 @@ function M.set_finished(p, on)
     write_atomic(path("finished.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
 end
 
+-- sync-seen.txt: for KOReader sync, the server's timestamp for each book's
+-- place that this device has already dealt with (gone to, stayed, or sent),
+-- per account: account \t path \t timestamp. Kept across restarts, so an
+-- old place from another device isn't offered again.
+local seen
+local function load_seen()
+    if seen then return seen end
+    seen = {}
+    local f = io.open(path("sync-seen.txt"), "rb")
+    if f then
+        for line in lines(f) do
+            local a, p, t = line:match("^(.-)\t(.-)\t(.+)$")
+            if a then seen[a .. "\t" .. p] = t end
+        end
+        f:close()
+    end
+    return seen
+end
+
+function M.get_sync_seen(account, p) return load_seen()[account .. "\t" .. p] end
+
+-- ts nil: forget it. account alone (p nil): forget that account's.
+function M.set_sync_seen(account, p, ts)
+    local all = load_seen()
+    if p then
+        local key = account .. "\t" .. p
+        ts = ts ~= nil and tostring(ts) or nil
+        if all[key] == ts then return end
+        all[key] = ts
+    else
+        for k in pairs(all) do if k:sub(1, #account + 1) == account .. "\t" then all[k] = nil end end
+    end
+    local out = {}
+    for k, t in pairs(all) do out[#out + 1] = k .. "\t" .. t end
+    table.sort(out)
+    write_atomic(path("sync-seen.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
+end
+
 -- Forget a deleted book: its progress, bookmarks and "last opened".
 function M.forget(p)
     load_progress()[p] = nil

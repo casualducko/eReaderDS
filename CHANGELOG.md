@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- **KOReader sync remembers what it's dealt with.** The server's timestamp
+  for a place you've jumped to, stayed away from, or sent is now saved per
+  account, server and book (`sync-seen.txt`), not just kept until quitting.
+  Before, after a restart an old place from another device looked new again
+  and could be offered ("Continue from 40%?") even when you'd read past it.
+- **A place read offline goes out.** If the server's record is this device's
+  own but older than where you are (read on offline, then quit), it's sent
+  when the book opens, instead of waiting for a page turn.
+- Paging back now counts for sync's regular check, like paging forward.
+- Checked end to end against a stand-in server: a new place is offered,
+  Jump is remembered across restarts, a newer place is offered again, Stay
+  sends this place, and an out-of-date own record is replaced.
+- **README:** how KOReader Sync works, what File name and File contents mean
+  (and why every device must use the same), what Send book details sends, and
+  the settings for an Xteink X4.
+
 ## v1.13.0
 
 - **Keyboards made consistent.** All six text fields (Find in Book, Get
