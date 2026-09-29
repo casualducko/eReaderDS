@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **KOReader Sync's question is easier to read:** every question card has a bold question, and the line under it is now full size and dark (the card grows to fit it). The sync questions say it in two short lines, like "Kobo, just now · Chapter 10" and "Here: 54%". A Kobo running KOReader is called "Kobo" instead of its model code ("Kobo_io").
+- **KOReader Sync's question is easier to read:** every question card has a bold question, and the line under it is now full size and dark (the card grows to fit it). The sync questions now say plainly where your other device is: "Continue from your Kobo?", "3 pages ahead, in Chapter 10", "Saved on Kobo 3 minutes ago". In the chapter you're reading the distance is counted in pages, since a few pages apart both places round to the same percentage. A Kobo running KOReader is called "Kobo" instead of its model code ("Kobo_io").
 
 ## v1.16.0
 

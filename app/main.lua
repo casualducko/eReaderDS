@@ -1995,6 +1995,27 @@ function app.sync_device_name(r)
     return d
 end
 
+-- Where another device's place is, from the spread you're on, for the sync
+-- questions. In the chapter you're reading it's counted in pages ("3 pages
+-- ahead, in Chapter 10"): percentages round to the same number a few pages
+-- apart. Elsewhere, its chapter and percentage beside yours.
+function app.sync_distance(b, ch, off, frac)
+    local label = #b.toc > 0 and app.find_label({ ch = ch, off = off }) or ""
+    local chap = (label ~= "" and label ~= b.title) and label or nil
+    local sp = spread
+    if b == book and sp and ch == sp.ch then
+        local j = 1
+        for i, p in ipairs(sp.pages) do if p.off <= off then j = i end end
+        local d = j - sp.pi
+        local n = math.abs(d)
+        local t = d == 0 and "On this page" or ((n == 1 and "1 page " or (n .. " pages ")) .. (d > 0 and "ahead" or "back"))
+        return chap and (t .. ", in " .. chap) or t
+    end
+    local here = sp and b == book and math.floor(b:fraction(sp.ch, sp.pages[sp.pi].off) * 100 + 0.5)
+    return (chap and (chap .. ", ") or "") .. math.floor(frac * 100 + 0.5) .. "%"
+        .. (here and (" (you're at " .. here .. "%)") or "")
+end
+
 function app.sync_device_id()
     if S.kosync_device == "" then
         local t = {}
@@ -2011,6 +2032,11 @@ local function ago(t)
     if d < 7200 then return math.floor(d / 60) .. " minutes ago" end
     if d < 172800 then return math.floor(d / 3600) .. " hours ago" end
     return math.floor(d / 86400) .. " days ago"
+end
+
+-- The sync questions' second line: "Saved on Kobo 3 minutes ago".
+function app.sync_saved_line(device, r)
+    return "Saved on " .. device .. " " .. ago(r.timestamp)
 end
 
 -- Ask the server where the open book is up to, and decide, the way
@@ -2197,9 +2223,9 @@ function app.sync_decide(b, how, docs, results)
             end
             app.untoast()
             app.ask({ question = "Send your place to the sync server?",
-                detail = "Here: " .. where .. "\n" .. app.sync_server_name() .. ": "
-                    .. (last and (math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5) .. "%, " .. ago(last.r.timestamp))
-                        or "nothing for this book yet"),
+                detail = "You're at " .. where .. "\n" .. app.sync_server_name()
+                    .. (last and (" has " .. math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5) .. "%, from " .. ago(last.r.timestamp))
+                        or " has nothing for this book yet"),
                 yes = "Send", no = "Not now", on_yes = function()
                     if book ~= b then return end
                     app.sync.pushed[b.path] = nil
@@ -2285,11 +2311,9 @@ function app.sync_decide(b, how, docs, results)
     -- Until it's answered, nothing is sent for this book (not even on quitting).
     app.sync.checked[b.path] = nil
     app.sync.asked[b.path] = true           -- (not asked again on its own this time)
-    local label = #b.toc > 0 and app.find_label({ ch = ch, off = off }) or ""
     app.untoast()                           -- ("Syncing…")
-    app.ask({ question = "Continue from " .. there .. "?",
-        detail = device .. ", " .. ago(r.timestamp) .. (label ~= "" and label ~= b.title and (" · " .. label) or "")
-            .. "\nHere: " .. here .. "%",
+    app.ask({ question = device == "another device" and "Continue from another device?" or ("Continue from your " .. device .. "?"),
+        detail = app.sync_distance(b, ch, off, frac) .. "\n" .. app.sync_saved_line(device, r),
         yes = "Jump", no = "Stay", on_yes = go,
         -- Stay: this device's place wins (and is sent when automatic sync
         -- is On; otherwise Send my place does that).
@@ -2336,11 +2360,9 @@ function app.sync_get_decide(b, docs, results)
     local here = b:fraction(pos.ch, pos.off)
     if b:fraction(ch, off) < here - 0.005 then
         -- Backwards: make sure.
-        local label = #b.toc > 0 and app.find_label({ ch = ch, off = off }) or ""
         app.untoast()
-        app.ask({ question = "Go back to " .. math.floor(frac * 100 + 0.5) .. "%?",
-            detail = device .. ", " .. ago(r.timestamp) .. (label ~= "" and label ~= b.title and (" · " .. label) or "")
-                .. "\nHere: " .. math.floor(here * 100 + 0.5) .. "%",
+        app.ask({ question = "Go back to where you were on " .. device .. "?",
+            detail = app.sync_distance(b, ch, off, frac) .. "\n" .. app.sync_saved_line(device, r),
             yes = "Go back", no = "Stay", on_yes = function() app.sync_go(b, r, rdoc, ch, off) end })
         return
     end
