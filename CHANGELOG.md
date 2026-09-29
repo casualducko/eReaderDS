@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.15.0
 
 - **Send my place / Get my place from the server** (Settings → KOReader
   Sync), like KOReader's Push and Pull, for choosing the direction yourself;
