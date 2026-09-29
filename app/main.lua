@@ -45,7 +45,7 @@ local THEMES = {
     { name = "Parchment",        bg = { 0.929, 0.878, 0.769 }, fg = { 0.227, 0.180, 0.125 }, dim = { 0.490, 0.420, 0.322 }, sel = { 0.863, 0.796, 0.651 } },
     { name = "Sky",              bg = { 0.894, 0.925, 0.957 }, fg = { 0.118, 0.165, 0.220 }, dim = { 0.369, 0.431, 0.502 }, sel = { 0.792, 0.843, 0.898 } },
     -- The Kindle app's green page: pale mint, dark gray-green text; restful at low brightness.
-    { name = "Green",            bg = { 0.800, 0.902, 0.816 }, fg = { 0.247, 0.302, 0.271 }, dim = { 0.431, 0.506, 0.463 }, sel = { 0.698, 0.831, 0.722 } },
+    { name = "Mint",             bg = { 0.800, 0.902, 0.816 }, fg = { 0.247, 0.302, 0.271 }, dim = { 0.431, 0.506, 0.463 }, sel = { 0.698, 0.831, 0.722 } },
     -- Dark palettes readers and programmers like for long sessions (Gruvbox,
     -- Nord, Solarized, Dracula, Catppuccin, Everforest), a warm dark sepia,
     -- and red on black, which keeps eyes used to the dark.
@@ -216,7 +216,11 @@ function app.is_line_art(id)
     end
     for x = 0, w - 1, math.max(1, math.floor(w / 64)) do look(x, 0); look(x, h - 1) end
     for y = 0, h - 1, math.max(1, math.floor(h / 64)) do look(0, y); look(w - 1, y) end
-    return n > 0 and sat / n < 0.05 and white / n >= 0.4 and pale / edge >= 0.6
+    if n == 0 or sat / n >= 0.05 then return false end
+    -- Tiny and gray: a letter or mark drawn as a picture ("ə"), often cropped
+    -- tight, so with little white around it.
+    if w <= 48 and h <= 48 then return white / n >= 0.2 end
+    return white / n >= 0.4 and pale / edge >= 0.6
 end
 
 -- The shader, made once (nil if the GPU won't have it: then a white box).
@@ -7579,6 +7583,9 @@ function love.load()
     -- "Night" was renamed "Midnight" (the night theme setting made it confusing).
     if S.theme == "Night" then S.theme = "Midnight" end
     if S.night_theme == "Night" then S.night_theme = "Midnight" end
+    -- "Green" (its name in test builds) is now "Mint".
+    if S.theme == "Green" then S.theme = "Mint" end
+    if S.night_theme == "Green" then S.night_theme = "Mint" end
     Timezone.apply(S.tz)
     app.night_check()
     Touch.open("gt9xx-0")

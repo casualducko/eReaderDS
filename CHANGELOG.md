@@ -11,10 +11,19 @@
 - **Five more light themes:** **Gruvbox Light**, **Catppuccin Latte** and
   **Rosé Pine Dawn** (the light versions of favourite palettes), **Parchment**
   (warm, deeper cream) and **Sky** (pale blue: tinted pages some readers,
-  dyslexic readers especially, find easier than white), and **Green** (the
+  dyslexic readers especially, find easier than white), and **Mint** (the
   Kindle app's pale mint page with dark gray-green text, restful at low brightness;
   greener than Sage). All 25 themes are on
   the Themes page (tap Theme in Settings) and can be the night theme.
+- **Letters drawn as pictures stay in the line.** Some older EPUBs spell
+  characters their fonts lacked with tiny images (Daemon's "dē′mən":
+  `d<img src="ebar.jpg"/>’m<img src="e.jpg"/>n`); each one used to break the
+  line and sit on its own. An image glued to the text (no space) now stays in
+  its word: letter-sized ones grow with the text size, sit on the baseline and
+  take the theme's ink; a large one still gets a block of its own. Other
+  images are handled as before, and KOReader positions are unchanged (checked
+  on 100,000 positions). Tiny gray images count as line art even when cropped
+  tight, so they don't show a white box on dark themes.
 
 ## v1.10.1
 

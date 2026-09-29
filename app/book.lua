@@ -2,6 +2,7 @@
 --
 -- Block kinds:
 --   text  { runs = {{text, i, b, off}}, center, heading (0,1,2), list }
+--         (a run can instead be { br } or { img = src }: a picture in the line)
 --   blank { off }           -- empty paragraph / scene break
 --   rule  { off }           -- <hr>
 --   image { src, off }      -- path inside the zip
@@ -186,7 +187,7 @@ local function parse_html(html, base, classes, show_notes)
             end
             local has = false
             for _, r in ipairs(cur.runs) do
-                if r.br or r.text:find("%S") then has = true; break end
+                if r.br or r.img or r.text:find("%S") then has = true; break end
             end
             if has then
                 blocks[#blocks + 1] = cur
@@ -216,7 +217,7 @@ local function parse_html(html, base, classes, show_notes)
         local s = style()
         local runs = cur.runs
         local last = runs[#runs]
-        if last and not last.br and last.i == s.i and last.b == s.b and last.link == s.link and last.sup == s.sup then
+        if last and not last.br and not last.img and last.i == s.i and last.b == s.b and last.link == s.link and last.sup == s.sup then
             -- Collected and joined once in flush: a paragraph of thousands of
             -- <span>s would otherwise be copied over and over.
             if not last.parts then last.parts = { last.text } end
@@ -228,7 +229,7 @@ local function parse_html(html, base, classes, show_notes)
                 -- label ("[1] The note..."), not a reference to a note.
                 local lead = true
                 for _, r in ipairs(runs) do
-                    if r.br or r.blank_free or (r.text and r.text:find("%S")) then lead = false; break end
+                    if r.br or r.img or r.blank_free or (r.text and r.text:find("%S")) then lead = false; break end
                 end
                 s.link.lead = lead
             end
@@ -371,8 +372,20 @@ local function parse_html(html, base, classes, show_notes)
                     elseif name == "img" or name == "image" then
                         local src = attr(tag, "src") or attr(tag, "xlink:href") or attr(tag, "href")
                         if src and skipping == 0 and not style().hidden then
-                            flush()
-                            blocks[#blocks + 1] = { kind = "image", src = resolve(base, src), off = off, node = last_node }
+                            -- Glued to the text around it ("d<img/>’m": a letter
+                            -- the book's fonts lacked, drawn as a picture), it
+                            -- stays in the line; otherwise it's a block of its own.
+                            local last = cur and cur.runs[#cur.runs]
+                            local prev = last and not last.br and not last.img
+                                and (last.parts and last.parts[#last.parts] or last.text or ""):sub(-1) or ""
+                            if cur and (prev:match("%S") or html:sub(pos, pos):match("[^%s<]")) then
+                                local s = style()
+                                cur.runs[#cur.runs + 1] = { img = resolve(base, src), off = off, i = s.i, b = s.b, link = s.link,
+                                    node = last_node }
+                            else
+                                flush()
+                                blocks[#blocks + 1] = { kind = "image", src = resolve(base, src), off = off, node = last_node }
+                            end
                             off = off + 1
                         end
                     else
@@ -742,13 +755,18 @@ function Book:resolve_xpointer(xp)
         end
         return p
     end
-    for _, b in ipairs(c.blocks) do
-        local node = b.node
+    local function add(node, off)
         while node and node.parent do
             local key = path(node)
             if first[key] then break end
-            first[key] = b.off
+            first[key] = off
             node = node.parent
+        end
+    end
+    for _, b in ipairs(c.blocks) do
+        add(b.node, b.off)
+        for _, r in ipairs(b.runs or {}) do            -- pictures in a line (letters)
+            if r.node then add(r.node, r.off) end
         end
     end
     for n = #steps, 1, -1 do

@@ -44,6 +44,24 @@ function M.paginate(chapter, ctx)
 
     local prev_kind = "start"   -- used for first-line indent decisions
 
+    -- A picture on its own, centred, as big as fits (small ones, icons and
+    -- ornaments, stay small). false if its size can't be read.
+    local function place_image(src, off)
+        local iw, ih = ctx.image_size(src)
+        if not (iw and iw > 0) then return false end
+        local s = math.min(W / iw, H / ih, ctx.max_image_scale or 3)
+        local dw, dh = math.floor(iw * s), math.floor(ih * s)
+        if iw < 64 and ih < 64 then
+            s = math.min(W / iw, H / ih, 1.5); dw, dh = math.floor(iw * s), math.floor(ih * s)
+        end
+        if y + dh > H then new_page() end
+        mark(off)
+        page.items[#page.items + 1] = { kind = "image", src = src,
+            x = math.floor((W - dw) / 2), y = y, w = dw, h = dh }
+        y = y + dh + math.floor(base_lh / 3)
+        return true
+    end
+
     -- Start a new page at each section start (e.g. chapters listed in the TOC).
     local breaks, bi = ctx.breaks or {}, 1
 
@@ -65,21 +83,7 @@ function M.paginate(chapter, ctx)
             prev_kind = "rule"
 
         elseif blk.kind == "image" then
-            local iw, ih = ctx.image_size(blk.src)
-            if iw and iw > 0 then
-                local s = math.min(W / iw, H / ih, ctx.max_image_scale or 3)
-                local dw, dh = math.floor(iw * s), math.floor(ih * s)
-                -- Small inline images (icons, ornaments) stay small.
-                if iw < 64 and ih < 64 then
-                    s = math.min(W / iw, H / ih, 1.5); dw, dh = math.floor(iw * s), math.floor(ih * s)
-                end
-                if y + dh > H then new_page() end
-                mark(blk.off)
-                page.items[#page.items + 1] = { kind = "image", src = blk.src,
-                    x = math.floor((W - dw) / 2), y = y, w = dw, h = dh }
-                y = y + dh + math.floor(base_lh / 3)
-                prev_kind = "image"
-            end
+            if place_image(blk.src, blk.off) then prev_kind = "image" end
 
         elseif blk.kind == "text" then
             local heading = blk.heading or 0
@@ -102,6 +106,23 @@ function M.paginate(chapter, ctx)
                 if run.br then
                     end_word()
                     words[#words + 1] = { br = true, off = run.off }
+                elseif run.img then
+                    -- A picture in the line. Letter-sized ones (made for text
+                    -- of about 16 px) grow with the text and join the word
+                    -- they're in; a bigger one gets a block of its own.
+                    local iw, ih = ctx.image_size(run.img)
+                    if iw and iw > 0 and ih > 0 and iw <= 64 and ih <= 48 then
+                        local s = size / 16
+                        local dh = math.min(ih * s, lh * 0.9)
+                        local dw = math.floor(iw * dh / ih + 0.5)
+                        dh = math.floor(dh + 0.5)
+                        if not cur then cur = { frags = {}, w = 0, off = run.off } end
+                        cur.frags[#cur.frags + 1] = { img = run.img, w = dw, h = dh, font = font_for(run.i, run.b) }
+                        cur.w = cur.w + dw
+                    elseif iw and iw > 0 then
+                        end_word()
+                        words[#words + 1] = { block_img = run.img, off = run.off }
+                    end
                 else
                     local t, font = run.text, font_for(run.i, run.b)
                     -- Superscripts (mostly note numbers): smaller and raised.
@@ -165,6 +186,13 @@ function M.paginate(chapter, ctx)
                     local ty = y + math.floor((lh - (big and F.h or F.r):getHeight()) / 2)
                     for k, wd in ipairs(line) do
                         for _, fr in ipairs(wd.frags) do
+                          if fr.img then
+                            -- Sitting on the baseline, like a letter.
+                            local base = ty + (big and F.h or F.r):getBaseline()
+                            page.items[#page.items + 1] = { kind = "image", src = fr.img, x = math.floor(x + 0.5),
+                                y = math.floor(base - fr.h), w = fr.w, h = fr.h }
+                            x = x + fr.w
+                          else
                             -- Line up baselines (a smaller font has a shorter ascent), then raise.
                             local by = ty
                             if fr.font ~= (big and F.h or F.r) then
@@ -174,6 +202,7 @@ function M.paginate(chapter, ctx)
                             page.items[#page.items + 1] = { kind = "text", x = math.floor(x + 0.5), y = math.floor(by),
                                 text = fr.text, font = fr.font, link = fr.link, off = wd.off }
                             x = x + fr.w
+                          end
                         end
                         if k < #line then x = x + gap end
                     end
@@ -184,7 +213,7 @@ function M.paginate(chapter, ctx)
                 -- Split a word so its first part (plus a hyphen) fits in
                 -- `room`; returns the two parts, or nil.
                 local function split(wd, room)
-                    if #wd.frags ~= 1 then return nil end    -- mixed styles: keep whole
+                    if #wd.frags ~= 1 or wd.frags[1].img then return nil end    -- mixed styles: keep whole
                     local fr = wd.frags[1]
                     local best
                     for _, b in ipairs(Hyphen.breaks(fr.text)) do
@@ -204,7 +233,7 @@ function M.paginate(chapter, ctx)
                 -- spaces such as Chinese or Japanese): break it between
                 -- characters, as much as fits in `room` (at least one).
                 local function hard_split(wd, room)
-                    if #wd.frags ~= 1 then return nil end
+                    if #wd.frags ~= 1 or wd.frags[1].img then return nil end
                     local fr = wd.frags[1]
                     local cuts = {}                  -- byte offsets where a character ends
                     for p in fr.text:gmatch("()[\1-\127\192-\255][\128-\191]*") do
@@ -226,7 +255,11 @@ function M.paginate(chapter, ctx)
                 local hyphen_run = 0      -- consecutive lines ending in a hyphen
                 local after_br = false    -- the line so far ended with a <br>
                 for _, wd in ipairs(words) do
-                    if wd.br then
+                    if wd.block_img then
+                        emit(true)
+                        if place_image(wd.block_img, wd.off) then first = false end
+                        after_br = false
+                    elseif wd.br then
                         if #line == 0 and after_br and y > 0 then
                             -- <br><br>: an empty line (a gap between verses)
                             if y + lh > H then new_page() else y = y + lh end
