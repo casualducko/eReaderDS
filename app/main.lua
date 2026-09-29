@@ -1892,29 +1892,35 @@ function app.sync_pull(how)
         local seen = app.sync.seen[b.path]
         local new_there = r.device_id ~= S.kosync_device and (seen == nil or r.timestamp ~= seen)
         app.sync.seen[b.path] = r.timestamp
-        if not new_there then
-            print("[sync] pull: nothing new there")
+        if r.device_id == S.kosync_device then
+            print("[sync] pull: it's this device's place (" .. tostring(r.timestamp) .. ")")
             return stands("Already in sync")
         end
         -- Where that is here: the paragraph, else its chapter and percentage.
+        -- (CrossPoint often sends just its chapter, so the percentage decides.)
         local frac = math.max(0, math.min(1, tonumber(r.percentage) or 0))
         local ch, off = b:resolve_xpointer(r.progress)
         if not off then
             local lc, loff = b:locate(frac)
             if not ch or lc == ch then ch, off = lc, loff else off = 0 end
         end
-        print(string.format("[sync] pull: %s at %.1f%% (%s) -> chapter %d offset %d; moved here: %s", tostring(r.device),
-            frac * 100, tostring(r.progress), ch, off, tostring(moved)))
-        local there, mine = b:fraction(ch, off), b:fraction(pos.ch, pos.off)
-        if math.abs(there - mine) < 0.002 then
-            -- Practically the same place: send this one only if it's ahead
-            -- (otherwise the server's counts as this one, until you read on).
-            if there > mine then
-                moved = false
-                app.sync.moved[b.path] = nil
-                app.sync.pushed[b.path] = b:xpointer(pos.ch, pos.off)
-            end
+        -- The same place means on the spread you're looking at.
+        local sp = spread
+        local same = sp and ch == sp.ch and off >= sp.pages[sp.pi].off and off < spread_end_off(sp)
+        print(string.format("[sync] pull: %s at %.1f%% (%s) -> chapter %d offset %d; %s, moved here: %s, same spread: %s (ts %s, seen %s)",
+            tostring(r.device), frac * 100, tostring(r.progress), ch, off, new_there and "new" or "seen before",
+            tostring(moved), tostring(same), tostring(r.timestamp), tostring(seen)))
+        if same then
+            -- Nothing to do; the server's place counts as this one until you read on.
+            moved = false
+            app.sync.moved[b.path] = nil
+            app.sync.pushed[b.path] = b:xpointer(pos.ch, pos.off)
             return stands("Already in sync")
+        end
+        if not new_there then
+            -- Seen before (you chose Stay, or it was checked already): what you've
+            -- read here since goes out; asked by hand, go to it if you haven't.
+            if moved or not now then return stands("Already in sync") end
         end
         local device = (r.device and r.device ~= "") and r.device or "another device"
         local function go()

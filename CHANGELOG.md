@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **KOReader Sync with CrossPoint:** after saving on an Xteink X4 a page or two
+  further on, "Sync this book now" here said "Already in sync". The X4 sends
+  just its chapter (`/body/DocFragment[19]/body/p[1]`) and a percentage, and
+  "the same place" was anything within 0.2% of the book, a spread or two.
+  Now the same place means on the spread you're looking at; otherwise, asked
+  by hand and not having read on here, it goes to the other device's place
+  (even one it has seen before). The log records each decision with the
+  server's timestamps.
+
 ## v1.9.0
 
 - **Review of everything since v1.2.0** (Send Books, Standard Ebooks,
