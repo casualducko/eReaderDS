@@ -2197,9 +2197,9 @@ function app.sync_decide(b, how, docs, results)
             end
             app.untoast()
             app.ask({ question = "Send your place to the sync server?",
-                detail = "You're at " .. where .. " here. " .. app.sync_server_name() .. " has "
-                    .. (last and ("this device's place from " .. ago(last.r.timestamp) .. " (" .. math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5) .. "%).")
-                        or "nothing for this book yet."),
+                detail = "Here: " .. where .. "\n" .. app.sync_server_name() .. ": "
+                    .. (last and (math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5) .. "%, " .. ago(last.r.timestamp))
+                        or "nothing for this book yet"),
                 yes = "Send", no = "Not now", on_yes = function()
                     if book ~= b then return end
                     app.sync.pushed[b.path] = nil
@@ -2288,8 +2288,8 @@ function app.sync_decide(b, how, docs, results)
     local label = #b.toc > 0 and app.find_label({ ch = ch, off = off }) or ""
     app.untoast()                           -- ("Syncing…")
     app.ask({ question = "Continue from " .. there .. "?",
-        detail = (label ~= "" and label ~= b.title and (label .. ", ") or "") .. "where you were on " .. device .. " "
-            .. ago(r.timestamp) .. ". You're at " .. here .. "% here.",
+        detail = device .. ", " .. ago(r.timestamp) .. (label ~= "" and label ~= b.title and (" · " .. label) or "")
+            .. "\nHere: " .. here .. "%",
         yes = "Jump", no = "Stay", on_yes = go,
         -- Stay: this device's place wins (and is sent when automatic sync
         -- is On; otherwise Send my place does that).
@@ -2339,8 +2339,8 @@ function app.sync_get_decide(b, docs, results)
         local label = #b.toc > 0 and app.find_label({ ch = ch, off = off }) or ""
         app.untoast()
         app.ask({ question = "Go back to " .. math.floor(frac * 100 + 0.5) .. "%?",
-            detail = (label ~= "" and label ~= b.title and (label .. ", ") or "") .. "where you were on " .. device .. " "
-                .. ago(r.timestamp) .. ". You're at " .. math.floor(here * 100 + 0.5) .. "% here.",
+            detail = device .. ", " .. ago(r.timestamp) .. (label ~= "" and label ~= b.title and (" · " .. label) or "")
+                .. "\nHere: " .. math.floor(here * 100 + 0.5) .. "%",
             yes = "Go back", no = "Stay", on_yes = function() app.sync_go(b, r, rdoc, ch, off) end })
         return
     end
@@ -4577,9 +4577,10 @@ function app.ask_draw()
     love.graphics.rectangle("fill", x - 30, top - 20, w + 60, PAGE_H - top + 20, 16, 16)
     color(th.sel)
     love.graphics.rectangle("fill", x - 14, top, w + 28, by + bh + 50 - top, 14, 14)
-    love.graphics.setFont(ui.font)
+    love.graphics.setFont(ui.bold)
     color(th.fg)
     love.graphics.printf(q.question, x, top + 24, w, "center")
+    love.graphics.setFont(ui.font)
     for i = 1, n do
         love.graphics.printf(lines[i], x + 10, top + 84 + (i - 1) * lh, w - 20, "center")
     end

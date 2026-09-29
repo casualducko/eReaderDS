@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **KOReader Sync's question is easier to read:** the line under "Continue from 53%?" (and under every other question card) is now the same size and colour as the question, and the card grows to fit it. A Kobo running KOReader is called "Kobo" instead of its model code ("Kobo_io").
+- **KOReader Sync's question is easier to read:** every question card has a bold question, and the line under it is now full size and dark (the card grows to fit it). The sync questions say it in two short lines, like "Kobo, just now · Chapter 10" and "Here: 54%". A Kobo running KOReader is called "Kobo" instead of its model code ("Kobo_io").
 
 ## v1.16.0
 
