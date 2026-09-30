@@ -12,6 +12,10 @@
 .field private final context:Landroid/content/Context;
 .field private final path:Ljava/lang/String;
 .field private final status:Ljava/lang/String;
+# (What's open, for cleanup() if something goes wrong.)
+.field private session:Landroid/content/pm/PackageInstaller$Session;
+.field private input:Ljava/io/InputStream;
+.field private output:Ljava/io/OutputStream;
 
 .method public constructor <init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)V
     .registers 4
@@ -75,6 +79,7 @@
     move-result v3
     invoke-virtual {v2, v3}, Landroid/content/pm/PackageInstaller;->openSession(I)Landroid/content/pm/PackageInstaller$Session;
     move-result-object v2
+    iput-object v2, v12, Lcom/casualducko/ereaderds/Install;->session:Landroid/content/pm/PackageInstaller$Session;
 
     # The APK into it.
     new-instance v4, Ljava/io/File;
@@ -88,8 +93,10 @@
     # openWrite(name, offset 0, length)
     invoke-virtual/range {v13 .. v18}, Landroid/content/pm/PackageInstaller$Session;->openWrite(Ljava/lang/String;JJ)Ljava/io/OutputStream;
     move-result-object v7
+    iput-object v7, v12, Lcom/casualducko/ereaderds/Install;->output:Ljava/io/OutputStream;
     new-instance v8, Ljava/io/FileInputStream;
     invoke-direct {v8, v4}, Ljava/io/FileInputStream;-><init>(Ljava/io/File;)V
+    iput-object v8, v12, Lcom/casualducko/ereaderds/Install;->input:Ljava/io/InputStream;
     const/high16 v9, 0x10000
     new-array v9, v9, [B
     :copy
@@ -139,6 +146,7 @@
 
     :failed
     move-exception v1
+    invoke-direct {v12}, Lcom/casualducko/ereaderds/Install;->cleanup()V
     iget-object v2, v12, Lcom/casualducko/ereaderds/Install;->status:Ljava/lang/String;
     new-instance v3, Ljava/lang/StringBuilder;
     invoke-direct {v3}, Ljava/lang/StringBuilder;-><init>()V
@@ -150,5 +158,33 @@
     invoke-virtual {v3}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
     move-result-object v1
     invoke-static {v2, v1}, Lcom/casualducko/ereaderds/Install;->write(Ljava/lang/String;Ljava/lang/String;)V
+    return-void
+.end method
+
+# After a failure: close the files and give up the session, so Android
+# deletes its partial copy of the APK at once (not days later).
+.method private cleanup()V
+    .registers 2
+    iget-object v0, p0, Lcom/casualducko/ereaderds/Install;->input:Ljava/io/InputStream;
+    if-eqz v0, :input_done
+    :try_input
+    invoke-virtual {v0}, Ljava/io/InputStream;->close()V
+    :try_input_end
+    .catch Ljava/lang/Throwable; {:try_input .. :try_input_end} :input_done
+    :input_done
+    iget-object v0, p0, Lcom/casualducko/ereaderds/Install;->output:Ljava/io/OutputStream;
+    if-eqz v0, :output_done
+    :try_output
+    invoke-virtual {v0}, Ljava/io/OutputStream;->close()V
+    :try_output_end
+    .catch Ljava/lang/Throwable; {:try_output .. :try_output_end} :output_done
+    :output_done
+    iget-object v0, p0, Lcom/casualducko/ereaderds/Install;->session:Landroid/content/pm/PackageInstaller$Session;
+    if-eqz v0, :session_done
+    :try_session
+    invoke-virtual {v0}, Landroid/content/pm/PackageInstaller$Session;->abandon()V
+    :try_session_end
+    .catch Ljava/lang/Throwable; {:try_session .. :try_session_end} :session_done
+    :session_done
     return-void
 .end method

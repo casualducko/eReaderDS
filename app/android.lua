@@ -73,8 +73,8 @@ end
 -- Set one; true if it took. (GammaOS lets any app change its own settings,
 -- the persist.gammaos.* ones, and restart its services.)
 function M.setprop(name, value)
-    local ok = pcall(C.__system_property_set, name, value)
-    return ok and (name:sub(1, 4) == "ctl." or M.getprop(name) == value)
+    local ok, rc = pcall(C.__system_property_set, name, value)
+    return ok and rc == 0 and (name:sub(1, 4) == "ctl." or M.getprop(name) == value)
 end
 
 function M.dir_exists(path)
@@ -202,6 +202,11 @@ local function jni_call(class, name, sig, ...)
         local v = select(i, ...)
         if type(v) == "string" then
             local str = J.NewStringUTF(env, v)
+            if str == nil or J.ExceptionCheck(env) ~= 0 then
+                J.ExceptionClear(env)
+                for _, r in ipairs(refs) do J.DeleteLocalRef(env, r) end
+                return false
+            end
             refs[#refs + 1] = str
             J.args[i].l = str
         else
@@ -444,9 +449,7 @@ end
 -- as DATA/shot.png, the two screens side by side.
 local shot_wanted = false
 function M.shot_pending()                       -- (looked at once a second)
-    local f = io.open(M.DATA .. "/.shot", "rb")
-    if f then f:close() end
-    shot_wanted = f ~= nil
+    shot_wanted = C.access(M.DATA .. "/.shot", 0) == 0     -- (cheaper than opening it)
     return shot_wanted
 end
 function M.shot_check(canvas)
@@ -460,9 +463,7 @@ end
 
 -- Testing the crash screen: create DATA/.crash.
 function M.crash_check()
-    local f = io.open(M.DATA .. "/.crash", "rb")
-    if not f then return end
-    f:close()
+    if C.access(M.DATA .. "/.crash", 0) ~= 0 then return end
     os.remove(M.DATA .. "/.crash")
     error("a test crash (.crash)")
 end

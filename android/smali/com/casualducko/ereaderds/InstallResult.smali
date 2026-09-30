@@ -34,9 +34,19 @@
     iget-object v3, p0, Lcom/casualducko/ereaderds/InstallResult;->status:Ljava/lang/String;
     invoke-static {v3, v2}, Lcom/casualducko/ereaderds/Install;->write(Ljava/lang/String;Ljava/lang/String;)V
 
-    # -1: Android's own "update this app?" screen.
+    # -1: Android's own "update this app?" screen (and its answer comes here
+    # later). Anything else is the end: stop listening, so a retry's answer
+    # isn't also handled by this one.
     const/4 v2, -0x1
-    if-ne v0, v2, :done
+    if-eq v0, v2, :confirm
+    :try_unregister
+    invoke-virtual {p1}, Landroid/content/Context;->getApplicationContext()Landroid/content/Context;
+    move-result-object v2
+    invoke-virtual {v2, p0}, Landroid/content/Context;->unregisterReceiver(Landroid/content/BroadcastReceiver;)V
+    :try_unregister_end
+    .catch Ljava/lang/Throwable; {:try_unregister .. :try_unregister_end} :done
+    goto :done
+    :confirm
     :try_start
     const-string v2, "android.intent.extra.INTENT"
     invoke-virtual {p2, v2}, Landroid/content/Intent;->getParcelableExtra(Ljava/lang/String;)Landroid/os/Parcelable;

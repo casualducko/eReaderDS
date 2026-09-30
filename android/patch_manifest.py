@@ -57,7 +57,7 @@ s = sub(r'(<uses-permission android:name="android.permission.INTERNET"/>)',
 s = sub(r'(<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>)',
         r'\1\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>'
         r'\n    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"/>', s)
-# (No microphone or Bluetooth needed.)
+# (No microphone needed. Bluetooth stays: SDL uses it for Bluetooth controllers.)
 s = s.replace('    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n', "")
 
 open(path, "w", encoding="utf-8").write(s)

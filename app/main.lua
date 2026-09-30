@@ -1105,6 +1105,7 @@ local function open_book(path)
         path:match("[^/]+$"), t1 - t0, t2 - t1) }
     -- Saving (a second on GammaOS, where each file written to the books
     -- folder is slow) waits until the page is on screen.
+    app.after_frame_saves = true
     app.after_frame = function()
         if book ~= b then return end
         Store.set_last(path)
@@ -1502,16 +1503,20 @@ local function preview_image(id)
     if s > 0.9 then return love.graphics.newImage(id) end
     local okm, full = pcall(love.graphics.newImage, id, { mipmaps = true })
     if okm then full:setMipmapFilter("linear") else full = love.graphics.newImage(id) end
-    local c = love.graphics.newCanvas(math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
+    local okc, c = pcall(love.graphics.newCanvas, math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
+    if not okc then full:release(); error(c, 0) end
     love.graphics.push("all")
-    love.graphics.setCanvas(c)
-    love.graphics.origin()
-    love.graphics.clear(0, 0, 0, 0)
-    love.graphics.setBlendMode("replace", "premultiplied")
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(full, 0, 0, 0, s, s)
-    love.graphics.pop()
+    local ok, err = pcall(function()
+        love.graphics.setCanvas(c)
+        love.graphics.origin()
+        love.graphics.clear(0, 0, 0, 0)
+        love.graphics.setBlendMode("replace", "premultiplied")
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.draw(full, 0, 0, 0, s, s)
+    end)
+    love.graphics.pop()                      -- (always, or the drawing state stays changed)
     full:release()
+    if not ok then c:release(); error(err, 0) end
     return c
 end
 
@@ -1548,6 +1553,10 @@ function app.previews_clear()
         if pv.cover then pv.cover:release() end
     end
     previews, preview_order = {}, {}
+    -- (Covers still waiting to be decoded aren't needed either.)
+    local jobs = love.thread.getChannel("cover_jobs")
+    app.covers_waiting = math.max(0, app.covers_waiting - jobs:getCount())
+    jobs:clear()
 end
 
 function app.cover_stop()
@@ -1602,6 +1611,7 @@ function library.delete(path)
         clear_book_caches()
     end
     if previews[path] then
+        if previews[path].cover then previews[path].cover:release() end
         previews[path] = nil
         for i, p in ipairs(preview_order) do if p == path then table.remove(preview_order, i) break end end
     end
@@ -5480,7 +5490,9 @@ function app.update_action(a)
     local u = app.upd
     if a == "toc" then app.update_skip() return end               -- Y
     if a == "confirm" then
-        if u.state == "error" and u.apk and io.open(u.apk, "rb") then app.update_install(u.apk)   -- (downloaded already)
+        local have = u.state == "error" and u.apk and io.open(u.apk, "rb")
+        if have then have:close() end
+        if have then app.update_install(u.apk)                        -- (downloaded already)
         elseif u.state == "available" or (u.state == "error" and u.url) then app.update_start()
         elseif u.state == "error" or (u.state == "none" and not u.checked) then app.update_check(true)
         elseif u.state == "ready" and u.apk then app.update_install(u.apk)
@@ -6721,10 +6733,10 @@ local function render_canvases()
     -- (GammaOS has little memory to spare: note big changes in what the
     -- textures take, and where.)
     if app.frame_canvas then
-        local mb = love.graphics.getStats().texturememory / 1048576
+        local st = love.graphics.getStats()
+        local mb = st.texturememory / 1048576
         if math.abs(mb - (app.tex_mb or 0)) >= 8 then
             app.tex_mb = mb
-            local st = love.graphics.getStats()
             print(string.format("[memory] textures %d MB (%s): %d images, %d canvases, %d fonts; Lua %d MB", mb, app.mode,
                 st.images, st.canvases, st.fonts, collectgarbage("count") / 1024))
         end
@@ -6987,12 +6999,29 @@ local function current_brightness()
     return Backlight.get() or 50
 end
 
+-- A book's first save, if it's still waiting for its page to be drawn: done
+-- now (quitting, or GammaOS may stop the app). A book waiting to be opened
+-- isn't opened for that.
+function app.pending_save()
+    if app.after_frame and app.after_frame_saves then
+        local f = app.after_frame
+        app.after_frame, app.after_frame_saves = nil, nil
+        pcall(f)
+    end
+end
+
 -- How long a touch lasted, for telling a tap from a hold: time spent
 -- waiting for input only, leaving out the app's own work (drawing, opening,
 -- a page of pictures). On a busy handheld (GammaOS swapping) a quick tap's
 -- lift could be handled a second after its press, and was then not a tap.
 app.busy = 0
 function app.touch_clock() return love.timer.getTime() - app.busy end
+-- Only stalls count (over 50 ms): ordinary work, even a steady stream of it
+-- (a Find running, a page turning), mustn't stop the clock, or holding a word
+-- would take ages to look it up.
+function app.add_busy(d)
+    if d > 0.05 then app.busy = app.busy + d - 0.05 end
+end
 
 local function touch_event(kind, sx, sy)
     local now = love.timer.getTime()
@@ -7626,6 +7655,7 @@ function handle_action(a)
                 local path = library.items[library.sel].path
                 app.toast("Opening…", 30)
                 local shown = overlay
+                app.after_frame_saves = nil
                 app.after_frame = function()
                     open_book(path)
                     if overlay == shown then overlay = nil end
@@ -8614,11 +8644,7 @@ function love.quit()
     end
     local t2 = love.timer.getTime()
     app.cover_stop()
-    if app.after_frame then
-        local f = app.after_frame                  -- (e.g. a book's first save, not done yet)
-        app.after_frame = nil
-        pcall(f)
-    end
+    app.pending_save()
     save_progress()
     Store.save_settings(S)
     Store.flush()
@@ -8743,7 +8769,7 @@ function love.run()
             -- Work that waits until this frame is on screen (see open_book).
             if app.after_frame then
                 local f = app.after_frame
-                app.after_frame = nil
+                app.after_frame, app.after_frame_saves = nil, nil
                 f()
             end
             if not app.first_shown then
@@ -8755,7 +8781,7 @@ function love.run()
                 scan_library()
             end
         end
-        app.busy = app.busy + (love.timer.getTime() - b0)
+        app.add_busy(love.timer.getTime() - b0)
         local function handle(name, a, b, c, d, e, f)
             if not name then return end
             if name == "quit" then
@@ -8769,6 +8795,7 @@ function love.run()
                     -- Going to the background: GammaOS may stop the app
                     -- without warning from here on, so save now.
                     if (name == "focus" or name == "visible") and not a then
+                        app.pending_save()
                         save_progress()
                         Store.save_settings(S)
                     elseif name == "focus" and a and S.brightness >= 0 and app.idle.state ~= "off" then
@@ -8778,12 +8805,12 @@ function love.run()
                     end
                     app.redraw_until = love.timer.getTime() + 4
                     -- DualStack let go of the second screen (another app's
-                    -- window came up, such as Magisk's): it only gives both
+                    -- window came up, such as Android's install question): it only gives both
                     -- screens when an app opens.
                     -- (Checked a little later: waking up, DualStack lets go
                     -- for a moment and takes the app back by itself.)
                     if name == "resize" and not require("android").stacked() then
-                        app.stack_check_at = love.timer.getTime() + 3
+                        app.stack_check_at = math.max(app.stack_check_at or 0, love.timer.getTime() + 3)
                     end
                 end
             end
@@ -8798,7 +8825,7 @@ function love.run()
             local b1 = love.timer.getTime()
             local r = handle(name, a, b, c, d, e, f)
             if r then return r end
-            if not name:match("^touch") then app.busy = app.busy + (love.timer.getTime() - b1) end
+            if not name:match("^touch") then app.add_busy(love.timer.getTime() - b1) end
         end
         if Touch.enabled and Touch.poll(lid.closed and function() end or touch_event) then got = true end
         local b2 = love.timer.getTime()
@@ -8814,7 +8841,7 @@ function love.run()
         if app.recv and app.recv_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
         if library.pending and not lid.closed then app.library_meta_step(); got = true end
-        app.busy = app.busy + (love.timer.getTime() - b2)
+        app.add_busy(love.timer.getTime() - b2)
         if overlay and love.timer.getTime() >= overlay.hide_at then
             if os.getenv("READER_DEBUG") then print(string.format("[debug] message closed at %.2f", love.timer.getTime())) end
             overlay = nil; redraw()
