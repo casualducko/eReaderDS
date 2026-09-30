@@ -17,10 +17,11 @@ device sideways like an open book: each screen shows one page.
 
 ## Install
 
-Download `eReaderDS-vX.Y.Z.zip` from the
-[latest release](https://github.com/casualducko/eReaderDS/releases/latest)
-and unzip it on your computer. Then follow the steps for
-your firmware.
+Get it from the
+[latest release](https://github.com/casualducko/eReaderDS/releases/latest):
+`eReaderDS-vX.Y.Z.zip` for the stock firmware and ROCKNIX (unzip it on your
+computer), or `eReaderDS-vX.Y.Z-android.apk` for GammaOS. Then follow the
+steps for your firmware.
 
 ### Stock firmware
 
@@ -68,8 +69,8 @@ The SD card can't be used from a computer the way it can with the stock
 firmware or ROCKNIX: under GammaOS it holds Android's own storage, which
 Windows and macOS can't open. Get files onto the handheld one of these ways:
 
-- **Download on the handheld (easiest):** open **Internet Browser** (in the
-  front end's **Applications** row), go to the
+- **Download on the handheld (easiest):** open **Game → Applications →
+  Internet Browser**, go to the
   [latest release](https://github.com/casualducko/eReaderDS/releases/latest)
   and tap `eReaderDS-vX.Y.Z-android.apk`. It goes to the **Download** folder.
 - **USB cable:** connect the handheld to a computer, then on the handheld
@@ -123,28 +124,34 @@ On GammaOS:
   is back when you leave it.
 - If another app's window comes up while you read, GammaOS takes one screen
   back: open eReaderDS again.
-- **Updates** download the new `.apk` and install it through Android's own
-  installer, with no questions: eReaderDS closes when it's done; open it again.
 - It's a little slower than on Linux: Android needs much of the handheld's
   1 GB of memory. If page turns start to stutter after a long session,
   restart the handheld: GammaOS runs short of memory over time.
 
-**Updates:** when it's online, eReaderDS checks for a newer version each time
-it starts and says so (with the version you have). Tap that note to update, or
-use **Settings → About eReaderDS** (or **Start** in the library with no book
+### Updating
+
+When it's online, eReaderDS checks for a newer version each time it starts and
+says so (with the version you have). Tap that note to update, or use
+**Settings → About eReaderDS** (or **Start** in the library with no book
 open). The update screen lists what's new in plain words; **Update now**
-downloads it, saves only the files that changed, and restarts. Your books,
-settings and progress are kept. After an update, a note offers to show
-**What's New** (also in Settings → About eReaderDS).
+downloads it. Your books, settings and progress are kept. After an update, a
+note offers to show **What's New** (also in Settings → About eReaderDS).
+
+- **Stock firmware and ROCKNIX:** it saves only the files that changed and
+  restarts by itself.
+- **GammaOS:** it installs the new `.apk` through Android's own installer,
+  with no questions. eReaderDS closes when it's done; open it again.
 
 To stop the automatic check and its notes, set **Update notices** to Off (same
 page); **Check for Updates** still works. To pass on just one version, choose
 **Skip this version** on the update screen; you'll still hear about the next.
 
-To update by hand, copy the same two items from a newer zip over the old ones
-(on ROCKNIX, over Wi-Fi into `games-roms/ports`, as above). Your settings,
-reading positions, bookmarks and fonts are kept. (Copy the two items, not the
-whole `Ports` folder: on a Mac, replacing `Ports` deletes your other ports.)
+To update by hand on the stock firmware or ROCKNIX, copy the same two items
+from a newer zip over the old ones (on ROCKNIX, over Wi-Fi into
+`games-roms/ports`, as above). Your settings, reading positions, bookmarks and
+fonts are kept. (Copy the two items, not the whole `Ports` folder: on a Mac,
+replacing `Ports` deletes your other ports.) On GammaOS, install the newer
+`.apk` the same way as the first time (steps 1-5); everything is kept.
 
 ## Controls
 
@@ -164,25 +171,6 @@ Directions are as you hold it. (To hold it the other way round, see
 
 The L/R and L2/R2 shoulder buttons aren't used. **Help** in Settings is a
 one-page summary of the buttons and touchscreen.
-
-### Holding it the other way round
-
-Settings → Reading & Device → **Hold it with buttons** → **On the left** turns
-everything 180°, for holding the device clockwise with the buttons under your
-left hand. Pages keep their reading order, so the first page is on the
-touchscreen; menus and lists stay on the touchscreen too. The face buttons
-work as a second D-pad (held this way: Y on top, A at the bottom, X on the
-right, B on the left):
-
-| | Y | A | X | B | Select |
-|---|---|---|---|---|---|
-| Reading | page back | page forward | page forward | page back | bookmark |
-| Menus and lists | up | down | OK | back | delete, options, keyboard space |
-
-While reading, **D-pad up** opens the word cursor (look up, and Select at the
-first and last word to highlight); **Start** or the curved arrow opens
-Settings. The bookmark corner is the touchscreen's top left. Hints and Help
-show the buttons for this grip.
 
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
@@ -204,6 +192,25 @@ show the buttons for this grip.
 - Swipe (or tap) to turn the pages of What's New.
 - Tap a note number, or the **Notes** button, to show footnotes.
 
+### Holding it the other way round
+
+Settings → Reading & Device → **Hold it with buttons** → **On the left** turns
+everything 180°, for holding the device clockwise with the buttons under your
+left hand. Pages keep their reading order, so the first page is on the
+touchscreen; menus and lists stay on the touchscreen too. The face buttons
+work as a second D-pad (held this way: Y on top, A at the bottom, X on the
+right, B on the left):
+
+| | Y | A | X | B | Select |
+|---|---|---|---|---|---|
+| Reading | page back | page forward | page forward | page back | bookmark |
+| Menus and lists | up | down | OK | back | delete, options, keyboard space |
+
+While reading, **D-pad up** opens the word cursor (look up, and Select at the
+first and last word to highlight); **Start** or the curved arrow opens
+Settings. The bookmark corner is the touchscreen's top left. Hints and Help
+show the buttons for this grip.
+
 ## Settings
 
 Press **B** (or Start, X, ↩) while reading. Settings has big rows on two
@@ -211,9 +218,9 @@ pages: swipe left or right on the touchscreen, or keep pressing down past the
 last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 1. What you open Settings for while reading. At the top, **My Books** (your
-   library, with how many books it has; Settings opens on the row below it). **This book:** Table of
-   Contents, Bookmarks and Highlights, Find in Book, Jump to %, and **Sync
-   with KOReader** when sync is on. **Reading:** Brightness, Text size,
+   library, with how many books it has; Settings opens on the row below it).
+   **This book:** Table of Contents, Bookmarks and Highlights, Find in Book,
+   Jump to %, and **Sync with KOReader** when sync is on. **Reading:** Brightness, Text size,
    **Theme** (tap it or press A: a page of all the themes, your book previewed
    in each), **Fonts** (its own page, [below](#fonts)). (**Update to v…** is
    first in This book when one is waiting.)
@@ -238,7 +245,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   your book in each, which the whole app follows; Night Mode, another theme
   that switches on by itself in the evening; page-flip or fade animation.
   Letters that some older books draw as tiny pictures (for characters their
-  fonts lacked) stay in the line and take the theme's ink.
+  fonts lacked) stay in the line and take the theme's ink, and characters a
+  font doesn't have (Russian, Greek, special spaces and symbols) are drawn
+  from Gentium Book Plus instead of showing as boxes.
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.
 - **Dictionary on the facing page:** press Y and move a cursor over the words;
@@ -326,7 +335,7 @@ files** (or drop files on the page). Books (`.epub`, `.txt`) go into the
 books folder and fonts (`.ttf`, `.otf`) into the fonts folder; each is listed
 on the device as it arrives. Press **B** or tap **Done** when they're sent:
 the new books are in My Books. The page only works while this screen is open.
-This is the easy way to add books on ROCKNIX.
+This is the easy way to add books on ROCKNIX and GammaOS.
 
 ## Getting books over Wi-Fi
 
@@ -342,8 +351,9 @@ tap the keys, or use the D-pad and A.
 carefully proofread and beautifully typeset: the whole collection, by newest,
 subject, collection or author, and search) work with no setup. To add your
 own catalog, such as a Calibre content server or Calibre-Web, edit
-`Ebook/.ereaderds/opds.txt` on the SD card (it's created the first time
-eReaderDS runs):
+`Ebook/.ereaderds/opds.txt` (on the SD card; on ROCKNIX `ebook/.ereaderds`;
+on GammaOS in the handheld's storage, over USB). It's created the first time
+eReaderDS runs:
 
 ```
 name = Calibre
@@ -520,15 +530,17 @@ name) only shows one weight.
 |---|---|
 | Not in the Ports menu | `eReaderDS.sh` and the `eReaderDS` folder must be directly inside `Ports` (ROCKNIX: `roms/ports`, then **Start → Game settings → Update gamelists**). |
 | ROCKNIX: can't find `roms` on the SD card | It's on the card's Linux part, which Mac and Windows can't open. Copy over Wi-Fi instead ([ROCKNIX](#rocknix)); never let the computer format the card. |
-| Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems). |
+| Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems) (GammaOS has no log file: just describe it). |
+| GammaOS: only on one screen | Close eReaderDS and open it again. If it stays on one screen, add it to DualStack by hand ([GammaOS](#gammaos-android)). |
+| GammaOS: page turns stutter after a while | Restart the handheld: GammaOS runs short of memory over a long session. |
 | "No books found" | Put `.epub` or `.txt` files in the `Ebook` folder at the top of the card (or in folders inside it). |
 | A book won't open or looks wrong | Unusual EPUBs may not display well; DRM-protected books, PDF and MOBI aren't supported. |
 | Get Books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
 | Pages upside down | Turn the device the other way, with the buttons on your right. |
-| Screen stays dim after quitting | Brightness is restored when the app quits; after a crash, set it in the system menu. |
+| Screen stays dim after quitting | Brightness is restored when the app quits; after a crash, set it in the system menu. (On GammaOS the system's brightness is back as soon as eReaderDS closes.) |
 | KOReader Sync says your place is saved, but the other device is ahead | Both must use the same server and account (Settings → KOReader Sync), and the book must be the same file, or have exactly the same file name, on both ("Author - Title" and "Title - Author" don't match). Keep only one edition of a book under a name. |
 | The clock is wrong | Set **Settings → Reading & Device → Time zone** (**Device clock** uses the system's own setting). |
-| An update fails | Check Wi-Fi and choose **Try again**. Nothing is changed until an update is complete; you can also [update by hand](#install). |
+| An update fails | Check Wi-Fi and choose **Try again**. Nothing is changed until an update is complete; you can also [update by hand](#updating). |
 
 ## Reporting problems
 
@@ -543,7 +555,7 @@ Or tell whoever sent you eReaderDS, or
 [open a bug report](https://github.com/casualducko/eReaderDS/issues/new?template=bug_report.yml).
 Include the **version** (top of Settings), **what happened** (a photo of the
 screens helps), and **`Ports/eReaderDS/log.txt`**, copied right after the
-problem.
+problem (on ROCKNIX `roms/ports/eReaderDS/log.txt`; GammaOS has no log file).
 
 ## Known limitations
 
@@ -554,6 +566,10 @@ problem.
   opened yet are estimated (usually within a few pages) until you reach them.
 - No tables, fixed-layout EPUBs, PDF, MOBI or DRM-protected books.
 - Hyphenation and the built-in dictionary are English only.
+- Chinese, Japanese and a few other scripts show as boxes: no built-in font
+  has them.
+- On GammaOS, eReaderDS closes to install an update (open it again), and the
+  **curved-arrow** button belongs to GammaOS.
 
 ## For developers
 
