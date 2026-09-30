@@ -7013,8 +7013,9 @@ local function touch_event(kind, sx, sy)
         elseif not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
             gesture.mode = "swipe"          -- mostly horizontal: page turn on release
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5
-                and gesture.side == "right" and app.scroll_list() then
-            -- On a list, a vertical slide scrolls it (brightness everywhere else).
+                and gesture.side == "right" and app.list_scrolls() then
+            -- On a list longer than the screen, a vertical slide scrolls it
+            -- (brightness everywhere else, including an empty or short list).
             local l, _, _, row_h = app.scroll_list()
             gesture.mode = "scroll"
             gesture.v0, gesture.top0, gesture.row_h = v, l.top or 1, row_h
@@ -7086,6 +7087,12 @@ function app.scroll_list()
         l, n, shown, row_h = app.fget, #app.fget.list, list_rows(app.FGET_ROW_H), app.FGET_ROW_H
     end
     if l then return l, n, shown, row_h end            -- (one that fits just doesn't move)
+end
+
+-- Is there a list on screen with more entries than fit (so a slide scrolls it)?
+function app.list_scrolls()
+    local l, n, shown = app.scroll_list()
+    return l ~= nil and n > (shown or 0)
 end
 
 -- Scroll that list so `top` is the first row shown, keeping the selection on

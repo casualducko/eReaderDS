@@ -187,8 +187,8 @@ show the buttons for this grip.
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
   open Settings instead: **Settings → Reading & Device → Tap**.)
 - Slide up/down to change brightness; keep going below 1% for Extra dim. (On
-  a list, such as My Books, Get Books, Table of Contents or Fonts, sliding
-  up/down scrolls it instead.)
+  a list longer than the screen, such as My Books, Get Books, Table of
+  Contents or Fonts, sliding up/down scrolls it instead.)
 - Pinch with two fingers to make the text bigger or smaller.
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.
