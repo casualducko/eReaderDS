@@ -254,8 +254,9 @@ function app.fit_image(id)
     local w, h = id:getDimensions()
     local s = math.min(1, PAGE_W / w, PAGE_H / h)
     if s > 0.9 then return love.graphics.newImage(id) end
-    local full = love.graphics.newImage(id, { mipmaps = true })
-    full:setMipmapFilter("linear")
+    -- (Mipmaps, for smooth scaling, where the driver allows them for any size.)
+    local okm, full = pcall(love.graphics.newImage, id, { mipmaps = true })
+    if okm then full:setMipmapFilter("linear") else full = love.graphics.newImage(id) end
     local c = love.graphics.newCanvas(math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
     love.graphics.push("all")
     love.graphics.setCanvas(c)
