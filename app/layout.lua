@@ -141,9 +141,17 @@ function M.paginate(chapter, ctx)
                         else
                             local e = a and a - 1 or n
                             local frag = sanitize(t:sub(i, e))
+                            -- Non-breaking hyphens (U+2011, in words like "y‑your"): an
+                            -- ordinary hyphen where the font has none (else a box), and
+                            -- the word is never split there (split() below).
+                            local nobreak = frag:find("\226\128\145", 1, true) ~= nil
+                            if nobreak and not font:hasGlyphs("\226\128\145") then
+                                frag = frag:gsub("\226\128\145", "-")
+                            end
                             local fw = font:getWidth(frag)
                             if not cur then cur = { frags = {}, w = 0, off = run.off + i - 1 } end
-                            cur.frags[#cur.frags + 1] = { text = frag, font = font, w = fw, link = run.link, rise = rise }
+                            cur.frags[#cur.frags + 1] = { text = frag, font = font, w = fw, link = run.link, rise = rise,
+                                nobreak = nobreak }
                             cur.w = cur.w + fw
                             i = e + 1
                         end
@@ -219,6 +227,7 @@ function M.paginate(chapter, ctx)
                 -- `room`; returns the two parts, or nil.
                 local function split(wd, room)
                     if #wd.frags ~= 1 or wd.frags[1].img then return nil end    -- mixed styles: keep whole
+                    if wd.frags[1].nobreak then return nil end                  -- non-breaking hyphens: keep whole
                     local fr = wd.frags[1]
                     local best
                     for _, b in ipairs(Hyphen.breaks(fr.text)) do
