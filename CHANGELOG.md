@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.17.1
+
+- **Less memory for fonts:** each font file is loaded once and shared by every text size, instead of again for each (a font family is six fonts, and the Gentium Book Plus fallback another six), and fonts no longer in use are freed at once. On GammaOS this cut the app's memory by about a sixth while reading (195 to 161 MB), which keeps page turns from stalling on its 1 GB of memory.
+
 ## v1.17.0
 
 - **GammaOS (Android):** eReaderDS runs on the RG DS Plus under GammaOS as an Android app (`eReaderDS-vX.Y.Z-android.apk`), on both screens through GammaOS's DualStack. Touch, the buttons, brightness, Get Books, the dictionary and KOReader Sync work as on Linux. No root needed: on first launch it adds itself to DualStack's list and gives the Anbernic button back (close and open it once), and updates install through Android's own installer without asking.

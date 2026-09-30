@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.17.1
+eReaderDS uses less memory for fonts, so page turns stay smooth on GammaOS.
+
 v1.17.0
 eReaderDS now runs on GammaOS too, on both screens: install the Android app from the release page (see the README for the steps).
 My Books moves smoothly, even with many covers, and a book says "Opening…" while it opens.
