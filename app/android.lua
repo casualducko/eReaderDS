@@ -371,24 +371,31 @@ end
 function M.bundled(dir)
     local dest = M.DATA .. "/bundled/" .. dir
     M.mkdir_p(dest)
-    for _, name in ipairs(love.filesystem.getDirectoryItems(dir)) do
+    local items, copied, kept = love.filesystem.getDirectoryItems(dir), 0, 0
+    for _, name in ipairs(items) do
         local src = dir .. "/" .. name
+        -- (Read from the APK's assets, LÖVE doesn't always call an entry a
+        -- "file" or know its size: anything that isn't a folder is copied.)
         local info = love.filesystem.getInfo(src)
-        if info and info.type == "file" then
+        if not (info and info.type == "directory") then
             local out = dest .. "/" .. name
             local f = io.open(out, "rb")
             local size = f and f:seek("end")
             if f then f:close() end
-            if size ~= info.size then
-                local data = love.filesystem.read(src)
-                local w = data and io.open(out .. ".tmp", "wb")
+            local data = (not (info and info.size) or size ~= info.size) and love.filesystem.read(src)
+            if data and #data ~= size then
+                local w = io.open(out .. ".tmp", "wb")
                 if w then
                     w:write(data); w:close()
                     os.rename(out .. ".tmp", out)
+                    copied = copied + 1
                 end
+            else
+                kept = kept + 1
             end
         end
     end
+    print(string.format("[android] bundled %s: %d entries, %d copied, %d up to date", dir, #items, copied, kept))
     return dest
 end
 
