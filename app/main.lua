@@ -6514,6 +6514,19 @@ end
 
 local function draw_message(side)
     local th = theme()
+    if side == "left" and app.android_setup_msg and message == app.android_setup_msg then
+        -- GammaOS's first-run steps: a big heading, then what to do.
+        local m = MARGINS[2]
+        local w = PAGE_W - m.outer - m.inner
+        app.setup_font = app.setup_font or load_font("GentiumBookPlus-Bold.ttf", 76)
+        love.graphics.setFont(app.setup_font)
+        color(th.fg)
+        love.graphics.printf(app.android_setup_title or "", m.outer, 200, w, "center")
+        love.graphics.setFont(ui.font)
+        love.graphics.printf(message or "", m.outer, 420, w, "center")
+        app.hints(m.outer, nil, { "A", "close" })
+        return
+    end
     if side == "left" then
         local m = MARGINS[2]
         love.graphics.setFont(ui.font)
@@ -8314,7 +8327,7 @@ function love.load()
             love.graphics.getPixelHeight(), love.graphics.getDPIScale()))
         -- First run: file access and both screens (GammaOS's DualStack).
         local t = love.timer.getTime()
-        app.android_setup_msg = require("android").setup()
+        app.android_setup_title, app.android_setup_msg = require("android").setup()
         local t2 = love.timer.getTime()
         require("android").ca_bundle()
         print(string.format("[startup] setup %.2fs, certificates %.2fs", t2 - t, love.timer.getTime() - t2))
@@ -8478,6 +8491,10 @@ local function run_test_script()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
             elseif a == "splash" then app.mode = "splash"       -- the opening screen (Android's splash is made from it)
+            elseif a == "setupmsg" then                          -- GammaOS's first-run page
+                app.android_setup_title = "One more step!"
+                app.android_setup_msg = "Press A to close eReaderDS, then open it again.\n\nFrom then on it opens on both screens."
+                show_message(app.android_setup_msg)
             elseif a == "draw" then render_canvases()           -- draw now (what taps measure against)
             elseif a:match("^btn:") then love.gamepadpressed(nil, a:sub(5))   -- a button as pressed (a, b, x, y, back, start)
             elseif a == "report" then app.report_open()
