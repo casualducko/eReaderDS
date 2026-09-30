@@ -94,11 +94,6 @@ it onto the handheld one of these ways (GammaOS's menu has no web browser):
 8. Once it opens, press **A** to close it: that finishes the installation.
 9. Open eReaderDS again, and you're good to go: it's on both screens from now on.
 
-No root or Magisk needed. If eReaderDS says it couldn't add itself (a GammaOS
-that doesn't allow it), add it by hand: **Quick Menu → System Settings →
-GammaOS Toolbox → Allowed packages**, and put `,com.casualducko.ereaderds` at
-the end (after `com.dsemu.drastic`).
-
 **Books** go in the **Ebook** folder of the handheld's storage (`/sdcard/Ebook`,
 made on the first run; folders inside it are fine). Three ways to get them
 there:
@@ -528,7 +523,7 @@ name) only shows one weight.
 | Not in the Ports menu | `eReaderDS.sh` and the `eReaderDS` folder must be directly inside `Ports` (ROCKNIX: `roms/ports`, then **Start → Game settings → Update gamelists**). |
 | ROCKNIX: can't find `roms` on the SD card | It's on the card's Linux part, which Mac and Windows can't open. Copy over Wi-Fi instead ([ROCKNIX](#rocknix)); never let the computer format the card. |
 | Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems) (GammaOS has no log file: just describe it). |
-| GammaOS: only on one screen | Close eReaderDS and open it again. If it stays on one screen, add it to DualStack by hand ([GammaOS](#gammaos-android)). |
+| GammaOS: only on one screen | Close eReaderDS and open it again. If it stays on one screen, please [report it](#reporting-problems). |
 | GammaOS: page turns stutter after a while | Restart the handheld: GammaOS runs short of memory over a long session. |
 | "No books found" | Put `.epub` or `.txt` files in the `Ebook` folder at the top of the card (or in folders inside it). |
 | A book won't open or looks wrong | Unusual EPUBs may not display well; DRM-protected books, PDF and MOBI aren't supported. |
