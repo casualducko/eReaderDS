@@ -126,7 +126,8 @@ On GammaOS:
 - **Updates** download the new `.apk` and install it through Android's own
   installer, with no questions: eReaderDS closes when it's done; open it again.
 - It's a little slower than on Linux: Android needs much of the handheld's
-  1 GB of memory.
+  1 GB of memory. If page turns start to stutter after a long session,
+  restart the handheld: GammaOS runs short of memory over time.
 
 **Updates:** when it's online, eReaderDS checks for a newer version each time
 it starts and says so (with the version you have). Tap that note to update, or
