@@ -7721,6 +7721,7 @@ function app.crash_clean(text)
 end
 
 function app.system_name()
+    if require("android").active then return "GammaOS (Android)" end
     local f = io.open("/etc/os-release", "rb")
     local s = f and f:read("*a") or ""
     if f then f:close() end
@@ -7776,6 +7777,9 @@ function love.errorhandler(msg)
         end
     end
     local function draw()
+        -- (Android: through the frame canvas, shown as the two stacked screens.)
+        local fc = app.frame_canvas
+        if fc then pcall(require("android").begin, fc) end
         love.graphics.origin()
         love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
         for _, side in ipairs({ "left", "right" }) do
@@ -7784,6 +7788,13 @@ function love.errorhandler(msg)
             if not pcall(page_transform, side) then love.graphics.translate(side == "left" and 0 or SCREEN_W, 0) end
             pcall(page, side)
             love.graphics.pop()
+        end
+        if fc then
+            pcall(require("android").finish)
+            pcall(function()
+                if require("android").shot_pending() then require("android").shot_check(fc) end
+            end)
+            pcall(require("android").present, fc)
         end
     end
     -- Testing: save the screen instead of waiting.
@@ -8454,8 +8465,10 @@ function love.run()
                     -- DualStack let go of the second screen (another app's
                     -- window came up, such as Magisk's): it only gives both
                     -- screens when an app opens.
+                    -- (Checked a little later: waking up, DualStack lets go
+                    -- for a moment and takes the app back by itself.)
                     if name == "resize" and not require("android").stacked() then
-                        app.toast("GammaOS took back the other screen\nOpen eReaderDS again for both screens", 8)
+                        app.stack_check_at = love.timer.getTime() + 3
                     end
                 end
             end
@@ -8499,6 +8512,12 @@ function love.run()
             lid_tick()
             love.timer.sleep(0.25)              -- screens are off: check rarely
         end
+        if app.stack_check_at and love.timer.getTime() > app.stack_check_at then
+            app.stack_check_at = nil
+            if not require("android").stacked() then
+                app.toast("GammaOS took back the other screen\nOpen eReaderDS again for both screens", 8)
+            end
+        end
         if app.redraw_until then
             local now = love.timer.getTime()
             if now > app.redraw_until then app.redraw_until = nil
@@ -8508,6 +8527,7 @@ function love.run()
         if second ~= app.clock_second then
             app.clock_second = second
             if app.frame_canvas and require("android").shot_pending() then redraw() end
+            if app.frame_canvas then require("android").crash_check() end
             local minute = os.date("%H%M")
             if minute ~= app.clock_minute then
                 app.clock_minute = minute

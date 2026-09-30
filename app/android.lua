@@ -187,6 +187,15 @@ function M.shot_check(canvas)
     if w then w:write(png); w:close() end
 end
 
+-- Testing the crash screen: create DATA/.crash.
+function M.crash_check()
+    local f = io.open(M.DATA .. "/.crash", "rb")
+    if not f then return end
+    f:close()
+    os.remove(M.DATA .. "/.crash")
+    error("a test crash (.crash)")
+end
+
 -- Show the 2048x768 frame: its left half (the top screen's) above its right
 -- half (the bottom screen's). On one screen only (no DualStack yet), just
 -- the top screen's half.
