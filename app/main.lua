@@ -5164,7 +5164,12 @@ function app.update_check(by_hand)
     end
     local checking = { state = "checking", by_hand = by_hand }
     app.upd = checking
-    shop.net_job({ kind = "fetch", url = app.Updater.RELEASES }, function(msg)
+    -- (Testing an update without publishing one: a release list's address
+    -- in .ereaderds/.update-test is used instead of GitHub's.)
+    local releases = app.Updater.RELEASES
+    local tf = io.open(Store.data_path(".update-test"), "rb")
+    if tf then releases = (tf:read("*l") or ""):match("%S+") or releases; tf:close() end
+    shop.net_job({ kind = "fetch", url = releases }, function(msg)
         by_hand = checking.by_hand
         if msg.kind == "error" then
             -- Checked on launch: stay quiet. Checked by hand: say why.
@@ -5203,7 +5208,11 @@ end
 -- shell after this process ends.
 function app.update_install(apk)
     save_progress()
-    require("android").su('(pm install -r "' .. apk .. '"; rm -f "' .. apk .. '") >/dev/null 2>&1 &')
+    -- Its own session (setsid), so it isn't stopped when su's shell ends or
+    -- when installing stops this app; what it says goes to .update.log.
+    local log = require("android").DATA .. "/.update.log"
+    require("android").su('setsid sh -c \'sleep 1; pm install -r "' .. apk .. '" > "' .. log
+        .. '" 2>&1 && rm -f "' .. apk .. '"\' </dev/null >/dev/null 2>&1 &')
     love.event.quit()
 end
 
@@ -8296,6 +8305,13 @@ function love.load()
 end
 
 function love.quit()
+    -- Android: GammaOS squeezes the last frame onto one screen as DualStack
+    -- lets go of a closing app; make that frame black.
+    if app.frame_canvas and love.graphics.isActive() then
+        love.graphics.origin()
+        love.graphics.clear(0, 0, 0)
+        love.graphics.present()
+    end
     if app.recv then app.recv_stop() end
     app.sync_auto_push(true)
     if net.thread then

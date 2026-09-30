@@ -31,7 +31,7 @@ M.QUIET = 'magisk --sqlite "UPDATE policies SET notification=0 WHERE uid=$(stat 
 
 -- A command as root (GammaOS has Magisk, which asks the first time).
 function M.su(cmd)
-    cmd = cmd .. "; " .. M.QUIET
+    cmd = cmd .. "\n" .. M.QUIET                  -- (a newline: cmd may end with &)
     return run("su -c '" .. cmd:gsub("'", "'\\''") .. "' </dev/null >/dev/null 2>&1")
 end
 
