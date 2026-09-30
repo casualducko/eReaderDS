@@ -194,8 +194,19 @@ How it fits GammaOS (`app/android.lua`):
   copied out of the APK to `.ereaderds/bundled/`; Android's CA certificates are
   gathered into `.ereaderds/cacerts.pem` for OpenSSL.
 
-Testing over ADB: Android's screenshots don't show DualStack's window as the
-screens do; create `/sdcard/Ebook/.ereaderds/.shot` and the app saves its next
-frame as `.ereaderds/shot.png` (both screens side by side). GammaOS's buttons
+Testing over ADB (files in `/sdcard/Ebook/.ereaderds/`):
+- `.shot`: the app saves its next frame as `shot.png` (both screens side by
+  side). Android's own screenshots don't show DualStack's window as the
+  screens do.
+- `.crash`: a test crash, for the crash screen and report.
+- `.update-test` containing a URL: the updater reads that release list
+  instead of GitHub's, so an update can be tried without publishing (serve a
+  JSON list and a higher-version APK from a computer).
+
+GammaOS stops apps outright when you go home (no chance to save on the way
+out), so the app saves its place 0.4 s after a page turn and when it loses
+focus. When it comes back (after sleep or the menu), DualStack reshapes the
+window: the window is resizable on Android, or SDL waits for a rotation that
+never comes and the app freezes. GammaOS's buttons
 come from a virtual "Xbox Wireless Controller" (`getevent -pl`); `sendevent`
 to it presses them, including in the front end.
