@@ -8495,6 +8495,10 @@ function love.run()
                     if (name == "focus" or name == "visible") and not a then
                         save_progress()
                         Store.save_settings(S)
+                    elseif name == "focus" and a and S.brightness >= 0 and app.idle.state ~= "off" then
+                        -- Back in front (after sleep or GammaOS's menu): the
+                        -- system has put its own brightness back.
+                        Backlight.set(S.brightness)
                     end
                     app.redraw_until = love.timer.getTime() + 4
                     -- DualStack let go of the second screen (another app's
