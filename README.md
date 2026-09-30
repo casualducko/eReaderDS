@@ -80,21 +80,22 @@ Windows and macOS can't open. Get files onto the handheld one of these ways:
 
 **Installing:**
 
-1. In the front end's **Applications** row, open **Files** (or **MiX**), go to
-   **Download** and tap the `.apk`. If Android says installing from here isn't
-   allowed, tap **Settings**, switch on **Allow from this source**, go back and
-   tap **Install**.
-2. Open **eReaderDS** from the **Applications** row. The first time, it asks
-   **Magisk** for root, once: tap **Grant**. It uses it to put itself on
-   DualStack's list (both screens), to give the Anbernic button back (below),
-   to read the Ebook folder, and later to set the brightness and install
-   updates.
-   - Magisk's question can end up hidden behind GammaOS's screens and time
-     out. If eReaderDS says it needs Magisk's permission, open **Magisk**
-     (also in **Applications**) **→ Superuser**, switch **eReaderDS** on, and
-     open eReaderDS again.
-3. When it says so, press **A** to close it and open it again: from then on it
-   opens on both screens.
+1. In the front end's **Applications** row, open **Files**, tap **☰** (top
+   left) → **Downloads**, and tap the `.apk`. (If the touchscreen can't reach
+   something, the **Mouse** tile in GammaOS's Control Center gives you a
+   pointer.) If Android says installing from here isn't allowed, tap
+   **Settings**, switch on **Allow from this source**, go back and tap
+   **Install**.
+2. When it's installed, tap **Done**, not Open. (Open starts eReaderDS behind
+   the front end, whose menu then ignores **A** until you move left and right.)
+3. Open **eReaderDS** from the **Applications** row. The first time, it adds
+   itself to DualStack's list and says **One more step!**: press **A** to close
+   it and open it again. From then on it opens on both screens.
+
+No root or Magisk needed. If eReaderDS says it couldn't add itself (a GammaOS
+that doesn't allow it), add it by hand: **Quick Menu → System Settings →
+GammaOS Toolbox → Allowed packages**, and put `,com.casualducko.ereaderds` at
+the end (after `com.dsemu.drastic`).
 
 **Books** go in the **Ebook** folder of the handheld's storage (`/sdcard/Ebook`,
 made on the first run; folders inside it are fine). Besides copying them over
@@ -106,10 +107,13 @@ On GammaOS:
   systems. (GammaOS normally uses the Anbernic button for its Control Center;
   on first run eReaderDS adds a GammaOS per-app button profile that gives it
   back inside eReaderDS only.) The curved-arrow button belongs to GammaOS.
-- If another app's window comes up while you read (for example Magisk asking
-  for permission), GammaOS takes one screen back: open eReaderDS again.
-- **Updates** download the new `.apk` and install it (with root); eReaderDS
-  closes, and you open it again.
+- **Brightness** is GammaOS's: use the sliders in its Control Center.
+  eReaderDS's own Extra dim still works (Settings → Brightness, or slide down).
+- If another app's window comes up while you read, GammaOS takes one screen
+  back: open eReaderDS again.
+- **Updates** download the new `.apk` and install it. That one step needs root
+  (Magisk asks; tap **Grant**). Without it, install the downloaded `.apk`
+  (`Ebook/.ereaderds/.update.apk`) with Files as above.
 - It's a little slower than on Linux: Android needs much of the handheld's
   1 GB of memory.
 
@@ -531,8 +535,9 @@ problem.
 ## Known limitations
 
 - Touch works only on the bottom screen.
-- On GammaOS, only one screen until eReaderDS has been added to DualStack
-  (it does that itself, with Magisk's permission).
+- On GammaOS, one screen on the very first launch (eReaderDS adds itself to
+  DualStack then; open it again), and no in-app brightness (GammaOS's own
+  sliders do it).
 - When a chapter runs over several files in the EPUB, its pages in files not
   opened yet are estimated (usually within a few pages) until you reach them.
 - No tables, fixed-layout EPUBs, PDF, MOBI or DRM-protected books.

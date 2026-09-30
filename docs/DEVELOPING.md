@@ -184,14 +184,21 @@ How it fits GammaOS (`app/android.lua`):
   `persist.gammaos.dualstack.pkgs` one 1024x1536 window, top screen above
   bottom. The app draws its usual 2048x768 frame (screens side by side) to a
   canvas and shows its halves stacked. It only gets both screens when it opens;
-  another app's window (Magisk's) makes DualStack let go.
+  another app's window makes DualStack let go.
 - **Front end:** GammaOS's front end (`gammaos-nano`) draws over Android.
   Launch the app from it (Android apps); `am start` over ADB runs it underneath.
 - **Touch:** LÖVE's own touch events (the top screen has none); the evdev
   reader is Linux-only.
-- **Root (Magisk):** first-run setup (DualStack list, all-files access),
-  brightness (one root shell), installing updates. The app turns off Magisk's
-  notices for itself, since each one makes DualStack let go.
+- **No root:** GammaOS runs SELinux permissive, so any app may set
+  `persist.gammaos.*` and restart GammaOS services (`ctl.restart`). First run
+  adds the package to `dualstack.pkgs` (or `pkgs_1`, `pkgs_2`... when the 91
+  characters are used up) and a gamepad profile (`gamepad.paN_*`, then
+  `ctl.restart gammapad`) through `__system_property_set`. Magisk's question
+  would open on display 0 under GammaOS's Control Center and time out, so
+  root is used only to install updates. The backlight needs root, so the
+  brightness is GammaOS's.
+- **Installer's Open:** it starts the app outside the front end, which covers
+  it; tap Done and launch from the front end.
 - **Files:** books and data in `/sdcard/Ebook`; the built-in dictionary is
   copied out of the APK to `.ereaderds/bundled/`; Android's CA certificates are
   gathered into `.ereaderds/cacerts.pem` for OpenSSL.

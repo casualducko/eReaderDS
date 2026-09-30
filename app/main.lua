@@ -2914,7 +2914,7 @@ local function menu_items()
         app.menu_on_page(1, section("Reading", {
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
-                  or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "n/a"),
+                  or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "Normal"),
               adjust = function(d)
                   local avail = Backlight.available()
                   local cur = S.brightness >= 0 and S.brightness or (avail and Backlight.get()) or 50

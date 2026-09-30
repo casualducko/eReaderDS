@@ -5,8 +5,8 @@
 -- screens, the top one above the bottom one (1024x1536). eReaderDS draws its
 -- usual 2048x768 frame (the two screens side by side, as on Linux) into a
 -- canvas and shows its halves one above the other. Without DualStack the app
--- gets only the top screen, and the setup here puts it on the list (GammaOS
--- is rooted; Magisk asks once).
+-- gets only the top screen, and the setup here puts it on the list (a GammaOS
+-- setting any app may change: no root needed).
 local M = {}
 
 M.active = love.system.getOS() == "Android"
@@ -56,6 +56,7 @@ end
 local ffi = require("ffi")
 for _, decl in ipairs({
     "int __system_property_get(const char *name, char *value);",
+    "int __system_property_set(const char *name, const char *value);",
     "int mkdir(const char *path, unsigned int mode);",
     "int access(const char *path, int mode);",
     "typedef struct rgds_DIR rgds_DIR;",
@@ -72,6 +73,13 @@ function M.getprop(name)
     local buf = ffi.new("char[92]")
     local ok, n = pcall(C.__system_property_get, name, buf)
     return ok and n > 0 and ffi.string(buf, n) or ""
+end
+
+-- Set one; true if it took. (GammaOS lets any app change its own settings,
+-- the persist.gammaos.* ones, and restart its services.)
+function M.setprop(name, value)
+    local ok = pcall(C.__system_property_set, name, value)
+    return ok and (name:sub(1, 4) == "ctl." or M.getprop(name) == value)
 end
 
 function M.dir_exists(path)
@@ -142,7 +150,9 @@ end
 M.QUIET = 'magisk --sqlite "UPDATE policies SET notification=0, logging=0 WHERE uid=$(stat -c %u /data/data/'
     .. M.PACKAGE .. ')" >/dev/null 2>&1'
 
--- A command as root (GammaOS has Magisk, which asks the first time).
+-- A command as root (GammaOS has Magisk, which asks the first time). Only
+-- for installing an update: everything else works without root, and Magisk's
+-- question usually opens on the screen GammaOS covers, where it times out.
 function M.su(cmd)
     cmd = cmd .. "\n" .. M.QUIET                  -- (a newline: cmd may end with &)
     return run("su -c '" .. cmd:gsub("'", "'\\''") .. "' </dev/null >/dev/null 2>&1")
@@ -169,73 +179,63 @@ function M.storage_ok()
     return true
 end
 
--- A note on the screen before asking Magisk (its question may be hidden and
--- take a while to time out): on the top screen, turned like a page.
-local function notice(text)
-    if not love.graphics.isActive() then return end
-    love.graphics.origin()
-    love.graphics.clear(0.957, 0.925, 0.847)
-    love.graphics.push()
-    love.graphics.translate(1024, 0)
-    love.graphics.rotate(math.pi / 2)
-    love.graphics.setColor(0.357, 0.275, 0.212)
-    love.graphics.setFont(love.graphics.newFont(34))
-    love.graphics.printf(text, 60, 320, 648, "center")
-    love.graphics.pop()
-    love.graphics.present()
-end
-
 -- GammaOS turns the Anbernic button into its Control Center for every app.
 -- A per-app gamepad profile for eReaderDS (GammaOS's own feature) gives it
 -- back as the controller's guide button, which quits, as on Linux. Nothing
 -- is changed if eReaderDS has a profile already (the reader's own).
-local function prop(name)
-    return M.getprop(name)
-end
+-- Returns whether there's one now, and whether it was just added.
 function M.gamepad_profile()
-    local n = tonumber(prop("persist.gammaos.gamepad.pa_count")) or 0
-    for i = 0, n - 1 do
-        if prop("persist.gammaos.gamepad.pa" .. i .. "_pkg") == M.PACKAGE then return true, false end
-    end
     local g = "persist.gammaos.gamepad.pa"
-    M.su("setprop " .. g .. n .. "_pkg " .. M.PACKAGE .. "; setprop " .. g .. n .. "_btn 316:316; setprop "
-        .. g .. "_count " .. (n + 1) .. "; stop gammapad; start gammapad")
-    return prop(g .. n .. "_pkg") == M.PACKAGE, true
+    local n = tonumber(M.getprop(g .. "_count")) or 0
+    for i = 0, n - 1 do
+        if M.getprop(g .. i .. "_pkg") == M.PACKAGE then return true, false end
+    end
+    local ok = M.setprop(g .. n .. "_pkg", M.PACKAGE) and M.setprop(g .. n .. "_btn", "316:316")
+        and M.setprop(g .. "_count", tostring(n + 1))
+    if ok then M.setprop("ctl.restart", "gammapad") end   -- (it reads profiles when it starts)
+    return ok, ok
+end
+
+-- DualStack's list: persist.gammaos.dualstack.pkgs, comma-separated, and when
+-- that's full (a setting holds 91 characters) pkgs_1, pkgs_2, ... after it.
+local function dualstack_add()
+    local base = "persist.gammaos.dualstack.pkgs"
+    local names, i = { base }, 1
+    while true do
+        local n = base .. "_" .. i
+        if M.getprop(n) == "" then break end
+        names[#names + 1] = n
+        i = i + 1
+    end
+    for _, n in ipairs(names) do
+        for p in M.getprop(n):gmatch("[^,%s]+") do
+            if p == M.PACKAGE then return true end
+        end
+    end
+    local last = M.getprop(names[#names])
+    local joined = last ~= "" and (last .. "," .. M.PACKAGE) or M.PACKAGE
+    if #joined <= 91 then return M.setprop(names[#names], joined) end
+    return M.setprop(base .. "_" .. i, M.PACKAGE)
 end
 
 -- One-time setup: all-files access, and the DualStack list. Returns a
 -- heading and a message when something's left for the reader to do, else nil.
 function M.setup()
     if not M.storage_ok() then
-        notice("Setting up eReaderDS…\n\nIf Magisk asks, tap Grant.")
-        M.su("appops set " .. M.PACKAGE .. " MANAGE_EXTERNAL_STORAGE allow")
-        if not M.storage_ok() then
-            return "Almost there", "eReaderDS can't use the Ebook folder yet.\n\nIn Android's Settings → Apps → "
-                .. "Special app access → All files access, switch eReaderDS on (or switch it on in Magisk → Superuser). "
-                .. "Then press A to close eReaderDS and open it again."
-        end
+        return "Almost there", "eReaderDS can't use the Ebook folder yet.\n\n"
+            .. "Open the Quick Menu → System Settings → Apps → eReaderDS → Permissions, "
+            .. "and allow access to all files. Then press A to close eReaderDS and open it again."
     end
     if not M.stacked() then
-        local function listed()
-            local list = M.getprop("persist.gammaos.dualstack.pkgs")
-            return list, list:find(M.PACKAGE, 1, true) ~= nil
-        end
-        local list, ok = listed()
-        if not ok then
-            notice("Setting up eReaderDS for both screens…\n\nIf Magisk asks, tap Grant.")
-            M.su("setprop persist.gammaos.dualstack.pkgs " .. (list ~= "" and (list .. "," .. M.PACKAGE) or M.PACKAGE))
-            ok = select(2, listed())
-        end
-        if ok then
+        if dualstack_add() then
             M.gamepad_profile()
             return "One more step!", "Press A to close eReaderDS, then open it again.\n\n"
                 .. "From then on it opens on both screens."
         end
-        -- Magisk's question can end up hidden behind GammaOS's screens and
-        -- time out, which Magisk remembers as a no.
-        return "Almost there", "To use both screens, eReaderDS needs Magisk's permission once.\n\n"
-            .. "Open Magisk → Superuser and switch eReaderDS on (or tap Grant if Magisk asks). "
-            .. "Then press A to close eReaderDS and open it again."
+        -- (GammaOS wouldn't take the setting: the reader can add it by hand.)
+        return "Almost there", "To use both screens, add eReaderDS to GammaOS's DualStack list.\n\n"
+            .. "Open the Quick Menu → System Settings → GammaOS Toolbox → Allowed packages, and add "
+            .. "a comma and " .. M.PACKAGE .. " to the end. Then press A to close eReaderDS and open it again."
     end
     -- (Already on DualStack, from an earlier version: the button profile on
     -- its own. The gamepad service restarts to read it, so open eReaderDS

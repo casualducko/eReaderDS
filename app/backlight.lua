@@ -8,32 +8,13 @@ M.LEVELS = { 1, 2, 3, 5, 8, 12, 18, 25, 35, 50, 65, 80, 100 }
 
 local devices
 
--- Android (GammaOS): apps can read the backlight but not set it; it's set
--- through one root shell, opened the first time (Magisk asks once).
+-- Android (GammaOS): apps can read the backlight but not set it (that takes
+-- root, and Magisk's question is easily hidden), so the brightness is left to
+-- GammaOS's own sliders in its Control Center.
 local ANDROID = love and love.system and love.system.getOS() == "Android"
-local root_shell
 
 local function write(path, value)
-    if ANDROID then
-        if root_shell == nil then
-            root_shell = io.popen("su", "w") or false
-            if root_shell then
-                root_shell:write(require("android").QUIET, "\n")
-                root_shell:flush()
-            end
-        end
-        if not root_shell then return false end
-        -- If root was refused (or Magisk's question timed out), the shell is
-        -- gone and writing fails: start again with the next change.
-        local ok = root_shell:write(string.format("echo %s > '%s'\n", value, path))
-        ok = ok and root_shell:flush()
-        if not ok then
-            pcall(root_shell.close, root_shell)
-            root_shell = nil
-            return false
-        end
-        return true
-    end
+    if ANDROID then return false end
     local f = io.open(path, "w")
     if not f then return false end
     f:write(value)
@@ -66,6 +47,7 @@ local function scan()
 end
 
 function M.available()
+    if ANDROID then return false end
     return #(devices or scan()) > 0
 end
 
