@@ -43,11 +43,6 @@ end
 
 if not M.active then return M end
 
-local function run(cmd)
-    local ok = os.execute(cmd)
-    return ok == true or ok == 0
-end
-
 ---------------------------------------------------------------- without a shell
 
 -- Starting a command (getprop, mkdir, ls, find) copies the whole app process
@@ -142,27 +137,8 @@ function M.find_files(root, depth, keep, skip_dir)
     return out
 end
 
--- Magisk shows a "granted" notice each time root is used, and that notice
--- makes DualStack give up the tall window (the app shrinks onto one screen);
--- and it logs each use through its own app, which it starts for that (88 MB,
--- enough to make a 1 GB handheld swap and pages turn slowly). Once root is
--- ours, turn both off for this app.
-M.QUIET = 'magisk --sqlite "UPDATE policies SET notification=0, logging=0 WHERE uid=$(stat -c %u /data/data/'
-    .. M.PACKAGE .. ')" >/dev/null 2>&1'
-
--- A command as root (GammaOS has Magisk, which asks the first time). Only
--- for installing an update: everything else works without root, and Magisk's
--- question usually opens on the screen GammaOS covers, where it times out.
-function M.su(cmd)
-    cmd = cmd .. "\n" .. M.QUIET                  -- (a newline: cmd may end with &)
-    return run("su -c '" .. cmd:gsub("'", "'\\''") .. "' </dev/null >/dev/null 2>&1")
-end
-
--- The screens' brightness, without root: Android lets an app set it for its
--- own window while that's showing (the system's own setting is back once it
--- closes). Done by a few lines of our own Java (android/smali/.../Bright),
--- called through JNI. value 0..1, or -1 for the system's own; false if it
--- couldn't be done.
+-- Our own bits of Java (android/smali/), called through JNI: LÖVE has no
+-- hook for what they do. Each is a static method taking the activity first.
 pcall(ffi.cdef, [[
     typedef union { int32_t i; float f; void *l; int64_t j; } rgds_jvalue;
     void *SDL_AndroidGetJNIEnv(void);
@@ -176,45 +152,100 @@ local function jni_setup()
     if env == nil then return false end
     local fn = ffi.cast("void ***", env)[0]
     local function f(i, sig) return ffi.cast(sig, fn[i]) end
-    local J = {
-        env = env, lib = love_lib,
+    return {
+        env = env, lib = love_lib, methods = {}, args = ffi.new("rgds_jvalue[4]"),
         FindClass = f(6, "void *(*)(void *, const char *)"),
         ExceptionClear = f(17, "void (*)(void *)"),
         NewGlobalRef = f(21, "void *(*)(void *, void *)"),
         DeleteLocalRef = f(23, "void (*)(void *, void *)"),
         GetStaticMethodID = f(113, "void *(*)(void *, void *, const char *, const char *)"),
         CallStaticVoidMethodA = f(143, "void (*)(void *, void *, void *, const rgds_jvalue *)"),
+        NewStringUTF = f(167, "void *(*)(void *, const char *)"),
         ExceptionCheck = f(228, "uint8_t (*)(void *)"),
     }
-    local cls = J.FindClass(env, "com/casualducko/ereaderds/Bright")
-    if cls == nil or J.ExceptionCheck(env) ~= 0 then J.ExceptionClear(env); return false end
-    J.cls = J.NewGlobalRef(env, cls)
-    J.DeleteLocalRef(env, cls)
-    J.set = J.GetStaticMethodID(env, J.cls, "set", "(Landroid/app/Activity;F)V")
-    if J.set == nil or J.ExceptionCheck(env) ~= 0 then J.ExceptionClear(env); return false end
-    J.args = ffi.new("rgds_jvalue[2]")
-    return J
 end
-function M.window_brightness_ok()
+-- The class and method, looked up once; nil if they aren't there.
+local function jni_method(class, name, sig)
     if jni == nil then
         local ok, J = pcall(jni_setup)
         jni = ok and J or false
-        if not jni then print("[android] window brightness unavailable") end
+        if not jni then print("[android] JNI unavailable") end
     end
-    return jni ~= false
+    if not jni then return nil end
+    local J, env, key = jni, jni.env, class .. "." .. name
+    if J.methods[key] == nil then
+        J.methods[key] = false
+        local cls = J.FindClass(env, class)
+        if cls ~= nil and J.ExceptionCheck(env) == 0 then
+            local id = J.GetStaticMethodID(env, cls, name, sig)
+            if id ~= nil and J.ExceptionCheck(env) == 0 then
+                J.methods[key] = { cls = J.NewGlobalRef(env, cls), id = id }
+            end
+            J.DeleteLocalRef(env, cls)
+        end
+        if J.ExceptionCheck(env) ~= 0 then J.ExceptionClear(env) end
+        if not J.methods[key] then print("[android] no " .. key) end
+    end
+    return J.methods[key] or nil
 end
-function M.window_brightness(value)
-    if not M.window_brightness_ok() then return false end
+-- Call one: the activity, then each argument (a string, or a number passed
+-- as a float). True if it ran without a Java exception.
+local function jni_call(class, name, sig, ...)
+    local m = jni_method(class, name, sig)
+    if not m then return false end
     local J, env = jni, jni.env
     local act = J.lib.SDL_AndroidGetActivity()
     if act == nil then return false end
+    local refs = { act }
     J.args[0].l = act
-    J.args[1].f = value
-    J.CallStaticVoidMethodA(env, J.cls, J.set, J.args)
+    for i = 1, select("#", ...) do
+        local v = select(i, ...)
+        if type(v) == "string" then
+            local str = J.NewStringUTF(env, v)
+            refs[#refs + 1] = str
+            J.args[i].l = str
+        else
+            J.args[i].f = v
+        end
+    end
+    J.CallStaticVoidMethodA(env, m.cls, m.id, J.args)
     local failed = J.ExceptionCheck(env) ~= 0
     if failed then J.ExceptionClear(env) end
-    J.DeleteLocalRef(env, act)
+    for _, r in ipairs(refs) do J.DeleteLocalRef(env, r) end
     return not failed
+end
+
+-- The screens' brightness, without root: Android lets an app set it for its
+-- own window while that's showing (the system's own setting is back once it
+-- closes). value 0..1, or -1 for the system's own; false if it couldn't be done.
+local BRIGHT = { "com/casualducko/ereaderds/Bright", "set", "(Landroid/app/Activity;F)V" }
+function M.window_brightness_ok()
+    return jni_method(BRIGHT[1], BRIGHT[2], BRIGHT[3]) ~= nil
+end
+function M.window_brightness(value)
+    return jni_call(BRIGHT[1], BRIGHT[2], BRIGHT[3], value)
+end
+
+-- Install a downloaded update (an APK) without root: Android's installer,
+-- which lets an app update itself without asking (android/smali/.../Install).
+-- It works on in the background; M.install_status() says how it's going:
+-- "installing", "confirm" (Android asked the reader after all), or "error"
+-- and a message. When it's done Android stops the app.
+M.INSTALL_STATUS = M.DATA .. "/.update.status"
+function M.install_update(apk)
+    os.remove(M.INSTALL_STATUS)
+    return jni_call("com/casualducko/ereaderds/Install", "start",
+        "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)V", apk, M.INSTALL_STATUS)
+end
+function M.install_status()
+    local f = io.open(M.INSTALL_STATUS, "rb")
+    if not f then return "installing" end
+    local s = f:read("*a") or ""
+    f:close()
+    if s == "" or s == "committed" or s:match("^0 ") then return "installing" end
+    if s:match("^%-1 ") then return "confirm" end
+    local msg = s:match("^error (.*)") or s:match("^%-?%d+ (.*)") or s
+    return "error", (msg == "null" or msg == "") and "Android couldn't install it." or msg
 end
 
 -- Both screens: the window is taller than it's wide.
@@ -280,6 +311,10 @@ end
 -- One-time setup: all-files access, and the DualStack list. Returns a
 -- heading and a message when something's left for the reader to do, else nil.
 function M.setup()
+    -- An update installed since the last launch: its download isn't needed.
+    for _, f in ipairs({ M.DATA .. "/.update.apk", M.INSTALL_STATUS }) do
+        if C.access(f, 0) == 0 then os.remove(f) end
+    end
     if not M.storage_ok() then
         return "Almost there", "eReaderDS can't use the Ebook folder yet.\n\n"
             .. "Open the Quick Menu → System Settings → Apps → eReaderDS → Permissions, "

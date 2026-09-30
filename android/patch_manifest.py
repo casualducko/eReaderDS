@@ -52,6 +52,11 @@ s = sub(r'android:screenOrientation="landscape"', 'android:screenOrientation="un
 # All-files access: books live in /sdcard/Ebook, where people copy them.
 s = sub(r'(<uses-permission android:name="android.permission.INTERNET"/>)',
         r'\1\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>', s)
+# Installing its own updates, without the reader confirming each one
+# (android/smali/.../Install): Android allows that for an app updating itself.
+s = sub(r'(<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>)',
+        r'\1\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>'
+        r'\n    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"/>', s)
 # (No microphone or Bluetooth needed.)
 s = s.replace('    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n', "")
 

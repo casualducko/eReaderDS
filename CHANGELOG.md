@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **GammaOS (Android):** eReaderDS runs on the RG DS Plus under GammaOS as an Android app (`eReaderDS-vX.Y.Z-android.apk`), on both screens through GammaOS's DualStack. Touch, the buttons, brightness, Get Books, the dictionary and KOReader Sync work as on Linux. No root needed: on first launch it adds itself to DualStack's list and gives the Anbernic button back (close and open it once); only installing an update uses Magisk.
+- **GammaOS (Android):** eReaderDS runs on the RG DS Plus under GammaOS as an Android app (`eReaderDS-vX.Y.Z-android.apk`), on both screens through GammaOS's DualStack. Touch, the buttons, brightness, Get Books, the dictionary and KOReader Sync work as on Linux. No root needed: on first launch it adds itself to DualStack's list and gives the Anbernic button back (close and open it once), and updates install through Android's own installer without asking.
 
 - **Less memory for pictures:** covers and illustrations bigger than a page are scaled down once when loaded (smoothly), instead of being kept at full size. An illustrated book's cover alone could take 24 MB.
 

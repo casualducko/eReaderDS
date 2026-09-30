@@ -112,9 +112,8 @@ On GammaOS:
   is back when you leave it.
 - If another app's window comes up while you read, GammaOS takes one screen
   back: open eReaderDS again.
-- **Updates** download the new `.apk` and install it. That one step needs root
-  (Magisk asks; tap **Grant**). Without it, install the downloaded `.apk`
-  (`Ebook/.ereaderds/.update.apk`) with Files as above.
+- **Updates** download the new `.apk` and install it through Android's own
+  installer, with no questions: eReaderDS closes when it's done; open it again.
 - It's a little slower than on Linux: Android needs much of the handheld's
   1 GB of memory.
 

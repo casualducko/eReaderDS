@@ -5217,7 +5217,8 @@ end
 function app.update_check(by_hand)
     local u = app.upd
     if u.state == "checking" then u.by_hand = u.by_hand or by_hand return end   -- asked while the launch check runs
-    if u.state == "downloading" or u.state == "unpacking" or u.state == "ready" then return end
+    if u.state == "downloading" or u.state == "unpacking" or u.state == "ready" or u.state == "installing"
+        or u.state == "confirm" then return end
     if not shop.online(true) then
         if by_hand then app.upd = { state = "error", message = "Not connected to Wi-Fi." } end
         return
@@ -5263,17 +5264,34 @@ function app.update_check(by_hand)
     end)
 end
 
--- Android: install the downloaded APK as root (GammaOS has Magisk) and close;
--- installing stops the running app anyway. The install runs on in its own
--- shell after this process ends.
+-- Android: install the downloaded APK through Android's own installer (no
+-- root; see android.lua), which stops this app when it's done: open it again
+-- afterwards. Until then the page says how it's going (app.update_poll).
 function app.update_install(apk)
     save_progress()
-    -- Its own session (setsid), so it isn't stopped when su's shell ends or
-    -- when installing stops this app; what it says goes to .update.log.
-    local log = require("android").DATA .. "/.update.log"
-    require("android").su('setsid sh -c \'sleep 1; pm install -r "' .. apk .. '" > "' .. log
-        .. '" 2>&1 && rm -f "' .. apk .. '"\' </dev/null >/dev/null 2>&1 &')
-    love.event.quit()
+    local u = app.upd
+    u.state, u.message, u.install_at = "installing", nil, love.timer.getTime()
+    if not require("android").install_update(apk) then
+        u.state, u.message = "error", "Android's installer couldn't be started."
+    end
+    redraw()
+end
+
+-- While installing: Android's answer, from the status file.
+function app.update_poll()
+    local u = app.upd
+    if u.state ~= "installing" and u.state ~= "confirm" then return false end
+    local now = love.timer.getTime()
+    if now - (u.poll_at or 0) < 0.5 then return false end
+    u.poll_at = now
+    local st, msg = require("android").install_status()
+    if st == "installing" and now - (u.install_at or now) > 90 then
+        st, msg = "error", "Android didn't finish installing it."
+    end
+    if st == u.state then return false end
+    u.state, u.message = st, msg
+    redraw()
+    return true
 end
 
 function app.update_open()
@@ -5378,7 +5396,8 @@ function app.update_action(a)
     local u = app.upd
     if a == "toc" then app.update_skip() return end               -- Y
     if a == "confirm" then
-        if u.state == "available" or (u.state == "error" and u.url) then app.update_start()
+        if u.state == "error" and u.apk and io.open(u.apk, "rb") then app.update_install(u.apk)   -- (downloaded already)
+        elseif u.state == "available" or (u.state == "error" and u.url) then app.update_start()
         elseif u.state == "error" or (u.state == "none" and not u.checked) then app.update_check(true)
         elseif u.state == "ready" and u.apk then app.update_install(u.apk)
         elseif u.state == "ready" then love.event.quit(app.UPDATE_EXIT) end
@@ -5472,7 +5491,11 @@ function app.update_draw(side)
     elseif u.state == "unpacking" then
         status = u.saving and "Saving to the SD card…" or ("Installing…  " .. math.floor((u.frac or 0) * 100) .. "%")
     elseif u.state == "ready" and u.apk then
-        status, button = "Downloaded. eReaderDS closes to install it: open it again afterwards.", "Install now"
+        status, button = "Downloaded. eReaderDS closes while it installs: open it again afterwards.", "Install now"
+    elseif u.state == "installing" then
+        status = "Installing…  eReaderDS closes when it's done: open it again afterwards."
+    elseif u.state == "confirm" then
+        status = "Android asks you to confirm the update: choose Update."
     elseif u.state == "ready" then
         status, button = "Ready. eReaderDS restarts with the new version.", "Restart now"
     elseif u.state == "checking" then
@@ -8630,6 +8653,7 @@ function love.run()
             app.on_hold(gesture.side, gesture.u0, gesture.v0)
         end
         if shop.net_poll() then got = true end
+        if app.update_poll() then got = true end
         if app.recv and app.recv_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
         if library.pending and not lid.closed then app.library_meta_step(); got = true end

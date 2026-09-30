@@ -195,7 +195,15 @@ How it fits GammaOS (`app/android.lua`):
   characters are used up) and a gamepad profile (`gamepad.paN_*`, then
   `ctl.restart gammapad`) through `__system_property_set`. Magisk's question
   would open on display 0 under GammaOS's Control Center and time out, so
-  root is used only to install updates.
+  nothing uses root.
+- **Updates:** `android/smali/.../Install` puts the downloaded APK into a
+  PackageInstaller session with `setRequireUserAction(USER_ACTION_NOT_REQUIRED)`;
+  holding `UPDATE_PACKAGES_WITHOUT_USER_ACTION`, an app updating itself is
+  installed without a confirmation (Android 12+). `InstallResult` writes
+  Android's answer to `.ereaderds/.update.status` and shows Android's own
+  confirmation if it asks after all. Installing stops the app; the next launch
+  deletes the download. Test with `.update-test` (below) and a build whose
+  `app/version.lua` is higher.
 - **Brightness:** the backlight files need root, so the app sets its own
   window's brightness instead (`WindowManager.LayoutParams.screenBrightness`,
   no permission; GammaOS applies it to both screens, and Android's own
