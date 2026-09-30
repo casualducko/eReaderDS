@@ -135,9 +135,11 @@ function M.find_files(root, depth, keep, skip_dir)
 end
 
 -- Magisk shows a "granted" notice each time root is used, and that notice
--- makes DualStack give up the tall window (the app shrinks onto one screen).
--- Once root is ours, turn the notices off for this app.
-M.QUIET = 'magisk --sqlite "UPDATE policies SET notification=0 WHERE uid=$(stat -c %u /data/data/'
+-- makes DualStack give up the tall window (the app shrinks onto one screen);
+-- and it logs each use through its own app, which it starts for that (88 MB,
+-- enough to make a 1 GB handheld swap and pages turn slowly). Once root is
+-- ours, turn both off for this app.
+M.QUIET = 'magisk --sqlite "UPDATE policies SET notification=0, logging=0 WHERE uid=$(stat -c %u /data/data/'
     .. M.PACKAGE .. ')" >/dev/null 2>&1'
 
 -- A command as root (GammaOS has Magisk, which asks the first time).
