@@ -111,11 +111,6 @@ On GammaOS:
   systems. (GammaOS normally uses the Anbernic button for its Control Center;
   on first run eReaderDS adds a GammaOS per-app button profile that gives it
   back inside eReaderDS only.) The curved-arrow button belongs to GammaOS.
-- **Brightness** works as on the other systems (slide up/down, or Settings)
-  and covers both screens while eReaderDS is open; GammaOS's own brightness
-  is back when you leave it.
-- If another app's window comes up while you read, GammaOS takes one screen
-  back: open eReaderDS again.
 - It's a little slower than on Linux: Android needs much of the handheld's
   1 GB of memory. If page turns start to stutter after a long session,
   restart the handheld: GammaOS runs short of memory over time.
