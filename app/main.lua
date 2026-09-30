@@ -7667,19 +7667,38 @@ local STICK_PRESS, STICK_RELEASE = 0.6, 0.3
 -- port had them off by one, which made the stick's up/down read as left/right.
 local stick = { x = 0, y = 0 }          -- latched direction per axis: -1, 0, 1
 
+-- Where each axis rests when the stick is let go. Usually 0, but GammaOS's
+-- gamepad service reports the RG DS Plus's stick resting over halfway along
+-- one axis, so a push that way never came back far enough to count again.
+-- Learned from readings that hold steady while the stick isn't pushed.
+app.stick_rest = { x = 0, y = 0 }
+local stick_last = { x = { v = 0, t = 0 }, y = { v = 0, t = 0 } }
+
 local function stick_axis(which, value)
     local neg, pos = "left", "right"
     if which == "y" then neg, pos = "up", "down" end
+    local now, last = love.timer.getTime(), stick_last[which]
+    if math.abs(value - last.v) < 0.06 and now - last.t > 0.15 and math.abs(value) < 0.8
+            and math.abs(value - app.stick_rest[which]) > 0.06 then
+        app.stick_rest[which] = value
+        log_input("stick %s rests at %.2f", which, value)
+    end
+    last.v, last.t = value, now
+    -- Pushes and letting go are measured from the rest, as a share of the
+    -- travel left on that side (so with a centred stick, as before).
+    local rest = app.stick_rest[which]
+    local d = value - rest
+    local room = d >= 0 and (1 - rest) or (1 + rest)
     local cur = stick[which]
     if cur == 0 then
-        if value >= STICK_PRESS then
+        if d >= STICK_PRESS * (1 - rest) then
             stick[which] = 1
             log_input("stick %s=%.2f -> %s", which, value, pos); dpad(pos)
-        elseif value <= -STICK_PRESS then
+        elseif -d >= STICK_PRESS * (1 + rest) then
             stick[which] = -1
             log_input("stick %s=%.2f -> %s", which, value, neg); dpad(neg)
         end
-    elseif math.abs(value) < STICK_RELEASE then
+    elseif math.abs(d) < STICK_RELEASE * room then
         stick[which] = 0
     end
 end
