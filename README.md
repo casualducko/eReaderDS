@@ -209,12 +209,13 @@ Press **B** (or Start, X, ↩) while reading. Settings has big rows on two
 pages: swipe left or right on the touchscreen, or keep pressing down past the
 last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
-1. What you open Settings for while reading. **This book:** Table of
+1. What you open Settings for while reading. At the top, **My Books** (your
+   library, with how many books it has; Settings opens on the row below it). **This book:** Table of
    Contents, Bookmarks and Highlights, Find in Book, Jump to %, and **Sync
    with KOReader** when sync is on. **Reading:** Brightness, Text size,
    **Theme** (tap it or press A: a page of all the themes, your book previewed
-   in each), **Fonts** (its own page, [below](#fonts)). Then **My Books**
-   (your library). (**Update to v…** is at the top when one is waiting.)
+   in each), **Fonts** (its own page, [below](#fonts)). (**Update to v…** is
+   first in This book when one is waiting.)
 2. What's set once. **Page layout:** Line spacing, Margins, Top/bottom
    margins, Justify text, Hyphenation. **More settings:** **Night Mode**
    ([below](#night-mode)), **Status Bar ›** (what the top and bottom lines

@@ -2972,6 +2972,15 @@ local function more_items()
     )
 end
 
+app.MENU_START = 2                  -- the row Settings opens on (after My Books)
+
+-- "14 books" (finished ones hidden in My Books included), once it's been looked at.
+function app.book_count()
+    if not library.seen then return nil end            -- (not read yet)
+    local n = #library.items + (library.hidden or 0)
+    return n == 1 and "1 book" or (n .. " books")
+end
+
 local function menu_items()
     if menu.page == "status" then return status_items() end
     if menu.page == "more" then return more_items() end
@@ -2985,9 +2994,14 @@ local function menu_items()
     -- reader opens Settings for in the middle of a book: getting around it,
     -- and making the page comfortable right now (brightness first: the
     -- change most often wanted, at night). My Books, leaving the book, is
-    -- last. The second holds what's set once: the page's layout, the other
-    -- settings pages, and help.
+    -- above them all, like a way back (Settings opens on the row after it,
+    -- app.MENU_START, so A straight away doesn't leave the book). The second
+    -- holds what's set once: the page's layout, the other settings pages,
+    -- and help.
     return join(
+        app.menu_on_page(1, section("", {
+            { label = "My Books", act = go_library, value = app.book_count() },
+        })),
         app.menu_on_page(1, section("This book", join(
             u.state == "available" and { { label = "Update to v" .. u.version, bold = true, act = app.update_open } } or {},
             {
@@ -3034,9 +3048,6 @@ local function menu_items()
             { label = "Fonts", value = fonts.name or S.font,
               value_font = Fonts.preview(fonts.name or S.font, app.MENU_SIZE),
               act = function() app.font_open() end },
-        })),
-        app.menu_on_page(1, section("", {
-            { label = "My Books", act = go_library },
         })),
         app.menu_on_page(2, section("Page layout", {
             { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
@@ -7497,7 +7508,7 @@ function handle_action(a)
         elseif a == "bookmark" then toggle_bookmark()
         elseif a == "next_section" then jump_section(1)
         elseif a == "prev_section" then jump_section(-1)
-        elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil
+        elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = app.MENU_START; menu.page = "main"; menu.top = nil
         elseif a == "toc" then look.open()          -- Y: look up a word
         elseif a == "confirm" then note.open()
         end
@@ -7669,7 +7680,7 @@ function handle_action(a)
         end
         if a == "bookmark" then shop.start() end
         if a == "menu" and not book and app.upd.state == "available" then app.update_open() end
-        if a == "menu" and book then app.mode = "menu"; menu.sel = 1; menu.page = "main"; menu.top = nil end
+        if a == "menu" and book then app.mode = "menu"; menu.sel = app.MENU_START; menu.page = "main"; menu.top = nil end
         if a == "back" and book then app.mode = "reader" end
         redraw()
     end
