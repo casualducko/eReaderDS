@@ -13,8 +13,21 @@ local M = {}
 -- (Standard Ebooks puts one, U+FEFF or U+2060, before each dash) and the
 -- zero-width space. Only left out when drawing, so places in the text stay
 -- the same.
+-- Also left out: soft hyphens (U+00AD, where a word may break; fonts draw
+-- them as a visible hyphen) and the zero-width joiners and direction marks
+-- (U+200C-U+200F). And U+0080-U+009F, from a book once in Windows-1252 read
+-- as Latin-1, are put back as what they were (curly quotes, dashes, …).
+local CP1252 = { [0x80] = "€", [0x82] = "‚", [0x84] = "„", [0x85] = "…", [0x86] = "†", [0x87] = "‡",
+    [0x89] = "‰", [0x8B] = "‹", [0x91] = "‘", [0x92] = "’", [0x93] = "“", [0x94] = "”", [0x95] = "•",
+    [0x96] = "–", [0x97] = "—", [0x99] = "™", [0x9B] = "›" }
 local function sanitize(s)
-    if s:find("[\226\239]") then s = s:gsub("\226\129\160", ""):gsub("\226\128\139", ""):gsub("\239\187\191", "") end
+    if s:find("[\226\239]") then
+        s = s:gsub("\226\129\160", ""):gsub("\226\128\139", ""):gsub("\239\187\191", "")
+            :gsub("\226\128[\140-\143]", "")
+    end
+    if s:find("\194[\128-\173]") then
+        s = s:gsub("\194\173", ""):gsub("\194([\128-\159])", function(c) return CP1252[c:byte()] or "" end)
+    end
     -- UTF-16 halves written as UTF-8 (ED A0..BF ..) pass utf8.len but can't be drawn.
     if s:find("\237[\160-\191]") then s = s:gsub("\237[\160-\191][\128-\191]", "\239\191\189") end
     if utf8.len(s) then return s end

@@ -4,6 +4,7 @@ local M = {}
 
 local BUNDLED_DIR = "fonts"   -- inside the LÖVE source
 M.DEFAULT = "Crimson Pro"            -- new readers' font, and the fallback
+M.FALLBACK = "Gentium Book Plus"      -- for characters a font doesn't have
 
 -- Serif or sans-serif, for the font list's filter. The bundled ones are
 -- known; for your own, the font's PANOSE class if it has one, then its name,
@@ -355,7 +356,21 @@ function M.load(name, size)
         }
     end
     local ok, res = pcall(load_family, fam)
-    if ok then return res, fam.name end
+    if ok then
+        -- Characters the font lacks (Cyrillic, Greek, special spaces, primes,
+        -- accents...) come from Gentium Book Plus, which has the most of any
+        -- bundled font, in the same style and size: not boxes.
+        local g = fam.name ~= M.FALLBACK and M.find(M.FALLBACK)
+        if g and g.name == M.FALLBACK then
+            local okg, gres = pcall(load_family, g)
+            if okg then
+                for k, f in pairs(res) do
+                    if gres[k] then pcall(f.setFallbacks, f, gres[k]) end
+                end
+            end
+        end
+        return res, fam.name
+    end
     print("[fonts] failed to load " .. fam.name .. ": " .. tostring(res))
     local def = M.find(M.DEFAULT)
     ok, res = pcall(load_family, def)
