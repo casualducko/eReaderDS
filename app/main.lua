@@ -6497,7 +6497,7 @@ local function draw_message(side)
         love.graphics.setFont(ui.font)
         color(th.fg)
         love.graphics.printf(message or "", m.outer, 200, PAGE_W - m.outer - m.inner, "left")
-        app.hints(m.outer, nil, { "A", "continue" })
+        app.hints(m.outer, nil, { "A", (app.android_setup_msg and message == app.android_setup_msg) and "close" or "continue" })
     end
 end
 
@@ -7260,6 +7260,11 @@ function handle_action(a)
     if app.choosing and app.choose_action(a) then return end
 
     if mode == "message" then
+        -- GammaOS's first-run messages: the next step is opening it again.
+        if app.android_setup_msg and message == app.android_setup_msg and (a == "confirm" or a == "back") then
+            love.event.quit()
+            return
+        end
         if a == "confirm" or a == "back" then
             -- Back to My Books or Get Books if that's where it came from.
             local back = app.message_back

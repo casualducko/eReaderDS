@@ -71,9 +71,8 @@ there as an Android app, using both screens through GammaOS's **DualStack**
 3. Open **eReaderDS** from the front end (it's with the other Android apps).
    The first time, it asks **Magisk** for root, once: tap **Grant**. It uses it
    to put itself on DualStack's list (both screens), to read the Ebook folder,
-   and later to set the brightness and install updates. Then close eReaderDS
-   (**Quit**, at the end of Settings) and open it again: from now on it opens
-   on both screens.
+   and later to set the brightness and install updates. Then press **A** to
+   close eReaderDS and open it again: from now on it opens on both screens.
    - Magisk's question can be hidden behind GammaOS's screens and time out.
      If eReaderDS says it needs Magisk's permission, open **Magisk →
      Superuser**, switch **eReaderDS** on, and open eReaderDS again (twice).

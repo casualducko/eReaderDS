@@ -52,14 +52,32 @@ function M.storage_ok()
     return true
 end
 
+-- A note on the screen before asking Magisk (its question may be hidden and
+-- take a while to time out): on the top screen, turned like a page.
+local function notice(text)
+    if not love.graphics.isActive() then return end
+    love.graphics.origin()
+    love.graphics.clear(0.957, 0.925, 0.847)
+    love.graphics.push()
+    love.graphics.translate(1024, 0)
+    love.graphics.rotate(math.pi / 2)
+    love.graphics.setColor(0.357, 0.275, 0.212)
+    love.graphics.setFont(love.graphics.newFont(34))
+    love.graphics.printf(text, 60, 320, 648, "center")
+    love.graphics.pop()
+    love.graphics.present()
+end
+
 -- One-time setup: all-files access, and the DualStack list. Returns a
 -- message to show when something's left for the reader to do, else nil.
 function M.setup()
     if not M.storage_ok() then
+        notice("Setting up eReaderDS…\n\nIf Magisk asks, tap Grant.")
         M.su("appops set " .. M.PACKAGE .. " MANAGE_EXTERNAL_STORAGE allow")
         if not M.storage_ok() then
             return "eReaderDS can't use the Ebook folder yet.\n\nIn Android's Settings → Apps → Special app access → "
-                .. "All files access, switch eReaderDS on (or switch it on in Magisk → Superuser), then open eReaderDS again."
+                .. "All files access, switch eReaderDS on (or switch it on in Magisk → Superuser). Then press A to close "
+                .. "eReaderDS and open it again."
         end
     end
     if not M.stacked() then
@@ -71,18 +89,19 @@ function M.setup()
         end
         local list, ok = listed()
         if not ok then
+            notice("Setting up eReaderDS for both screens…\n\nIf Magisk asks, tap Grant.")
             M.su("setprop persist.gammaos.dualstack.pkgs " .. (list ~= "" and (list .. "," .. M.PACKAGE) or M.PACKAGE))
             ok = select(2, listed())
         end
         if ok then
             return "eReaderDS uses both screens, and GammaOS will now give it them.\n\n"
-                .. "Close eReaderDS (Quit, at the end of Settings) and open it again."
+                .. "Press A to close eReaderDS, then open it again."
         end
         -- Magisk's question can end up hidden behind GammaOS's screens and
         -- time out, which Magisk remembers as a no.
         return "eReaderDS uses both screens. To set that up once, it needs Magisk's permission.\n\n"
             .. "Open Magisk → Superuser and switch eReaderDS on (or tap Grant if Magisk asks). "
-            .. "Then open eReaderDS again."
+            .. "Then press A to close eReaderDS and open it again."
     end
     return nil
 end
