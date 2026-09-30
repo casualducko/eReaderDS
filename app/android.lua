@@ -63,16 +63,26 @@ function M.setup()
         end
     end
     if not M.stacked() then
-        local p = io.popen("getprop persist.gammaos.dualstack.pkgs 2>/dev/null")
-        local list = p and p:read("*l") or ""
-        if p then p:close() end
-        if not (list or ""):find(M.PACKAGE, 1, true) then
-            local new = (list ~= nil and list ~= "") and (list .. "," .. M.PACKAGE) or M.PACKAGE
-            M.su("setprop persist.gammaos.dualstack.pkgs " .. new)
+        local function listed()
+            local p = io.popen("getprop persist.gammaos.dualstack.pkgs 2>/dev/null")
+            local list = p and p:read("*l") or ""
+            if p then p:close() end
+            return list or "", (list or ""):find(M.PACKAGE, 1, true) ~= nil
         end
-        return "eReaderDS uses both screens.\n\nIt has asked GammaOS for them (DualStack). "
-            .. "Close eReaderDS and open it again.\n\nIf it still shows only this screen, add eReaderDS to "
-            .. "DualStack in GammaOS's settings."
+        local list, ok = listed()
+        if not ok then
+            M.su("setprop persist.gammaos.dualstack.pkgs " .. (list ~= "" and (list .. "," .. M.PACKAGE) or M.PACKAGE))
+            ok = select(2, listed())
+        end
+        if ok then
+            return "eReaderDS uses both screens, and GammaOS will now give it them.\n\n"
+                .. "Close eReaderDS (Quit, at the end of Settings) and open it again."
+        end
+        -- Magisk's question can end up hidden behind GammaOS's screens and
+        -- time out, which Magisk remembers as a no.
+        return "eReaderDS uses both screens. To set that up once, it needs Magisk's permission.\n\n"
+            .. "Open Magisk → Superuser and switch eReaderDS on (or tap Grant if Magisk asks). "
+            .. "Then open eReaderDS again."
     end
     return nil
 end
