@@ -305,16 +305,22 @@ end
 -- Font files from the fonts folder, read into memory: the few most recent
 -- are kept (a font made from one keeps its own reference), so browsing many
 -- fonts doesn't hold them all.
-local FILEDATA_KEEP = 12
+local FILEDATA_KEEP = 16                -- (a family and its fallbacks are 8)
 
+-- One copy of each font file, shared by every size made from it (newFont with
+-- a path reads the whole file again for each font: a family is 6 fonts, and
+-- the Gentium fallbacks another 6).
 local function new_font(face, size)
-    if face.bundled then return love.graphics.newFont(face.path, size) end
     local fd = filedata[face.path]
     if not fd then
-        local f = assert(io.open(face.path, "rb"))
-        local data = f:read("*a")
-        f:close()
-        fd = love.filesystem.newFileData(data, face.path:match("[^/]+$"))
+        if face.bundled then
+            fd = love.filesystem.newFileData(face.path)
+        else
+            local f = assert(io.open(face.path, "rb"))
+            local data = f:read("*a")
+            f:close()
+            fd = love.filesystem.newFileData(data, face.path:match("[^/]+$"))
+        end
         filedata[face.path] = fd
         filedata_order[#filedata_order + 1] = face.path
         while #filedata_order > FILEDATA_KEEP do filedata[table.remove(filedata_order, 1)] = nil end

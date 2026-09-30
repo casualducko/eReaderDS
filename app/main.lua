@@ -177,6 +177,9 @@ local function build_fonts()
     for k, v in pairs(loaded) do fonts[k] = v end
     fonts.name = name
     clear_pages()
+    -- The fonts just replaced hold native memory Lua's collector doesn't see
+    -- (it would take its time with a heap this small): free them now.
+    collectgarbage("collect")
 end
 
 local function margins() return MARGINS[S.margins] or MARGINS[2] end
