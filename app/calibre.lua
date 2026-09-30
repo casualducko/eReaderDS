@@ -17,7 +17,7 @@
 --   { kind = "progress", got, size }
 --   { kind = "done", title, path }
 --   { kind = "failed", title, message }
---   { kind = "deleted", path }
+--   { kind = "deleted", path, title }
 --   { kind = "message", text }                  Calibre's own message
 --   { kind = "password" }                       Calibre wants a (different) password
 --   { kind = "busy", name }                     Calibre is busy with another device
@@ -50,7 +50,9 @@ end
 
 ---------------------------------------------------------------- the record
 
--- { uuid = this device's id, info = what Calibre calls it, address, password,
+-- { uuid = this device's id, info = what Calibre calls it, password,
+--   servers = { { name, address = "host:port" }, ... } (computers saved to try
+--   when Calibre can't be found by itself), last = the address used last,
 --   books = { [lpath] = its metadata } }
 local store
 local function load_store()
@@ -234,14 +236,16 @@ local function receive_book(path, size, title)
     return true
 end
 
--- One connection, until it ends; returns why.
-local function session(ip, port, name)
+-- One connection, until it ends; returns why ("unreachable" if it couldn't
+-- connect at all).
+local function session(ip, port, name, timeout, address)
     buf = ""
     sock = socket.tcp()
-    sock:settimeout(5)
-    local ok, err = sock:connect(ip, port)
-    if not ok then sock:close(); return "couldn't connect (" .. tostring(err) .. ")" end
+    sock:settimeout(timeout or 5)
+    local ok = sock:connect(ip, port)
+    if not ok then sock:close(); sock = nil; return "unreachable" end
     sock:settimeout(0.25)
+    if address then store.last = address; save_store() end
     out:push({ kind = "connected", name = name or ip })
     while true do
         local op, arg = receive()
@@ -332,7 +336,9 @@ local function session(ip, port, name)
             for _, lp in ipairs(type(arg.lpaths) == "table" and arg.lpaths or {}) do
                 local m = store.books[lp]
                 local path = ROOT .. "/" .. clean(lp)
-                if os.remove(path) then out:push({ kind = "deleted", path = path }) end
+                if os.remove(path) then
+                    out:push({ kind = "deleted", path = path, title = m and m.title or clean(lp):match("([^/]+)%.%w+$") })
+                end
                 store.books[lp] = nil
                 send(OP.OK, { uuid = m and m.uuid or "" })
             end
@@ -361,27 +367,62 @@ end
 
 ---------------------------------------------------------------- main loop
 
+-- The saved computers, the one used last first (an older single "address"
+-- becomes the first of them).
+local function saved()
+    local list = {}
+    if type(store.servers) == "table" then
+        for _, sv in ipairs(store.servers) do
+            if type(sv) == "table" and type(sv.address) == "string" and sv.address ~= "" then list[#list + 1] = sv end
+        end
+    end
+    if type(store.address) == "string" and store.address ~= "" then
+        table.insert(list, 1, { name = store.address:match("^[^:]+"), address = store.address })
+        store.servers, store.address = list, nil
+        save_store()
+    end
+    for i, sv in ipairs(list) do
+        if sv.address == store.last and i > 1 then table.insert(list, 1, table.remove(list, i)) break end
+    end
+    return list
+end
+
+local function host_port(address)
+    return address:match("^([^:]+)"), tonumber(address:match(":(%d+)$")) or 9090
+end
+
 load_store()
 math.randomseed(os.time())
 while true do
     if stopping() then break end
     out:push({ kind = "searching" })
-    local ip, port, name
-    local addr = store.address and tostring(store.address) or ""
-    if addr ~= "" then
-        ip = addr:match("^([^:]+)")
-        port = tonumber(addr:match(":(%d+)$")) or 9090
-        name = ip
-    else
-        ip, port, name = discover()
-    end
+    -- Calibre announcing itself first, then each saved computer.
+    local tries = {}
+    local ip, port, name = discover()
+    local list = saved()
     if ip then
-        local ok, why = pcall(session, ip, port, name)
-        if sock then sock:close(); sock = nil end
-        save_store()
-        if why == "stopped" then break end
-        out:push({ kind = "lost", message = ok and why or tostring(why):gsub("^lost: ", "") })
+        for _, sv in ipairs(list) do
+            if host_port(sv.address) == ip then name = sv.name end        -- (the name it was given)
+        end
+        tries[1] = { ip = ip, port = port, name = name }
     end
+    for _, sv in ipairs(list) do
+        local h, p = host_port(sv.address)
+        if h ~= ip then tries[#tries + 1] = { ip = h, port = p, name = sv.name, address = sv.address } end
+    end
+    local finished = false
+    for _, t in ipairs(tries) do
+        if ctl:peek() == "stop" then break end
+        local ok, why = pcall(session, t.ip, t.port, t.name, t.address and 2 or 5, t.address)
+        if sock then sock:close(); sock = nil end
+        if not (ok and why == "unreachable") then
+            save_store()
+            if why == "stopped" then finished = true; break end
+            out:push({ kind = "lost", message = ok and why or tostring(why):gsub("^lost: ", "") })
+            break
+        end
+    end
+    if finished then break end
     -- Before looking again: two seconds, a little at a time.
     for _ = 1, 8 do
         if ctl:peek() == "stop" then break end

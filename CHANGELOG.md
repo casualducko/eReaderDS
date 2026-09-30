@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- **Connect to Calibre** (Get Books): eReaderDS works as a Calibre wireless device. Start the wireless device connection in Calibre and open Connect to Calibre: Calibre finds eReaderDS, sends books to it (with Send to device), shows which ones are on it, and can delete them. They're kept in the books folder's Calibre folder, named "Title - Author". Calibre's address (for networks where it can't be found by itself) and password are under Y.
+- **Connect to Calibre** (Get Books): eReaderDS works as a Calibre wireless device. Start the wireless device connection in Calibre and open Connect to Calibre: Calibre finds eReaderDS, sends books to it (with Send to device), shows which ones are on it, and can delete them; the screen lists each book as it arrives or is deleted. Books are kept in the books folder's Calibre folder, named "Title - Author". Where Calibre can't be found by itself (some office networks), save its computer under Computers & Password (Y) with an address and a name, such as Home or Work: eReaderDS looks for Calibre, then tries each saved computer. A Calibre password goes there too.
+
+- **KOReader Sync doesn't ask to send 0%:** opening a book at its very start that the sync server knows nothing about no longer asks "Send your place to the sync server?" (it asks once you've read in; Sync with KOReader still works any time).
 
 ## v1.17.1
 

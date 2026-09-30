@@ -2392,6 +2392,10 @@ function app.sync_decide(b, how, docs, results)
     -- head: what to say when nothing needed sending ("Already in sync").
     local function stands(send, note, head)
         app.sync.checked[b.path] = true
+        -- A book just opened at its very start, that the server knows nothing
+        -- about: there's no place worth sending yet (it's asked, or sent,
+        -- once you've read in). By hand it's still done.
+        if not now and not moved and #own == 0 and here == 0 then return end
         local where = app.sync_where(pos.ch, pos.off) .. (note and (" · " .. note) or "")
         if (moved or send) and not now and app.sync_auto() ~= "on" then
             -- Ask when opening: offer to send, rather than sending on its own.
@@ -8567,8 +8571,11 @@ function app.cal_close()
     local c = app.cal_stop()
     app.mode = c and c.back or "library"
     if app.mode ~= "shop" then app.mode = "library" end
-    if c and c.received > 0 then
-        app.toast(c.received == 1 and "1 book received from Calibre" or (c.received .. " books received from Calibre"))
+    if c and c.received + c.deleted > 0 then
+        local parts = {}
+        if c.received > 0 then parts[#parts + 1] = c.received == 1 and "1 book received" or (c.received .. " books received") end
+        if c.deleted > 0 then parts[#parts + 1] = c.deleted .. " deleted" end
+        app.toast(table.concat(parts, ", ") .. " (Calibre)")
     end
     redraw()
 end
@@ -8587,30 +8594,71 @@ function app.cal_setting(key, value)
     if w then w:write(require("json").encode(t)); w:close(); os.rename(file .. ".tmp", file) end
 end
 
--- Change a setting: stop, save, and connect again.
-function app.cal_change(key, value)
+-- Change the connection's settings: stop, change them, and connect again.
+function app.cal_edit(fn)
     local back = app.cal and app.cal.back
     app.cal_stop()
-    app.cal_setting(key, value)
+    local list = app.cal_servers()
+    fn(list)
+    app.cal_setting("servers", list)
+    app.cal_setting("address", "")                -- (the older single address is in the list now)
     app.cal_open()
     if app.cal and back then app.cal.back = back end
 end
 
+-- The saved Calibre computers: { { name, address }, ... }.
+function app.cal_servers()
+    local list = {}
+    for _, sv in ipairs(type(app.cal_setting("servers")) == "table" and app.cal_setting("servers") or {}) do
+        if type(sv) == "table" and sv.address then list[#list + 1] = { name = sv.name, address = sv.address } end
+    end
+    local old = app.cal_setting("address")
+    if type(old) == "string" and old ~= "" then table.insert(list, 1, { name = old:match("^[^:]+"), address = old }) end
+    return list
+end
+
+-- The address, then a name for it.
+function app.cal_add(edit_i)
+    local list = app.cal_servers()
+    local cur = edit_i and list[edit_i]
+    app.kb_open({ title = "Calibre's Address", text = cur and cur.address or "", url = true, ok = "Next",
+        hint = "The computer's address and Calibre's port (shown when you start the wireless device connection), "
+            .. "such as 192.168.1.20:9090.",
+        submit = function(t)
+            local address = t:gsub("^%a+://", ""):gsub("/+$", ""):gsub("%s", "")
+            if address == "" then return end
+            if not address:match(":%d+$") then address = address .. ":9090" end
+            app.kb_open({ title = "Name for " .. address, text = cur and cur.name or "", ok = "Save",
+                hint = "What to call this computer, such as Home or Work.",
+                submit = function(n)
+                    n = n:match("^%s*(.-)%s*$")
+                    app.cal_edit(function(l)
+                        local entry = { name = n ~= "" and n or address:match("^[^:]+"), address = address }
+                        if edit_i then l[edit_i] = entry else l[#l + 1] = entry end
+                    end)
+                end })
+        end })
+end
+
 function app.cal_options()
-    app.choose({ title = "Calibre", options = {
-        { "Calibre's address…", function()
-            app.kb_open({ title = "Calibre's Address", text = app.cal_setting("address") or "", url = true, ok = "Connect",
-                allow_empty = true,
-                hint = "Only needed if eReaderDS can't find Calibre by itself: the computer's address and "
-                    .. "Calibre's port, such as 192.168.1.20:9090. Leave it empty to look for Calibre again.",
-                submit = function(t) app.cal_change("address", t:gsub("^%a+://", ""):gsub("/+$", "")) end })
-        end },
-        { "Calibre's password…", function()
-            app.kb_open({ title = "Calibre's Password", secret = true, ok = "Save", allow_empty = true,
-                hint = "The password set in Calibre's wireless device connection, if it has one.",
-                submit = function(t) app.cal_change("password", t) end })
-        end },
-    } })
+    local opts = {}
+    for i, sv in ipairs(app.cal_servers()) do
+        opts[#opts + 1] = { (sv.name or sv.address) .. "  ·  " .. sv.address, function()
+            app.choose({ title = sv.name or sv.address, options = {
+                { "Change address or name…", function() app.cal_add(i) end },
+                { "Remove it", function() app.cal_edit(function(l) table.remove(l, i) end) end },
+            } })
+        end }
+    end
+    opts[#opts + 1] = { "Add a Calibre computer…", function() app.cal_add() end }
+    opts[#opts + 1] = { "Calibre's password…", function()
+        app.kb_open({ title = "Calibre's Password", secret = true, ok = "Save", allow_empty = true,
+            hint = "The password set in Calibre's wireless device connection, if it has one.",
+            submit = function(t)
+                app.cal_edit(function() app.cal_setting("password", t) end)
+            end })
+    end }
+    app.choose({ title = "Calibre", options = opts })
 end
 
 -- Messages from the connection; true if anything changed.
@@ -8646,6 +8694,7 @@ function app.cal_poll()
             if k == "done" then c.received, c.last = c.received + 1, msg.path end
         elseif k == "deleted" then
             c.deleted = c.deleted + 1
+            table.insert(c.books, 1, { title = msg.title or "A book", deleted = true })
             if book and msg.path == book.path then c.reopen = true end
         end
     end
@@ -8666,8 +8715,9 @@ end
 function app.cal_tap(side, u, v)
     if side ~= "right" then return end
     local bx, by, bw, bh = app.recv_button()
-    if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then app.cal_close()
-    elseif v < by - 40 then app.cal_options() end
+    local ox, oy, ow, oh = app.cal_buttons()
+    if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 10 and v <= by + bh + 30 then app.cal_close()
+    elseif u >= ox - 20 and u <= ox + ow + 20 and v >= oy - 20 and v <= oy + oh + 10 then app.cal_options() end
 end
 
 function app.cal_draw(side)
@@ -8699,26 +8749,30 @@ function app.cal_draw(side)
         love.graphics.printf(help, x, y, w, "left")
         local _, hl = ui.small:getWrap(help, w)
         y = y + #hl * ui.small:getHeight() + 40
-        if c.received > 0 then
+        if c.received + c.deleted > 0 then
+            local parts = {}
+            if c.received > 0 then parts[#parts + 1] = c.received == 1 and "1 book received" or (c.received .. " books received") end
+            if c.deleted > 0 then parts[#parts + 1] = c.deleted .. " deleted" end
             love.graphics.setFont(ui.small_bold)
             color(th.fg)
-            love.graphics.print(c.received == 1 and "1 book received" or (c.received .. " books received"), x, y)
+            love.graphics.print(table.concat(parts, ", "), x, y)
             y = y + 50
         end
         for _, b in ipairs(c.books) do
             if y > PAGE_H - 140 then break end
             love.graphics.setFont(ui.font)
-            color(b.failed and th.dim or th.fg)
+            color((b.failed or b.deleted) and th.dim or th.fg)
             love.graphics.print(fit_text(ui.font, b.title, w), x, y)
             local line
-            if b.failed then line = "Failed: " .. b.failed
+            if b.deleted then line = "✕  Deleted from My Books"
+            elseif b.failed then line = "Failed: " .. b.failed
             elseif b.done then line = "✓  Added to My Books  ·  " .. (shop.format_size(b.size) or "0 KB")
             else line = "Receiving" .. ((b.total or 1) > 1 and (" " .. b.this .. " of " .. b.total) or "") .. "…  "
                 .. math.floor((b.got or 0) / math.max(1, b.size or 1) * 100) .. "%" end
             love.graphics.setFont(ui.small)
             color(b.failed and th.fg or th.dim)
             love.graphics.print(fit_text(ui.small, line, w), x, y + 40)
-            if not b.done and not b.failed then
+            if not b.done and not b.failed and not b.deleted then
                 color(th.sel)
                 love.graphics.rectangle("fill", x, y + 76, w, 6, 3, 3)
                 color(th.fg)
@@ -8728,18 +8782,44 @@ function app.cal_draw(side)
         end
         return
     end
-    -- The touchscreen: what can be done here.
+    -- The touchscreen: the saved computers, and buttons for them and to leave.
     love.graphics.setFont(ui.font)
     color(th.fg)
-    love.graphics.printf("Books sent from Calibre go to My Books (in its Calibre folder). Books deleted from "
-        .. "eReaderDS in Calibre are deleted here too.", x, 110, w, "left")
-    love.graphics.setFont(ui.small)
+    love.graphics.printf("Books from Calibre go to My Books, in its Calibre folder.", x, 90, w, "left")
+    local y = 90 + #select(2, ui.font:getWrap("Books from Calibre go to My Books, in its Calibre folder.", w)) * ui.font:getHeight() + 36
+    love.graphics.setFont(ui.small_bold)
     color(th.dim)
-    local addr = app.cal_setting("address")
-    love.graphics.printf((addr and ("Calibre's address: " .. addr .. ".  ") or "")
-        .. "Y (or tap here): Calibre's address or password.", x, 330, w, "left")
+    love.graphics.print("SAVED COMPUTERS", x, y)
+    y = y + 46
+    local list = app.cal_servers()
+    if #list == 0 then
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.printf("None yet: Calibre is usually found by itself. Add one if it isn't.", x, y, w, "left")
+    end
+    local limit = select(2, app.cal_buttons()) - 30
+    for _, sv in ipairs(list) do
+        if y + 80 > limit then break end
+        local here = c.state == "connected" and (c.name == sv.name or c.name == sv.address:match("^[^:]+"))
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.print(fit_text(ui.font, (here and "✓  " or "") .. (sv.name or sv.address), w), x, y)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print(fit_text(ui.small, sv.address .. (here and "  ·  connected" or ""), w), x, y + 40)
+        y = y + 84
+    end
+    local ox, oy, ow, oh = app.cal_buttons()
+    app.button(ox, oy, ow, oh, "Computers & Password", "Y", "soft")
     local bx, by, bw, bh = app.recv_button()
     app.button(bx, by, bw, bh, "Done", "B", "soft")
+end
+
+-- The "Computers & Password" button, above Done: x, y, w, h.
+function app.cal_buttons()
+    local _, by = app.recv_button()
+    local w, h = 460, 60
+    return math.floor((PAGE_W - w) / 2), by - 84, w, h
 end
 
 function love.load()

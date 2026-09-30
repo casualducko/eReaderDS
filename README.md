@@ -336,12 +336,22 @@ and can delete them.
 2. In eReaderDS, open **Get Books → Connect to Calibre**. It finds Calibre by
    itself and says **Connected to Calibre on <your computer>**.
 3. In Calibre, select books and click **Send to device**. They arrive in the
-   **Calibre** folder inside the books folder and show up in My Books when
-   you press **Done**.
+   **Calibre** folder inside the books folder (named "Title - Author") and
+   show up in My Books when you press **Done**. Calibre marks them as on the
+   device, and deleting them from the device in Calibre (its **Device** view)
+   deletes them here too. The screen lists each book as it arrives or is
+   deleted.
 
-If it can't find Calibre (some networks block that), press **Y → Calibre's
-address** and type the computer's address and port, such as
-`192.168.1.20:9090`. If you set a password in Calibre, enter it with **Y →
+**Saved computers:** some networks (offices, mostly) keep Calibre from being
+found by itself. Tap **Computers & Password** (or press **Y**) → **Add a
+Calibre computer**, type its address and port (such as `192.168.1.20:9090`;
+Calibre shows it when you start the wireless device connection), and give it
+a name, such as *Home* or *Work*. Saved computers are listed on the
+touchscreen (✓ on the one connected); each can be changed or removed. When
+connecting, eReaderDS first looks for Calibre, then tries each saved computer
+(the last one used first), so it finds the right one wherever you are.
+
+If you set a password in Calibre, enter it with **Computers & Password →
 Calibre's password**. To browse your Calibre library from the handheld
 instead, add it as a catalog ([below](#getting-books-over-wi-fi)).
 
@@ -415,8 +425,9 @@ off.
      it was saved: "3 pages ahead, in Chapter 10 · Saved on Kobo 3 minutes
      ago" (in the chapter you're reading it counts pages; elsewhere it gives
      the chapter and percentage beside yours). If the server is behind you, it
-     asks **Send your place to the sync server?**. Nothing is sent without
-     asking.
+     asks **Send your place to the sync server?** (not for a book opened at
+     its very start that the server knows nothing about yet: there's no place
+     worth sending until you've read in). Nothing is sent without asking.
    - **On:** as above, but your place is also sent on its own: when the book
      opens, every few minutes while reading, and when you leave the book,
      close the lid or the screens go off.
