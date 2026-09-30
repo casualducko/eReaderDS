@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.17.0
 
 - **GammaOS (Android):** eReaderDS runs on the RG DS Plus under GammaOS as an Android app (`eReaderDS-vX.Y.Z-android.apk`), on both screens through GammaOS's DualStack. Touch, the buttons, brightness, Get Books, the dictionary and KOReader Sync work as on Linux. No root needed: on first launch it adds itself to DualStack's list and gives the Anbernic button back (close and open it once), and updates install through Android's own installer without asking.
 
@@ -9,6 +9,8 @@
 - **My Books moves smoothly:** covers are unpacked in the background (a big one took half a second, and moving through the list stopped for it), and many more are kept, at the size they're shown. Opening a book says "Opening…" and shows the page sooner (your place is saved just after).
 
 - **No more boxes for unusual characters:** letters and symbols a reading font doesn't have (Russian and Greek, special spaces, primes, accented letters) are drawn from Gentium Book Plus instead. Non-breaking hyphens (as in "y‑your‑r‑r Gr‑r‑race") show as hyphens, soft hyphens no longer appear in the middle of words, and garbled quotes and dashes from old Windows files are put right.
+
+- **Settings:** My Books is the first row, with how many books you have; Settings still opens on the row below it (Table of Contents).
 
 - **Touch:** sliding up/down changes the brightness on an empty or short list too (it only scrolls a list longer than the screen), and taps aren't missed when the handheld is busy.
 

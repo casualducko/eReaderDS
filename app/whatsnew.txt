@@ -2,6 +2,13 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.17.0
+eReaderDS now runs on GammaOS too, on both screens: install the Android app from the release page (see the README for the steps).
+My Books moves smoothly, even with many covers, and a book says "Opening…" while it opens.
+My Books is now the first row in Settings, with how many books you have.
+No more little boxes for unusual characters: Russian, Greek, special spaces and symbols show properly, and stray hyphens in the middle of words are gone.
+Sliding up and down changes the brightness on short lists and on "No books yet" too, and taps aren't missed when the handheld is busy.
+
 v1.16.1
 Questions are easier to read: the question is bold, and the details underneath are full size.
 KOReader Sync's questions say where your other device is and when, like "3 pages ahead, in Chapter 10 · Saved on Kobo 3 minutes ago".

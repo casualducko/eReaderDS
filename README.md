@@ -62,8 +62,7 @@ ROCKNIX.
 
 GammaOS turns the RG DS Plus into an Android handheld. eReaderDS runs there as
 an Android app, on both screens through GammaOS's **DualStack** (the same way
-DraStic does). From the next release, each release also has
-`eReaderDS-vX.Y.Z-android.apk`.
+DraStic does). Each release has it as `eReaderDS-vX.Y.Z-android.apk`.
 
 The SD card can't be used from a computer the way it can with the stock
 firmware or ROCKNIX: under GammaOS it holds Android's own storage, which
