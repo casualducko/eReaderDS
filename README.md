@@ -72,10 +72,13 @@ Windows and macOS can't open. Get files onto the handheld one of these ways:
   front end's **Applications** row), go to the
   [latest release](https://github.com/casualducko/eReaderDS/releases/latest)
   and tap `eReaderDS-vX.Y.Z-android.apk`. It goes to the **Download** folder.
-- **USB cable:** connect the handheld to a computer and set its USB mode to
-  **File transfer** (**Settings → Connected devices → USB**). On Windows it
-  shows up in File Explorer; on a Mac, use a free app such as OpenMTP. Copy
-  the `.apk` into **Download** (and books into **Ebook**, see below).
+- **USB cable:** connect the handheld to a computer, then on the handheld
+  choose **Quick Menu → USB Settings → MTP (Media Transfer Protocol)** (it
+  says "MTP Active"; **B** stops it). On Windows the handheld shows up in File
+  Explorer. A Mac can't open it by itself (nothing appears on the desktop):
+  use the free [OpenMTP](https://openmtp.org). You see the handheld's own
+  folders (**Download**, **Ebook**, ...), not the SD card as a drive. Copy
+  the `.apk` into **Download**.
 - **ADB**, if you already use it: `adb install eReaderDS-vX.Y.Z-android.apk`.
 
 **Installing:**
@@ -99,9 +102,16 @@ GammaOS Toolbox → Allowed packages**, and put `,com.casualducko.ereaderds` at
 the end (after `com.dsemu.drastic`).
 
 **Books** go in the **Ebook** folder of the handheld's storage (`/sdcard/Ebook`,
-made on the first run; folders inside it are fine). Besides copying them over
-USB, you can download them in eReaderDS with **Get Books**, or send them from a
-phone or computer's browser (**Get Books → Send from Your Phone or Computer**).
+made on the first run; folders inside it are fine). Three ways to get them
+there:
+
+- **From your phone or computer, over Wi-Fi (easiest):** in eReaderDS, open
+  **Get Books → Send from Your Phone or Computer**, go to the address it shows
+  in a browser on the same Wi-Fi, and pick the books to send.
+- **USB cable:** turn on **MTP** as above (**Quick Menu → USB Settings → MTP**)
+  and copy the books into the **Ebook** folder (OpenMTP on a Mac).
+- **Get Books** in eReaderDS downloads them straight from Standard Ebooks,
+  Project Gutenberg and other catalogs.
 
 On GammaOS:
 - **Start** opens Settings and the **Anbernic** button quits, as on the other
