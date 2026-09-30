@@ -163,8 +163,10 @@ Ports/eReaderDS/
 ## Android (GammaOS)
 
 `android/build.sh` makes `dist/eReaderDS-vX.Y.Z-android.apk`: LÖVE 11.5's
-Android app (downloaded once to `android/cache/`) with `app/` inside as
-`assets/game.love` (stored uncompressed), LÖVE's embedded-game switch on, the
+Android app (downloaded once to `android/cache/`) with `app/` unzipped in the
+APK's `assets/` (LÖVE copies an `assets/game.love` to its cache on every
+launch, ~3 s for ours; unzipped it reads the files in place), LÖVE's
+embedded-game switch on, the
 package renamed `com.casualducko.ereaderds`, our icon (`android/icon.png`), and
 Google's OpenSSL 1.1.1 build for Android (for HTTPS). It needs Java 17,
 apktool, the Android SDK build-tools (zipalign, apksigner) and python3.
