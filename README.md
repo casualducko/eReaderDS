@@ -59,23 +59,47 @@ ROCKNIX.
 
 ### GammaOS (Android)
 
-GammaOS Core/Next turns the RG DS Plus into an Android handheld. eReaderDS runs
-there as an Android app, using both screens through GammaOS's **DualStack**
-(the same way DraStic does). From the next release, each release also has
+GammaOS turns the RG DS Plus into an Android handheld. eReaderDS runs there as
+an Android app, on both screens through GammaOS's **DualStack** (the same way
+DraStic does). From the next release, each release also has
 `eReaderDS-vX.Y.Z-android.apk`.
 
-1. Copy the `.apk` to the handheld (USB, or download it there) and open it in
-   **Files** to install it (allow installing from Files if Android asks).
-2. Put books in the **Ebook** folder of the handheld's storage (`/sdcard/Ebook`,
-   made on the first run), or use Get Books or send them from a phone.
-3. Open **eReaderDS** from the front end (it's with the other Android apps).
-   The first time, it asks **Magisk** for root, once: tap **Grant**. It uses it
-   to put itself on DualStack's list (both screens), to read the Ebook folder,
-   and later to set the brightness and install updates. Then press **A** to
-   close eReaderDS and open it again: from now on it opens on both screens.
-   - Magisk's question can be hidden behind GammaOS's screens and time out.
-     If eReaderDS says it needs Magisk's permission, open **Magisk →
-     Superuser**, switch **eReaderDS** on, and open eReaderDS again (twice).
+The SD card can't be used from a computer the way it can with the stock
+firmware or ROCKNIX: under GammaOS it holds Android's own storage, which
+Windows and macOS can't open. Get files onto the handheld one of these ways:
+
+- **Download on the handheld (easiest):** open **Internet Browser** (in the
+  front end's **Applications** row), go to the
+  [latest release](https://github.com/casualducko/eReaderDS/releases/latest)
+  and tap `eReaderDS-vX.Y.Z-android.apk`. It goes to the **Download** folder.
+- **USB cable:** connect the handheld to a computer and set its USB mode to
+  **File transfer** (**Settings → Connected devices → USB**). On Windows it
+  shows up in File Explorer; on a Mac, use a free app such as OpenMTP. Copy
+  the `.apk` into **Download** (and books into **Ebook**, see below).
+- **ADB**, if you already use it: `adb install eReaderDS-vX.Y.Z-android.apk`.
+
+**Installing:**
+
+1. In the front end's **Applications** row, open **Files** (or **MiX**), go to
+   **Download** and tap the `.apk`. If Android says installing from here isn't
+   allowed, tap **Settings**, switch on **Allow from this source**, go back and
+   tap **Install**.
+2. Open **eReaderDS** from the **Applications** row. The first time, it asks
+   **Magisk** for root, once: tap **Grant**. It uses it to put itself on
+   DualStack's list (both screens), to give the Anbernic button back (below),
+   to read the Ebook folder, and later to set the brightness and install
+   updates.
+   - Magisk's question can end up hidden behind GammaOS's screens and time
+     out. If eReaderDS says it needs Magisk's permission, open **Magisk**
+     (also in **Applications**) **→ Superuser**, switch **eReaderDS** on, and
+     open eReaderDS again.
+3. When it says so, press **A** to close it and open it again: from then on it
+   opens on both screens.
+
+**Books** go in the **Ebook** folder of the handheld's storage (`/sdcard/Ebook`,
+made on the first run; folders inside it are fine). Besides copying them over
+USB, you can download them in eReaderDS with **Get Books**, or send them from a
+phone or computer's browser (**Get Books → Send from Your Phone or Computer**).
 
 On GammaOS:
 - **Start** opens Settings and the **Anbernic** button quits, as on the other
