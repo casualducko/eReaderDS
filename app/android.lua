@@ -286,6 +286,12 @@ function M.gamepad_profile()
     return ok, ok
 end
 
+-- GammaOS's front end sometimes comes back from an app with its icons gone;
+-- asking it to refresh its apps list (a new value each time) redraws them.
+function M.refresh_front_end()
+    M.setprop("sys.gammaos.nano.apps_refresh_req", tostring(os.time()))
+end
+
 -- DualStack's list: persist.gammaos.dualstack.pkgs, comma-separated, and when
 -- that's full (a setting holds 91 characters) pkgs_1, pkgs_2, ... after it.
 local function dualstack_add()

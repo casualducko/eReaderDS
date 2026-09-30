@@ -8485,7 +8485,10 @@ function love.quit()
     -- Android: everything is saved; LÖVE's own shutdown then took about five
     -- seconds before GammaOS's menu came back. End here instead (GammaOS
     -- stops apps this way itself when you go home).
-    if app.frame_canvas then os.exit(0) end
+    if app.frame_canvas then
+        require("android").refresh_front_end()
+        os.exit(0)
+    end
     return false
 end
 
