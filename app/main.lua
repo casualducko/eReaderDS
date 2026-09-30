@@ -419,6 +419,9 @@ end
 -- progress file on the SD card for every page. The main loop only wakes on its
 -- own while it's polling the touchscreen; otherwise save straight away.
 local SAVE_DELAY = 2
+-- (GammaOS stops an app outright when you go home, with no chance to save
+-- on the way out: save much sooner there.)
+if require("android").active then SAVE_DELAY = 0.4 end
 local function save_progress_soon()
     if Touch.enabled then save_due = love.timer.getTime() + SAVE_DELAY else save_progress() end
 end
@@ -8441,6 +8444,12 @@ function love.run()
                 -- GammaOS's DualStack reshapes it) without always saying when
                 -- it's done: keep redrawing for a few seconds.
                 if app.frame_canvas then
+                    -- Going to the background: GammaOS may stop the app
+                    -- without warning from here on, so save now.
+                    if (name == "focus" or name == "visible") and not a then
+                        save_progress()
+                        Store.save_settings(S)
+                    end
                     app.redraw_until = love.timer.getTime() + 4
                     -- DualStack let go of the second screen (another app's
                     -- window came up, such as Magisk's): it only gives both
