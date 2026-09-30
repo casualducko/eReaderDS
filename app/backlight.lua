@@ -23,8 +23,15 @@ local function write(path, value)
             end
         end
         if not root_shell then return false end
-        root_shell:write(string.format("echo %s > '%s'\n", value, path))
-        root_shell:flush()
+        -- If root was refused (or Magisk's question timed out), the shell is
+        -- gone and writing fails: start again with the next change.
+        local ok = root_shell:write(string.format("echo %s > '%s'\n", value, path))
+        ok = ok and root_shell:flush()
+        if not ok then
+            pcall(root_shell.close, root_shell)
+            root_shell = nil
+            return false
+        end
         return true
     end
     local f = io.open(path, "w")

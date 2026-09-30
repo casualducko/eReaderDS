@@ -58,8 +58,8 @@ function M.setup()
     if not M.storage_ok() then
         M.su("appops set " .. M.PACKAGE .. " MANAGE_EXTERNAL_STORAGE allow")
         if not M.storage_ok() then
-            return "eReaderDS can't use the Ebook folder yet.\n\nIn Android's Settings → Apps → eReaderDS → Permissions, "
-                .. "allow access to all files, then open eReaderDS again."
+            return "eReaderDS can't use the Ebook folder yet.\n\nIn Android's Settings → Apps → Special app access → "
+                .. "All files access, switch eReaderDS on (or switch it on in Magisk → Superuser), then open eReaderDS again."
         end
     end
     if not M.stacked() then
@@ -171,17 +171,17 @@ end
 -- For testing over ADB (Android's own screenshots don't show DualStack's
 -- window as the screens do): create DATA/.shot and the next frame is saved
 -- as DATA/shot.png, the two screens side by side.
-function M.shot_pending()
+local shot_wanted = false
+function M.shot_pending()                       -- (looked at once a second)
     local f = io.open(M.DATA .. "/.shot", "rb")
     if f then f:close() end
-    return f ~= nil
+    shot_wanted = f ~= nil
+    return shot_wanted
 end
 function M.shot_check(canvas)
-    local req = M.DATA .. "/.shot"
-    local f = io.open(req, "rb")
-    if not f then return end
-    f:close()
-    os.remove(req)
+    if not shot_wanted then return end
+    shot_wanted = false
+    os.remove(M.DATA .. "/.shot")
     local png = canvas:newImageData():encode("png"):getString()
     local w = io.open(M.DATA .. "/shot.png", "wb")
     if w then w:write(png); w:close() end

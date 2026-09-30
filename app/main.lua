@@ -8519,7 +8519,12 @@ function love.run()
             love.timer.sleep(0.001)            -- animating or working: next frame
         elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or (S.idle_min or 0) > 0 then
             -- Touch, the lid and the timers don't wake love.event.wait(), so poll at a gentle rate.
-            if not got and not app.dirty then love.timer.sleep(gesture and 0.008 or 0.025) end
+            if got then app.last_input = love.timer.getTime() end
+            local nap = gesture and 0.008 or 0.025
+            -- Android: touches wait in the event queue, so after a few quiet
+            -- seconds look less often (less CPU while you read).
+            if app.frame_canvas and not gesture and love.timer.getTime() - (app.last_input or 0) > 5 then nap = 0.06 end
+            if not got and not app.dirty then love.timer.sleep(nap) end
         elseif not got then
             local r = handle(love.event.wait())
             if r then return r end
