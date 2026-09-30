@@ -66,16 +66,13 @@ DraStic does). Each release has it as `eReaderDS-vX.Y.Z-android.apk`.
 
 The SD card can't be used from a computer the way it can with the stock
 firmware or ROCKNIX: under GammaOS it holds Android's own storage, which
-Windows and macOS can't open. Get files onto the handheld one of these ways:
+Windows and macOS can't open. Download the `.apk` on your computer, then get
+it onto the handheld one of these ways (GammaOS's menu has no web browser):
 
-- **Download on the handheld (easiest):** open **Game → Applications →
-  Internet Browser**, go to the
-  [latest release](https://github.com/casualducko/eReaderDS/releases/latest)
-  and tap `eReaderDS-vX.Y.Z-android.apk`. It goes to the **Download** folder.
 - **USB cable:** connect the handheld to a computer, then on the handheld
   choose **Quick Menu → USB Settings → MTP (Media Transfer Protocol)** (it
   says "MTP Active"; **B** stops it). On Windows the handheld shows up in File
-  Explorer. A Mac can't open it by itself (nothing appears on the desktop):
+  Explorer as **GammaOS Core**. A Mac can't open it by itself (nothing appears on the desktop):
   use the free [OpenMTP](https://openmtp.org). You see the handheld's own
   folders (**Download**, **Ebook**, ...), not the SD card as a drive. Copy
   the `.apk` into **Download**.
