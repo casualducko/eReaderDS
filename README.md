@@ -107,8 +107,9 @@ On GammaOS:
   systems. (GammaOS normally uses the Anbernic button for its Control Center;
   on first run eReaderDS adds a GammaOS per-app button profile that gives it
   back inside eReaderDS only.) The curved-arrow button belongs to GammaOS.
-- **Brightness** is GammaOS's: use the sliders in its Control Center.
-  eReaderDS's own Extra dim still works (Settings → Brightness, or slide down).
+- **Brightness** works as on the other systems (slide up/down, or Settings)
+  and covers both screens while eReaderDS is open; GammaOS's own brightness
+  is back when you leave it.
 - If another app's window comes up while you read, GammaOS takes one screen
   back: open eReaderDS again.
 - **Updates** download the new `.apk` and install it. That one step needs root
@@ -536,8 +537,7 @@ problem.
 
 - Touch works only on the bottom screen.
 - On GammaOS, one screen on the very first launch (eReaderDS adds itself to
-  DualStack then; open it again), and no in-app brightness (GammaOS's own
-  sliders do it).
+  DualStack then; open it again).
 - When a chapter runs over several files in the EPUB, its pages in files not
   opened yet are estimated (usually within a few pages) until you reach them.
 - No tables, fixed-layout EPUBs, PDF, MOBI or DRM-protected books.

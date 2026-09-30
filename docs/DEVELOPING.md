@@ -195,8 +195,14 @@ How it fits GammaOS (`app/android.lua`):
   characters are used up) and a gamepad profile (`gamepad.paN_*`, then
   `ctl.restart gammapad`) through `__system_property_set`. Magisk's question
   would open on display 0 under GammaOS's Control Center and time out, so
-  root is used only to install updates. The backlight needs root, so the
-  brightness is GammaOS's.
+  root is used only to install updates.
+- **Brightness:** the backlight files need root, so the app sets its own
+  window's brightness instead (`WindowManager.LayoutParams.screenBrightness`,
+  no permission; GammaOS applies it to both screens, and Android's own
+  setting returns when the app closes). LÖVE has no Java hook for it, so
+  `android/smali/` holds a tiny class (assembled by apktool into
+  `classes2.dex`) that `android.lua` calls through JNI via SDL's
+  `SDL_AndroidGetJNIEnv`/`SDL_AndroidGetActivity`.
 - **Installer's Open:** it starts the app outside the front end, which covers
   it; tap Done and launch from the front end.
 - **Files:** books and data in `/sdcard/Ebook`; the built-in dictionary is

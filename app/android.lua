@@ -158,6 +158,65 @@ function M.su(cmd)
     return run("su -c '" .. cmd:gsub("'", "'\\''") .. "' </dev/null >/dev/null 2>&1")
 end
 
+-- The screens' brightness, without root: Android lets an app set it for its
+-- own window while that's showing (the system's own setting is back once it
+-- closes). Done by a few lines of our own Java (android/smali/.../Bright),
+-- called through JNI. value 0..1, or -1 for the system's own; false if it
+-- couldn't be done.
+pcall(ffi.cdef, [[
+    typedef union { int32_t i; float f; void *l; int64_t j; } rgds_jvalue;
+    void *SDL_AndroidGetJNIEnv(void);
+    void *SDL_AndroidGetActivity(void);
+]])
+local jni
+local function jni_setup()
+    local ok, love_lib = pcall(ffi.load, "love")
+    if not ok then return false end
+    local env = love_lib.SDL_AndroidGetJNIEnv()
+    if env == nil then return false end
+    local fn = ffi.cast("void ***", env)[0]
+    local function f(i, sig) return ffi.cast(sig, fn[i]) end
+    local J = {
+        env = env, lib = love_lib,
+        FindClass = f(6, "void *(*)(void *, const char *)"),
+        ExceptionClear = f(17, "void (*)(void *)"),
+        NewGlobalRef = f(21, "void *(*)(void *, void *)"),
+        DeleteLocalRef = f(23, "void (*)(void *, void *)"),
+        GetStaticMethodID = f(113, "void *(*)(void *, void *, const char *, const char *)"),
+        CallStaticVoidMethodA = f(143, "void (*)(void *, void *, void *, const rgds_jvalue *)"),
+        ExceptionCheck = f(228, "uint8_t (*)(void *)"),
+    }
+    local cls = J.FindClass(env, "com/casualducko/ereaderds/Bright")
+    if cls == nil or J.ExceptionCheck(env) ~= 0 then J.ExceptionClear(env); return false end
+    J.cls = J.NewGlobalRef(env, cls)
+    J.DeleteLocalRef(env, cls)
+    J.set = J.GetStaticMethodID(env, J.cls, "set", "(Landroid/app/Activity;F)V")
+    if J.set == nil or J.ExceptionCheck(env) ~= 0 then J.ExceptionClear(env); return false end
+    J.args = ffi.new("rgds_jvalue[2]")
+    return J
+end
+function M.window_brightness_ok()
+    if jni == nil then
+        local ok, J = pcall(jni_setup)
+        jni = ok and J or false
+        if not jni then print("[android] window brightness unavailable") end
+    end
+    return jni ~= false
+end
+function M.window_brightness(value)
+    if not M.window_brightness_ok() then return false end
+    local J, env = jni, jni.env
+    local act = J.lib.SDL_AndroidGetActivity()
+    if act == nil then return false end
+    J.args[0].l = act
+    J.args[1].f = value
+    J.CallStaticVoidMethodA(env, J.cls, J.set, J.args)
+    local failed = J.ExceptionCheck(env) ~= 0
+    if failed then J.ExceptionClear(env) end
+    J.DeleteLocalRef(env, act)
+    return not failed
+end
+
 -- Both screens: the window is taller than it's wide.
 function M.stacked()
     local w, h = love.graphics.getDimensions()

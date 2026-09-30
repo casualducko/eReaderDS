@@ -61,6 +61,9 @@ mkdir -p "$work/assets"
 (cd "$repo/app" && find . -type f ! -name '.*' ! -path './data/*' ! -path '*/.*' | while read -r f; do
     mkdir -p "$work/assets/$(dirname "$f")"; cp "$f" "$work/assets/$f"; done)
 
+# Our own bit of Java (smali), as a second dex beside LÖVE's: see android/smali.
+cp -R "$here/smali" "$work/smali_classes2"
+
 # 64-bit ARM only (the RG DS Plus and its kin), plus OpenSSL.
 find "$work/lib" -mindepth 1 -maxdepth 1 ! -name arm64-v8a -exec rm -rf {} +
 unzip -q -o -j "$openssl_aar" \

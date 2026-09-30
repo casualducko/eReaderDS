@@ -9,9 +9,10 @@ M.LEVELS = { 1, 2, 3, 5, 8, 12, 18, 25, 35, 50, 65, 80, 100 }
 local devices
 
 -- Android (GammaOS): apps can read the backlight but not set it (that takes
--- root, and Magisk's question is easily hidden), so the brightness is left to
--- GammaOS's own sliders in its Control Center.
+-- root). They can set their own window's brightness, though, which GammaOS
+-- applies to both screens while eReaderDS is showing; android.lua does that.
 local ANDROID = love and love.system and love.system.getOS() == "Android"
+local android_pct                               -- what it was last set to
 
 local function write(path, value)
     if ANDROID then return false end
@@ -47,12 +48,13 @@ local function scan()
 end
 
 function M.available()
-    if ANDROID then return false end
+    if ANDROID then return require("android").window_brightness_ok() end
     return #(devices or scan()) > 0
 end
 
 -- Current brightness in percent (of the first backlight).
 function M.get()
+    if ANDROID and android_pct then return android_pct end
     local d = (devices or scan())[1]
     if not d then return nil end
     local v = read_num(d.dir .. "/brightness")
@@ -60,6 +62,12 @@ function M.get()
 end
 
 function M.set(pct)
+    if ANDROID then
+        -- (Android's own scale: 1/255 is its dimmest, as the backlight's 1.)
+        android_pct = pct
+        require("android").window_brightness(math.max(1 / 255, math.min(1, pct / 100)))
+        return
+    end
     for _, d in ipairs(devices or scan()) do
         -- 1% is the panel's real minimum (raw 1), 100% its maximum.
         local v = math.floor(1 + (d.max - 1) * (math.max(1, pct) - 1) / 99 + 0.5)
@@ -72,6 +80,12 @@ end
 -- Turn the screens' backlights off or back on (for the lid). Uses bl_power when
 -- the driver has it (4 = powered down), otherwise brightness 0; `pct` restores.
 function M.power(on, pct)
+    if ANDROID then
+        -- (0 is as dark as Android goes for a window.)
+        if on then M.set(pct or android_pct or 50)
+        else require("android").window_brightness(0) end
+        return
+    end
     for _, d in ipairs(devices or scan()) do
         local f = io.open(d.dir .. "/bl_power", "rb")
         if f then f:close(); write(d.dir .. "/bl_power", on and "0" or "4") end
