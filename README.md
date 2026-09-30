@@ -243,9 +243,10 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   and highlights ([below](#highlights)); they're also saved as a file for each
   book, to read on a computer.
 - **Get books over Wi-Fi:** Project Gutenberg and Standard Ebooks built in,
-  plus Calibre or any OPDS catalog ([below](#getting-books-over-wi-fi)); or
-  send your own books from a phone or computer's web browser
-  ([below](#sending-books-from-a-phone-or-computer)).
+  plus Calibre or any OPDS catalog ([below](#getting-books-over-wi-fi)); send
+  your own books from a phone or computer's web browser
+  ([below](#sending-books-from-a-phone-or-computer)); or let Calibre send them
+  as to any e-reader ([below](#connecting-to-calibre)).
 - **My Books** (the library): every book in the `Ebook` folder and the folders
   inside it (a copied Calibre library works as it is), listed by the title and
   author inside each book (not the file name); covers and progress, sorted by
@@ -323,6 +324,26 @@ books folder and fonts (`.ttf`, `.otf`) into the fonts folder; each is listed
 on the device as it arrives. Press **B** or tap **Done** when they're sent:
 the new books are in My Books. The page only works while this screen is open.
 This is the easy way to add books on ROCKNIX and GammaOS.
+
+## Connecting to Calibre
+
+eReaderDS works as a wireless device for [Calibre](https://calibre-ebook.com),
+like other e-readers: Calibre sends books to it, shows which ones are on it,
+and can delete them.
+
+1. In Calibre on your computer (on the same Wi-Fi), click **Connect/share →
+   Start wireless device connection** (no password needed; keep port 9090).
+2. In eReaderDS, open **Get Books → Connect to Calibre**. It finds Calibre by
+   itself and says **Connected to Calibre on <your computer>**.
+3. In Calibre, select books and click **Send to device**. They arrive in the
+   **Calibre** folder inside the books folder and show up in My Books when
+   you press **Done**.
+
+If it can't find Calibre (some networks block that), press **Y → Calibre's
+address** and type the computer's address and port, such as
+`192.168.1.20:9090`. If you set a password in Calibre, enter it with **Y →
+Calibre's password**. To browse your Calibre library from the handheld
+instead, add it as a catalog ([below](#getting-books-over-wi-fi)).
 
 ## Getting books over Wi-Fi
 

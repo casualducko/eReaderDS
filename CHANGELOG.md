@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Connect to Calibre** (Get Books): eReaderDS works as a Calibre wireless device. Start the wireless device connection in Calibre and open Connect to Calibre: Calibre finds eReaderDS, sends books to it (with Send to device), shows which ones are on it, and can delete them. They're kept in the books folder's Calibre folder, named "Title - Author". Calibre's address (for networks where it can't be found by itself) and password are under Y.
+
 ## v1.17.1
 
 - **Less memory for fonts:** each font file is loaded once and shared by every text size, instead of again for each (a font family is six fonts, and the Gentium Book Plus fallback another six), and fonts no longer in use are freed at once. On GammaOS this cut the app's memory by about a sixth while reading (195 to 161 MB), which keeps page turns from stalling on its 1 GB of memory.

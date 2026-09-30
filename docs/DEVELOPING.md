@@ -233,3 +233,18 @@ window: the window is resizable on Android, or SDL waits for a rotation that
 never comes and the app freezes. GammaOS's buttons
 come from a virtual "Xbox Wireless Controller" (`getevent -pl`); `sendevent`
 to it presses them, including in the front end.
+
+## Calibre wireless device (app/calibre.lua)
+
+Calibre's smart device driver (`calibre/devices/smart_device_app/driver.py`)
+is the server; eReaderDS is the client, on its own thread while the Connect to
+Calibre screen is open. It finds Calibre with a UDP "hello" on ports 54982,
+48123, 39001, 44044 and 59678 (Calibre answers `calibre wireless device client
+(on <host>);<content port>,<wireless port>`), or uses the address set under Y.
+Messages both ways are `<length>[opcode, {...}]` JSON; a book's bytes follow
+its SEND_BOOK message raw. eReaderDS declares canUseCachedMetadata false, so
+GET_BOOK_COUNT is answered with the full (brief) metadata of the books it
+keeps in `.ereaderds/calibre.json`; SEND_BOOK is answered with a plain lpath
+("Title - Author.epub", without Calibre's " (id)") when that name is free.
+Books go to `<books>/Calibre/`, the only place a DELETE_BOOK may remove from.
+

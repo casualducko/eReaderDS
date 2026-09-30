@@ -1793,7 +1793,11 @@ function shop.start()
     local entries = { { title = "Send from Your Phone or Computer", author = "Over Wi-Fi, from a web browser",
         formats = {}, receive = true, summary = "Send your own books (.epub or .txt) to eReaderDS from a phone "
             .. "or computer on the same Wi-Fi: open the address it shows in a web browser and choose the files. "
-            .. "Fonts (.ttf or .otf) can be sent the same way." } }
+            .. "Fonts (.ttf or .otf) can be sent the same way." },
+        { title = "Connect to Calibre", author = "Calibre on your computer, over Wi-Fi",
+            formats = {}, calibre = true, summary = "Send books from Calibre as to any e-reader. In Calibre, click "
+                .. "Connect/share, then Start wireless device connection; then open this. eReaderDS appears as a "
+                .. "device: send books to it (they go to the Calibre folder in My Books), or delete them there." } }
     for _, c in ipairs(library.catalogs or {}) do
         local u = Opds.parse_url(c.url)
         entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = c.about or "",
@@ -1821,7 +1825,7 @@ function shop.hints(pg, it)
         return { "A", "download", "B", "back" }
     end
     if it.search then return { "A", "search", "B", "back" } end
-    if it.receive then return { "A", "start", "B", "back" } end
+    if it.receive or it.calibre then return { "A", "start", "B", "back" } end
     if it.href or it.catalog then return { "A", "open", "B", "back" } end
     return { "B", "back" }
 end
@@ -1944,6 +1948,8 @@ function shop.confirm()
         shop.push_page(it.catalog.name, it.catalog.url, true)
     elseif it.receive then
         app.recv_open()
+    elseif it.calibre then
+        app.cal_open()
     elseif it.search then
         app.kb_open({ title = "Search " .. shop.catalog.name, text = shop.last_query,
             hint = "Words from a book's title or its author's name.",
@@ -3797,11 +3803,11 @@ function shop.draw(side)
                 if e.book then
                     mark = (shop.dl and shop.dl.item == e) and "…"
                         or (e.have or shop.have(e)) and "✓" or nil
-                elseif e.href or e.catalog or e.receive or e.search then
+                elseif e.href or e.catalog or e.receive or e.calibre or e.search then
                     mark = "›"
                 end
                 love.graphics.setFont(ui.font)
-                color((e.book or e.href or e.catalog or e.receive or e.search) and th.fg or th.dim)
+                color((e.book or e.href or e.catalog or e.receive or e.calibre or e.search) and th.fg or th.dim)
                 love.graphics.print(fit_text(ui.font, e.title, rw - 60), rx, ty)
                 if mark then love.graphics.printf(mark, rx, ty, rw, "right") end
                 if sub ~= "" then
@@ -6726,6 +6732,7 @@ local function render_canvases()
     elseif app.mode == "report" then painter = app.report_draw
     elseif app.mode == "fontget" then painter = app.fget_draw
     elseif app.mode == "receive" then painter = app.recv_draw
+    elseif app.mode == "calibre" then painter = app.cal_draw
     else painter = draw_library end
 
     for i, side in ipairs({ "left", "right" }) do
@@ -7419,7 +7426,7 @@ end
 function app.idle_tick()
     local I = app.idle
     local now = love.timer.getTime()
-    if I.last == 0 or lid.closed or (S.idle_min or 0) <= 0 or app.recv or shop.dl
+    if I.last == 0 or lid.closed or (S.idle_min or 0) <= 0 or app.recv or app.cal or shop.dl
         or not Backlight.available() then
         I.last = I.state and I.last or now
         return
@@ -7552,6 +7559,7 @@ function handle_action(a)
     if mode == "report" then app.report_action(a) return end
     if mode == "fontget" then app.fget_action(a) return end
     if mode == "receive" then app.recv_action(a) return end
+    if mode == "calibre" then app.cal_action(a) return end
 
     if mode == "about" or mode == "help" then
         if a == "back" or a == "confirm" or a == "menu" then app.mode = "menu" end
@@ -7837,6 +7845,8 @@ function app.on_tap(side, u, v)
         app.fget_tap(side, u, v)
     elseif mode == "receive" then
         app.recv_tap(side, u, v)
+    elseif mode == "calibre" then
+        app.cal_tap(side, u, v)
     elseif mode == "update" then
         app.update_tap(side, u, v)
     elseif mode == "whatsnew" then
@@ -8508,6 +8518,230 @@ function app.recv_draw(side)
     app.button(bx, by, bw, bh, "Done", "B", "soft")
 end
 
+---------------------------------------------------------------- Calibre
+
+-- "Connect to Calibre" (Get Books): Calibre's wireless device connection, on
+-- its own thread (calibre.lua) while this screen is open. Books arrive in
+-- the books folder's Calibre folder; the library is looked at again after.
+function app.cal_open()
+    if app.cal then app.mode = "calibre"; redraw(); return end
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
+    love.thread.getChannel("calibre_ctl"):clear()
+    love.thread.getChannel("calibre_out"):clear()
+    local c = { back = app.mode, state = "searching", books = {}, received = 0, deleted = 0 }
+    c.thread = love.thread.newThread("calibre.lua")
+    c.thread:start({ books = Store.download_dir(), data = Store.data_path(""):gsub("/$", ""), version = VERSION })
+    app.cal = c
+    app.mode = "calibre"
+    redraw()
+end
+
+function app.cal_stop()
+    local c = app.cal
+    if not c then return end
+    love.thread.getChannel("calibre_ctl"):push("stop")
+    c.thread:wait()
+    love.thread.getChannel("calibre_ctl"):clear()
+    app.cal_poll()
+    app.cal = nil
+    love.thread.getChannel("calibre_out"):clear()
+    if c.reopen and book then
+        -- The open book was deleted from Calibre.
+        save_progress()
+        book:close()
+        book, spread = nil, nil
+        app.find_stop(); app.find, app.find_mark = nil, nil
+        clear_book_caches()
+    end
+    if c.received + c.deleted > 0 then
+        Store.flush()
+        scan_library()
+        for i, it in ipairs(library.items) do
+            if it.path == c.last then library.sel = i end
+        end
+    end
+    return c
+end
+
+function app.cal_close()
+    local c = app.cal_stop()
+    app.mode = c and c.back or "library"
+    if app.mode ~= "shop" then app.mode = "library" end
+    if c and c.received > 0 then
+        app.toast(c.received == 1 and "1 book received from Calibre" or (c.received .. " books received from Calibre"))
+    end
+    redraw()
+end
+
+-- Settings kept with the connection's own record (calibre.json): Calibre's
+-- address (when it can't be found by itself) and its password.
+function app.cal_setting(key, value)
+    local file = Store.data_path("calibre.json")
+    local f = io.open(file, "rb")
+    local ok, t = false, nil
+    if f then ok, t = pcall(require("json").decode, f:read("*a")); f:close() end
+    t = ok and type(t) == "table" and t or {}
+    if value == nil then return t[key] end
+    t[key] = value ~= "" and value or nil
+    local w = io.open(file .. ".tmp", "wb")
+    if w then w:write(require("json").encode(t)); w:close(); os.rename(file .. ".tmp", file) end
+end
+
+-- Change a setting: stop, save, and connect again.
+function app.cal_change(key, value)
+    local back = app.cal and app.cal.back
+    app.cal_stop()
+    app.cal_setting(key, value)
+    app.cal_open()
+    if app.cal and back then app.cal.back = back end
+end
+
+function app.cal_options()
+    app.choose({ title = "Calibre", options = {
+        { "Calibre's address…", function()
+            app.kb_open({ title = "Calibre's Address", text = app.cal_setting("address") or "", url = true, ok = "Connect",
+                allow_empty = true,
+                hint = "Only needed if eReaderDS can't find Calibre by itself: the computer's address and "
+                    .. "Calibre's port, such as 192.168.1.20:9090. Leave it empty to look for Calibre again.",
+                submit = function(t) app.cal_change("address", t:gsub("^%a+://", ""):gsub("/+$", "")) end })
+        end },
+        { "Calibre's password…", function()
+            app.kb_open({ title = "Calibre's Password", secret = true, ok = "Save", allow_empty = true,
+                hint = "The password set in Calibre's wireless device connection, if it has one.",
+                submit = function(t) app.cal_change("password", t) end })
+        end },
+    } })
+end
+
+-- Messages from the connection; true if anything changed.
+function app.cal_poll()
+    local c = app.cal
+    if not c then return false end
+    local got = false
+    local ch = love.thread.getChannel("calibre_out")
+    while true do
+        local msg = ch:pop()
+        if not msg then break end
+        got = true
+        local k = msg.kind
+        if k == "searching" then
+            if c.state ~= "lost" then c.state = "searching" end
+        elseif k == "connected" then
+            c.state, c.name, c.note = "connected", msg.name, nil
+        elseif k == "lost" then
+            c.state, c.note = "lost", msg.message
+        elseif k == "busy" then
+            c.note = "Calibre is busy with another device" .. (msg.name and (" (" .. msg.name .. ")") or "") .. "."
+        elseif k == "password" then
+            c.note = "Calibre asks for a password: press Y to enter it."
+        elseif k == "message" then
+            c.note = msg.text
+        elseif k == "start" then
+            table.insert(c.books, 1, { title = msg.title, got = 0, size = msg.size, this = msg.this, total = msg.total })
+        elseif k == "progress" then
+            if c.books[1] then c.books[1].got = msg.got end
+        elseif k == "done" or k == "failed" then
+            local b = c.books[1]
+            if b then b.done, b.failed = k == "done", msg.message end
+            if k == "done" then c.received, c.last = c.received + 1, msg.path end
+        elseif k == "deleted" then
+            c.deleted = c.deleted + 1
+            if book and msg.path == book.path then c.reopen = true end
+        end
+    end
+    if not c.thread:isRunning() and c.thread:getError() and not c.error then
+        c.error = "The connection stopped: " .. tostring(c.thread:getError()):gsub("^[^:]*:%d+: ", "")
+        print("[calibre] " .. c.error)
+        got = true
+    end
+    if got then redraw() end
+    return got
+end
+
+function app.cal_action(a)
+    if a == "back" or a == "menu" then app.cal_close()
+    elseif a == "toc" then app.cal_options() end
+end
+
+function app.cal_tap(side, u, v)
+    if side ~= "right" then return end
+    local bx, by, bw, bh = app.recv_button()
+    if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then app.cal_close()
+    elseif v < by - 40 then app.cal_options() end
+end
+
+function app.cal_draw(side)
+    local th = theme()
+    local c = app.cal
+    local m = MARGINS[2]
+    local x = side == "left" and m.outer or m.inner
+    local w = PAGE_W - m.outer - m.inner
+    if side == "left" then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Calibre", x, 60)
+        love.graphics.setFont(ui.font)
+        local status
+        if c.error then status = c.error
+        elseif c.state == "connected" then status = "Connected to Calibre" .. (c.name and (" on " .. c.name) or "") .. "."
+        elseif c.state == "lost" then status = "Lost the connection" .. (c.note and (": " .. c.note) or "") .. ". Looking again…"
+        else status = "Looking for Calibre on your Wi-Fi…" end
+        color(th.fg)
+        love.graphics.printf(status, x, 160, w, "left")
+        local _, lines = ui.font:getWrap(status, w)
+        local y = 160 + #lines * ui.font:getHeight() + 30
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        local help = c.state == "connected"
+            and "In Calibre, select books and click Send to device. eReaderDS keeps them in the Calibre folder in My Books."
+            or "In Calibre on your computer (same Wi-Fi), click Connect/share, then Start wireless device connection."
+        if c.note and c.state ~= "lost" then help = c.note .. "  " .. help end
+        love.graphics.printf(help, x, y, w, "left")
+        local _, hl = ui.small:getWrap(help, w)
+        y = y + #hl * ui.small:getHeight() + 40
+        if c.received > 0 then
+            love.graphics.setFont(ui.small_bold)
+            color(th.fg)
+            love.graphics.print(c.received == 1 and "1 book received" or (c.received .. " books received"), x, y)
+            y = y + 50
+        end
+        for _, b in ipairs(c.books) do
+            if y > PAGE_H - 140 then break end
+            love.graphics.setFont(ui.font)
+            color(b.failed and th.dim or th.fg)
+            love.graphics.print(fit_text(ui.font, b.title, w), x, y)
+            local line
+            if b.failed then line = "Failed: " .. b.failed
+            elseif b.done then line = "✓  Added to My Books  ·  " .. (shop.format_size(b.size) or "0 KB")
+            else line = "Receiving" .. ((b.total or 1) > 1 and (" " .. b.this .. " of " .. b.total) or "") .. "…  "
+                .. math.floor((b.got or 0) / math.max(1, b.size or 1) * 100) .. "%" end
+            love.graphics.setFont(ui.small)
+            color(b.failed and th.fg or th.dim)
+            love.graphics.print(fit_text(ui.small, line, w), x, y + 40)
+            if not b.done and not b.failed then
+                color(th.sel)
+                love.graphics.rectangle("fill", x, y + 76, w, 6, 3, 3)
+                color(th.fg)
+                love.graphics.rectangle("fill", x, y + 76, w * math.min(1, (b.got or 0) / math.max(1, b.size or 1)), 6, 3, 3)
+            end
+            y = y + 96
+        end
+        return
+    end
+    -- The touchscreen: what can be done here.
+    love.graphics.setFont(ui.font)
+    color(th.fg)
+    love.graphics.printf("Books sent from Calibre go to My Books (in its Calibre folder). Books deleted from "
+        .. "eReaderDS in Calibre are deleted here too.", x, 110, w, "left")
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    local addr = app.cal_setting("address")
+    love.graphics.printf((addr and ("Calibre's address: " .. addr .. ".  ") or "")
+        .. "Y (or tap here): Calibre's address or password.", x, 330, w, "left")
+    local bx, by, bw, bh = app.recv_button()
+    app.button(bx, by, bw, bh, "Done", "B", "soft")
+end
+
 function love.load()
     app.scale = love.graphics.getWidth() / 2048
     if require("android").active then
@@ -8646,6 +8880,7 @@ function love.quit()
     end
     local t0 = love.timer.getTime()
     if app.recv then app.recv_stop() end
+    if app.cal then app.cal_stop() end
     app.sync_auto_push(true)
     local t1 = love.timer.getTime()
     if net.thread then
@@ -8708,6 +8943,8 @@ local function run_test_script()
             elseif a == "report" then app.report_open()
             elseif a == "receive" then app.recv_open()
             elseif a == "recvpoll" then app.recv_poll()
+            elseif a == "calibre" then app.cal_open()
+            elseif a == "calpoll" then app.cal_poll()
             elseif a == "work" then                -- finish a background task
                 while app.task do app.task_step() end
                 while library.pending do app.library_meta_step() end
@@ -8853,6 +9090,7 @@ function love.run()
         if app.update_poll() then got = true end
         if app.cover_poll() then got = true end
         if app.recv and app.recv_poll() then got = true end
+        if app.cal and app.cal_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
         if library.pending and not lid.closed then app.library_meta_step(); got = true end
         app.add_busy(love.timer.getTime() - b2)
@@ -8902,7 +9140,7 @@ function love.run()
         end
         if app.anim or app.task or library.pending or app.covers_waiting > 0 then
             love.timer.sleep(0.001)            -- animating or working: next frame
-        elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or (S.idle_min or 0) > 0 then
+        elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or app.cal or (S.idle_min or 0) > 0 then
             -- Touch, the lid and the timers don't wake love.event.wait(), so poll at a gentle rate.
             if got then app.last_input = love.timer.getTime() end
             local nap = gesture and 0.008 or 0.025
