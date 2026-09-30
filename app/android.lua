@@ -294,6 +294,7 @@ end
 
 -- DualStack's list: persist.gammaos.dualstack.pkgs, comma-separated, and when
 -- that's full (a setting holds 91 characters) pkgs_1, pkgs_2, ... after it.
+-- Returns "listed" (it was already), "added", or nil if it couldn't be.
 local function dualstack_add()
     local base = "persist.gammaos.dualstack.pkgs"
     local names, i = { base }, 1
@@ -305,13 +306,15 @@ local function dualstack_add()
     end
     for _, n in ipairs(names) do
         for p in M.getprop(n):gmatch("[^,%s]+") do
-            if p == M.PACKAGE then return true end
+            if p == M.PACKAGE then return "listed" end
         end
     end
     local last = M.getprop(names[#names])
     local joined = last ~= "" and (last .. "," .. M.PACKAGE) or M.PACKAGE
-    if #joined <= 91 then return M.setprop(names[#names], joined) end
-    return M.setprop(base .. "_" .. i, M.PACKAGE)
+    local ok
+    if #joined <= 91 then ok = M.setprop(names[#names], joined)
+    else ok = M.setprop(base .. "_" .. i, M.PACKAGE) end
+    return ok and "added" or nil
 end
 
 -- One-time setup: all-files access, and the DualStack list. Returns a
@@ -327,7 +330,16 @@ function M.setup()
             .. "and allow access to all files. Then press A to close eReaderDS and open it again."
     end
     if not M.stacked() then
-        if dualstack_add() then
+        local listed = dualstack_add()
+        if listed == "listed" then
+            -- On the list already: DualStack is just late (right after the
+            -- handheld starts it can take a while). The window grows by
+            -- itself; main.lua says so if it doesn't.
+            M.stack_late = true
+            M.gamepad_profile()
+            return nil
+        end
+        if listed then
             M.gamepad_profile()
             return "One more step!", "Press A to close eReaderDS, then open it again.\n\n"
                 .. "From then on it opens on both screens."

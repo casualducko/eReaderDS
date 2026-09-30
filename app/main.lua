@@ -8473,6 +8473,8 @@ function love.load()
         -- First run: file access and both screens (GammaOS's DualStack).
         local t = love.timer.getTime()
         app.android_setup_title, app.android_setup_msg = require("android").setup()
+        -- (Already on DualStack's list but not given both screens yet: check back.)
+        if require("android").stack_late then app.stack_check_at = love.timer.getTime() + 15 end
         local t2 = love.timer.getTime()
         require("android").ca_bundle()
         print(string.format("[startup] setup %.2fs, certificates %.2fs", t2 - t, love.timer.getTime() - t2))
@@ -8821,9 +8823,12 @@ function love.run()
         end
         if app.stack_check_at and love.timer.getTime() > app.stack_check_at then
             app.stack_check_at = nil
-            if not require("android").stacked() then
-                app.toast("GammaOS took back the other screen\nOpen eReaderDS again for both screens", 8)
+            local Android = require("android")
+            if not Android.stacked() then
+                app.toast((Android.stack_late and "" or "GammaOS took back the other screen\n")
+                    .. "Open eReaderDS again for both screens", 8)
             end
+            Android.stack_late = nil
         end
         if app.redraw_until then
             local now = love.timer.getTime()
