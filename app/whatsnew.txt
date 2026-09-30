@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.18.0
+Connect to Calibre: in Get Books, eReaderDS works as a Calibre wireless device. Start the wireless device connection in Calibre, then send books to eReaderDS as to any e-reader; Calibre shows which are on it and can delete them.
+If Calibre isn't found by itself, save its computer (with a name like Home or Work) under Computers & Password.
+Opening a new book no longer asks to send your place to the sync server at 0%.
+
 v1.17.1
 eReaderDS uses less memory for fonts, so page turns stay smooth on GammaOS.
 

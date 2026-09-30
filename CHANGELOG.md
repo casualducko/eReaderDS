@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.18.0
 
 - **Connect to Calibre** (Get Books): eReaderDS works as a Calibre wireless device. Start the wireless device connection in Calibre and open Connect to Calibre: Calibre finds eReaderDS, sends books to it (with Send to device), shows which ones are on it, and can delete them; the screen lists each book as it arrives or is deleted. Books are kept in the books folder's Calibre folder, named "Title - Author". Where Calibre can't be found by itself (some office networks), save its computer under Computers & Password (Y) with an address and a name, such as Home or Work: eReaderDS looks for Calibre, then tries each saved computer. A Calibre password goes there too.
 
