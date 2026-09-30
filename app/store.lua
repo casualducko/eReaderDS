@@ -499,6 +499,8 @@ function M.forget(p)
     end
 end
 
-function M.flush() os.execute("sync") end
+-- (Not on Android, where it's slow, flushing the whole storage, and closing
+-- the app waited on it; the files are already written.)
+function M.flush() if not Android.active then os.execute("sync") end end
 
 return M

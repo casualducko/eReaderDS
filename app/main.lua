@@ -8386,8 +8386,10 @@ function love.quit()
         love.graphics.clear(0, 0, 0)
         love.graphics.present()
     end
+    local t0 = love.timer.getTime()
     if app.recv then app.recv_stop() end
     app.sync_auto_push(true)
+    local t1 = love.timer.getTime()
     if net.thread then
         -- Stop whatever is running (a download's .part file is removed) and the thread.
         love.thread.getChannel("net_cancel"):clear()
@@ -8396,9 +8398,16 @@ function love.quit()
         love.thread.getChannel("net_jobs"):push({ kind = "quit" })
         net.thread:wait()
     end
+    local t2 = love.timer.getTime()
     save_progress()
     Store.save_settings(S)
     Store.flush()
+    print(string.format("[quit] sync %.2fs, network thread %.2fs, saving %.2fs", t1 - t0, t2 - t1,
+        love.timer.getTime() - t2))
+    -- Android: everything is saved; LÖVE's own shutdown then took about five
+    -- seconds before GammaOS's menu came back. End here instead (GammaOS
+    -- stops apps this way itself when you go home).
+    if app.frame_canvas then os.exit(0) end
     return false
 end
 

@@ -68,6 +68,27 @@ local function notice(text)
     love.graphics.present()
 end
 
+-- GammaOS turns the Anbernic button into its Control Center for every app.
+-- A per-app gamepad profile for eReaderDS (GammaOS's own feature) gives it
+-- back as the controller's guide button, which quits, as on Linux. Nothing
+-- is changed if eReaderDS has a profile already (the reader's own).
+local function prop(name)
+    local p = io.popen("getprop " .. name .. " 2>/dev/null")
+    local v = p and p:read("*l") or ""
+    if p then p:close() end
+    return v or ""
+end
+function M.gamepad_profile()
+    local n = tonumber(prop("persist.gammaos.gamepad.pa_count")) or 0
+    for i = 0, n - 1 do
+        if prop("persist.gammaos.gamepad.pa" .. i .. "_pkg") == M.PACKAGE then return true, false end
+    end
+    local g = "persist.gammaos.gamepad.pa"
+    M.su("setprop " .. g .. n .. "_pkg " .. M.PACKAGE .. "; setprop " .. g .. n .. "_btn 316:316; setprop "
+        .. g .. "_count " .. (n + 1) .. "; stop gammapad; start gammapad")
+    return prop(g .. n .. "_pkg") == M.PACKAGE, true
+end
+
 -- One-time setup: all-files access, and the DualStack list. Returns a
 -- message to show when something's left for the reader to do, else nil.
 function M.setup()
@@ -94,6 +115,7 @@ function M.setup()
             ok = select(2, listed())
         end
         if ok then
+            M.gamepad_profile()
             return "eReaderDS uses both screens, and GammaOS will now give it them.\n\n"
                 .. "Press A to close eReaderDS, then open it again."
         end
@@ -102,6 +124,14 @@ function M.setup()
         return "eReaderDS uses both screens. To set that up once, it needs Magisk's permission.\n\n"
             .. "Open Magisk → Superuser and switch eReaderDS on (or tap Grant if Magisk asks). "
             .. "Then press A to close eReaderDS and open it again."
+    end
+    -- (Already on DualStack, from an earlier version: the button profile on
+    -- its own. The gamepad service restarts to read it, so open eReaderDS
+    -- again for the buttons to be sure to work.)
+    local has, added = M.gamepad_profile()
+    if added and has then
+        return "eReaderDS can now be closed with the Anbernic button, as on Linux.\n\n"
+            .. "Press A to close eReaderDS, then open it again."
     end
     return nil
 end

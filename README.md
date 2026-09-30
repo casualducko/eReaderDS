@@ -78,8 +78,10 @@ there as an Android app, using both screens through GammaOS's **DualStack**
      Superuser**, switch **eReaderDS** on, and open eReaderDS again (twice).
 
 On GammaOS:
-- **Start** opens Settings, as on the other systems. The curved-arrow and
-  Anbernic buttons belong to GammaOS (its Control Center and menu).
+- **Start** opens Settings and the **Anbernic** button quits, as on the other
+  systems. (GammaOS normally uses the Anbernic button for its Control Center;
+  on first run eReaderDS adds a GammaOS per-app button profile that gives it
+  back inside eReaderDS only.) The curved-arrow button belongs to GammaOS.
 - If another app's window comes up while you read (for example Magisk asking
   for permission), GammaOS takes one screen back: open eReaderDS again.
 - **Updates** download the new `.apk` and install it (with root); eReaderDS
