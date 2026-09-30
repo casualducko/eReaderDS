@@ -1096,6 +1096,7 @@ local function open_book(path)
     if app.find and app.find.book ~= b then app.find_stop(); app.find, app.find_mark = nil, nil end
     book = b
     clear_book_caches()
+    app.previews_clear()
     local pr = Store.get_progress(path)
     app.mode = "reader"
     if pr then goto_pos(pr.ch, pr.off) else goto_pos(1, 0) end
@@ -1539,6 +1540,14 @@ function app.cover_poll()
     end
     if got then redraw() end
     return got
+end
+
+-- Reading a book: the covers are only for My Books (rebuilt when it's back).
+function app.previews_clear()
+    for _, pv in pairs(previews) do
+        if pv.cover then pv.cover:release() end
+    end
+    previews, preview_order = {}, {}
 end
 
 function app.cover_stop()
@@ -6709,10 +6718,20 @@ local function render_canvases()
     end
     app.preview_theme = nil
     love.graphics.setCanvas()
+    -- (GammaOS has little memory to spare: note big changes in what the
+    -- textures take, and where.)
+    if app.frame_canvas then
+        local mb = love.graphics.getStats().texturememory / 1048576
+        if math.abs(mb - (app.tex_mb or 0)) >= 8 then
+            app.tex_mb = mb
+            print(string.format("[memory] textures %d MB (%s)", mb, app.mode))
+        end
+    end
     if app.open_timing and app.mode == "reader" then
         local t = app.open_timing
         app.open_timing = nil
-        print(string.format("%s, drawing %.2fs, %.2fs in all", t.text, love.timer.getTime() - r0, love.timer.getTime() - t.t0))
+        print(string.format("%s, drawing %.2fs, %.2fs in all (textures %d MB)", t.text, love.timer.getTime() - r0,
+            love.timer.getTime() - t.t0, love.graphics.getStats().texturememory / 1048576))
     end
 end
 
@@ -6954,6 +6973,13 @@ local function current_brightness()
     return Backlight.get() or 50
 end
 
+-- How long a touch lasted, for telling a tap from a hold: time spent
+-- waiting for input only, leaving out the app's own work (drawing, opening,
+-- a page of pictures). On a busy handheld (GammaOS swapping) a quick tap's
+-- lift could be handled a second after its press, and was then not a tap.
+app.busy = 0
+function app.touch_clock() return love.timer.getTime() - app.busy end
+
 local function touch_event(kind, sx, sy)
     local now = love.timer.getTime()
     -- A touch that wakes the screens does nothing else, until the finger lifts.
@@ -7003,7 +7029,7 @@ local function touch_event(kind, sx, sy)
         return
     end
     if kind == "down" then
-        gesture = { side = side, u0 = u, v0 = v, u = u, t0 = now, moved = 0 }
+        gesture = { side = side, u0 = u, v0 = v, u = u, t0 = app.touch_clock(), moved = 0 }
     elseif kind == "move" and gesture then
         local du, dv = u - gesture.u0, v - gesture.v0
         gesture.moved = math.max(gesture.moved, math.abs(du), math.abs(dv))
@@ -7052,7 +7078,7 @@ local function touch_event(kind, sx, sy)
         elseif gesture.mode == "swipe" then
             -- Swipe left (toward the page's left edge) = next page, like a book.
             local du = gesture.u - gesture.u0
-            if app.mode == "reader" and math.abs(du) > 60 and now - gesture.t0 < 1.0 then
+            if app.mode == "reader" and math.abs(du) > 60 and app.touch_clock() - gesture.t0 < 1.0 then
                 if du < 0 then turn(1, next_spread) else turn(-1, prev_spread) end
             elseif app.mode == "whatsnew" and math.abs(du) > 60 then
                 app.whatsnew_action(du < 0 and "next" or "prev")
@@ -7061,7 +7087,7 @@ local function touch_event(kind, sx, sy)
             end
         elseif gesture.held then
             -- Already handled while the finger was down.
-        elseif gesture.moved < 30 and now - gesture.t0 < 0.5 and app.on_tap then
+        elseif gesture.moved < 30 and app.touch_clock() - gesture.t0 < 0.5 and app.on_tap then
             app.on_tap(gesture.side, gesture.u0, gesture.v0)
         end
         gesture = nil
@@ -8694,6 +8720,7 @@ function love.run()
     love.load(love.arg.parseGameArguments(arg), arg)
     run_test_script()
     return function()
+        local b0 = love.timer.getTime()
         if (app.dirty or app.anim) and love.graphics.isActive() and not lid.closed and app.idle.state ~= "off" then
             app.dirty = false
             love.graphics.origin()
@@ -8714,6 +8741,7 @@ function love.run()
                 scan_library()
             end
         end
+        app.busy = app.busy + (love.timer.getTime() - b0)
         local function handle(name, a, b, c, d, e, f)
             if not name then return end
             if name == "quit" then
@@ -8753,13 +8781,16 @@ function love.run()
         love.event.pump()
         for name, a, b, c, d, e, f in love.event.poll() do
             got = true
+            local b1 = love.timer.getTime()
             local r = handle(name, a, b, c, d, e, f)
             if r then return r end
+            if not name:match("^touch") then app.busy = app.busy + (love.timer.getTime() - b1) end
         end
         if Touch.enabled and Touch.poll(lid.closed and function() end or touch_event) then got = true end
+        local b2 = love.timer.getTime()
         if KeyProbe.enabled and KeyProbe.poll() then got = true end
         if gesture and not lid.closed and not gesture.mode and not gesture.held and gesture.moved < 30
-            and love.timer.getTime() - gesture.t0 > 0.6 then
+            and app.touch_clock() - gesture.t0 > 0.6 then
             gesture.held = true                -- press and hold
             app.on_hold(gesture.side, gesture.u0, gesture.v0)
         end
@@ -8769,6 +8800,7 @@ function love.run()
         if app.recv and app.recv_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
         if library.pending and not lid.closed then app.library_meta_step(); got = true end
+        app.busy = app.busy + (love.timer.getTime() - b2)
         if overlay and love.timer.getTime() >= overlay.hide_at then
             if os.getenv("READER_DEBUG") then print(string.format("[debug] message closed at %.2f", love.timer.getTime())) end
             overlay = nil; redraw()
