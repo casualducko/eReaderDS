@@ -87,7 +87,7 @@ Windows and macOS can't open. Get files onto the handheld one of these ways:
 2. Tap the **Mouse** icon on the bottom screen.
 3. With the D-pad or analog stick, move the pointer over **Downloads** in the
    menu on the left and press **A**.
-4. Move over the eReaderDS `.apk` file and press **A** twice (then wait a few
+4. Move over the eReaderDS `.apk` file and press **A** twice (then wait 5-10
    seconds). If Android says installing from here isn't allowed, choose
    **Settings**, switch on **Allow from this source** and go back.
 5. Move over **Install** and press **A**.
