@@ -6724,7 +6724,9 @@ local function render_canvases()
         local mb = love.graphics.getStats().texturememory / 1048576
         if math.abs(mb - (app.tex_mb or 0)) >= 8 then
             app.tex_mb = mb
-            print(string.format("[memory] textures %d MB (%s)", mb, app.mode))
+            local st = love.graphics.getStats()
+            print(string.format("[memory] textures %d MB (%s): %d images, %d canvases, %d fonts; Lua %d MB", mb, app.mode,
+                st.images, st.canvases, st.fonts, collectgarbage("count") / 1024))
         end
     end
     if app.open_timing and app.mode == "reader" then
