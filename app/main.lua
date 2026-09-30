@@ -6939,9 +6939,21 @@ function compose_anim_frame(t)
     end
 end
 
+-- The previous spread's pages, kept for the page-turn animation: only made
+-- while it's on (6 MB of graphics memory, which a 1 GB handheld can use).
+local function spare_canvases(on)
+    if on and not old_canvases[1] then
+        old_canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+        old_canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+    elseif not on and old_canvases[1] then
+        for i = 1, 2 do old_canvases[i]:release(); old_canvases[i] = nil end
+    end
+end
+
 -- Turn the page with the configured animation. `fn` changes the spread.
 local function turn(dir, fn)
     app.anim = nil
+    spare_canvases(S.anim ~= "off")
     if S.anim == "off" or app.mode ~= "reader" or not spread then fn(); redraw(); return end
     if app.dirty then render_canvases() end     -- what is on screen right now (already there unless changed)
     local ch, pi = spread.ch, spread.pi
@@ -8532,8 +8544,6 @@ function love.load()
     print(string.format("[startup] settings etc %.2fs, brightness %.2fs", tb - ts, love.timer.getTime() - tb))
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
-    old_canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
-    old_canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
     ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
     ui.bold = load_font("GentiumBookPlus-Bold.ttf", UI_SIZE)
