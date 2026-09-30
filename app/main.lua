@@ -1083,8 +1083,10 @@ end
 
 local function open_book(path)
     app.asking = nil
+    local t0 = love.timer.getTime()
     if book and book.path ~= path then app.sync_auto_push() end    -- the book being left
     local ok, b, err = pcall(Book.open, path)
+    local t1 = love.timer.getTime()
     if not ok or not b then
         show_message("Could not open this book.\n\n" .. tostring(ok and err or b))
         return
@@ -1097,10 +1099,18 @@ local function open_book(path)
     local pr = Store.get_progress(path)
     app.mode = "reader"
     if pr then goto_pos(pr.ch, pr.off) else goto_pos(1, 0) end
-    Store.set_last(path)
-    Store.set_opened(path)
-    save_progress()
-    app.export_notes(true)                 -- highlights from before there were files
+    local t2 = love.timer.getTime()
+    app.open_timing = { t0 = t0, text = string.format("[open] %s: book %.2fs, page %.2fs",
+        path:match("[^/]+$"), t1 - t0, t2 - t1) }
+    -- Saving (a second on GammaOS, where each file written to the books
+    -- folder is slow) waits until the page is on screen.
+    app.after_frame = function()
+        if book ~= b then return end
+        Store.set_last(path)
+        Store.set_opened(path)
+        save_progress()
+        app.export_notes(true)             -- highlights from before there were files
+    end
     app.sync.checked[path], app.sync.pushed[path], app.sync.asked[path] = nil, nil, nil
     app.sync.moved[path] = nil                 -- (what's been seen there is kept: app.sync_seen)
     app.sync_pull("open")                  -- where another device has got to
@@ -1408,6 +1418,7 @@ function app.library_meta_step()
     local q = library.pending
     if not q then return end
     local t0 = love.timer.getTime()
+    q.started = q.started or t0
     while #q > 0 and love.timer.getTime() - t0 < 0.03 do
         local it = table.remove(q)
         local ok, m = pcall(Book.meta, it.path)      -- a damaged file mustn't stop the library
@@ -1421,7 +1432,10 @@ function app.library_meta_step()
         local cur = library.items[library.sel]
         library.sort(library.items)
         for i, it in ipairs(library.items) do if it == cur then library.sel = i end end
+        local t2 = love.timer.getTime()
         Store.save_meta(library.seen)
+        print(string.format("[library] new books done after %.2fs (saving the list %.2fs)",
+            love.timer.getTime() - q.started, love.timer.getTime() - t2))
     end
     redraw()
 end
@@ -1472,8 +1486,69 @@ function library.cycle_sort(d)
 end
 
 -- Title, author and cover for the selected book, cached so moving through the
--- library doesn't reopen books (a few most recent are kept).
+-- library doesn't reopen books. Covers are decoded on their own thread
+-- (coverworker.lua: a big one takes half a second on GammaOS, and the list
+-- would stop for it) and kept at the size they're shown, so many fit.
 local previews, preview_order = {}, {}
+local PREVIEW_H, PREVIEWS_KEEP = 520, 30
+app.covers_waiting = 0
+local cover_thread
+
+-- A cover at its preview size: shrunk on the GPU, kept as that (a canvas).
+local function preview_image(id)
+    local w, h = id:getDimensions()
+    local s = math.min(1, PAGE_W / w, PREVIEW_H / h)
+    if s > 0.9 then return love.graphics.newImage(id) end
+    local okm, full = pcall(love.graphics.newImage, id, { mipmaps = true })
+    if okm then full:setMipmapFilter("linear") else full = love.graphics.newImage(id) end
+    local c = love.graphics.newCanvas(math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
+    love.graphics.push("all")
+    love.graphics.setCanvas(c)
+    love.graphics.origin()
+    love.graphics.clear(0, 0, 0, 0)
+    love.graphics.setBlendMode("replace", "premultiplied")
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(full, 0, 0, 0, s, s)
+    love.graphics.pop()
+    full:release()
+    return c
+end
+
+-- Covers decoded since last time: onto their previews.
+function app.cover_poll()
+    if app.covers_waiting == 0 then return false end
+    local got = false
+    while true do
+        local msg = love.thread.getChannel("cover_out"):pop()
+        if not msg then break end
+        app.covers_waiting = math.max(0, app.covers_waiting - 1)
+        local pv = previews[msg.path]
+        if msg.image then
+            if pv then
+                local ok, img = pcall(preview_image, msg.image)
+                if ok then
+                    if pv.cover then pv.cover:release() end
+                    pv.cover = img
+                end
+            end
+            msg.image:release()
+        elseif msg.error then
+            print("[library] cover: " .. msg.error)
+        end
+        got = true
+    end
+    if got then redraw() end
+    return got
+end
+
+function app.cover_stop()
+    if not cover_thread then return end
+    love.thread.getChannel("cover_jobs"):clear()
+    love.thread.getChannel("cover_jobs"):push("quit")
+    cover_thread:wait()
+    cover_thread = nil
+end
+
 local function library_preview()
     local it = library.items[library.sel]
     if not it then return nil end
@@ -1482,22 +1557,22 @@ local function library_preview()
     local ok, b = pcall(Book.open, it.path)
     if ok and b then
         pv.title, pv.author = b.title, b.author
-        if b.cover then
-            local data = b:read_resource(b.cover)
-            if data then
-                local ok2, img = pcall(function()
-                    return app.image_from(love.filesystem.newFileData(data, b.cover))
-                end)
-                if ok2 then pv.cover = img end
+        local data = b.cover and b:read_resource(b.cover)
+        if data then
+            if not cover_thread then
+                cover_thread = love.thread.newThread("coverworker.lua")
+                cover_thread:start()
             end
+            love.thread.getChannel("cover_jobs"):push({ path = it.path, name = b.cover, data = data })
+            app.covers_waiting = app.covers_waiting + 1
         end
         if b ~= book then b:close() end
     end
     previews[it.path] = pv
     preview_order[#preview_order + 1] = it.path
-    if #preview_order > 6 then
+    if #preview_order > PREVIEWS_KEEP then
         local old = table.remove(preview_order, 1)
-        if previews[old].cover then previews[old].cover:release() end   -- big textures: don't wait for the GC
+        if previews[old].cover then previews[old].cover:release() end   -- textures: don't wait for the GC
         previews[old] = nil
     end
     return pv
@@ -6560,6 +6635,7 @@ local function draw_message(side)
 end
 
 local function render_canvases()
+    local r0 = love.timer.getTime()
     local th = theme()
     local painter
     if app.mode == "reader" then
@@ -6633,6 +6709,11 @@ local function render_canvases()
     end
     app.preview_theme = nil
     love.graphics.setCanvas()
+    if app.open_timing and app.mode == "reader" then
+        local t = app.open_timing
+        app.open_timing = nil
+        print(string.format("%s, drawing %.2fs, %.2fs in all", t.text, love.timer.getTime() - r0, love.timer.getTime() - t.t0))
+    end
 end
 
 -- Transform so drawing happens in page coordinates (0..PAGE_W, 0..PAGE_H)
@@ -7494,7 +7575,15 @@ function handle_action(a)
             elseif a == "down" then library.sel = math.min(n, library.sel + 1)
             elseif a == "left" or a == "right" then library.cycle_sort(a == "right" and 1 or -1)
             elseif a == "confirm" then
-                open_book(library.items[library.sel].path)
+                -- "Opening…" first (a big book can take a moment), then the book.
+                local path = library.items[library.sel].path
+                app.toast("Opening…", 30)
+                local shown = overlay
+                app.after_frame = function()
+                    open_book(path)
+                    if overlay == shown then overlay = nil end
+                    redraw()
+                end
             elseif a == "toc" then
                 app.library_options(library.items[library.sel])
             end
@@ -8477,6 +8566,12 @@ function love.quit()
         net.thread:wait()
     end
     local t2 = love.timer.getTime()
+    app.cover_stop()
+    if app.after_frame then
+        local f = app.after_frame                  -- (e.g. a book's first save, not done yet)
+        app.after_frame = nil
+        pcall(f)
+    end
     save_progress()
     Store.save_settings(S)
     Store.flush()
@@ -8597,6 +8692,12 @@ function love.run()
             love.graphics.origin()
             love.draw()
             love.graphics.present()
+            -- Work that waits until this frame is on screen (see open_book).
+            if app.after_frame then
+                local f = app.after_frame
+                app.after_frame = nil
+                f()
+            end
             if not app.first_shown then
                 app.first_shown = true
                 print("[reader] ready (uptime " .. app.uptime() .. ")")
@@ -8657,6 +8758,7 @@ function love.run()
         end
         if shop.net_poll() then got = true end
         if app.update_poll() then got = true end
+        if app.cover_poll() then got = true end
         if app.recv and app.recv_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
         if library.pending and not lid.closed then app.library_meta_step(); got = true end
@@ -8701,7 +8803,7 @@ function love.run()
                 if S.sb_show and S.sb_clock ~= "off" and app.CLOCK_MODES[app.mode] then redraw() end
             end
         end
-        if app.anim or app.task or library.pending then
+        if app.anim or app.task or library.pending or app.covers_waiting > 0 then
             love.timer.sleep(0.001)            -- animating or working: next frame
         elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or (S.idle_min or 0) > 0 then
             -- Touch, the lid and the timers don't wake love.event.wait(), so poll at a gentle rate.
