@@ -108,7 +108,7 @@ local book = nil
 -- and image sizes (read from file headers, so layout never decodes images).
 -- (Android on these handhelds has much less memory to spare: fewer.)
 local PAGES_KEEP, IMAGES_KEEP = 4, 12
-if require("android").active then PAGES_KEEP, IMAGES_KEEP = 2, 6 end
+if require("android").active then PAGES_KEEP, IMAGES_KEEP = 2, 4 end
 local pages_cache, pages_order = {}, {}
 local images, images_order, image_dims = {}, {}, {}
 -- app.page_offs: where each laid-out file's pages start (numbers only), kept
@@ -246,6 +246,41 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
 }
 ]]
 
+-- An image no bigger than a page (it's never drawn larger): a big one is
+-- scaled down once, smoothly (through mipmaps), and only the small copy kept.
+-- Books' illustrations are often 2000 pixels or more, several times the
+-- memory a page needs.
+function app.fit_image(id)
+    local w, h = id:getDimensions()
+    local s = math.min(1, PAGE_W / w, PAGE_H / h)
+    if s > 0.9 then return love.graphics.newImage(id) end
+    local full = love.graphics.newImage(id, { mipmaps = true })
+    full:setMipmapFilter("linear")
+    local c = love.graphics.newCanvas(math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
+    love.graphics.push("all")
+    love.graphics.setCanvas(c)
+    love.graphics.origin()
+    love.graphics.clear(0, 0, 0, 0)
+    love.graphics.setBlendMode("replace", "premultiplied")
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(full, 0, 0, 0, s, s)
+    love.graphics.pop()
+    full:release()
+    local small = c:newImageData()
+    c:release()
+    local image = love.graphics.newImage(small)
+    small:release()
+    return image
+end
+
+-- An image from a file's data, no bigger than a page (see fit_image).
+function app.image_from(filedata)
+    local id = love.image.newImageData(filedata)
+    local image = app.fit_image(id)
+    id:release()
+    return image
+end
+
 -- Decoded image for drawing (the oldest ones are released).
 local function get_image(src)
     local img = images[src]
@@ -257,7 +292,7 @@ local function get_image(src)
                 local id = love.image.newImageData(love.filesystem.newFileData(data, src))
                 local okl, line = pcall(app.is_line_art, id)
                 app.image_ink[src] = okl and line or nil
-                local image = love.graphics.newImage(id)
+                local image = app.fit_image(id)
                 id:release()
                 return image
             end)
@@ -1429,7 +1464,7 @@ local function library_preview()
             local data = b:read_resource(b.cover)
             if data then
                 local ok2, img = pcall(function()
-                    return love.graphics.newImage(love.filesystem.newFileData(data, b.cover))
+                    return app.image_from(love.filesystem.newFileData(data, b.cover))
                 end)
                 if ok2 then pv.cover = img end
             end
@@ -1705,7 +1740,7 @@ function shop.cover(it)
         -- Small images embedded in the feed itself (base64).
         local ok, img = pcall(function()
             local data = love.data.decode("string", "base64", url:match("^data:[^,]*;base64,(.*)$"))
-            return love.graphics.newImage(love.filesystem.newFileData(data, "cover"))
+            return app.image_from(love.filesystem.newFileData(data, "cover"))
         end)
         shop.keep_cover(url, ok and img or false)
         return ok and img or nil
@@ -1716,7 +1751,7 @@ function shop.cover(it)
             -- Failed or huge (decoding happens here, on the UI thread): no cover.
             if msg.kind ~= "done" or #msg.body > 4000000 then return end
             local ok, img = pcall(function()
-                return love.graphics.newImage(love.filesystem.newFileData(msg.body, "cover"))
+                return app.image_from(love.filesystem.newFileData(msg.body, "cover"))
             end)
             if ok then shop.keep_cover(url, img) end
         end)
@@ -4065,7 +4100,7 @@ function app.book_cover()
     if app.cover_for ~= book.path then
         app.cover_for, app.cover_img = book.path, nil
         local ok, img = pcall(function()
-            return love.graphics.newImage(love.filesystem.newFileData(book:read_resource(book.cover), book.cover))
+            return app.image_from(love.filesystem.newFileData(book:read_resource(book.cover), book.cover))
         end)
         if ok then app.cover_img = img end
     end
@@ -5889,7 +5924,7 @@ function app.fget_fetch_preview(e)
     shop.net_job({ kind = "fetch", url = app.FONTPACK .. e.preview }, function(msg)
         if msg.kind == "done" then
             local ok, img = pcall(function()
-                return love.graphics.newImage(love.filesystem.newFileData(msg.body, e.preview))
+                return app.image_from(love.filesystem.newFileData(msg.body, e.preview))
             end)
             if ok then g.previews[e.preview] = img end
         end
