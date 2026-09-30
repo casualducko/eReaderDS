@@ -1,6 +1,7 @@
 -- Settings and reading progress, stored as small text files in READER_DATA
 -- (Ebook/.ereaderds on the device, outside the app folder so updates keep them).
 local M = {}
+local Android = require("android")
 
 local DEFAULTS = {
     font = "Crimson Pro", font_size = 40, spacing = 0.85, margins = 1, vmargins = 2, justify = true,
@@ -17,7 +18,7 @@ local DEFAULTS = {
     read_cps = 20,     -- learned reading speed, characters per second (~250 words/min to start)
     -- Backlight in percent; -1 = leave the system setting alone. ROCKNIX's
     -- panels are dimmer at the same level, so its launcher asks for more.
-    brightness = tonumber(os.getenv("READER_DEFAULT_BRIGHTNESS") or "") or 20,
+    brightness = tonumber(os.getenv("READER_DEFAULT_BRIGHTNESS") or "") or (Android.active and -1 or 20),
     extra_dim = 0,     -- 0-3: dark layer over the page, dimmer than the backlight allows
     seen_version = "", -- the version last run: after an update, "what's new" is offered once
     update_notices = true, -- check for a newer version on launch and say so
@@ -41,7 +42,7 @@ local DEFAULTS = {
 
 local function data_dir()
     local d = os.getenv("READER_DATA")
-    if not d then d = love.filesystem.getSource() .. "/data" end
+    if not d then d = Android.active and Android.DATA or (love.filesystem.getSource() .. "/data") end
     os.execute('mkdir -p "' .. d .. '"')
     return d
 end
@@ -115,6 +116,8 @@ function M.book_dirs()
     local dirs = {}
     if env then
         for d in env:gmatch("[^:]+") do dirs[#dirs + 1] = d end
+    elseif Android.active then
+        dirs = { Android.BOOKS }
     else
         dirs = { "/mnt/mmc/Ebook", "/mnt/sdcard/Ebook", "/mnt/mmc/Books" }
     end
@@ -128,6 +131,7 @@ function M.data_path(name) return path(name) end
 -- /storage/roms/ebook). Returns the name and where it is (or nil).
 function M.books_folder()
     local d = M.book_dirs()[1] or "/mnt/mmc/Ebook"
+    if Android.active and d == Android.BOOKS then return "Ebook", "on the handheld's storage" end
     local rel = d:match("^/storage/(.+)$")
     if rel then return rel, nil end
     rel = d:match("^/mnt/mmc/(.+)$") or d:match("^/mnt/sdcard/(.+)$")

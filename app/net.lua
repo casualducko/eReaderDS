@@ -69,6 +69,8 @@ local SSL_OP_IGNORE_UNEXPECTED_EOF = 0x80
 local CA_FILES = {
     "/etc/ssl/certs/ca-certificates.crt", "/etc/ssl/cert.pem", "/etc/pki/tls/certs/ca-bundle.crt",
     "/opt/homebrew/etc/openssl@3/cert.pem", "/usr/local/etc/openssl@3/cert.pem",
+    -- Android: made from the system's certificates at start-up (android.lua).
+    "/storage/emulated/0/Ebook/.ereaderds/cacerts.pem",
 }
 
 local function load_ssl()

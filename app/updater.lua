@@ -37,9 +37,11 @@ local function plain(md)
     return (md:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
--- The newest release that's newer than `current` and has the app's zip:
--- { version, url, size, notes } or nil. Tags with a suffix (v1.3.0-beta,
--- pre-releases for testing) don't match, so they're never offered.
+-- The newest release that's newer than `current` and has the app's zip (or,
+-- on Android, its APK): { version, url, size, notes } or nil. Tags with a
+-- suffix (v1.3.0-beta, pre-releases for testing) don't match, so they're
+-- never offered.
+M.ASSET = type(love) == "table" and love.system and love.system.getOS() == "Android" and "^eReaderDS%-v.*%-android%.apk$" or "^eReaderDS%-v.*%.zip$"
 function M.parse(body, current)
     local ok, list = pcall(Json.decode, body)
     if not ok or type(list) ~= "table" then return nil, "couldn't read the release list" end
@@ -48,7 +50,7 @@ function M.parse(body, current)
         local v = type(r) == "table" and not r.draft and not r.prerelease and tostring(r.tag_name or ""):match("^v?(%d[%d%.]*)$")
         if v and M.newer(v, current) and (not best or M.newer(v, best.version)) then
             for _, a in ipairs(r.assets or {}) do
-                if tostring(a.name or ""):match("^eReaderDS%-v.*%.zip$") and a.browser_download_url then
+                if tostring(a.name or ""):match(M.ASSET) and a.browser_download_url then
                     best = { version = v, url = a.browser_download_url, size = a.size, notes = plain(r.body) }
                 end
             end

@@ -763,7 +763,9 @@ function look.scan()
     if look.dict.list then return look.dict.list end
     local dirs = {}
     for _, d in ipairs(Store.book_dirs()) do dirs[#dirs + 1] = d .. "/Dictionaries" end
-    dirs[#dirs + 1] = love.filesystem.getSource() .. "/dict"
+    -- (On Android the app is packed in its APK: the built-in one is copied out first.)
+    dirs[#dirs + 1] = require("android").active and require("android").bundled("dict")
+        or (love.filesystem.getSource() .. "/dict")
     return look.dict.scan(dirs)
 end
 
@@ -1227,6 +1229,17 @@ function shop.online(fresh)
     local v = true
     if os.getenv("READER_OFFLINE") then
         v = false
+    elseif require("android").active then
+        -- Android keeps its default route out of /proc/net/route: ask for the
+        -- address a connection out would use (no packet is sent).
+        local ok, ip = pcall(function()
+            local u = require("socket").udp()
+            u:setpeername("8.8.8.8", 53)
+            local a = u:getsockname()
+            u:close()
+            return a
+        end)
+        v = ok and ip ~= nil and ip ~= "0.0.0.0"
     else
         local f = io.open("/proc/net/route", "rb")
         if f then
@@ -1630,7 +1643,7 @@ function shop.start()
     entries[#entries + 1] = { title = "Add a Catalog", author = "Calibre, Calibre-Web or any OPDS server",
         formats = {}, info = true, summary = "Get books from your own library over Wi-Fi. Edit "
             .. Store.books_folder() .. "/.ereaderds/opds.txt"
-            .. (select(2, Store.books_folder()) and " on the SD card" or "") .. " (it has examples), for example:\n\n"
+            .. (select(2, Store.books_folder()) and (" " .. select(2, Store.books_folder())) or "") .. " (it has examples), for example:\n\n"
             .. "name = Calibre\nurl = http://192.168.1.20:8080/opds\nuser = me\npassword = secret" }
     shop.stack = { { title = "Get Books", entries = entries, sel = 1, top = 1 } }
     app.mode = "shop"
@@ -5183,6 +5196,15 @@ function app.update_check(by_hand)
     end)
 end
 
+-- Android: install the downloaded APK as root (GammaOS has Magisk) and close;
+-- installing stops the running app anyway. The install runs on in its own
+-- shell after this process ends.
+function app.update_install(apk)
+    save_progress()
+    require("android").su('(pm install -r "' .. apk .. '"; rm -f "' .. apk .. '") >/dev/null 2>&1 &')
+    love.event.quit()
+end
+
 function app.update_open()
     if app.mode ~= "update" then app.update_back = app.mode end
     app.mode = "update"
@@ -5198,6 +5220,9 @@ function app.update_start()
     end
     local dir = app.Updater.app_dir()
     local zip = dir .. "/.update.zip"
+    -- Android: the new APK, installed as a whole (app.update_install).
+    local apk = require("android").active and (require("android").DATA .. "/.update.apk")
+    if apk then zip = apk end
     u.state, u.got, u.total, u.message = "downloading", 0, u.size or 0, nil
     u.job = shop.net_job({ kind = "download", url = u.url, dest = zip, size = u.size }, function(msg)
         if msg.kind == "progress" then
@@ -5212,6 +5237,7 @@ function app.update_start()
                 u.state, u.message = "error", "The download was incomplete. Try again."
                 return
             end
+            if apk then u.state = "ready"; u.apk = apk; return end
             u.state, u.frac, u.saving = "unpacking", 0, nil
             -- Unpack a file at a time between frames (the screen stays live).
             app.find_stop()                                -- the update comes first
@@ -5283,6 +5309,7 @@ function app.update_action(a)
     if a == "confirm" then
         if u.state == "available" or (u.state == "error" and u.url) then app.update_start()
         elseif u.state == "error" or (u.state == "none" and not u.checked) then app.update_check(true)
+        elseif u.state == "ready" and u.apk then app.update_install(u.apk)
         elseif u.state == "ready" then love.event.quit(app.UPDATE_EXIT) end
     elseif a == "back" or a == "menu" then
         if u.state == "downloading" and u.job then
@@ -5373,6 +5400,8 @@ function app.update_draw(side)
             .. ((u.total or 0) > 0 and (" of " .. shop.format_size(u.total)) or "")
     elseif u.state == "unpacking" then
         status = u.saving and "Saving to the SD card…" or ("Installing…  " .. math.floor((u.frac or 0) * 100) .. "%")
+    elseif u.state == "ready" and u.apk then
+        status, button = "Downloaded. eReaderDS closes to install it: open it again afterwards.", "Install now"
     elseif u.state == "ready" then
         status, button = "Ready. eReaderDS restarts with the new version.", "Restart now"
     elseif u.state == "checking" then
@@ -6996,12 +7025,20 @@ local function draw_extra_dim()
 end
 
 function love.draw()
+    -- Android: the usual side-by-side frame is drawn off screen, then shown
+    -- as the two stacked screens (android.lua).
+    if app.frame_canvas then require("android").begin(app.frame_canvas); love.graphics.clear(0, 0, 0) end
     love.graphics.push()
     love.graphics.scale(app.scale)
     frame()
     draw_extra_dim()
     draw_overlay()
     love.graphics.pop()
+    if app.frame_canvas then
+        require("android").finish()
+        require("android").shot_check(app.frame_canvas)
+        require("android").present(app.frame_canvas)
+    end
 end
 
 -- Desktop testing: the mouse on the bottom-screen half acts as a finger.
@@ -8151,7 +8188,17 @@ end
 
 function love.load()
     app.scale = love.graphics.getWidth() / 2048
-    if os.getenv("READER_SCALE") == nil then pcall(love.window.setPosition, 0, 0, 1) end
+    if require("android").active then
+        app.scale = 1
+        app.frame_canvas = love.graphics.newCanvas(2048, 768)
+        app.redraw_until = love.timer.getTime() + 8           -- (see love.run: surfaces settling)
+        print(string.format("[android] window %dx%d, pixels %dx%d, dpi scale %.2f",
+            love.graphics.getWidth(), love.graphics.getHeight(), love.graphics.getPixelWidth(),
+            love.graphics.getPixelHeight(), love.graphics.getDPIScale()))
+        -- First run: file access and both screens (GammaOS's DualStack).
+        app.android_setup_msg = require("android").setup()
+        require("android").ca_bundle()
+    elseif os.getenv("READER_SCALE") == nil then pcall(love.window.setPosition, 0, 0, 1) end
     love.graphics.setDefaultFilter("linear", "linear")
     love.keyboard.setKeyRepeat(true)
 
@@ -8194,9 +8241,9 @@ function love.load()
     Timezone.apply(S.tz)
     app.night_check()
     Touch.open("gt9xx-0")
-    KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
+    if not require("android").active then KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
         { ["gt9xx-0"] = true, ["Goodix Capacitive TouchScreen"] = true },  -- stock, ROCKNIX
-        { [LID_DEVICE] = true, [app.BACK_DEVICE] = true })
+        { [LID_DEVICE] = true, [app.BACK_DEVICE] = true }) end
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
@@ -8239,6 +8286,7 @@ function love.load()
         Store.save_settings(S)
     end
     app.crash_check()                      -- closed unexpectedly last time?
+    if app.android_setup_msg then show_message(app.android_setup_msg) end
     -- A newer version? (Only when online; quietly does nothing otherwise.)
     if S.update_notices and (not os.getenv("READER_SCRIPT") or os.getenv("READER_FAKE_VERSION")) then
         app.update_check()
@@ -8371,6 +8419,10 @@ function love.run()
                 if not love.quit() then return a or 0 end
             elseif name == "visible" or name == "focus" or name == "resize" or name == "displayrotated" then
                 redraw()
+                -- Android recreates the window's surfaces around these (and
+                -- GammaOS's DualStack reshapes it) without always saying when
+                -- it's done: keep redrawing for a few seconds.
+                if app.frame_canvas then app.redraw_until = love.timer.getTime() + 4 end
             end
             if love.handlers[name] then love.handlers[name](a, b, c, d, e, f) end
         end
@@ -8412,9 +8464,15 @@ function love.run()
             lid_tick()
             love.timer.sleep(0.25)              -- screens are off: check rarely
         end
+        if app.redraw_until then
+            local now = love.timer.getTime()
+            if now > app.redraw_until then app.redraw_until = nil
+            elseif now - (app.redraw_last or 0) > 0.5 then app.redraw_last = now; redraw() end
+        end
         local second = os.time()                -- (the clock is looked at once a second, not every frame)
         if second ~= app.clock_second then
             app.clock_second = second
+            if app.frame_canvas and require("android").shot_pending() then redraw() end
             local minute = os.date("%H%M")
             if minute ~= app.clock_minute then
                 app.clock_minute = minute

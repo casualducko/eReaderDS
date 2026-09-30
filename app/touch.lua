@@ -15,6 +15,74 @@ function M.open() return false end
 function M.poll() return false end
 function M.close() end
 
+-- Android (GammaOS): no evdev for apps, but LÖVE gets the touches itself.
+-- They're turned into the same events, on the same terms: the first finger
+-- down is the one followed, and two fingers make a pinch until all lift.
+if love and love.system and love.system.getOS() == "Android" then
+    local Android = require("android")
+    local fingers, first = {}, nil           -- id -> { x, y } (bottom screen only)
+    local queue = {}
+    local pinching, was_down = false, false
+
+    local function report()
+        local n, any = 0, nil
+        for _, f in pairs(fingers) do n = n + 1; any = any or f end
+        local st = first and fingers[first]
+        if n >= 2 then
+            local p, q = st or any, nil
+            for _, f in pairs(fingers) do if f ~= p then q = f break end end
+            local dx, dy = p.x - q.x, p.y - q.y
+            queue[#queue + 1] = { pinching and "pinch" or "pinch_start", math.sqrt(dx * dx + dy * dy) }
+            pinching = true
+        elseif pinching then
+            if n == 0 then pinching = false; queue[#queue + 1] = { "pinch_end" } end
+            was_down = false
+        elseif st and not was_down then queue[#queue + 1] = { "down", st.x, st.y }
+        elseif st then queue[#queue + 1] = { "move", st.x, st.y }
+        elseif was_down then queue[#queue + 1] = { "up", M.last_x or 0, M.last_y or 0 } end
+        if st then M.last_x, M.last_y = st.x, st.y end
+        if not pinching and n < 2 then was_down = st ~= nil end
+    end
+
+    local function touch(id, x, y, down)
+        local bx, by = Android.bottom_xy(x, y)
+        if down then
+            if not bx then return end
+            if not fingers[id] and next(fingers) == nil then first = id end
+            fingers[id] = { x = bx, y = by }
+        else
+            if not fingers[id] then return end
+            if bx then fingers[id].x, fingers[id].y = bx, by end
+            M.last_x, M.last_y = fingers[id].x, fingers[id].y
+            fingers[id] = nil
+            if id == first then first = nil end
+        end
+        report()
+    end
+
+    function love.touchpressed(id, x, y) touch(id, x, y, true) end
+    function love.touchmoved(id, x, y) if fingers[id] then touch(id, x, y, true) end end
+    function love.touchreleased(id, x, y) touch(id, x, y, false) end
+
+    function M.open() M.enabled = true; return true end
+    function M.poll(handler)
+        if #queue == 0 then return false end
+        local q = queue
+        queue = {}
+        -- Android reports each finger's move separately, many per frame: only
+        -- the latest of a run of moves (or pinch steps) matters, and handling
+        -- each one made pinching slow.
+        for i, e in ipairs(q) do
+            local nxt = q[i + 1]
+            if not (nxt and nxt[1] == e[1] and (e[1] == "move" or e[1] == "pinch")) then
+                handler(e[1], e[2], e[3])
+            end
+        end
+        return true
+    end
+    return M
+end
+
 local ok_ffi, ffi = pcall(require, "ffi")
 if not ok_ffi or ffi.os ~= "Linux" then return M end
 

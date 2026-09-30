@@ -8,6 +8,32 @@ M.LEVELS = { 1, 2, 3, 5, 8, 12, 18, 25, 35, 50, 65, 80, 100 }
 
 local devices
 
+-- Android (GammaOS): apps can read the backlight but not set it; it's set
+-- through one root shell, opened the first time (Magisk asks once).
+local ANDROID = love and love.system and love.system.getOS() == "Android"
+local root_shell
+
+local function write(path, value)
+    if ANDROID then
+        if root_shell == nil then
+            root_shell = io.popen("su", "w") or false
+            if root_shell then
+                root_shell:write(require("android").QUIET, "\n")
+                root_shell:flush()
+            end
+        end
+        if not root_shell then return false end
+        root_shell:write(string.format("echo %s > '%s'\n", value, path))
+        root_shell:flush()
+        return true
+    end
+    local f = io.open(path, "w")
+    if not f then return false end
+    f:write(value)
+    f:close()
+    return true
+end
+
 local function read_num(path)
     local f = io.open(path, "rb")
     if not f then return nil end
@@ -51,11 +77,7 @@ function M.set(pct)
     for _, d in ipairs(devices or scan()) do
         -- 1% is the panel's real minimum (raw 1), 100% its maximum.
         local v = math.floor(1 + (d.max - 1) * (math.max(1, pct) - 1) / 99 + 0.5)
-        local f = io.open(d.dir .. "/brightness", "w")
-        if f then
-            f:write(tostring(v))
-            f:close()
-        else
+        if not write(d.dir .. "/brightness", tostring(v)) then
             print("[backlight] cannot write " .. d.dir .. "/brightness")
         end
     end
@@ -65,19 +87,13 @@ end
 -- the driver has it (4 = powered down), otherwise brightness 0; `pct` restores.
 function M.power(on, pct)
     for _, d in ipairs(devices or scan()) do
-        local f = io.open(d.dir .. "/bl_power", "w")
-        if f then
-            f:write(on and "0" or "4")
-            f:close()
-        end
+        local f = io.open(d.dir .. "/bl_power", "rb")
+        if f then f:close(); write(d.dir .. "/bl_power", on and "0" or "4") end
     end
     if on then
         if pct then M.set(pct) end
     else
-        for _, d in ipairs(devices or scan()) do
-            local f = io.open(d.dir .. "/brightness", "w")
-            if f then f:write("0"); f:close() end
-        end
+        for _, d in ipairs(devices or scan()) do write(d.dir .. "/brightness", "0") end
     end
 end
 
