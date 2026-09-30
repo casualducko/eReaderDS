@@ -80,17 +80,18 @@ Windows and macOS can't open. Get files onto the handheld one of these ways:
 
 **Installing:**
 
-1. In the front end's **Applications** row, open **Files**, tap **☰** (top
-   left) → **Downloads**, and tap the `.apk`. (If the touchscreen can't reach
-   something, the **Mouse** tile in GammaOS's Control Center gives you a
-   pointer.) If Android says installing from here isn't allowed, tap
-   **Settings**, switch on **Allow from this source**, go back and tap
-   **Install**.
-2. When it's installed, tap **Done**, not Open. (Open starts eReaderDS behind
-   the front end, whose menu then ignores **A** until you move left and right.)
-3. Open **eReaderDS** from the **Applications** row. The first time, it adds
-   itself to DualStack's list and says **One more step!**: press **A** to close
-   it and open it again. From then on it opens on both screens.
+1. On the main screen, go to **Game → Applications → Files**.
+2. Tap the **Mouse** icon on the bottom screen.
+3. With the D-pad or analog stick, move the pointer over **Downloads** in the
+   menu on the left and press **A**.
+4. Move over the eReaderDS `.apk` file and press **A** twice (then wait a few
+   seconds). If Android says installing from here isn't allowed, choose
+   **Settings**, switch on **Allow from this source** and go back.
+5. Move over **Install** and press **A**.
+6. Move over **Open** and press **A**.
+7. When you're back at the main menu, press **A** on the **eReaderDS** icon.
+8. Once it opens, press **A** to close it: that finishes the installation.
+9. Open eReaderDS again, and you're good to go: it's on both screens from now on.
 
 No root or Magisk needed. If eReaderDS says it couldn't add itself (a GammaOS
 that doesn't allow it), add it by hand: **Quick Menu → System Settings →
