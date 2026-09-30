@@ -8,6 +8,10 @@
 
 - **My Books moves smoothly:** covers are unpacked in the background (a big one took half a second, and moving through the list stopped for it), and many more are kept, at the size they're shown. Opening a book says "Opening…" and shows the page sooner (your place is saved just after).
 
+- **No more boxes for unusual characters:** letters and symbols a reading font doesn't have (Russian and Greek, special spaces, primes, accented letters) are drawn from Gentium Book Plus instead. Non-breaking hyphens (as in "y‑your‑r‑r Gr‑r‑race") show as hyphens, soft hyphens no longer appear in the middle of words, and garbled quotes and dashes from old Windows files are put right.
+
+- **Touch:** sliding up/down changes the brightness on an empty or short list too (it only scrolls a list longer than the screen), and taps aren't missed when the handheld is busy.
+
 ## v1.16.1
 
 - **KOReader Sync's question is easier to read:** every question card has a bold question, and the line under it is now full size and dark (the card grows to fit it). The sync questions now say plainly where your other device is: "Continue from your Kobo?", "3 pages ahead, in Chapter 10", "Saved on Kobo 3 minutes ago". In the chapter you're reading the distance is counted in pages, since a few pages apart both places round to the same percentage. A Kobo running KOReader is called "Kobo" instead of its model code ("Kobo_io").
