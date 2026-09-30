@@ -54,11 +54,12 @@ for f in "$work"/res/drawable-*/love.png; do
     else convert "$here/icon.png" -resize "${size}x${size}" "$f"; fi
 done
 
-# The app itself, as LÖVE expects it: assets/game.love.
-rm -f "$cache/game.love"
-(cd "$repo/app" && zip -q -r -X "$cache/game.love" . -x '.*' -x '*/.*' -x 'data/*')
+# The app itself, unzipped in the APK's assets: LÖVE reads it there in place.
+# (Packed as assets/game.love instead, LÖVE copies all of it to its cache on
+# every launch: about three seconds of black screen for our 22 MB.)
 mkdir -p "$work/assets"
-cp "$cache/game.love" "$work/assets/game.love"
+(cd "$repo/app" && find . -type f ! -name '.*' ! -path './data/*' ! -path '*/.*' | while read -r f; do
+    mkdir -p "$work/assets/$(dirname "$f")"; cp "$f" "$work/assets/$f"; done)
 
 # 64-bit ARM only (the RG DS Plus and its kin), plus OpenSSL.
 find "$work/lib" -mindepth 1 -maxdepth 1 ! -name arm64-v8a -exec rm -rf {} +

@@ -8296,6 +8296,17 @@ function love.load()
     app.scale = love.graphics.getWidth() / 2048
     if require("android").active then
         app.scale = 1
+        -- The opening screen straight away (splash.png is the top screen's
+        -- half of it): Android and LÖVE have already kept the screens black
+        -- for a few seconds, and the setup and fonts below take another one.
+        pcall(function()
+            local img = love.graphics.newImage("splash.png")
+            local W, H = love.graphics.getDimensions()
+            love.graphics.clear(0.957, 0.925, 0.847)
+            love.graphics.draw(img, 0, 0, 0, W / 1024, (H > W and H / 2 or H) / 768)
+            love.graphics.present()
+            img:release()
+        end)
         app.frame_canvas = love.graphics.newCanvas(2048, 768)
         app.redraw_until = love.timer.getTime() + 8           -- (see love.run: surfaces settling)
         print(string.format("[android] window %dx%d, pixels %dx%d, dpi scale %.2f",
@@ -8466,6 +8477,7 @@ local function run_test_script()
             elseif a == "update" then app.update_open()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
+            elseif a == "splash" then app.mode = "splash"       -- the opening screen (Android's splash is made from it)
             elseif a == "draw" then render_canvases()           -- draw now (what taps measure against)
             elseif a:match("^btn:") then love.gamepadpressed(nil, a:sub(5))   -- a button as pressed (a, b, x, y, back, start)
             elseif a == "report" then app.report_open()

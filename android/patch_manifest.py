@@ -71,7 +71,10 @@ y = sub(r"versionName: \S+", "versionName: %s" % version, y)
 y = y.replace("apkFileName: love-11.5-android.apk", "apkFileName: eReaderDS.apk")
 # The game is stored as it is (it's a zip already): LÖVE opens it in place
 # instead of reading it all into memory first, which fails for a big one.
-if "- assets/game.love" not in y:
-    y = sub(r"doNotCompress:\n", "doNotCompress:\n- assets/game.love\n", y)
+# Files that are compressed already aren't squeezed again (the rest are: the
+# app reads fonts and the dictionary whole, so compression costs nothing).
+for ext in ("dz", "png", "jpg"):
+    if ("\n- " + ext + "\n") not in y:
+        y = sub(r"doNotCompress:\n", "doNotCompress:\n- " + ext + "\n", y)
 open(yml, "w", encoding="utf-8").write(y)
 print("manifest: %s %s (%s)" % (PACKAGE, version, code))
