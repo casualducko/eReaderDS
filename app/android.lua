@@ -190,11 +190,16 @@ function M.present(canvas)
     love.graphics.setColor(1, 1, 1)
     love.graphics.clear(0, 0, 0)
     if M.stacked() then
+        M.was_stacked = true
         local sx, sy = W / 1024, (H / 2) / 768
         love.graphics.draw(canvas, quads[1], 0, 0, 0, sx, sy)
         love.graphics.draw(canvas, quads[2], 0, H / 2, 0, sx, sy)
     else
-        love.graphics.draw(canvas, quads[1], 0, 0, 0, W / 1024, H / 768)
+        -- One screen only. Before DualStack (first run) the window is on the
+        -- top screen: its page, with the setup message. When DualStack lets
+        -- go later, the window is left on the bottom screen: its page, with
+        -- the menus, messages and touch.
+        love.graphics.draw(canvas, quads[M.was_stacked and 2 or 1], 0, 0, 0, W / 1024, H / 768)
     end
 end
 
@@ -203,7 +208,10 @@ end
 -- no touch, but a desktop-style window might).
 function M.bottom_xy(x, y)
     local W, H = love.graphics.getDimensions()
-    if not M.stacked() then return nil end
+    if not M.stacked() then
+        if not M.was_stacked then return nil end
+        return x * 1024 / W, y * 768 / H                -- (see present)
+    end
     if y < H / 2 then return nil end
     return x * 1024 / W, (y - H / 2) * 768 / (H / 2)
 end

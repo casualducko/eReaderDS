@@ -81,6 +81,12 @@ leaves settings and progress (`Ebook/.ereaderds`) alone.
    as `v1.3.0-beta`, becomes a pre-release, which the in-app updater never
    offers.)
 
+4. Once the release is up, build the Android APK here (it needs the signing
+   key, which stays off GitHub) and add it:
+   ```sh
+   android/build.sh && gh release upload v0.2.0 dist/eReaderDS-v0.2.0-android.apk
+   ```
+
 To build the zip locally: `tools/build-release.sh` (writes to `dist/`).
 
 The zip contains only `Ports/…`, laid out like the SD card. It never includes
@@ -153,3 +159,43 @@ Ports/eReaderDS/
 | `tools/` | Desktop testing helpers |
 | `app/version.lua` | Version string shown in the app and used for releases |
 | `runtime/` | LÖVE 11.5 aarch64 engine and its libraries (see `runtime/NOTICES.md`) |
+
+## Android (GammaOS)
+
+`android/build.sh` makes `dist/eReaderDS-vX.Y.Z-android.apk`: LÖVE 11.5's
+Android app (downloaded once to `android/cache/`) with `app/` inside as
+`assets/game.love` (stored uncompressed), LÖVE's embedded-game switch on, the
+package renamed `com.casualducko.ereaderds`, our icon (`android/icon.png`), and
+Google's OpenSSL 1.1.1 build for Android (for HTTPS). It needs Java 17,
+apktool, the Android SDK build-tools (zipalign, apksigner) and python3.
+
+**Signing:** Android only installs an update signed with the same key as the
+installed app. The script uses `~/.android/ereaderds-release.keystore` (made on
+the first build, password in the `.pass` file beside it). Back both up; a lost
+key means everyone has to uninstall before the next version. Releases: build
+locally and upload the APK to the release (`gh release upload vX.Y.Z
+dist/eReaderDS-vX.Y.Z-android.apk`); the in-app updater looks for
+`eReaderDS-v*-android.apk` on Android.
+
+How it fits GammaOS (`app/android.lua`):
+- **Both screens:** GammaOS's DualStack gives an app on
+  `persist.gammaos.dualstack.pkgs` one 1024x1536 window, top screen above
+  bottom. The app draws its usual 2048x768 frame (screens side by side) to a
+  canvas and shows its halves stacked. It only gets both screens when it opens;
+  another app's window (Magisk's) makes DualStack let go.
+- **Front end:** GammaOS's front end (`gammaos-nano`) draws over Android.
+  Launch the app from it (Android apps); `am start` over ADB runs it underneath.
+- **Touch:** LÖVE's own touch events (the top screen has none); the evdev
+  reader is Linux-only.
+- **Root (Magisk):** first-run setup (DualStack list, all-files access),
+  brightness (one root shell), installing updates. The app turns off Magisk's
+  notices for itself, since each one makes DualStack let go.
+- **Files:** books and data in `/sdcard/Ebook`; the built-in dictionary is
+  copied out of the APK to `.ereaderds/bundled/`; Android's CA certificates are
+  gathered into `.ereaderds/cacerts.pem` for OpenSSL.
+
+Testing over ADB: Android's screenshots don't show DualStack's window as the
+screens do; create `/sdcard/Ebook/.ereaderds/.shot` and the app saves its next
+frame as `.ereaderds/shot.png` (both screens side by side). GammaOS's buttons
+come from a virtual "Xbox Wireless Controller" (`getevent -pl`); `sendevent`
+to it presses them, including in the front end.

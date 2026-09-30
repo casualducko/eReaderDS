@@ -106,7 +106,9 @@ local book = nil
 -- Caches for the open book, kept small (1 GB of RAM): laid-out pages for the
 -- few most recent chapters, decoded images for the most recently drawn ones,
 -- and image sizes (read from file headers, so layout never decodes images).
+-- (Android on these handhelds has much less memory to spare: fewer.)
 local PAGES_KEEP, IMAGES_KEEP = 4, 12
+if require("android").active then PAGES_KEEP, IMAGES_KEEP = 2, 6 end
 local pages_cache, pages_order = {}, {}
 local images, images_order, image_dims = {}, {}, {}
 -- app.page_offs: where each laid-out file's pages start (numbers only), kept
@@ -8422,7 +8424,15 @@ function love.run()
                 -- Android recreates the window's surfaces around these (and
                 -- GammaOS's DualStack reshapes it) without always saying when
                 -- it's done: keep redrawing for a few seconds.
-                if app.frame_canvas then app.redraw_until = love.timer.getTime() + 4 end
+                if app.frame_canvas then
+                    app.redraw_until = love.timer.getTime() + 4
+                    -- DualStack let go of the second screen (another app's
+                    -- window came up, such as Magisk's): it only gives both
+                    -- screens when an app opens.
+                    if name == "resize" and not require("android").stacked() then
+                        app.toast("GammaOS took back the other screen\nOpen eReaderDS again for both screens", 8)
+                    end
+                end
             end
             if love.handlers[name] then love.handlers[name](a, b, c, d, e, f) end
         end

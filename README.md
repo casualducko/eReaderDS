@@ -10,8 +10,9 @@ device sideways like an open book: each screen shows one page.
 
 ![eReaderDS on the RG DS Plus: My Books, turning pages, a bookmark, brightness and text size by touch, Settings and the Themes page, looking up and highlighting a word, the bookmarks and highlights list, and syncing with KOReader](docs/demo.gif)
 
-> For the **RG DS Plus on its stock firmware or ROCKNIX** (not the original RG
-> DS, and not other custom firmware such as KNULLI). Found a problem? Please
+> For the **RG DS Plus on its stock firmware, ROCKNIX or GammaOS** (not the
+> original RG DS, and not other custom firmware such as KNULLI). GammaOS
+> (Android) support is new: see [GammaOS](#gammaos-android). Found a problem? Please
 > [report it](#reporting-problems).
 
 ## Install
@@ -55,6 +56,33 @@ it.
 
 While it runs, the bottom screen is turned on; closing the lid is handled by
 ROCKNIX.
+
+### GammaOS (Android)
+
+GammaOS Core/Next turns the RG DS Plus into an Android handheld. eReaderDS runs
+there as an Android app, using both screens through GammaOS's **DualStack**
+(the same way DraStic does). From the next release, each release also has
+`eReaderDS-vX.Y.Z-android.apk`.
+
+1. Copy the `.apk` to the handheld (USB, or download it there) and open it in
+   **Files** to install it (allow installing from Files if Android asks).
+2. Put books in the **Ebook** folder of the handheld's storage (`/sdcard/Ebook`,
+   made on the first run), or use Get Books or send them from a phone.
+3. Open **eReaderDS** from the front end (it's with the other Android apps).
+   The first time, it asks **Magisk** for root, once: tap **Grant**. It uses it
+   to put itself on DualStack's list (both screens), to read the Ebook folder,
+   and later to set the brightness and install updates. Then close eReaderDS
+   and open it again: from now on it opens on both screens.
+
+On GammaOS:
+- **Start** opens Settings, as on the other systems. The curved-arrow and
+  Anbernic buttons belong to GammaOS (its Control Center and menu).
+- If another app's window comes up while you read (for example Magisk asking
+  for permission), GammaOS takes one screen back: open eReaderDS again.
+- **Updates** download the new `.apk` and install it (with root); eReaderDS
+  closes, and you open it again.
+- It's a little slower than on Linux: Android needs much of the handheld's
+  1 GB of memory.
 
 **Updates:** when it's online, eReaderDS checks for a newer version each time
 it starts and says so (with the version you have). Tap that note to update, or
@@ -474,6 +502,8 @@ problem.
 ## Known limitations
 
 - Touch works only on the bottom screen.
+- On GammaOS, only one screen until eReaderDS has been added to DualStack
+  (it does that itself, with Magisk's permission).
 - When a chapter runs over several files in the EPUB, its pages in files not
   opened yet are estimated (usually within a few pages) until you reach them.
 - No tables, fixed-layout EPUBs, PDF, MOBI or DRM-protected books.
