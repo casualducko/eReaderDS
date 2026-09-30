@@ -43,7 +43,7 @@ local DEFAULTS = {
 local function data_dir()
     local d = os.getenv("READER_DATA")
     if not d then d = Android.active and Android.DATA or (love.filesystem.getSource() .. "/data") end
-    os.execute('mkdir -p "' .. d .. '"')
+    Android.mkdir(d)
     return d
 end
 
@@ -56,6 +56,13 @@ end
 local last_written = {}          -- file -> text, to skip writes that change nothing
 
 local function write_atomic(file, text)
+    if last_written[file] == nil then
+        -- First write of this file this session: if it already says this,
+        -- there's nothing to do (reopening a book rewrote several files).
+        local cur = io.open(file, "rb")
+        last_written[file] = cur and cur:read("*a") or false
+        if cur then cur:close() end
+    end
     if last_written[file] == text then return true end
     local tmp = file .. ".tmp"
     local f = io.open(tmp, "wb")
@@ -150,10 +157,9 @@ end
 function M.find_download_dir()
     local dirs = M.book_dirs()
     for _, d in ipairs(dirs) do
-        local r = os.execute('[ -d "' .. d .. '" ]')
-        if r == 0 or r == true then return d end
+        if Android.is_dir(d) then return d end
     end
-    os.execute('mkdir -p "' .. dirs[1] .. '"')
+    Android.mkdir(dirs[1])
     return dirs[1]
 end
 

@@ -16,11 +16,122 @@ M.BOOKS = M.ROOT .. "/Ebook"
 M.DATA = M.BOOKS .. "/.ereaderds"
 M.CA_FILE = M.DATA .. "/cacerts.pem"            -- (net.lua looks for it at this path)
 
+-- Folder helpers for every system: on Linux the usual commands, on Android
+-- straight through the C library (see "without a shell" below).
+function M.ls(dir)                              -- the names in a folder, sorted
+    local t = {}
+    if M.active then
+        for _, e in ipairs(M.list_dir(dir)) do t[#t + 1] = e.name end
+        table.sort(t)
+        return t
+    end
+    local p = io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
+    if p then
+        for n in p:lines() do t[#t + 1] = n end
+        p:close()
+    end
+    return t
+end
+function M.mkdir(dir)
+    if M.active then M.mkdir_p(dir) else os.execute('mkdir -p "' .. dir .. '"') end
+end
+function M.is_dir(dir)
+    if M.active then return M.dir_exists(dir) end
+    local r = os.execute('[ -d "' .. dir .. '" ]')
+    return r == 0 or r == true
+end
+
 if not M.active then return M end
 
 local function run(cmd)
     local ok = os.execute(cmd)
     return ok == true or ok == 0
+end
+
+---------------------------------------------------------------- without a shell
+
+-- Starting a command (getprop, mkdir, ls, find) copies the whole app process
+-- first, which on Android costs about a third of a second each time; startup
+-- ran about ten. These do the same through the C library directly.
+local ffi = require("ffi")
+for _, decl in ipairs({
+    "int __system_property_get(const char *name, char *value);",
+    "int mkdir(const char *path, unsigned int mode);",
+    "int access(const char *path, int mode);",
+    "typedef struct rgds_DIR rgds_DIR;",
+    "struct rgds_dirent { uint64_t d_ino; int64_t d_off; unsigned short d_reclen; unsigned char d_type; char d_name[256]; };",
+    "rgds_DIR *opendir(const char *name);",
+    "struct rgds_dirent *readdir(rgds_DIR *dir);",
+    "int closedir(rgds_DIR *dir);",
+}) do pcall(ffi.cdef, decl) end
+local C = ffi.C
+local DT_DIR, DT_UNKNOWN = 4, 0
+
+-- An Android system property ("" when unset).
+function M.getprop(name)
+    local buf = ffi.new("char[92]")
+    local ok, n = pcall(C.__system_property_get, name, buf)
+    return ok and n > 0 and ffi.string(buf, n) or ""
+end
+
+function M.dir_exists(path)
+    local ok, d = pcall(C.opendir, path)
+    if not ok or d == nil then return false end
+    C.closedir(d)
+    return true
+end
+
+-- mkdir -p.
+function M.mkdir_p(path)
+    local p = ""
+    for part in path:gmatch("[^/]+") do
+        p = p .. "/" .. part
+        pcall(C.mkdir, p, tonumber("775", 8))
+    end
+end
+
+-- The names in a folder, with whether each is a folder: { { name, dir } }.
+function M.list_dir(path)
+    local out = {}
+    local ok, d = pcall(C.opendir, path)
+    if not ok or d == nil then return out end
+    while true do
+        local e = C.readdir(d)
+        if e == nil then break end
+        local name = ffi.string(e.d_name)
+        if name ~= "." and name ~= ".." then
+            local dir = e.d_type == DT_DIR
+            if e.d_type == DT_UNKNOWN then
+                local sub = C.opendir(path .. "/" .. name)
+                dir = sub ~= nil
+                if dir then C.closedir(sub) end
+            end
+            out[#out + 1] = { name = name, dir = dir }
+        end
+    end
+    C.closedir(d)
+    return out
+end
+
+-- Files under a folder (depth-limited) whose names pass keep(name, rel),
+-- with their sizes: { { path, size } }. skip_dir(rel) leaves a folder out.
+function M.find_files(root, depth, keep, skip_dir)
+    local out = {}
+    local function walk(dir, rel, left)
+        for _, e in ipairs(M.list_dir(dir)) do
+            local r = rel == "" and e.name or (rel .. "/" .. e.name)
+            if e.dir then
+                if left > 1 and not skip_dir(r) then walk(dir .. "/" .. e.name, r, left - 1) end
+            elseif keep(e.name, r) then
+                local f = io.open(dir .. "/" .. e.name, "rb")
+                local size = f and f:seek("end")
+                if f then f:close() end
+                out[#out + 1] = { path = dir .. "/" .. e.name, size = size }
+            end
+        end
+    end
+    walk(root, "", depth)
+    return out
 end
 
 -- Magisk shows a "granted" notice each time root is used, and that notice
@@ -43,7 +154,11 @@ end
 
 -- Can we write to the books folder? (Needs Android's all-files access.)
 function M.storage_ok()
-    run('mkdir -p "' .. M.DATA .. '" 2>/dev/null')
+    -- (Asking is enough when the folder is there, and quick: opening or making
+    -- a file in shared storage costs Android much more.)
+    local W_OK = 2
+    if C.access(M.DATA, W_OK) == 0 then return true end
+    M.mkdir_p(M.DATA)
     local test = M.DATA .. "/.write-test"
     local f = io.open(test, "wb")
     if not f then return false end
@@ -73,10 +188,7 @@ end
 -- back as the controller's guide button, which quits, as on Linux. Nothing
 -- is changed if eReaderDS has a profile already (the reader's own).
 local function prop(name)
-    local p = io.popen("getprop " .. name .. " 2>/dev/null")
-    local v = p and p:read("*l") or ""
-    if p then p:close() end
-    return v or ""
+    return M.getprop(name)
 end
 function M.gamepad_profile()
     local n = tonumber(prop("persist.gammaos.gamepad.pa_count")) or 0
@@ -103,10 +215,8 @@ function M.setup()
     end
     if not M.stacked() then
         local function listed()
-            local p = io.popen("getprop persist.gammaos.dualstack.pkgs 2>/dev/null")
-            local list = p and p:read("*l") or ""
-            if p then p:close() end
-            return list or "", (list or ""):find(M.PACKAGE, 1, true) ~= nil
+            local list = M.getprop("persist.gammaos.dualstack.pkgs")
+            return list, list:find(M.PACKAGE, 1, true) ~= nil
         end
         local list, ok = listed()
         if not ok then
@@ -141,7 +251,7 @@ end
 -- file's size changes (a new version).
 function M.bundled(dir)
     local dest = M.DATA .. "/bundled/" .. dir
-    run('mkdir -p "' .. dest .. '"')
+    M.mkdir_p(dest)
     for _, name in ipairs(love.filesystem.getDirectoryItems(dir)) do
         local src = dir .. "/" .. name
         local info = love.filesystem.getInfo(src)
@@ -167,27 +277,23 @@ end
 -- lookup by hashed name doesn't match Android's naming). Made once a day at
 -- most, since the system's list only changes with an update.
 function M.ca_bundle()
-    local f = io.open(M.CA_FILE, "rb")
-    if f then
-        f:close()
-        local p = io.popen('find "' .. M.CA_FILE .. '" -mtime -1 2>/dev/null')
-        local fresh = p and p:read("*l")
-        if p then p:close() end
-        if fresh then return end
-    end
+    local stamp = M.CA_FILE .. ".day"
+    local today = os.date("%Y%m%d")
+    local f = io.open(stamp, "rb")
+    local made = f and f:read("*l")
+    if f then f:close() end
+    local have = io.open(M.CA_FILE, "rb")
+    if have then have:close() end
+    if have and made == today then return end
     local parts = {}
     for _, dir in ipairs({ "/apex/com.android.conscrypt/cacerts", "/system/etc/security/cacerts" }) do
-        local p = io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
-        if p then
-            for name in p:lines() do
-                local c = io.open(dir .. "/" .. name, "rb")
-                if c then
-                    local text = c:read("*a"); c:close()
-                    local pem = text:match("(%-%-%-%-%-BEGIN CERTIFICATE%-%-%-%-%-.-%-%-%-%-%-END CERTIFICATE%-%-%-%-%-)")
-                    if pem then parts[#parts + 1] = pem end
-                end
+        for _, e in ipairs(M.list_dir(dir)) do
+            local c = io.open(dir .. "/" .. e.name, "rb")
+            if c then
+                local text = c:read("*a"); c:close()
+                local pem = text:match("(%-%-%-%-%-BEGIN CERTIFICATE%-%-%-%-%-.-%-%-%-%-%-END CERTIFICATE%-%-%-%-%-)")
+                if pem then parts[#parts + 1] = pem end
             end
-            p:close()
         end
         if #parts > 0 then break end
     end
@@ -196,6 +302,8 @@ function M.ca_bundle()
     if w then
         w:write(table.concat(parts, "\n"), "\n"); w:close()
         os.rename(M.CA_FILE .. ".tmp", M.CA_FILE)
+        local s = io.open(stamp, "wb")
+        if s then s:write(today, "\n"); s:close() end
     end
 end
 

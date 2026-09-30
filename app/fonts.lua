@@ -41,7 +41,7 @@ end
 -- need be), e.g. Ebook/Fonts or roms/ebook/Fonts.
 function M.user_dir()
     local d = user_dirs()[1]
-    if d then os.execute('mkdir -p "' .. d .. '"') end
+    if d then require("android").mkdir(d) end
     return d
 end
 
@@ -219,30 +219,52 @@ local function is_font(name)
     return (ext == "ttf" or ext == "otf" or ext == "ttc") and not name:match("^%._")
 end
 
+-- The bundled fonts' names, read from each file once per version and kept
+-- in LÖVE's save folder: reading ~70 fonts' name tables took a good part of
+-- a second at every start on Android.
+local CACHE = "fonts-bundled.txt"
+local function bundle_cache()
+    local key = "v" .. require("version")
+    local ok, text = pcall(love.filesystem.read, CACHE)
+    local names = {}
+    if ok and text and text:sub(1, #key + 1) == key .. "\n" then
+        for file, fam, sub in text:gmatch("([^\t\n]+)\t([^\t\n]+)\t([^\t\n]*)\n") do
+            names[file] = { fam, sub }
+        end
+    end
+    return names, key
+end
+
 function M.scan()
     families, by_name = {}, {}
     release_previews()
     filedata, filedata_order = {}, {}
+    local cached, key = bundle_cache()
+    local out, missed = { key }, false
     for _, file in ipairs(love.filesystem.getDirectoryItems(BUNDLED_DIR)) do
         if is_font(file) then
             local p = BUNDLED_DIR .. "/" .. file
-            local fam, sub = names_from_bundle(p)
-            if not fam then fam, sub = names_from_filename(file) end
+            local fam, sub
+            if cached[file] then
+                fam, sub = cached[file][1], cached[file][2]
+            else
+                missed = true
+                fam, sub = names_from_bundle(p)
+                if not fam then fam, sub = names_from_filename(file) end
+            end
             add_face(p, true, fam, sub)
+            out[#out + 1] = file .. "\t" .. fam .. "\t" .. (sub or "")
         end
     end
+    if missed then pcall(love.filesystem.write, CACHE, table.concat(out, "\n") .. "\n") end
     for _, dir in ipairs(user_dirs()) do
-        local ls = io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
-        if ls then
-            for file in ls:lines() do
-                if is_font(file) then
-                    local p = dir .. "/" .. file
-                    local fam, sub, kind = names_from_path(p)
-                    if not fam then fam, sub = names_from_filename(file) end
-                    add_face(p, false, fam, sub, kind)
-                end
+        for _, file in ipairs(require("android").ls(dir)) do
+            if is_font(file) then
+                local p = dir .. "/" .. file
+                local fam, sub, kind = names_from_path(p)
+                if not fam then fam, sub = names_from_filename(file) end
+                add_face(p, false, fam, sub, kind)
             end
-            ls:close()
         end
     end
     -- Every font, bundled or your own, alphabetically.

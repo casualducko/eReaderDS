@@ -6,6 +6,7 @@
 -- rotated onto its screen.
 -- Write log lines immediately, so log.txt is complete even after a crash.
 io.stdout:setvbuf("line")
+print("[startup] main.lua running")
 
 local Book = require("book")
 local Layout = require("layout")
@@ -157,8 +158,16 @@ local function fit_text(font, text, w)
     return lo > 0 and cut(lo) or "…"
 end
 
+-- (Each font file is read once and kept, for its several sizes.)
+app.font_files = {}
 local function load_font(file, size)
-    local ok, f = pcall(love.graphics.newFont, "fonts/" .. file, size)
+    local data = app.font_files[file]
+    if not data then
+        local okd, d = pcall(love.filesystem.newFileData, "fonts/" .. file)
+        data = okd and d or "fonts/" .. file
+        app.font_files[file] = data
+    end
+    local ok, f = pcall(love.graphics.newFont, data, size)
     if ok then return f end
     return love.graphics.newFont(size)
 end
@@ -1173,7 +1182,7 @@ function app.export_notes(only_if_missing)
     end
     local f = io.open(file .. ".tmp", "wb")
     if not f then
-        os.execute('mkdir -p "' .. dir .. '"')
+        require("android").mkdir(dir)
         f = io.open(file .. ".tmp", "wb")
         if not f then return end
     end
@@ -1301,6 +1310,18 @@ end
 -- not hidden folders or the fonts, dictionaries and highlights folders:
 -- { path, size }.
 function app.find_books(dir)
+    -- Android: walked directly (running find there costs a third of a
+    -- second), on the same terms as below.
+    local A = require("android")
+    if A.active then
+        local SKIP = { fonts = true, dictionaries = true, highlights = true }
+        return A.find_files(dir, 6, function(name)
+            local ext = (name:match("%.([^.]+)$") or ""):lower()
+            return not name:match("^%.") and (ext == "epub" or ext == "txt" or ext == "part")
+        end, function(rel)
+            return rel:match("^%.") or rel:find("/%.") or (not rel:find("/") and SKIP[rel:lower()])
+        end)
+    end
     local function run(cmd)
         local out = {}
         local p = io.popen(cmd)
@@ -8281,8 +8302,11 @@ function love.load()
             love.graphics.getWidth(), love.graphics.getHeight(), love.graphics.getPixelWidth(),
             love.graphics.getPixelHeight(), love.graphics.getDPIScale()))
         -- First run: file access and both screens (GammaOS's DualStack).
+        local t = love.timer.getTime()
         app.android_setup_msg = require("android").setup()
+        local t2 = love.timer.getTime()
         require("android").ca_bundle()
+        print(string.format("[startup] setup %.2fs, certificates %.2fs", t2 - t, love.timer.getTime() - t2))
     elseif os.getenv("READER_SCALE") == nil then pcall(love.window.setPosition, 0, 0, 1) end
     love.graphics.setDefaultFilter("linear", "linear")
     love.keyboard.setKeyRepeat(true)
@@ -8309,6 +8333,7 @@ function love.load()
             tostring(joystick:isGamepad())))
     end
     print("[reader] eReaderDS v" .. VERSION .. " (uptime " .. app.uptime() .. ")")
+    local ts = love.timer.getTime()
     S = Store.load_settings()
     if S.chrome == false then
         -- "Page info: Off" from older versions: hide the status bar text.
@@ -8329,7 +8354,9 @@ function love.load()
     if not require("android").active then KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
         { ["gt9xx-0"] = true, ["Goodix Capacitive TouchScreen"] = true },  -- stock, ROCKNIX
         { [LID_DEVICE] = true, [app.BACK_DEVICE] = true }) end
+    local tb = love.timer.getTime()
     if S.brightness >= 0 and Backlight.available() then Backlight.set(S.brightness) end
+    print(string.format("[startup] settings etc %.2fs, brightness %.2fs", tb - ts, love.timer.getTime() - tb))
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     old_canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
@@ -8356,12 +8383,16 @@ function love.load()
         { 1, 1, 1, 1, 1, 1, 1, 0 }, { 0, 1, 0, 1, 1, 1, 1, 1 },
     }, "fan", "static")
     turn_mesh = love.graphics.newMesh((TURN_COLS + 1) * 2, "strip", "stream")
+    local tf = love.timer.getTime()
     build_fonts()
-
-    scan_library()
+    local tl = love.timer.getTime()
     local last = Store.get_last()
     local f = last and io.open(last, "rb")
+    -- Reopening a book: My Books is filled in just after it's on screen.
+    if f then app.library_later = true else scan_library() end
+    local to = love.timer.getTime()
     if f then f:close(); open_book(last) end
+    print(string.format("[startup] fonts %.2fs, library %.2fs, book %.2fs", tl - tf, to - tl, love.timer.getTime() - to))
     -- Just updated? Offer what's new, once. (A new install has no seen_version.)
     if S.seen_version ~= VERSION then
         if S.seen_version ~= "" then
@@ -8415,6 +8446,8 @@ end
 local function run_test_script()
     local script = os.getenv("READER_SCRIPT")
     if script then
+        -- (Scripts run before the first frame: fill My Books first.)
+        if app.library_later then app.library_later = nil; scan_library() end
         for a in script:gmatch("[^,]+") do
             local dir = a:match("^dp(%a+)$")
             local sa, sv = a:match("^stick:(%a):([%-%d.]+)$")
@@ -8512,6 +8545,10 @@ function love.run()
             if not app.first_shown then
                 app.first_shown = true
                 print("[reader] ready (uptime " .. app.uptime() .. ")")
+            end
+            if app.library_later then
+                app.library_later = nil
+                scan_library()
             end
         end
         local function handle(name, a, b, c, d, e, f)

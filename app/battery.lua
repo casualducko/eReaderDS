@@ -15,17 +15,12 @@ local function read(path)
 end
 
 local function find()
-    local p = io.popen('ls -1 "' .. ROOT .. '" 2>/dev/null')
-    if p then
-        for name in p:lines() do
-            local d = ROOT .. "/" .. name
-            if (read(d .. "/type") or ""):lower() == "battery" and read(d .. "/capacity") then
-                p:close()
-                print("[battery] " .. d)
-                return d
-            end
+    for _, name in ipairs(require("android").ls(ROOT)) do
+        local d = ROOT .. "/" .. name
+        if (read(d .. "/type") or ""):lower() == "battery" and read(d .. "/capacity") then
+            print("[battery] " .. d)
+            return d
         end
-        p:close()
     end
     print("[battery] none found in " .. ROOT)
     return false

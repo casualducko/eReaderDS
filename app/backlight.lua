@@ -51,16 +51,13 @@ end
 
 local function scan()
     devices = {}
-    local p = io.popen('ls -1 "' .. ROOT .. '" 2>/dev/null')
-    if not p then return devices end
-    for name in p:lines() do
+    for _, name in ipairs(require("android").ls(ROOT)) do
         local dir = ROOT .. "/" .. name
         local max = read_num(dir .. "/max_brightness")
         if max and max > 0 and read_num(dir .. "/brightness") then
             devices[#devices + 1] = { name = name, dir = dir, max = max }
         end
     end
-    p:close()
     for _, d in ipairs(devices) do
         print(string.format("[backlight] %s max=%d now=%d", d.name, d.max, read_num(d.dir .. "/brightness")))
     end
