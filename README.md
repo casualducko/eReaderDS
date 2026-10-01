@@ -481,6 +481,9 @@ last word, then Save.)
 
 **Highlight color:** Yellow (the default), Green, Blue, Pink or Subtle, in
 Settings → Reading & Device; it's shaded to suit each theme, light or dark.
+On a dark theme highlights are muted, so the light text on them stays easy
+to read; **Highlights on dark themes → Bright** makes them highlighter
+bright there too, with the highlighted words in dark ink.
 
 **With the buttons:** press **Y** for the word cursor, move to the first word, press **Select**, move
 

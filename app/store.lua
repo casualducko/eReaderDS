@@ -25,6 +25,7 @@ local DEFAULTS = {
     night_theme = "off", -- a theme used automatically at night ("off" or a theme's name)
     hidden_themes = "", -- built-in themes left out of the lists, by name: "Dracula,Nord"
     hl_color = "yellow", -- highlights: "yellow" | "green" | "blue" | "pink" | "subtle" (the selection colour)
+    hl_bright = false,   -- highlights on a dark theme: bright, with dark text (else muted, the text light)
     dim_pictures = true, -- pictures in books drawn darker on a dark theme
     night_from = 21,   -- ... from this hour (0-23, the device's clock)
     night_to = 7,      -- ... until this one

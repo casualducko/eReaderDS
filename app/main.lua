@@ -952,12 +952,23 @@ function app.hl_colour(th)
     if not hue then return th.sel end
     local L = app.rgb_lab(th.bg[1], th.bg[2], th.bg[3])[1]
     local dark = L < 50
+    -- Bright, on a dark theme: the colour it is on a white page (the words on
+    -- it in dark ink: app.hl_ink).
+    if dark and S.hl_bright then L, dark = 97, false end
     local l, c = dark and L + 17 or L - 8, dark and 0.055 or 0.085
     -- (Yellow is only highlighter-yellow when light and strong; darker, it's khaki.)
     if S.hl_color == "yellow" and not dark then l, c = L - 2, 0.13 end
     local h = math.rad(hue)
     local function axis(v) return math.max(-100, math.min(100, math.floor(v / app.TEDIT_CHROMA * 100 + 0.5))) end
     return app.lab_rgb({ math.max(0, math.min(100, l)), axis(c * math.sin(h)), axis(c * math.cos(h)) })
+end
+
+-- The text colour of highlighted words: dark ink on bright highlights on a
+-- dark theme (light text on them would be hard to read), else nil.
+function app.hl_ink(th)
+    if S.hl_bright and app.HL_HUES[S.hl_color] and app.rgb_lab(th.bg[1], th.bg[2], th.bg[3])[1] < 50 then
+        return { 0.1, 0.1, 0.1 }
+    end
 end
 
 -- Pictures drawn darker on a dark theme (a bright one glares at night).
@@ -1018,6 +1029,9 @@ function app.hl_bands(page, ox, oy)
         local top, bottom = l.top2 or l.top, l.bottom2 or l.bottom
         love.graphics.rectangle("fill", ox + it.x - 3, oy + top, x2 - it.x + 6, bottom - top, 4, 4)
     end
+    local set = {}
+    for _, it in ipairs(marked) do set[it] = true end
+    return set
 end
 
 -- Highlighting by touch, in look-up (the touchscreen's page): while
@@ -3174,6 +3188,9 @@ local function more_items()
             { label = "Highlight color", value = ({ yellow = "Yellow", green = "Green", blue = "Blue", pink = "Pink",
                 subtle = "Subtle" })[S.hl_color] or "Yellow",
               adjust = function(d) S.hl_color = cycle({ "yellow", "green", "blue", "pink", "subtle" }, S.hl_color, d) end },
+            { label = "Highlights on dark themes", value = S.hl_bright and "Bright" or "Muted", adjust = function()
+                S.hl_bright = not S.hl_bright
+            end },
             { label = "Dim pictures on dark themes", value = S.dim_pictures and "On" or "Off", adjust = function()
                 S.dim_pictures = not S.dim_pictures
             end },
@@ -3330,10 +3347,11 @@ local function draw_page(page, side, top)
     local ox = side == "left" and m.outer or m.inner
     local oy = top or text_top()
     if not page then return end
-    if app.hl_active and #app.hl_active > 0 then app.hl_bands(page, ox, oy) end
+    local marked = app.hl_active and #app.hl_active > 0 and app.hl_bands(page, ox, oy)
+    local ink = marked and app.hl_ink(th)
     for _, it in ipairs(page.items) do
         if it.kind == "text" then
-            color(th.fg)
+            color(ink and marked[it] and ink or th.fg)
             love.graphics.setFont(it.font)
             love.graphics.print(it.text, ox + it.x, oy + it.y)
         elseif it.kind == "image" then
