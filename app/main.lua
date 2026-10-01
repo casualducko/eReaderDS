@@ -10691,6 +10691,12 @@ local function run_test_script()
             elseif a == "update" then app.update_open()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
+            elseif a == "covers" then                           -- wait for covers being loaded (after a draw asks for them)
+                local t = love.timer.getTime()
+                while app.covers_waiting > 0 and love.timer.getTime() - t < 10 do
+                    app.cover_poll()
+                    love.timer.sleep(0.05)
+                end
             elseif a == "splash" then app.mode = "splash"       -- the opening screen (Android's splash is made from it)
             elseif a == "setupmsg" then                          -- GammaOS's first-run page
                 app.android_setup_title = "One more step!"

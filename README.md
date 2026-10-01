@@ -294,7 +294,7 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 | Settings | Themes |
 |---|---|
-| ![Settings](docs/screenshots/settings.png) | ![Themes, previewing Nord](docs/screenshots/themes.png) |
+| ![Settings](docs/screenshots/settings.png) | ![Themes, previewing Nord, with one of your own tagged Custom](docs/screenshots/themes.png) |
 
 *Screenshots use public-domain books from Project Gutenberg.*
 
@@ -642,7 +642,7 @@ word by word, across both pages; up/down move it line by line on the same
 page, going round from its last line to its first. The definition shows on
 the facing page (A for more of a long entry, B to close).
 
-![Looking up a word](docs/screenshots/lookup.png)
+![Looking up a word, with a highlight above it](docs/screenshots/lookup.png)
 
 English (WordNet) is built in. To add others, copy **StarDict** dictionaries
 (the files KOReader uses: `.ifo`, `.idx`, `.dict` or `.dict.dz`, and `.syn`
