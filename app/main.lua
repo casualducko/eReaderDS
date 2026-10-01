@@ -817,8 +817,11 @@ function look.layout()
         end
     end
     local w, h = content_size()
+    -- (On the touchscreen, the definition leaves room for the look-up buttons.)
+    local cur = look.words[look.sel]
+    local room = cur and cur.side ~= app.touch_side() and 110 or 0
     look.pages = Layout.paginate({ blocks = blocks }, {
-        fonts = look.fonts, size = size, w = w, h = h - 60, spacing = 1.0,
+        fonts = look.fonts, size = size, w = w, h = h - 60 - room, spacing = 1.0,
         justify = false, indent = false, image_size = function() return nil end,
     })
     return look.pages
@@ -873,6 +876,11 @@ function look.move(a)
         end
         local step = a == "down" and 1 or -1
         local target = cur.line
+        -- (Choosing a highlight: no going round, or it would cover the page.)
+        if look.hl_start and ((step < 0 and cur.line <= first) or (step > 0 and cur.line >= last)) then
+            look.find()
+            return
+        end
         -- Lines with no words (images, blank) are skipped.
         local best, best_d
         for _ = 1, last - first + 1 do
@@ -999,9 +1007,13 @@ function app.look_buttons()
     for _, b in ipairs(list) do b.w = ui.font:getWidth(b[2]) + 72; total = total + b.w + gap end
     local on_text = look.hl_start or w.side == app.touch_side()
     local y = on_text and PAGE_H - 88 or PAGE_H - 26 - ui.small:getHeight() - 84
+    -- (The word near the bottom of the page: the buttons go at the top, so
+    -- they don't cover it.)
+    local at_top = on_text and w.side == app.touch_side() and w.y2 > PAGE_H - 170
+    if at_top then y = 70 + (look.hl_start and ui.hint:getHeight() + 10 or 0) end
     local x = math.floor((PAGE_W - total) / 2)
     for _, b in ipairs(list) do
-        b.x, b.y, b.h = x, y, app.BUTTON_H
+        b.x, b.y, b.h, b.at_top = x, y, app.BUTTON_H, at_top
         x = x + b.w + gap
     end
     return list
@@ -1016,10 +1028,11 @@ function app.look_bar(side)
         -- Over the page's text: a band of page colour under the buttons.
         local m = margins()
         local top = list[1].y - (look.hl_start and ui.hint:getHeight() + 22 or 16)
+        local bottom = list[1].at_top and (list[1].y + list[1].h + 16) or PAGE_H
         color(th.bg)
-        love.graphics.rectangle("fill", 0, top, PAGE_W, PAGE_H - top)
+        love.graphics.rectangle("fill", 0, top, PAGE_W, bottom - top)
         color(th.dim, 0.5)
-        love.graphics.line(m.inner, top, PAGE_W - m.outer, top)
+        love.graphics.line(m.inner, list[1].at_top and bottom or top, PAGE_W - m.outer, list[1].at_top and bottom or top)
         if look.hl_start then
             -- How to choose the rest: by touch on this screen, or the cursor
             -- when the words are on the other one.
@@ -1043,7 +1056,9 @@ function app.look_bar_tap(side, u, v)
             if b[1] == "save" then app.hl_select()
             elseif b[1] == "cancel" then look.hl_start = nil; look.find()
             elseif b[1] == "close" then app.on_back()        -- (out of look-up, as B does)
-            elseif b[1] == "start" then look.hl_start = look.sel   -- (then choose the rest, and Save)
+            elseif b[1] == "start" then
+                -- (then choose the rest, and Save)
+                if look.words[look.sel].off then look.hl_start = look.sel else app.toast("This can't be highlighted") end
             else app.hl_select() end                         -- remove: the highlight this word is in
             redraw()
             return true
@@ -1057,7 +1072,8 @@ end
 function app.hl_drag(side, u, v)
     local cur = look.words[look.sel]
     if not cur or side ~= (look.drag and look.drag.side or cur.side) then return end
-    look.drag = look.drag or { anchor = look.sel, side = cur.side }
+    -- (From Start Highlight: its word is the anchor, and stays chosen.)
+    look.drag = look.drag or { anchor = look.hl_start or look.sel, side = cur.side, started = look.hl_start ~= nil }
     local best, bd
     for i, w in ipairs(look.words) do
         if w.side == side then
@@ -1068,7 +1084,7 @@ function app.hl_drag(side, u, v)
         end
     end
     if not best then return end
-    if best == look.drag.anchor then look.hl_start, look.sel = nil, best
+    if best == look.drag.anchor and not look.drag.started then look.hl_start, look.sel = nil, best
     else look.hl_start, look.sel = look.drag.anchor, best end
     redraw()
 end
@@ -1567,7 +1583,8 @@ function app.library_meta_step()
         -- but one still at the top (not moved to yet: after a reset or on a
         -- new card every book is read again) stays at the top, rather than
         -- following that book far down the list.
-        local cur = library.sel > 1 and library.items[library.sel]
+        local cur = library.items[library.sel]
+        if not (library.sel > 1 or library.picked or (book and cur and cur.path == book.path)) then cur = nil end
         library.sort(library.items)
         if cur then
             for i, it in ipairs(library.items) do if it == cur then library.sel = i end end
@@ -2546,10 +2563,11 @@ function app.sync_decide(b, how, docs, results)
             if (tonumber(e.r.timestamp) or 0) > (tonumber(last.r.timestamp) or 0) then last = e end
         end
         local mine = last and (tonumber(last.r.timestamp) or 0) or -1
-        local other_newer = false
+        local other_newer
         for _, list in ipairs({ old, new }) do
             for _, e in ipairs(list) do
-                if (tonumber(e.r.timestamp) or 0) > mine then other_newer = true end
+                local t = tonumber(e.r.timestamp) or 0
+                if t > mine and (not other_newer or t > (tonumber(other_newer.r.timestamp) or 0)) then other_newer = e end
             end
         end
         if (moved or send) and not now and app.sync_auto() ~= "on" and other_newer then
@@ -2559,9 +2577,10 @@ function app.sync_decide(b, how, docs, results)
                 -- (own: this device's own sends only, so it says "from here":
                 -- the server's name, such as CrossPoint, read like another device.)
                 detail = "You're at " .. where .. "\n"
-                    .. (last and ("Last sent from here: " .. math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5)
-                        .. "%, " .. ago(last.r.timestamp))
-                        or "The sync server has nothing for this book yet"),
+                    .. app.sync_device_name(other_newer.r):gsub("^%l", string.upper) .. ": " .. math.floor((tonumber(other_newer.r.percentage) or 0) * 100 + 0.5)
+                    .. "%, " .. ago(other_newer.r.timestamp)
+                    .. (last and ("\nLast sent from here: " .. math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5)
+                        .. "%, " .. ago(last.r.timestamp)) or ""),
                 yes = "Send", no = "Not now", on_yes = function()
                     if book ~= b then return end
                     app.sync.pushed[b.path] = nil
@@ -3261,7 +3280,7 @@ local function menu_items()
             { label = "Night Mode", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
             { label = "Status Bar", value = "›", act = function() open_sub("status") end },
             { label = "Reading & Device", value = "›", act = function() open_sub("more") end },
-            { label = "Back Up & Restore", value = "›", act = function() open_sub("backup") end },
+            { label = "Back Up & Restore", value = "›", act = function() app.bk_size = nil; open_sub("backup") end },
             { label = "KOReader Sync", value = app.sync_on() and "On" or "Off", opens = true, act = function() open_sub("sync") end },
         })),
         app.menu_on_page(2, section("", {
@@ -3616,9 +3635,12 @@ function app.hints(x, y, list)
         color(th.dim)
         love.graphics.print(list[i + 1], x, y)
         x = x + f:getWidth(list[i + 1]) + 32
+        app.hints_end = x - 32                             -- (for app.count, so they don't overlap)
         -- On the touchscreen, a hint for a button can be tapped instead of
         -- pressing it (see app.hint_tap).
-        if app.hint_boxes and app.HINT_ACTIONS[list[i]] then
+        -- (Not A under a question card: a tap off the card keeps things as
+        -- they are, and the card has its own button for yes.)
+        if app.hint_boxes and app.HINT_ACTIONS[list[i]] and not (app.asking and list[i] == "A") then
             app.hint_boxes[#app.hint_boxes + 1] = { x0, y, x - 32 - x0, f:getHeight(), app.HINT_ACTIONS[list[i]] }
         end
     end
@@ -3635,7 +3657,15 @@ function app.count(x, w, sel, n, more, note)
     color(theme().dim)
     local text = n > 0 and (sel .. " / " .. n .. (more and "+" or "")) or ""
     if note then text = text .. (text ~= "" and "  ·  " or "") .. note end
-    love.graphics.printf(text, x, PAGE_H - 70 + ui.small:getBaseline() - ui.hint:getBaseline(), w, "right")
+    -- Too long beside the hints: smaller, then shorter (the note's number only).
+    local f, right = ui.hint, app.hints_end or 0
+    app.hints_end = nil
+    if x + w - f:getWidth(text) < right + 24 then f = ui.small end
+    if note and x + w - f:getWidth(text) < right + 24 then
+        text = (n > 0 and (sel .. " / " .. n .. (more and "+" or "") .. "  ·  ") or "") .. (note:match("^%d+") or note) .. " hidden"
+    end
+    love.graphics.setFont(f)
+    love.graphics.printf(text, x, PAGE_H - 70 + ui.small:getBaseline() - f:getBaseline(), w, "right")
 end
 
 local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
@@ -3713,6 +3743,9 @@ function app.theme_hide(t, hide)
         return
     end
     T.sel = math.max(n > 0 and 1 or 0, math.min(keep_sel, n))
+    if in_use and not hide then
+        T.sel = 0                                           -- (restored: still the one in use, now in the other list)
+    end
     if in_use and hide then
         app.theme_pick()
         app.toast(t.name .. " hidden · now " .. T.list[T.sel].name)
@@ -3762,7 +3795,7 @@ function app.theme_set_filter(filter, keep)
     local T = app.themes
     keep = keep or app.theme_current()
     T.filter = filter
-    app.theme_filter_last = filter
+    if filter ~= "hidden" then app.theme_filter_last = filter end
     T.list = {}
     if filter == "custom" then
         -- Your own themes, after a row for making a new one.
@@ -8342,8 +8375,15 @@ local function touch_event(kind, sx, sy)
         gesture.u = u
         if gesture.held then
             -- A press-and-hold (look-up) doesn't turn into a swipe or slide;
-            -- dragging on chooses words to highlight.
-            if app.mode == "lookup" then app.hl_drag(side, u, v) end
+            -- dragging on (past a wobble, and only from a word it opened)
+            -- chooses words to highlight.
+            if app.mode == "lookup" and gesture.hl_ok and gesture.moved >= 18 then app.hl_drag(side, u, v) end
+        elseif gesture.mode == "hl" or (not gesture.mode and gesture.moved >= 18 and app.mode == "lookup" and look.hl_start
+                and side == app.touch_side() and look.words[look.hl_start] and look.words[look.hl_start].side == side) then
+            -- After Start Highlight, dragging on the words' page chooses them
+            -- (from the word started on).
+            gesture.mode = "hl"
+            app.hl_drag(side, u, v)
         elseif not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
             gesture.mode = "swipe"          -- mostly horizontal: page turn on release
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5
@@ -8393,9 +8433,9 @@ local function touch_event(kind, sx, sy)
             elseif app.mode == "menu" and math.abs(du) > 60 then
                 app.menu_page(du < 0 and 1 or -1)           -- the next / previous settings page
             end
-        elseif gesture.held then
+        elseif gesture.held or gesture.mode == "hl" then
             -- Already handled while the finger was down (and any drag).
-            if app.mode == "lookup" then app.hl_drag_end() end
+            if app.mode == "lookup" and (gesture.hl_ok or gesture.mode == "hl") then app.hl_drag_end() end
         elseif gesture.moved < 30 and app.touch_clock() - gesture.t0 < 0.5 and app.on_tap then
             app.on_tap(gesture.side, gesture.u0, gesture.v0)
         end
@@ -8438,7 +8478,10 @@ function app.list_scroll(top)
     top = math.max(1, math.min(math.max(1, n - shown + 1), top))
     if top == l.top then return end
     l.top = top
+    local was = l.sel
     l.sel = math.max(top, math.min(top + shown - 1, l.sel))
+    -- (Themes: the one highlighted is the one shown, and kept.)
+    if app.mode == "themes" and l.sel ~= was and app.themes.list[l.sel] and not app.themes.list[l.sel].hidden_row then app.theme_pick() end
     if app.mode == "shop" then shop.move(0) end            -- near the end: load more
     redraw()
 end
@@ -8446,14 +8489,15 @@ end
 -- A short message popup (e.g. "Bookmark added").
 -- on_tap: what tapping the toast does (it's on the touchscreen), if anything.
 -- How long it shows goes by its length: 1.2 seconds, and a quarter second
--- for each word after the third, up to 4 (about reading pace). Messages
+-- for each word after the third, up to 6 (about reading pace). Messages
 -- that wait for something ("Sending…", given more than 4 seconds; they're
 -- replaced when it's done) and ones to tap keep their own time.
 function app.toast(text, secs, on_tap)
     if not on_tap and (secs == nil or secs <= 4) then
         local words = 0
         for _ in tostring(text):gmatch("%S+") do words = words + 1 end
-        secs = math.min(4, 1.2 + 0.25 * math.max(0, words - 3))
+        -- (Long enough to read: never less than asked for, nor a long one cut short.)
+        secs = math.max(secs or 0, math.min(6, 1.2 + 0.25 * math.max(0, words - 3)))
     end
     overlay = { text = text, hide_at = love.timer.getTime() + secs, on_tap = on_tap }
     if os.getenv("READER_DEBUG") then print(string.format("[debug] message %q at %.2f", text, love.timer.getTime())) end
@@ -8926,6 +8970,7 @@ function handle_action(a)
     if mode == "library" then
         local n = #library.items
         if n > 0 then
+            library.picked = true
             if a == "up" then library.sel = math.max(1, library.sel - 1)
             elseif a == "down" then library.sel = math.min(n, library.sel + 1)
             elseif a == "left" or a == "right" then library.cycle_sort(a == "right" and 1 or -1)
@@ -8963,7 +9008,8 @@ function app.on_hold(side, u, v)
     local saved = look.words
     look.words = look.collect()
     local w = look.hit(side, u, v)
-    if w then look.open(w) else look.words = saved end
+    if w then look.open(w) return true end            -- (true: a drag from here can choose words)
+    look.words = saved
 end
 
 -- A quick tap on the touchscreen (page coordinates of the touched side).
@@ -8981,6 +9027,9 @@ function app.hint_tap(side, u, v)
 end
 
 function app.on_tap(side, u, v)
+    -- (Look-up's buttons first: their tap area meets the hints'.)
+    if app.mode == "lookup" and not app.asking and not app.choosing and (overlay == nil or not overlay.on_tap)
+            and app.look_bar_tap(side, u, v) then return end
     if overlay == nil or not overlay.on_tap then
         if app.hint_tap(side, u, v) then return end
     end
@@ -9075,6 +9124,7 @@ function app.on_tap(side, u, v)
         -- The list: tap a book to see it on the top screen, again to open it.
         for _, r in ipairs((app.library_layout(library.top))) do
             if r.idx and v >= r.y and v < r.y + 96 then
+                library.picked = true
                 if r.idx == library.sel then action("confirm") else library.sel = r.idx; redraw() end
             end
         end
@@ -9085,7 +9135,9 @@ function app.on_tap(side, u, v)
         local cur = look.words[look.sel]
         local _, i
         if cur and side == cur.side then _, i = look.hit(side, u, v) end
-        if i then look.sel = i; look.find(); redraw() else action("back") end
+        -- (Choosing a highlight, a tap that misses a word or button does
+        -- nothing: it shouldn't lose the words chosen.)
+        if i then look.sel = i; look.find(); redraw() elseif not look.hl_start then action("back") end
     elseif mode == "note" then
         -- Another note number on this page: show that one. Anywhere else: close.
         local cur = note.refs[note.sel]
@@ -9327,6 +9379,12 @@ function app.crash_save(msg, trace)
     f:write("version=", VERSION, "\n", "system=", app.system_name(), "\n", "time=", os.date("%Y-%m-%d %H:%M"), "\n",
         "error=", (app.crash_clean(msg):gsub("\n", " ")), "\n", "where=", table.concat(lines, " | "), "\n")
     f:close()
+end
+
+-- A thread that stops with an error: noted, not the crash screen (LÖVE's
+-- own does that). Each thread's owner sees it stopped (getError) and says so.
+function love.threaderror(_, err)
+    print("[thread] " .. tostring(err))
 end
 
 function love.errorhandler(msg)
@@ -9818,11 +9876,11 @@ end
 
 -- What a whole backup would hold (looked at again after 30 seconds).
 function app.backup_size()
-    local now = love.timer.getTime()
-    if not app.bk_size or now - app.bk_size.t > 30 then
+    -- (Worked out when the page opens, not on every draw: it looks at every file.)
+    if not app.bk_size then
         local root, data_dir = app.backup_where()
         local _, total = require("backup").collect(root, data_dir, true)
-        app.bk_size = { t = now, n = total }
+        app.bk_size = { n = total }
     end
     return app.bk_size.n
 end
@@ -9888,6 +9946,10 @@ function app.backup_start(whole)
         app.pending_save()
         Store.save_settings(S)
         local stamp = os.date("%Y-%m-%d-%H%M")
+        -- (One left unfinished, when eReaderDS was closed while backing up.)
+        for _, e in ipairs(require("android").ls(root .. "/Backups")) do
+            if e:match("%.zip%.part$") then os.remove(root .. "/Backups/" .. e) end
+        end
         local out = root .. "/Backups/eReaderDS-backup-" .. stamp .. (whole and "" or "-settings") .. ".zip"
         love.thread.getChannel("backup_out"):clear()
         local t = love.thread.newThread("backupworker.lua")
@@ -9918,8 +9980,14 @@ function app.backup_choose()
         return
     end
     local opts = {}
-    for i = 1, math.min(8, #list) do
-        local b = list[i]
+    -- (Eight at most; the newest automatic copy always among them: the way
+    -- back from the last restore or reset.)
+    local shown = {}
+    for i = 1, math.min(8, #list) do shown[#shown + 1] = list[i] end
+    if #list > 8 and not shown[8].auto then
+        for i = 9, #list do if list[i].auto then shown[8] = list[i] break end end
+    end
+    for _, b in ipairs(shown) do
         opts[#opts + 1] = { app.backup_label(b), function() app.backup_confirm(b) end }
     end
     app.choose({ title = "Restore which backup?", options = opts })
@@ -9945,7 +10013,7 @@ function app.backup_restore(b)
     love.thread.getChannel("backup_out"):clear()
     local t = love.thread.newThread("backupworker.lua")
     t:start({ kind = "restore", zip = b.path, root = root, data_dir = data_dir,
-        before = { out = root .. "/Backups/eReaderDS-before-restore-" .. os.date("%Y-%m-%d-%H%M") .. ".zip",
+        before = { out = root .. "/Backups/eReaderDS-before-restore-" .. os.date("%Y-%m-%d-%H%M%S") .. ".zip",
             manifest = app.backup_manifest(false, root) } })
     app.bk = { kind = "restore", thread = t, done = 0, total = 0 }
     app.toast("Restoring…", 3600)
@@ -9960,11 +10028,13 @@ function app.reset_ask()
             .. "A backup is made first.",
         on_yes = function()
             local root, data_dir = app.backup_where()
+            app.pending_save()             -- (the copy made first has it all, as it is now)
+            Store.save_settings(S)
             Store.frozen = true            -- (nothing of the app's written from here: see backup_restore)
             love.thread.getChannel("backup_out"):clear()
             local t = love.thread.newThread("backupworker.lua")
             t:start({ kind = "reset", root = root, data_dir = data_dir,
-                before = { out = root .. "/Backups/eReaderDS-before-reset-" .. os.date("%Y-%m-%d-%H%M") .. ".zip",
+                before = { out = root .. "/Backups/eReaderDS-before-reset-" .. os.date("%Y-%m-%d-%H%M%S") .. ".zip",
                     manifest = app.backup_manifest(false, root) } })
             app.bk = { kind = "reset", thread = t, done = 0, total = 0 }
             app.toast("Resetting…", 3600)
@@ -9985,8 +10055,10 @@ function app.backup_poll()
             app.bk = nil
             app.bk_size = nil
             if bk.kind == "restore" or bk.kind == "reset" then
-                app.toast((bk.kind == "reset" and "Reset" or "Restored") .. "\neReaderDS is closing: open it again", 3600)
-                app.bk_quit_at = love.timer.getTime() + 3
+                local skipped = (msg.skipped or 0) > 0
+                    and ("\n" .. msg.skipped .. (msg.skipped == 1 and " book" or " books") .. " couldn't be copied") or ""
+                app.toast((bk.kind == "reset" and "Reset" or "Restored") .. skipped .. "\neReaderDS is closing: open it again", 3600)
+                app.bk_quit_at = love.timer.getTime() + (skipped ~= "" and 6 or 3)
             else
                 app.toast("Backed up\n" .. Store.books_folder() .. "/Backups/" .. bk.out:match("([^/]+)$"))
             end
@@ -10451,6 +10523,9 @@ function love.load()
 end
 
 function love.quit()
+    -- A restore or reset going: finished first (its files mustn't be left
+    -- half written).
+    if app.bk and (app.bk.kind == "restore" or app.bk.kind == "reset") then app.bk.thread:wait() end
     -- Android: GammaOS squeezes the last frame onto one screen as DualStack
     -- lets go of a closing app; make that frame black.
     if app.frame_canvas and love.graphics.isActive() then
@@ -10673,7 +10748,7 @@ function love.run()
         if gesture and not lid.closed and not gesture.mode and not gesture.held and gesture.moved < 30
             and app.touch_clock() - gesture.t0 > 0.6 then
             gesture.held = true                -- press and hold
-            app.on_hold(gesture.side, gesture.u0, gesture.v0)
+            gesture.hl_ok = app.on_hold(gesture.side, gesture.u0, gesture.v0)
         end
         if shop.net_poll() then got = true end
         if app.update_poll() then got = true end
@@ -10733,7 +10808,8 @@ function love.run()
         end
         if app.anim or app.task or library.pending or app.covers_waiting > 0 then
             love.timer.sleep(0.001)            -- animating or working: next frame
-        elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or app.cal or (S.idle_min or 0) > 0 then
+        elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or app.cal or app.bk or app.bk_quit_at
+                or (S.idle_min or 0) > 0 then
             -- Touch, the lid and the timers don't wake love.event.wait(), so poll at a gentle rate.
             if got then app.last_input = love.timer.getTime() end
             local nap = gesture and 0.008 or 0.025

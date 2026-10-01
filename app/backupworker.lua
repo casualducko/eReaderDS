@@ -21,7 +21,7 @@ local function progress(done, total)
     end
 end
 
-local ok, err
+local ok, err, skipped
 if job.kind == "reset" then
     local files = Backup.collect(job.root, job.data_dir, false)
     Backup.mkdir_p(job.before.out:match("^(.*)/"))
@@ -39,11 +39,21 @@ elseif job.kind == "backup" then
 else
     -- First, what's here now (settings and reading), in case it was the
     -- wrong backup.
+    -- (Not restored without it: it's the way back. Nor ever over, or pruning,
+    -- the backup being restored.)
     if job.before then
         Backup.mkdir_p(job.before.out:match("^(.*)/"))
-        Backup.write(job.before.out, Backup.collect(job.root, job.data_dir, false), job.before.manifest, job.root)
-        Backup.prune(job.before.out:match("^(.*)/"), 3)
+        if job.before.out == job.zip then job.before.out = job.before.out:gsub("%.zip$", "-2.zip") end
+        ok, err = Backup.write(job.before.out, Backup.collect(job.root, job.data_dir, false), job.before.manifest, job.root)
+        if ok then Backup.prune(job.before.out:match("^(.*)/"), 3, job.zip) end
+    else
+        ok = true
     end
-    ok, err = Backup.restore(job.zip, job.root, job.data_dir, progress)
+    if not ok then
+        err = "a copy of your settings couldn't be made first, so nothing was restored (" .. tostring(err) .. ")"
+    else
+        ok, err = Backup.restore(job.zip, job.root, job.data_dir, progress)
+        skipped = ok and err or 0
+    end
 end
-if ok then out:push({ kind = "done" }) else out:push({ kind = "failed", message = tostring(err) }) end
+if ok then out:push({ kind = "done", skipped = skipped }) else out:push({ kind = "failed", message = tostring(err) }) end

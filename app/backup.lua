@@ -244,11 +244,12 @@ end
 -- The copies made by themselves before a restore or a reset
 -- ("eReaderDS-before-…zip") beyond the newest `keep` are deleted, so they
 -- don't pile up. Your own backups are never touched.
-function M.prune(dir, keep)
+-- (spare: the one being restored, which is never deleted.)
+function M.prune(dir, keep, spare)
     local found = {}
     for _, e in ipairs(list(dir)) do
         local stamp = not e.dir and e.name:match("^eReaderDS%-before%-%a+%-(%d+%-%d+%-%d+%-%d+)%.zip$")
-        if stamp then found[#found + 1] = { name = e.name, stamp = stamp } end
+        if stamp and dir .. "/" .. e.name ~= spare then found[#found + 1] = { name = e.name, stamp = stamp } end
     end
     table.sort(found, function(a, b) return a.stamp > b.stamp end)
     for i = keep + 1, #found do os.remove(dir .. "/" .. found[i].name) end
@@ -273,77 +274,143 @@ function M.manifest(path)
     return t
 end
 
--- Put a backup's files back: the data files into data_dir (with {BOOKS} made
--- the books folder, root, again), everything else into root by its place
--- there. A book already there at the same size isn't copied again.
--- progress(done, total). True, or nil and why.
+-- Put a backup's files back: everything but the data files into root by
+-- its place there (a book already there at the same size isn't copied
+-- again; one that can't be written, such as a name this card can't hold, is
+-- skipped and counted), then the data files into data_dir (with {BOOKS} made
+-- the books folder, root, again), all at once: each written beside its old
+-- one first, so a failure leaves the settings as they were. Data files the
+-- backup doesn't have are removed (they become the backup's). This device's
+-- own ids (for sync and Calibre) are kept, so a backup from another device
+-- doesn't make two of the same. progress(done, total).
+-- True and how many books were skipped, or nil and why.
+local function safe_name(name)
+    if name:match("^/") then return false end
+    for part in (name .. "/"):gmatch("([^/]*)/") do
+        if part == "" or part == ".." or part == "." then return false end
+    end
+    return true
+end
+
+local function read_file(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local s = f:read("*a")
+    f:close()
+    return s
+end
+
+local LOGINS = { ["opds.txt"] = true, ["calibre.json"] = true }
+
 function M.restore(path, root, data_dir, progress)
     local ok, zf = pcall(require("zip").open, path)
     if not ok or not zf then return nil, "couldn't read the backup" end
     if not zf.entries[M.MANIFEST] then zf:close(); return nil, "that isn't an eReaderDS backup" end
-    local total, done = 0, 0
-    for _, e in pairs(zf.entries) do total = total + e.usize end
-    local function fail(why) zf:close(); return nil, why end
+    local total, done, skipped = 0, 0, 0
+    local data = {}
     for name, e in pairs(zf.entries) do
         if name ~= M.MANIFEST and not name:match("/$") then
-            -- (Never outside the books folder: no "..", no absolute names.)
-            if name:find("..", 1, true) or name:match("^/") then return fail("the backup has a bad file name") end
+            -- (Never outside the books folder: no ".." parts, no absolute names.)
+            if not safe_name(name) then zf:close(); return nil, "the backup has a bad file name" end
+            total = total + e.usize
             local data_name = name:match("^%.ereaderds/([^/]+)$")
-            if data_name then
-                local text = zf:read(name)
-                if not text then return fail("couldn't read " .. name .. " from the backup") end
-                local parts, i = {}, 1
-                while true do
-                    local a, b = text:find(M.TOKEN .. "/", i, true)
-                    if not a then parts[#parts + 1] = text:sub(i) break end
-                    parts[#parts + 1] = text:sub(i, a - 1) .. root .. "/"
-                    i = b + 1
-                end
-                M.mkdir_p(data_dir)
-                local f = io.open(data_dir .. "/" .. data_name, "wb")
-                if not f then return fail("couldn't write the settings") end
-                local w = f:write(table.concat(parts))
-                if not (f:close() and w) then return fail("couldn't write the settings (is the SD card full?)") end
-            elseif not name:match("^%.") then
-                local dest = root .. "/" .. name
-                if size_of(dest) ~= e.usize then
-                    M.mkdir_p(dest:match("^(.*)/"))
-                    local f = io.open(dest .. ".part", "wb")
-                    if not f then return fail("couldn't write " .. name) end
-                    local wrote = true
-                    if e.method == 0 then
-                        -- Stored: copied a piece at a time.
-                        local src = zf.file
-                        src:seek("set", e.offset)
-                        local hdr = src:read(30)
-                        if not hdr or hdr:sub(1, 4) ~= "PK\3\4" then f:close(); os.remove(dest .. ".part"); return fail("the backup is damaged") end
-                        src:seek("cur", hdr:byte(27) + hdr:byte(28) * 256 + hdr:byte(29) + hdr:byte(30) * 256)
-                        local left = e.csize
-                        while left > 0 do
-                            local chunk = src:read(math.min(CHUNK, left))
-                            if not chunk or #chunk == 0 then wrote = false break end
-                            if not f:write(chunk) then wrote = false break end
-                            left = left - #chunk
-                            done = done + #chunk
-                            if progress then progress(done, total) end
-                        end
-                    else
-                        local data = zf:read(name)
-                        if not data or not f:write(data) then wrote = false end
-                        done = done + e.usize
-                    end
-                    if not f:close() then wrote = false end
-                    if not wrote then os.remove(dest .. ".part"); return fail("couldn't copy " .. name .. " (is the SD card full?)") end
-                    os.remove(dest)
-                    if not os.rename(dest .. ".part", dest) then return fail("couldn't save " .. name) end
-                else
-                    done = done + e.usize
-                end
-            end
+            if data_name and data_file(data_name) then data[#data + 1] = { name = name, data_name = data_name } end
         end
     end
+    local function fail(why) zf:close(); return nil, why end
+    -- The books (and the rest of the books folder).
+    for name, e in pairs(zf.entries) do
+        if name ~= M.MANIFEST and not name:match("/$") and not name:match("^%.") then
+            local dest, start = root .. "/" .. name, done
+            if size_of(dest) ~= e.usize then
+                M.mkdir_p(dest:match("^(.*)/"))
+                local f = io.open(dest .. ".part", "wb")
+                local wrote = f ~= nil
+                if f and e.method == 0 then
+                    -- Stored: copied a piece at a time.
+                    local src = zf.file
+                    src:seek("set", e.offset)
+                    local hdr = src:read(30)
+                    if not hdr or hdr:sub(1, 4) ~= "PK\3\4" then f:close(); os.remove(dest .. ".part"); return fail("the backup is damaged") end
+                    src:seek("cur", hdr:byte(27) + hdr:byte(28) * 256 + hdr:byte(29) + hdr:byte(30) * 256)
+                    local left = e.csize
+                    while left > 0 do
+                        local chunk = src:read(math.min(CHUNK, left))
+                        if not chunk or #chunk == 0 then wrote = false break end
+                        if not f:write(chunk) then wrote = false break end
+                        left = left - #chunk
+                        done = done + #chunk
+                        if progress then progress(done, total) end
+                    end
+                elseif f then
+                    local d = zf:read(name)
+                    if not d or not f:write(d) then wrote = false end
+                end
+                if f and not f:close() then wrote = false end
+                if wrote then
+                    os.remove(dest)
+                    wrote = os.rename(dest .. ".part", dest)
+                end
+                if not wrote then
+                    os.remove(dest .. ".part")
+                    skipped = skipped + 1
+                    print("[backup] couldn't restore " .. name)
+                end
+            end
+            done = start + e.usize
+            if progress then progress(done, total) end
+        end
+    end
+    -- The data files: each written as .tmp first; only when all are there do
+    -- they replace the old ones.
+    M.mkdir_p(data_dir)
+    local mine = {
+        ["settings.txt"] = { "\nkosync_device=[^\n]*", read_file(data_dir .. "/settings.txt") },
+        ["calibre.json"] = { '"uuid"%s*:%s*"[^"]*"', read_file(data_dir .. "/calibre.json") },
+    }
+    local written, from_backup = {}, {}
+    local function undo() for _, n in ipairs(written) do os.remove(data_dir .. "/" .. n .. ".tmp") end end
+    for _, d in ipairs(data) do
+        local text = zf:read(d.name)
+        if not text then undo(); return fail("couldn't read " .. d.name .. " from the backup") end
+        local parts, i = {}, 1
+        while true do
+            local a, b = text:find(M.TOKEN .. "/", i, true)
+            if not a then parts[#parts + 1] = text:sub(i) break end
+            parts[#parts + 1] = text:sub(i, a - 1) .. root .. "/"
+            i = b + 1
+        end
+        text = table.concat(parts)
+        local keep = mine[d.data_name]
+        local own = keep and keep[2] and ("\n" .. keep[2]):match(keep[1])
+        if own then
+            local n
+            text, n = ("\n" .. text):gsub(keep[1], function() return own end, 1)
+            text = text:sub(2)
+            if n == 0 and d.data_name == "settings.txt" then text = text:gsub("([^\n])$", "%1\n") .. own:sub(2) .. "\n" end
+        end
+        local f = io.open(data_dir .. "/" .. d.data_name .. ".tmp", "wb")
+        if not f then undo(); return fail("couldn't write the settings") end
+        written[#written + 1] = d.data_name
+        local w = f:write(text)
+        if not (f:close() and w) then undo(); return fail("couldn't write the settings (is the SD card full?)") end
+        from_backup[d.data_name] = true
+    end
     zf:close()
-    return true
+    for _, e in ipairs(list(data_dir)) do
+        -- (Not logins the backup hasn't any of: the question doesn't say they go.)
+        if not e.dir and data_file(e.name) and not from_backup[e.name] and not LOGINS[e.name] then
+            os.remove(data_dir .. "/" .. e.name)
+        end
+    end
+    for _, n in ipairs(written) do
+        local p = data_dir .. "/" .. n
+        if not os.rename(p .. ".tmp", p) then
+            os.remove(p)
+            if not os.rename(p .. ".tmp", p) then return nil, "couldn't save " .. n end
+        end
+    end
+    return true, skipped
 end
 
 return M

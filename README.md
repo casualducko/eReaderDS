@@ -377,7 +377,12 @@ it to another handheld or system:
   the ones before a reset) the newest 3 are kept.
 - **Another handheld or system:** copy the zip into its `Ebook/Backups` and
   restore. Books are found by their place in the books folder, so a backup
-  from the stock firmware restores on ROCKNIX or GammaOS.
+  from the stock firmware restores on ROCKNIX or GammaOS. The handheld keeps
+  its own sync and Calibre identity. A book whose name the card can't hold
+  (such as `:` from ROCKNIX onto the stock firmware's card) is skipped, and
+  the message says how many were.
+- If a restore can't finish, your settings are left as they were. Closing
+  eReaderDS while it restores waits for it to finish.
 - **Reset eReaderDS** (Start fresh) clears everything it has saved, like a
   new install, but not your books, fonts or dictionaries. A backup is made
   first (`eReaderDS-before-reset-….zip`), so Restore can undo it.
