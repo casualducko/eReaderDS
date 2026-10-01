@@ -375,7 +375,8 @@ it to another handheld or system:
   were are saved first (`eReaderDS-before-restore-….zip`), in case it was the
   wrong one. The list shows each backup's date, its kind, the system it
   came from if it's another, and "nothing read yet" for one with no place in
-  any book (such as one made just after a reset); yours come first. Of these automatic copies (and
+  any book (such as one made just after a reset). Yours come first (those
+  made on this system, then those from another), then the automatic copies. Of these automatic copies (and
   the ones before a reset) the newest 3 are kept.
 - **Another handheld or system:** copy the zip into its `Ebook/Backups` and
   restore. Books are found by their place in the books folder, so a backup

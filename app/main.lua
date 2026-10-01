@@ -9971,11 +9971,17 @@ function app.backup_list()
             end
         end
     end
-    -- Yours first, newest first; then the copies made by themselves before
-    -- a restore or a reset.
-    for _, b in ipairs(out) do b.auto = b.name:match("^eReaderDS%-before%-") ~= nil end
+    -- Yours first, newest first: those made here, then those from another
+    -- system (its clock may not agree with this one's); then the copies made
+    -- by themselves before a restore or a reset.
+    local here = app.system_name()
+    for _, b in ipairs(out) do
+        b.auto = b.name:match("^eReaderDS%-before%-") ~= nil
+        b.here = b.info.system == nil or b.info.system == here
+    end
     table.sort(out, function(a, b)
         if a.auto ~= b.auto then return not a.auto end
+        if a.here ~= b.here then return a.here end
         return (a.info.date or "") > (b.info.date or "")
     end)
     return out
