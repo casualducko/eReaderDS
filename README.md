@@ -327,8 +327,10 @@ in the highlighted one on the top screen. **A** uses it. Along the title,
   - **Name**: tap it (or A) to type one; the **×** clears it.
   - **Page color** / **Text color**: which one the rest changes (**Y**
     switches).
-  - A row of colors to start from (the rainbow, soft for a light page, deep
-    for a dark one; the other way round for the text).
+  - A row of colors to start from, picked for reading: soft page colors
+    (Paper, Cream, Sepia, Sage, Mist Blue…) and inks to match for a light
+    page; deep ones (Charcoal, Espresso, Navy Night…) and soft whites, amber
+    or night red for a dark one.
   - **Brightness**, **Warmth** (cooler to warmer) and **Tint** (greener to
     pinker), like adjusting a photo: drag them, or press left/right (hold to
     keep going). Warmth and Tint are neutral in the middle.

@@ -3675,25 +3675,38 @@ app.TEDIT_SLIDERS = { { "Brightness", 0, 100, "Darker", "Lighter" }, { "Warmth",
 app.TEDIT_CHROMA = 0.2           -- OKLab a/b at the ends of Warmth and Tint
 -- The editor's rows, top to bottom (up/down move between them).
 app.TEDIT_ROW = { name = 1, which = 2, picks = 3, slider = 4, buttons = 7 }     -- (sliders: 4, 5, 6)
--- Ready-made colours to start from: the rainbow (and neutral). For a light
--- page: soft page colours and deep text ones; for a dark page: deep page
--- colours and light text ones. { name, hue angle in OKLab (nil: neutral) }.
-app.TEDIT_PICKS = { { "Neutral" }, { "Red", 29 }, { "Orange", 55 }, { "Yellow", 100 }, { "Green", 142 },
-    { "Blue", 255 }, { "Purple", 305 }, { "Pink", 350 } }
--- { brightness, colourfulness, neutral's brightness } for each.
-app.TEDIT_PICK_LOOK = {
-    light = { bg = { 93, 0.045, 97 }, fg = { 38, 0.10, 15 } },
-    dark = { bg = { 24, 0.035, 14 }, fg = { 86, 0.06, 90 } },
+-- Ready-made colours to start from, chosen for reading: muted page
+-- colours (a faint tint is easier on the eyes than a strong one) and inks
+-- to match, for a light page and for a dark one (where the text is a soft,
+-- warm white rather than glaring white, or amber or red for night). The
+-- first page and text colours of each are the Light and Dark starts.
+-- { name, r, g, b }; eight in each.
+app.TEDIT_SETS = {
+    light = {
+        bg = { { "Paper", 0.969, 0.957, 0.925 }, { "Cream", 0.961, 0.929, 0.839 }, { "Sepia", 0.918, 0.859, 0.753 },
+            { "Stone", 0.894, 0.890, 0.875 }, { "Sage", 0.875, 0.910, 0.847 }, { "Mist Blue", 0.867, 0.910, 0.941 },
+            { "Lavender", 0.910, 0.890, 0.941 }, { "Blush", 0.953, 0.882, 0.875 } },
+        fg = { { "Ink", 0.122, 0.114, 0.102 }, { "Graphite", 0.227, 0.227, 0.227 }, { "Sepia Brown", 0.357, 0.275, 0.212 },
+            { "Navy", 0.118, 0.165, 0.267 }, { "Forest", 0.137, 0.220, 0.165 }, { "Plum", 0.243, 0.141, 0.263 },
+            { "Slate", 0.204, 0.251, 0.298 }, { "Burgundy", 0.353, 0.122, 0.153 } },
+    },
+    dark = {
+        bg = { { "Charcoal", 0.110, 0.110, 0.118 }, { "Black", 0, 0, 0 }, { "Espresso", 0.165, 0.129, 0.098 },
+            { "Graphite", 0.169, 0.176, 0.188 }, { "Navy Night", 0.078, 0.106, 0.176 }, { "Pine", 0.086, 0.141, 0.114 },
+            { "Aubergine", 0.141, 0.102, 0.169 }, { "Deep Teal", 0.078, 0.141, 0.153 } },
+        fg = { { "Soft White", 0.902, 0.894, 0.875 }, { "Warm Cream", 0.910, 0.863, 0.761 }, { "Amber", 0.898, 0.647, 0.353 },
+            { "Silver", 0.722, 0.737, 0.761 }, { "Ice Blue", 0.765, 0.839, 0.933 }, { "Mint", 0.749, 0.890, 0.784 },
+            { "Rose", 0.922, 0.765, 0.796 }, { "Night Red", 0.816, 0.271, 0.227 } },
+    },
 }
+app.TEDIT_PICKS = app.TEDIT_SETS.light.bg          -- (how many there are: the same in each)
 
--- Pick i as a colour { brightness, warmth, tint } for the page or the text,
--- on a light page or a dark one (dark: the page colour's brightness < 50).
+-- Pick i for the page or the text, on a light page or a dark one (dark: the
+-- page colour's brightness < 50): its name, and the colour { brightness,
+-- warmth, tint }.
 function app.tedit_pick_colour(i, which, dark)
-    local p, look = app.TEDIT_PICKS[i], app.TEDIT_PICK_LOOK[dark and "dark" or "light"][which]
-    if not p[2] then return { look[3], 0, 0 } end
-    local h = math.rad(p[2])
-    local function clamp(v) return math.max(-100, math.min(100, math.floor(v + 0.5))) end
-    return { look[1], clamp(look[2] * math.sin(h) / app.TEDIT_CHROMA * 100), clamp(look[2] * math.cos(h) / app.TEDIT_CHROMA * 100) }
+    local p = app.TEDIT_SETS[dark and "dark" or "light"][which][i]
+    return app.rgb_lab(p[2], p[3], p[4]), p[1]
 end
 
 -- OKLab <-> sRGB (Björn Ottosson's formulas); colours off the screen's
@@ -3802,10 +3815,14 @@ function app.theme_free_name(base, except)
 end
 
 -- Where a new theme can start: light or dark, to tweak.
-app.TEDIT_TEMPLATES = {
-    { "Light", { name = "My Light Theme", fg = { 0.16, 0.15, 0.14 }, bg = { 0.96, 0.95, 0.92 } } },
-    { "Dark", { name = "My Dark Theme", fg = { 0.82, 0.80, 0.76 }, bg = { 0.11, 0.11, 0.12 } } },
-}
+-- (The first colours of each set: Paper and Ink, Charcoal and Soft White.)
+do
+    local function first(set, which) local p = app.TEDIT_SETS[set][which][1]; return { p[2], p[3], p[4] } end
+    app.TEDIT_TEMPLATES = {
+        { "Light", { name = "My Light Theme", fg = first("light", "fg"), bg = first("light", "bg") } },
+        { "Dark", { name = "My Dark Theme", fg = first("dark", "fg"), bg = first("dark", "bg") } },
+    }
+end
 
 -- New Theme: light or dark to start from.
 function app.tedit_new()
@@ -4130,6 +4147,11 @@ function app.tedit_draw(side)
             love.graphics.circle("line", cx, cy, r + 1)
             love.graphics.setLineWidth(1)
         end
+    end
+    if e.pick then
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf(select(2, app.tedit_pick_colour(e.pick, e.which, dark)), x, L.picks.y + L.picks.h + 2, w, "center")
     end
     -- The sliders: rounded tracks showing the colours they lead to.
     local hsl = e[e.which]
