@@ -59,7 +59,7 @@ else
         err = "a copy of your settings couldn't be made first, so nothing was restored (" .. tostring(err) .. ")"
     else
         step("Restoring…")
-        ok, err = Backup.restore(job.zip, job.root, job.data_dir, progress)
+        ok, err = Backup.restore(job.zip, job.root, job.data_dir, progress, job.same_system)
         skipped = ok and err or 0
     end
 end

@@ -282,7 +282,9 @@ end
 -- one first, so a failure leaves the settings as they were. Data files the
 -- backup doesn't have are removed (they become the backup's). This device's
 -- own ids (for sync and Calibre) are kept, so a backup from another device
--- doesn't make two of the same. progress(done, total).
+-- doesn't make two of the same; with none yet (after a reset) it takes the
+-- backup's only when same_system (it was made here), else a new one is made.
+-- progress(done, total).
 -- True and how many books were skipped, or nil and why.
 local function safe_name(name)
     if name:match("^/") then return false end
@@ -302,7 +304,7 @@ end
 
 local LOGINS = { ["opds.txt"] = true, ["calibre.json"] = true }
 
-function M.restore(path, root, data_dir, progress)
+function M.restore(path, root, data_dir, progress, same_system)
     local ok, zf = pcall(require("zip").open, path)
     if not ok or not zf then return nil, "couldn't read the backup" end
     if not zf.entries[M.MANIFEST] then zf:close(); return nil, "that isn't an eReaderDS backup" end
@@ -367,8 +369,11 @@ function M.restore(path, root, data_dir, progress)
     local mine = {
         -- (Only an id there is: after a reset there's none yet, and the
         -- backup's, from this device, is the one to have.)
-        ["settings.txt"] = { "\nkosync_device=[^\n]+", read_file(data_dir .. "/settings.txt") },
-        ["calibre.json"] = { '"uuid"%s*:%s*"[^"]+"', read_file(data_dir .. "/calibre.json") },
+        -- { this device's (an id there), the file now, none, the backup's (to replace) }
+        ["settings.txt"] = { "\nkosync_device=[^\n]+", read_file(data_dir .. "/settings.txt"), "\nkosync_device=",
+            "\nkosync_device=[^\n]*" },
+        ["calibre.json"] = { '"uuid"%s*:%s*"[^"]+"', read_file(data_dir .. "/calibre.json"), '"uuid":""',
+            '"uuid"%s*:%s*"[^"]*"' },
     }
     local written, from_backup = {}, {}
     local function undo() for _, n in ipairs(written) do os.remove(data_dir .. "/" .. n .. ".tmp") end end
@@ -385,9 +390,11 @@ function M.restore(path, root, data_dir, progress)
         text = table.concat(parts)
         local keep = mine[d.data_name]
         local own = keep and keep[2] and ("\n" .. keep[2]):match(keep[1])
+        -- (None here, and the backup is from another system: not its id.)
+        if keep and not own and not same_system then own = keep[3] end
         if own then
             local n
-            text, n = ("\n" .. text):gsub(keep[1], function() return own end, 1)
+            text, n = ("\n" .. text):gsub(keep[4], function() return own end, 1)
             text = text:sub(2)
             if n == 0 and d.data_name == "settings.txt" then text = text:gsub("([^\n])$", "%1\n") .. own:sub(2) .. "\n" end
         end

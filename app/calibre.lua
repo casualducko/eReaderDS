@@ -61,7 +61,7 @@ local function load_store()
     if f then ok, s = pcall(json.decode, f:read("*a")); f:close() end
     store = ok and type(s) == "table" and s or {}
     store.books = type(store.books) == "table" and store.books or {}
-    if not store.uuid then
+    if type(store.uuid) ~= "string" or store.uuid == "" then      -- (none, or cleared by a restore from another system)
         local h = love.data.encode("string", "hex", love.data.hash("md5", tostring(os.time()) .. tostring(math.random())))
         store.uuid = h:sub(1, 8) .. "-" .. h:sub(9, 12) .. "-" .. h:sub(13, 16) .. "-" .. h:sub(17, 20) .. "-" .. h:sub(21, 32)
     end

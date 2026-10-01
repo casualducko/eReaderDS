@@ -10098,6 +10098,7 @@ function app.backup_restore(b)
     love.thread.getChannel("backup_out"):clear()
     local t = love.thread.newThread("backupworker.lua")
     t:start({ kind = "restore", zip = b.path, root = root, data_dir = data_dir, android = require("android").active,
+        same_system = b.info.system == app.system_name(),
         before = { out = root .. "/Backups/eReaderDS-before-restore-" .. os.date("%Y-%m-%d-%H%M%S") .. ".zip",
             manifest = app.backup_manifest(false, root) } })
     app.bk = { kind = "restore", thread = t, done = 0, total = 0 }
