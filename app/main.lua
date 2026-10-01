@@ -3497,9 +3497,11 @@ function app.theme_set_filter(filter, keep)
         T.list[1] = app.NEW_THEME
         for _, t in ipairs(THEMES) do if t.custom and not t.hidden then T.list[#T.list + 1] = t end end
     else
+        -- Built-in themes and yours together, A to Z.
         for _, t in ipairs(THEMES) do
-            if not t.custom and (filter == "all" or app.theme_kind(t) == filter) then T.list[#T.list + 1] = t end
+            if not t.hidden and (filter == "all" or app.theme_kind(t) == filter) then T.list[#T.list + 1] = t end
         end
+        table.sort(T.list, function(a, b) return a.name:lower() < b.name:lower() end)
     end
     T.sel, T.top = 1, 1
     for i, t in ipairs(T.list) do if t.name == keep then T.sel = i end end
@@ -3529,9 +3531,8 @@ function app.theme_action(a)
     local T = app.themes
     if a == "toc" then
         local t = T.list[T.sel]
-        if T.filter == "custom" then                          -- Y: change one of yours
-            if t and t.custom then app.tedit_open(t) end
-        elseif t then                                         -- Y: copy a theme to change
+        if t and t.custom then app.tedit_open(t)                 -- Y: change one of yours
+        elseif t and not t.new then                           -- Y: copy a built-in one to change
             app.tedit_open(nil, { name = "My " .. t.name, fg = t.fg, bg = t.bg })
         end
         return
@@ -3628,6 +3629,14 @@ function app.theme_draw(side)
         love.graphics.printf("Aa", rx, centered_y(ui.font, UI_SIZE, sy, sh), sw, "center")
         color(th.fg)
         love.graphics.print(t.name, rx + sw + 24, centered_y(ui.font, UI_SIZE, ry, h))
+        if t.custom and T.filter ~= "custom" then
+            -- One of yours, among the built-in ones: a small tag after its name.
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.print("Custom", rx + sw + 24 + ui.font:getWidth(t.name) + 14,
+                centered_y(ui.small, SMALL_SIZE, ry, h))
+            love.graphics.setFont(ui.font)
+        end
         if t.name == cur then
             color(th.dim)
             love.graphics.printf("✓", rx, centered_y(ui.font, UI_SIZE, ry, h), rw, "right")
@@ -3636,7 +3645,8 @@ function app.theme_draw(side)
     if T.filter == "custom" then
         app.hints(x, nil, { "A", T.list[T.sel] and T.list[T.sel].new and "new" or "use", "Y", "change", "‹ ›", "filter", "B", "back" })
     else
-        app.hints(x, nil, { "A", "use", "Y", "copy", "‹ ›", "filter", "B", "back" })
+        local t = T.list[T.sel]
+        app.hints(x, nil, { "A", "use", "Y", t and t.custom and "change" or "copy", "‹ ›", "filter", "B", "back" })
     end
     if T.filter ~= "custom" then app.count(x, w, T.sel, #T.list) end
 end
