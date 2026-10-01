@@ -209,7 +209,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
    **This book:** Table of Contents, Bookmarks and Highlights, Find in Book,
    Jump to %, and **Sync with KOReader** when sync is on. **Reading:** Brightness, Text size,
    **Theme** (tap it or press A: a page of all the themes, your book previewed
-   in each), **Fonts** (its own page, [below](#fonts)). (**Update to v…** is
+   in each, and your own; [below](#themes)), **Fonts** (its own page,
+   [below](#fonts)). (**Update to v…** is
    first in This book when one is waiting.)
 2. What's set once. **Page layout:** Line spacing, Margins, Top/bottom
    margins, Justify text, Hyphenation. **More settings:** **Night Mode**
@@ -228,8 +229,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   ink, so it sits on any theme instead of in a white box);
   justified text with optional hyphenation (English); 18 built-in fonts plus
   your own; 25 themes (Sepia by default, plus E-ink, Paper, Mint, Sky,
-  Midnight, Gruvbox, Nord, Red Night and more), picked on a page that shows
-  your book in each, which the whole app follows; Night Mode, another theme
+  Midnight, Gruvbox, Nord, Red Night and more), grouped into Light and Dark
+  and picked on a page that shows your book in each, which the whole app
+  follows, and [themes of your own](#themes); Night Mode, another theme
   that switches on by itself in the evening; page-flip or fade animation.
   Letters that some older books draw as tiny pictures (for characters their
   fonts lacked) stay in the line and take the theme's ink, and characters a
@@ -287,8 +289,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 
 ## On-screen keyboard
 
-Searching (Find in Book, Get Books) and signing in to KOReader Sync use a
-keyboard on the touchscreen. Tap the keys, or move with the D-pad and press
+Searching (Find in Book, Get Books), naming a theme and signing in to
+KOReader Sync use a keyboard on the touchscreen. Tap the keys, or move with the D-pad and press
 A; **B** deletes (and closes the keyboard when the field is empty), **Y**
 types a space, and **Start** or **X** confirms. The top screen lists the
 buttons for the field you're in.
@@ -299,15 +301,50 @@ buttons for the field you're in.
 - **Moving in the text:** tap where you want the cursor, or press up from
   the top row of keys to reach the text, then left/right; down goes back to
   the keys. Typing, deleting and spaces happen at the cursor.
+- **×** at the end of the text clears it (tap it, or A while the D-pad is on
+  the text).
+- **Cancel** is across the bottom; if you've typed something new, it asks
+  before throwing it away.
 - **Passwords** show as dots; the **eye** at the end of the field shows what
   you've typed (tap it, or A while the D-pad is on the text).
 - **Web addresses** (your own sync server) get a row of **https://**,
   **http://**, **www.**, **.com**, **:** and **/** keys.
 
+## Themes
+
+**Settings → Theme** shows every theme with a swatch, your book previewed
+in the highlighted one on the top screen. **A** uses it. Along the title,
+**All · Light · Dark · Custom** narrow the list: press left/right, or tap one.
+
+**Custom** holds themes you make:
+
+- **New Theme** asks **Light** or **Dark** to start from. Or, on any other
+  list, press **Y** on a theme to **copy** it (say, Sepia that's almost
+  right) and change the copy.
+- **Y** on one of yours changes it.
+- In the editor, the top screen shows your book in the colors as you go:
+  - **Name**: tap it (or A) to type one; the **×** clears it.
+  - **Page color** / **Text color**: which one the rest changes (**Y**
+    switches).
+  - A row of colors to start from (the rainbow, soft for a light page, deep
+    for a dark one; the other way round for the text).
+  - **Brightness**, **Warmth** (cooler to warmer) and **Tint** (greener to
+    pinker), like adjusting a photo: drag them, or press left/right (hold to
+    keep going). Warmth and Tint are neutral in the middle.
+  - **Reset Colors** goes back to the light or dark start; **Delete Theme**
+    removes one of yours. Both ask first.
+- **A** saves the theme and uses it. **B** goes back; if you've changed
+  anything it asks first, and B again keeps editing.
+
+The Themes pages themselves stay plain (white, or dark when your theme is
+dark), so a tinted theme doesn't color the swatches. Your themes are kept
+in `Ebook/.ereaderds/themes.txt` (on ROCKNIX `ebook/.ereaderds`; on GammaOS
+`Ebook/.ereaderds` in the device's storage), and work as the night theme too.
+
 ## Night Mode
 
 **Settings → Night Mode** picks a second theme (a dark one such as
-Midnight, Dark Sepia, Gruvbox or Red Night) and the hours to use it, 9 PM to
+Midnight, Dark Sepia, Gruvbox or Red Night, or one of your own) and the hours to use it, 9 PM to
 7 AM to start. It switches on the hour by the device's clock, and the whole
 app changes with it. While picking, the touchscreen previews each theme. At night, the
 **Theme** row changes the night theme (it says "(night)"), so your daytime

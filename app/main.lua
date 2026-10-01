@@ -2305,7 +2305,7 @@ end
 
 -- A sync message: what happened in bold, then the details.
 function app.sync_say(head, detail, secs)
-    app.toast(detail and detail ~= "" and (head .. "\n" .. detail) or head, secs or (detail and 4 or 2))
+    app.toast(detail and detail ~= "" and (head .. "\n" .. detail) or head, secs)
 end
 
 -- The server's answers usable? Says why not when asked by hand (now).
@@ -2904,6 +2904,13 @@ function app.night_preview(side)
     end
     -- Making a theme: the book in its colours as they change.
     if side == "left" and app.mode == "theme_edit" then return app.EDIT_THEME.name end
+    -- The Themes pages themselves on a neutral page (White, or Midnight when
+    -- the current theme is dark), so a tinted theme doesn't colour the
+    -- swatches and sliders, without a bright flash at night.
+    if side == "right" and (app.mode == "themes" or app.mode == "theme_edit") then
+        local cur = app.theme_named(app.theme_current()) or THEMES[1]
+        return app.theme_kind(cur) == "dark" and "Midnight" or "White"
+    end
 end
 
 
@@ -3654,17 +3661,23 @@ app.TEDIT_SLIDERS = { { "Brightness", 0, 100, "Darker", "Lighter" }, { "Warmth",
     { "Tint", -100, 100, "Greener", "Pinker" } }
 app.TEDIT_CHROMA = 0.2           -- OKLab a/b at the ends of Warmth and Tint
 -- The editor's rows, top to bottom (up/down move between them).
-app.TEDIT_ROW = { name = 1, which = 2, picks = 3, slider = 4, delete = 7 }      -- (sliders: 4, 5, 6)
--- Ready-made colours to start from: the rainbow (and neutral), soft for the
--- page and deep for the text. { name, hue angle in OKLab (nil: neutral) }.
+app.TEDIT_ROW = { name = 1, which = 2, picks = 3, slider = 4, buttons = 7 }     -- (sliders: 4, 5, 6)
+-- Ready-made colours to start from: the rainbow (and neutral). For a light
+-- page: soft page colours and deep text ones; for a dark page: deep page
+-- colours and light text ones. { name, hue angle in OKLab (nil: neutral) }.
 app.TEDIT_PICKS = { { "Neutral" }, { "Red", 29 }, { "Orange", 55 }, { "Yellow", 100 }, { "Green", 142 },
     { "Blue", 255 }, { "Purple", 305 }, { "Pink", 350 } }
-app.TEDIT_PICK_LOOK = { bg = { 93, 0.045 }, fg = { 38, 0.10 } }    -- brightness, colourfulness
+-- { brightness, colourfulness, neutral's brightness } for each.
+app.TEDIT_PICK_LOOK = {
+    light = { bg = { 93, 0.045, 97 }, fg = { 38, 0.10, 15 } },
+    dark = { bg = { 24, 0.035, 14 }, fg = { 86, 0.06, 90 } },
+}
 
--- Pick i as a colour { brightness, warmth, tint } for the page or the text.
-function app.tedit_pick_colour(i, which)
-    local p, look = app.TEDIT_PICKS[i], app.TEDIT_PICK_LOOK[which]
-    if not p[2] then return { which == "bg" and 97 or 15, 0, 0 } end
+-- Pick i as a colour { brightness, warmth, tint } for the page or the text,
+-- on a light page or a dark one (dark: the page colour's brightness < 50).
+function app.tedit_pick_colour(i, which, dark)
+    local p, look = app.TEDIT_PICKS[i], app.TEDIT_PICK_LOOK[dark and "dark" or "light"][which]
+    if not p[2] then return { look[3], 0, 0 } end
     local h = math.rad(p[2])
     local function clamp(v) return math.max(-100, math.min(100, math.floor(v + 0.5))) end
     return { look[1], clamp(look[2] * math.sin(h) / app.TEDIT_CHROMA * 100), clamp(look[2] * math.cos(h) / app.TEDIT_CHROMA * 100) }
@@ -3777,8 +3790,8 @@ end
 
 -- Where a new theme can start: light or dark, to tweak.
 app.TEDIT_TEMPLATES = {
-    { "Light: dark text on a light page", { name = "My Light Theme", fg = { 0.16, 0.15, 0.14 }, bg = { 0.96, 0.95, 0.92 } } },
-    { "Dark: light text on a dark page", { name = "My Dark Theme", fg = { 0.82, 0.80, 0.76 }, bg = { 0.11, 0.11, 0.12 } } },
+    { "Light", { name = "My Light Theme", fg = { 0.16, 0.15, 0.14 }, bg = { 0.96, 0.95, 0.92 } } },
+    { "Dark", { name = "My Dark Theme", fg = { 0.82, 0.80, 0.76 }, bg = { 0.11, 0.11, 0.12 } } },
 }
 
 -- New Theme: light or dark to start from.
@@ -3807,12 +3820,28 @@ function app.tedit_open(t, from)
         which = "bg",
         row = app.TEDIT_ROW.picks,
     }
+    app.tedit.start = app.tedit_state()           -- (to tell whether anything changed)
     app.theme_colours(app.EDIT_THEME, app.tedit.fg, app.tedit.bg)
     app.mode = "theme_edit"
     redraw()
 end
 
-function app.tedit_rows() return app.tedit.theme and app.TEDIT_ROW.delete or app.TEDIT_ROW.delete - 1 end
+-- The name and colours as one string (to see whether anything changed).
+function app.tedit_state()
+    local e = app.tedit
+    return e.name .. "|" .. app.colour_string(e.fg) .. "|" .. app.colour_string(e.bg)
+end
+
+-- B: back to the list. With changes, a card asks first; B there (or a tap
+-- elsewhere) keeps editing, so pressing B twice never loses anything.
+function app.tedit_cancel()
+    local e = app.tedit
+    if app.tedit_state() == e.start then app.tedit_close() return end
+    app.ask({ question = "Discard your changes?", detail = e.theme and e.theme.name or "This new theme isn't saved yet.",
+        yes = "Discard", no = "Keep Editing", on_yes = function() app.tedit_close() end })
+end
+
+function app.tedit_rows() return app.TEDIT_ROW.buttons end
 
 function app.tedit_close(saved)
     local back = app.tedit and app.tedit.back or "custom"
@@ -3823,8 +3852,7 @@ function app.tedit_close(saved)
 end
 
 -- Save: a new theme is added, a changed one updated (and the reading or
--- night theme renamed with it). With A it's then the one used; leaving with
--- B saves it too (nothing made is lost; Delete removes one).
+-- night theme renamed with it), and then it's the one used.
 function app.tedit_save(use)
     local e = app.tedit
     local t = e.theme
@@ -3851,7 +3879,7 @@ end
 
 function app.tedit_delete()
     local t = app.tedit.theme
-    app.ask({ question = "Delete " .. t.name .. "?", yes = "Delete", on_yes = function()
+    app.ask({ question = "Delete " .. t.name .. "?", detail = "This can't be undone.", yes = "Delete", on_yes = function()
         for i, x in ipairs(THEMES) do if x == t then table.remove(THEMES, i) break end end
         if S.theme == t.name then S.theme = "Sepia" end
         if S.night_theme == t.name then S.night_theme = "off" end
@@ -3888,6 +3916,7 @@ function app.tedit_action(a)
         local d = (a == "left" or a == "prev") and -1 or 1
         if e.row == R.which then e.which = d < 0 and "bg" or "fg"
         elseif e.row == R.picks then app.tedit_pick((e.pick or 0) + d)
+        elseif e.row == R.buttons and e.theme then e.btn = d < 0 and "reset" or "delete"
         elseif slider then
             app.tedit_set(slider, e[e.which][slider] + d)
             app.tedit_hold = { d = d, k = slider, t0 = now, next = now + 0.4 }
@@ -3895,10 +3924,13 @@ function app.tedit_action(a)
     elseif a == "toc" then e.which = e.which == "fg" and "bg" or "fg"; e.pick = nil   -- Y: text / page
     elseif a == "confirm" then
         if e.row == R.name then app.tedit_rename() return end
-        if e.row == R.delete then app.tedit_delete() return end
+        if e.row == R.buttons then
+            if e.btn == "delete" and e.theme then app.tedit_delete() else app.tedit_reset() end
+            return
+        end
         app.tedit_save(true)
         return
-    elseif a == "back" or a == "menu" then app.tedit_save(false) return
+    elseif a == "back" or a == "menu" then app.tedit_cancel() return
     end
     redraw()
 end
@@ -3908,7 +3940,7 @@ function app.tedit_pick(i)
     local e = app.tedit
     i = (i - 1) % #app.TEDIT_PICKS + 1
     e.pick = i
-    e[e.which] = app.tedit_pick_colour(i, e.which)
+    e[e.which] = app.tedit_pick_colour(i, e.which, e.bg[1] < 50)
     app.theme_colours(app.EDIT_THEME, e.fg, e.bg)
     redraw()
 end
@@ -3917,13 +3949,11 @@ end
 function app.tedit_tick()
     local h = app.tedit_hold
     if not h or not app.tedit or app.mode ~= "theme_edit" then app.tedit_hold = nil return end
-    local held = love.keyboard.isDown(h.d < 0 and "left" or "right")
+    -- (The stick by its latched direction: its resting place isn't always
+    -- the middle, see app.stick_rest.)
+    local held = love.keyboard.isDown(h.d < 0 and "left" or "right") or (app.stick and app.stick.x == h.d)
     for _, j in ipairs(love.joystick.getJoysticks()) do
-        if j:isGamepad() then
-            if j:isGamepadDown(h.d < 0 and "dpleft" or "dpright") then held = true end
-            local x = j:getGamepadAxis("leftx")
-            if math.abs(x) > 0.5 and (x < 0) == (h.d < 0) then held = true end
-        end
+        if j:isGamepad() and j:isGamepadDown(h.d < 0 and "dpleft" or "dpright") then held = true end
     end
     if not held then app.tedit_hold = nil return end
     local now = love.timer.getTime()
@@ -3939,13 +3969,44 @@ function app.tedit_layout()
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     return {
         x = x, w = w,
-        name = { y = 160, h = 56 },
-        switch = { y = 236, h = 52 },
-        picks = { y = 310, h = 56 },
-        slider = function(k) return 426 + (k - 1) * 112, 40 end,     -- track y, h
-        sample = { y = 740, h = 64 },
-        delete = { y = 852, h = 50 },
+        name = { y = 140, h = 54 },
+        switch = { y = 222, h = 52 },
+        picks = { y = 302, h = 52 },
+        slider = function(k) return 432 + (k - 1) * 118, 34 end,     -- track y, h
+        sample = { y = 768, h = 66 },
+        delete = { y = 866, h = 52 },
     }
+end
+
+-- The buttons under the sample: Reset Colors, and Delete (yours only),
+-- centred side by side. { which, label, x, y, w, h }.
+function app.tedit_buttons()
+    local L = app.tedit_layout()
+    local list = { { "reset", "Reset Colors" } }
+    if app.tedit.theme then list[2] = { "delete", "Delete Theme" } end
+    local gap, total = 24, -24
+    for _, b in ipairs(list) do b.w = ui.font:getWidth(b[2]) + 72; total = total + b.w + gap end
+    local bx = math.floor(L.x + (L.w - total) / 2)
+    for _, b in ipairs(list) do
+        b.x, b.y, b.h = bx, L.delete.y, L.delete.h
+        bx = bx + b.w + gap
+    end
+    return list
+end
+
+-- Reset: the colours of the Light or Dark start (whichever this page is
+-- nearer), keeping the name. Asks first.
+function app.tedit_reset()
+    local e = app.tedit
+    local dark = e.bg[1] < 50
+    local tpl = app.TEDIT_TEMPLATES[dark and 2 or 1][2]
+    app.ask({ question = "Reset colors to the " .. (dark and "dark" or "light") .. " defaults?",
+        detail = "The name stays the same.", yes = "Reset", on_yes = function()
+            e.fg = app.rgb_lab(tpl.fg[1], tpl.fg[2], tpl.fg[3])
+            e.bg = app.rgb_lab(tpl.bg[1], tpl.bg[2], tpl.bg[3])
+            e.pick = nil
+            app.theme_colours(app.EDIT_THEME, e.fg, e.bg)
+        end })
 end
 
 function app.tedit_slider_at(v)
@@ -3960,7 +4021,8 @@ function app.tedit_drag(k, u)
     local L = app.tedit_layout()
     app.tedit.row = app.TEDIT_ROW.slider + k - 1
     local s = app.TEDIT_SLIDERS[k]
-    app.tedit_set(k, s[2] + math.max(0, math.min(1, (u - L.x) / L.w)) * (s[3] - s[2]))
+    local rad = select(2, L.slider(k)) / 2               -- (the handle travels between the round ends)
+    app.tedit_set(k, s[2] + math.max(0, math.min(1, (u - L.x - rad) / (L.w - 2 * rad))) * (s[3] - s[2]))
 end
 
 function app.tedit_tap(side, u, v)
@@ -3973,12 +4035,18 @@ function app.tedit_tap(side, u, v)
         return
     end
     if v >= L.picks.y - 8 and v < L.picks.y + L.picks.h + 8 then
-        local n = #app.TEDIT_PICKS
+        local n, r = #app.TEDIT_PICKS, L.picks.h / 2
         e.row = R.picks
-        app.tedit_pick(math.max(1, math.min(n, math.floor((u - L.x) / L.w * n) + 1)))
+        app.tedit_pick(math.max(1, math.min(n, math.floor((u - L.x - r) / ((L.w - 2 * r) / (n - 1)) + 1.5))))
         return
     end
-    if e.theme and v >= L.delete.y - 10 and v < L.delete.y + L.delete.h + 10 then e.row = R.delete; app.tedit_delete() return end
+    for _, b in ipairs(app.tedit_buttons()) do
+        if u >= b.x - 12 and u <= b.x + b.w + 12 and v >= b.y - 12 and v <= b.y + b.h + 12 then
+            e.row, e.btn = R.buttons, b[1]
+            if b[1] == "delete" then app.tedit_delete() else app.tedit_reset() end
+            return
+        end
+    end
 end
 
 function app.tedit_draw(side)
@@ -3989,130 +4057,130 @@ function app.tedit_draw(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(e.theme and "Change Theme" or "New Theme", x, 60)
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    love.graphics.print("Tap a color to start from, then adjust it like a photo.", x, 118)
-    local function focus(y, h, r)
-        color(th.fg)
-        love.graphics.setLineWidth(3)
-        love.graphics.rectangle("line", x - 10, y - 8, w + 20, h + 16, r or 14, r or 14)
-        love.graphics.setLineWidth(1)
+    -- The row being changed: a soft band behind it.
+    local function focus(y, h, pad)
+        pad = pad or 12
+        color(th.sel, 0.55)
+        love.graphics.rectangle("fill", x - 16, y - pad, w + 32, h + 2 * pad, 18, 18)
     end
     -- Name
+    if e.row == R.name then focus(L.name.y, L.name.h) end
     color(th.sel)
-    love.graphics.rectangle("fill", x, L.name.y, w, L.name.h, 12, 12)
+    love.graphics.rectangle("fill", x, L.name.y, w, L.name.h, L.name.h / 2, L.name.h / 2)
     love.graphics.setFont(ui.font)
     color(th.fg)
-    love.graphics.print(fit_text(ui.font, e.name, w - 200), x + 18, centered_y(ui.font, UI_SIZE, L.name.y, L.name.h))
+    love.graphics.print(fit_text(ui.font, e.name, w - 200), x + 24, centered_y(ui.font, UI_SIZE, L.name.y, L.name.h))
     love.graphics.setFont(ui.small)
     color(th.dim)
-    love.graphics.printf("Rename", x, centered_y(ui.small, SMALL_SIZE, L.name.y, L.name.h), w - 18, "right")
-    if e.row == R.name then focus(L.name.y, L.name.h) end
+    love.graphics.printf("Rename", x, centered_y(ui.small, SMALL_SIZE, L.name.y, L.name.h), w - 24, "right")
     -- Page color / Text color
+    if e.row == R.which then focus(L.switch.y, L.switch.h) end
     for i, which in ipairs({ "bg", "fg" }) do
-        local bx, bw = x + (i - 1) * (w / 2 + 6), w / 2 - 6
+        local bx, bw = x + (i - 1) * (w / 2 + 8), w / 2 - 8
         local on = e.which == which
-        color(on and th.fg or th.dim)
-        love.graphics.rectangle(on and "fill" or "line", bx, L.switch.y, bw, L.switch.h, 26, 26)
+        if on then
+            color(th.fg)
+            love.graphics.rectangle("fill", bx, L.switch.y, bw, L.switch.h, L.switch.h / 2, L.switch.h / 2)
+        end
         love.graphics.setFont(on and ui.bold or ui.font)
-        color(on and th.bg or th.fg)
+        color(on and th.bg or th.dim)
         love.graphics.printf(which == "fg" and "Text color" or "Page color", bx,
             centered_y(ui.font, UI_SIZE, L.switch.y, L.switch.h), bw, "center")
     end
-    if e.row == R.which then focus(L.switch.y, L.switch.h, 32) end
-    -- Ready-made colours: a swatch each (the page's with "Aa" in the text colour).
-    local picks = app.TEDIT_PICKS
-    local n = #picks
-    local gap = 10
-    local sw = (w - gap * (n - 1)) / n
-    for i, p in ipairs(picks) do
-        local sx = x + (i - 1) * (sw + gap)
-        local rgb = app.lab_rgb(app.tedit_pick_colour(i, e.which))
+    -- Ready-made colours: a round swatch each; the one picked ringed.
+    if e.row == R.picks then focus(L.picks.y, L.picks.h) end
+    local picks, dark = app.TEDIT_PICKS, e.bg[1] < 50
+    local n, r = #picks, L.picks.h / 2
+    local step = (w - 2 * r) / (n - 1)
+    for i in ipairs(picks) do
+        local cx, cy = x + r + (i - 1) * step, L.picks.y + r
+        local rgb = app.lab_rgb(app.tedit_pick_colour(i, e.which, dark))
         love.graphics.setColor(rgb[1], rgb[2], rgb[3])
-        love.graphics.rectangle("fill", sx, L.picks.y, sw, L.picks.h, 10, 10)
-        color(th.dim, 0.7)
-        love.graphics.rectangle("line", sx, L.picks.y, sw, L.picks.h, 10, 10)
+        love.graphics.circle("fill", cx, cy, r - 4)
         if e.pick == i then
             color(th.fg)
-            love.graphics.setLineWidth(4)
-            love.graphics.rectangle("line", sx - 4, L.picks.y - 4, sw + 8, L.picks.h + 8, 12, 12)
+            love.graphics.setLineWidth(3)
+            love.graphics.circle("line", cx, cy, r + 1)
             love.graphics.setLineWidth(1)
         end
     end
-    love.graphics.setFont(ui.small)
-    color(th.dim)
-    love.graphics.printf(e.pick and picks[e.pick][1] or "", x, L.picks.y + L.picks.h + 4, w, "center")
-    if e.row == R.picks then focus(L.picks.y, L.picks.h) end
-    -- The sliders: each track shows the colours it leads to.
+    -- The sliders: rounded tracks showing the colours they lead to.
     local hsl = e[e.which]
     for k, s in ipairs(app.TEDIT_SLIDERS) do
         local ty, tht = L.slider(k)
         local on = e.row == R.slider + k - 1
+        -- (from the name above to the end words below: 110 of the 118 px
+        -- between sliders)
+        -- (the name's full height, descenders too, sits above the track)
+        local name_y = ty - ui.bold:getHeight() - 2
+        local words_y = ty + tht + 2
+        if on then focus(name_y - 2, words_y + ui.small:getHeight() + 2 - (name_y - 2), 2) end
         love.graphics.setFont(on and ui.bold or ui.font)
         color(th.fg)
-        love.graphics.print(s[1], x, ty - 38)
-        local steps = 96
-        for i = 0, steps - 1 do
+        love.graphics.print(s[1], x, name_y)
+        local rad = tht / 2
+        local function col_at(f)
             -- Brightness shows the colour itself, dark to light. Warmth and
             -- Tint show which way they go (blue to yellow, green to pink) at
             -- a middle brightness, so they read even for black or white.
-            local col = k == 1 and { hsl[1], hsl[2], hsl[3] } or { 68, 0, 0 }
-            col[k] = s[2] + (i + 0.5) / steps * (s[3] - s[2])
-            local rgb = app.lab_rgb(col)
-            love.graphics.setColor(rgb[1], rgb[2], rgb[3])
-            love.graphics.rectangle("fill", x + i * w / steps, ty, w / steps + 1, tht)
+            local c = k == 1 and { hsl[1], hsl[2], hsl[3] } or { 68, 0, 0 }
+            c[k] = s[2] + f * (s[3] - s[2])
+            return app.lab_rgb(c)
         end
-        color(th.dim, 0.7)
-        love.graphics.rectangle("line", x, ty, w, tht, 6, 6)
+        local steps = 96
+        local inner = w - 2 * rad
+        for i = 0, steps - 1 do
+            local rgb = col_at((i + 0.5) / steps)
+            love.graphics.setColor(rgb[1], rgb[2], rgb[3])
+            love.graphics.rectangle("fill", x + rad + i * inner / steps, ty, inner / steps + 1, tht)
+        end
+        for _, f in ipairs({ 0, 1 }) do                       -- round ends
+            local rgb = col_at(f)
+            love.graphics.setColor(rgb[1], rgb[2], rgb[3])
+            love.graphics.circle("fill", x + rad + f * inner, ty + rad, rad)
+        end
         if s[2] < 0 then
-            -- Neutral: a mark in the middle.
-            color(th.dim)
-            love.graphics.rectangle("fill", x + w / 2 - 1, ty - 6, 3, tht + 12)
+            color(th.fg, 0.5)                                 -- neutral: a small tick
+            love.graphics.rectangle("fill", x + w / 2 - 1, ty + tht + 3, 2, 8)
         end
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.print(s[4], x, ty + tht + 2)
-        love.graphics.printf(s[5], x, ty + tht + 2, w, "right")
-        if s[2] < 0 then love.graphics.printf("Neutral", x, ty + tht + 2, w, "center") end
-        -- The handle: rings in the page's paper and ink, so it shows on any colour.
-        local hx = x + (hsl[k] - s[2]) / (s[3] - s[2]) * w
-        love.graphics.setLineWidth(on and 7 or 5)
+        love.graphics.print(s[4], x, words_y)
+        love.graphics.printf(s[5], x, words_y, w, "right")
+        -- The handle: a disc in the colour now, ringed in the page's ink.
+        local hx = x + rad + (hsl[k] - s[2]) / (s[3] - s[2]) * inner
+        local now = app.lab_rgb(hsl)
+        love.graphics.setColor(now[1], now[2], now[3])
+        love.graphics.circle("fill", hx, ty + rad, rad + 6)
         color(th.bg)
-        love.graphics.circle("line", hx, ty + tht / 2, tht / 2 + 4)
-        love.graphics.setLineWidth(2)
+        love.graphics.setLineWidth(4)
+        love.graphics.circle("line", hx, ty + rad, rad + 6)
         color(th.fg)
-        love.graphics.circle("line", hx, ty + tht / 2, tht / 2 + 9)
+        love.graphics.setLineWidth(on and 3 or 2)
+        love.graphics.circle("line", hx, ty + rad, rad + 9)
         love.graphics.setLineWidth(1)
     end
-    -- A sample in the colours, and a word if it's hard to read.
+    -- A sample in the colours.
     local t = app.EDIT_THEME
     local sy, sh = L.sample.y, L.sample.h
     love.graphics.setColor(t.bg[1], t.bg[2], t.bg[3])
-    love.graphics.rectangle("fill", x, sy, w, sh, 12, 12)
-    color(th.dim, 0.6)
-    love.graphics.rectangle("line", x, sy, w, sh, 12, 12)
+    love.graphics.rectangle("fill", x, sy, w, sh, 14, 14)
+    color(th.dim, 0.3)
+    love.graphics.rectangle("line", x, sy, w, sh, 14, 14)
     love.graphics.setFont(ui.font)
     love.graphics.setColor(t.fg[1], t.fg[2], t.fg[3])
     love.graphics.printf("It was a dark and stormy night", x, centered_y(ui.font, UI_SIZE, sy, sh), w, "center")
-    local function lum(c)
-        local function ch(v) return v <= 0.03928 and v / 12.92 or ((v + 0.055) / 1.055) ^ 2.4 end
-        return 0.2126 * ch(c[1]) + 0.7152 * ch(c[2]) + 0.0722 * ch(c[3])
+    -- Reset Colors and Delete (yours only): buttons; both ask first.
+    local chosen = e.theme and e.btn or "reset"
+    for _, b in ipairs(app.tedit_buttons()) do
+        if e.row == R.buttons and b[1] == chosen then
+            color(th.sel, 0.55)
+            love.graphics.rectangle("fill", b.x - 12, b.y - 12, b.w + 24, b.h + 24, b.h / 2 + 12, b.h / 2 + 12)
+        end
+        app.button(b.x, b.y, b.w, b.h, b[2], nil, "soft")
     end
-    local a, b = lum(t.fg), lum(t.bg)
-    if (math.max(a, b) + 0.05) / (math.min(a, b) + 0.05) < 3 then
-        love.graphics.setFont(ui.small_bold)
-        color(th.fg)
-        love.graphics.printf("Hard to read: the text and page colors are too alike", x, sy + sh + 6, w, "center")
-    end
-    -- Delete (yours only)
-    if e.theme then
-        love.graphics.setFont(ui.font)
-        color(th.fg)
-        love.graphics.printf("Delete This Theme", x, centered_y(ui.font, UI_SIZE, L.delete.y, L.delete.h), w, "center")
-        if e.row == R.delete then focus(L.delete.y, L.delete.h) end
-    end
-    app.hints(x, nil, { "A", e.row == R.name and "rename" or e.row == R.delete and "delete" or "use",
-        "Y", "text/page", "‹ ›", "change", "B", "save" })
+    app.hints(x, nil, { "A", e.row == R.name and "rename" or e.row == R.buttons and (chosen == "delete" and "delete" or "reset") or "save",
+        "Y", "text/page", "‹ ›", "change", "B", "cancel" })
 end
 
 -- Sorted by progress or by series, My Books has a header over each group:
@@ -5529,15 +5597,20 @@ function app.kb_layer(layer)
         for ch in row:gmatch(".") do keys[#keys + 1] = { key = ch, label = ch, span = 1 } end
         app.KB_ROWS[#app.KB_ROWS + 1] = keys
     end
-    -- One bottom row, its keys lined up with the columns above.
-    app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "cancel", label = "Cancel", span = 2 },
-        { key = "shift", label = "", span = 1 }, { key = "symbols", label = layer == "symbols" and "abc" or "#@", span = 1 },
+    -- A row of the other keys, lined up with the columns above, and Cancel
+    -- across the bottom on its own.
+    app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "shift", label = "", span = 2 },
+        { key = "symbols", label = layer == "symbols" and "abc" or "#@", span = 2 },
         { key = "space", label = "Space", span = 2 }, { key = "del", label = "Delete", span = 2 },
         { key = "ok", label = "Search", span = 2 } }
+    app.KB_ROWS[#app.KB_ROWS + 1] = { { key = "cancel", label = "Cancel", span = 10 } }
     if app.kb then app.kb.layer = layer end
 end
 app.kb_layer("lower")
 app.KB_TOP, app.KB_ROW_H = 300, 112          -- keys area on the right page
+-- A row's height: 112, or less when there are too many rows to fit (a web
+-- address's keyboard has an extra row).
+function app.kb_row_h() return math.min(app.KB_ROW_H, math.floor((PAGE_H - 24 - app.KB_TOP) / #app.KB_ROWS)) end
 app.KB_MAX = 120                             -- characters
 
 -- Open the keyboard. opts: title, hint, text, submit(text), cancel(),
@@ -5547,7 +5620,7 @@ function app.kb_open(opts)
     -- No key is highlighted until the D-pad is used (r, c = nil).
     app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "",
         submit = opts.submit, cancel = opts.cancel, back = app.mode, ok = opts.ok, secret = opts.secret,
-        allow_empty = opts.allow_empty, url = opts.url, pos = #(opts.text or "") }
+        allow_empty = opts.allow_empty, url = opts.url, pos = #(opts.text or ""), start = opts.text or "" }
     app.kb_layer("lower")
     app.mode = "keyboard"
     redraw()
@@ -5600,7 +5673,14 @@ function app.kb_press(key)
     elseif key == "space" then
         -- (not at the start, nor a second one)
         if kb.pos > 0 and kb.text:sub(kb.pos, kb.pos) ~= " " then app.kb_type(" ") end
-    elseif key == "cancel" then
+    elseif key == "cancel" or key == "cancel!" then
+        -- The Cancel key, with something new typed: a card asks first (B
+        -- there keeps typing, so a slip loses nothing).
+        if key == "cancel" and kb.text ~= kb.start and kb.text ~= "" then
+            app.ask({ question = "Discard what you typed?", yes = "Discard", no = "Keep Typing",
+                on_yes = function() app.kb_press("cancel!") end })
+            return
+        end
         app.mode = kb.back
         app.kb = nil
         if kb.cancel then kb.cancel() end
@@ -5669,7 +5749,9 @@ function app.kb_action(a)
             kb.c = app.kb_key_at(kb.r, (c0 + c1) / 2 - 0.01)
         end
     elseif a == "confirm" then
-        if kb.r == 0 then kb.reveal = kb.secret and not kb.reveal     -- (a password's eye)
+        if kb.r == 0 then
+            -- A on the text: a password's eye; otherwise empty it.
+            if kb.secret then kb.reveal = not kb.reveal else kb.text, kb.pos = "", 0 end
         elseif kb.r then app.kb_press(rows[kb.r][kb.c].key) end
     elseif a == "back" then
         if kb.text == "" then app.kb_press("cancel") else app.kb_press("del") end
@@ -5696,8 +5778,18 @@ function app.kb_tap(side, u, v)
             return
         end
     end
-    -- In the text: the cursor goes to the nearest gap between characters.
+    -- The ×: empty the text.
     local kb = app.kb
+    if kb.text ~= "" then
+        local cx, cy, cw, ch = app.kb_clear_box()
+        if u >= cx - 12 and u <= cx + cw + 12 and v >= cy - 16 and v <= cy + ch + 16 then
+            kb.flash = { clear = true, t = love.timer.getTime() + 0.15 }
+            kb.text, kb.pos = "", 0
+            redraw()
+            return
+        end
+    end
+    -- In the text: the cursor goes to the nearest gap between characters.
     if kb.hit and v >= 140 and v <= 256 then
         local best, bd = kb.pos, math.huge
         for _, b in ipairs(kb.hit) do
@@ -5709,12 +5801,13 @@ function app.kb_tap(side, u, v)
         return
     end
     local x0, unit = app.kb_geom()
-    local r = math.floor((v - app.KB_TOP) / app.KB_ROW_H) + 1
+    local r = math.floor((v - app.KB_TOP) / app.kb_row_h()) + 1
     if r < 1 or r > #app.KB_ROWS or u < x0 - 10 or u > x0 + unit * 10 + 10 then return end
     local col = math.max(0, math.min(9.99, (u - x0) / unit))
     local kb = app.kb
     local c = app.kb_key_at(r, col)
     if kb.r then kb.r, kb.c = r, c end              -- follow taps only once the D-pad is in use
+    kb.flash = { r = r, c = c, t = love.timer.getTime() + 0.15 }     -- the key lights up for a moment
     app.kb_press(app.KB_ROWS[r][c].key)
 end
 
@@ -5758,6 +5851,16 @@ function app.kb_eye_box()
     local m = MARGINS[2]
     local w = PAGE_W - m.outer - m.inner
     return x0 + w - 76, 160, 76, 76
+end
+
+-- The clear button (an ×) at the end of the text, before a password's eye:
+-- x, y, w, h. Shown when there's text.
+function app.kb_clear_box()
+    local x0 = app.kb_geom()
+    local m = MARGINS[2]
+    local w = PAGE_W - m.outer - m.inner
+    local right = x0 + w - (app.kb.secret and 88 or 6)
+    return right - 64, 166, 64, 64
 end
 
 -- An eye (open: the password shows; struck through: hidden), in colour c.
@@ -5817,6 +5920,7 @@ function app.kb_draw(side)
         local rows = { { "Type", "Tap the keys, or D-pad and A" }, { "B", "Delete (cancel when empty)" },
             { "Y", "Space" }, { "Start, X", kb.ok or "Search" } }
         rows[#rows + 1] = { "Cursor", "Tap the text, or D-pad up to it and left/right" }
+        if not kb.secret then rows[#rows + 1] = { "×", "Clear it all (tap it, or A on the text)" } end
         if kb.secret then rows[#rows + 1] = { "Eye", "Show or hide it (tap it, or A on the text)" } end
         for _, row in ipairs(rows) do
             color(th.fg)
@@ -5847,15 +5951,31 @@ function app.kb_draw(side)
         color(th.fg)
         tw = tw - ew - 12
     end
+    if kb.text ~= "" then
+        -- The ×: a round button that empties the text.
+        local cx, cy, cw, ch = app.kb_clear_box()
+        local lit = kb.flash and kb.flash.clear
+        color(lit and th.fg or th.dim, lit and 1 or 0.35)
+        love.graphics.circle("fill", cx + cw / 2, cy + ch / 2, 22)
+        color(lit and th.bg or th.sel)
+        love.graphics.setLineWidth(4)
+        love.graphics.line(cx + cw / 2 - 9, cy + ch / 2 - 9, cx + cw / 2 + 9, cy + ch / 2 + 9)
+        love.graphics.line(cx + cw / 2 + 9, cy + ch / 2 - 9, cx + cw / 2 - 9, cy + ch / 2 + 9)
+        love.graphics.setLineWidth(1)
+        color(th.fg)
+        tw = tw - cw - 8
+    end
     app.kb_draw_text(kb, x0 + 8, 150 + (96 - ui.title:getHeight()) / 2, tw, th)
     -- The keys.
     love.graphics.setLineWidth(2)
     for r, row in ipairs(app.KB_ROWS) do
         for c, k in ipairs(row) do
             local c0, c1 = app.kb_cols(r, c)
-            local kx, ky = x0 + c0 * unit + 3, app.KB_TOP + (r - 1) * app.KB_ROW_H + 3
-            local kw, kh = (c1 - c0) * unit - 6, app.KB_ROW_H - 6
-            if kb.r and r == kb.r and c == kb.c then
+            local rh = app.kb_row_h()
+            local kx, ky = x0 + c0 * unit + 3, app.KB_TOP + (r - 1) * rh + 3
+            local kw, kh = (c1 - c0) * unit - 6, rh - 6
+            local lit = kb.flash and kb.flash.r == r and kb.flash.c == c
+            if lit or (kb.r and r == kb.r and c == kb.c) then
                 color(th.fg)
                 love.graphics.rectangle("fill", kx, ky, kw, kh, 10, 10)
                 color(th.bg)
@@ -7798,8 +7918,17 @@ end
 
 -- A short message popup (e.g. "Bookmark added").
 -- on_tap: what tapping the toast does (it's on the touchscreen), if anything.
+-- How long it shows goes by its length: 1.2 seconds, and a quarter second
+-- for each word after the third, up to 4 (about reading pace). Messages
+-- that wait for something ("Sending…", given more than 4 seconds; they're
+-- replaced when it's done) and ones to tap keep their own time.
 function app.toast(text, secs, on_tap)
-    overlay = { text = text, hide_at = love.timer.getTime() + (secs or 1.2), on_tap = on_tap }
+    if not on_tap and (secs == nil or secs <= 4) then
+        local words = 0
+        for _ in tostring(text):gmatch("%S+") do words = words + 1 end
+        secs = math.min(4, 1.2 + 0.25 * math.max(0, words - 3))
+    end
+    overlay = { text = text, hide_at = love.timer.getTime() + secs, on_tap = on_tap }
     if os.getenv("READER_DEBUG") then print(string.format("[debug] message %q at %.2f", text, love.timer.getTime())) end
     redraw()
 end
@@ -8514,6 +8643,7 @@ local STICK_PRESS, STICK_RELEASE = 0.6, 0.3
 -- positive = right/down, like the D-pad). The mapping borrowed from another
 -- port had them off by one, which made the stick's up/down read as left/right.
 local stick = { x = 0, y = 0 }          -- latched direction per axis: -1, 0, 1
+app.stick = stick                       -- (for holding a slider: see app.tedit_tick)
 
 -- Where each axis rests when the stick is let go. Usually 0, but GammaOS's
 -- gamepad service reports the RG DS Plus's stick resting over halfway along
@@ -9784,6 +9914,7 @@ function love.run()
         end
         app.idle_tick()
         if app.tedit_hold then app.tedit_tick() end
+        if app.kb and app.kb.flash and love.timer.getTime() > app.kb.flash.t then app.kb.flash = nil; redraw() end
         if app.idle.state == "off" and not lid.closed and not (app.task or library.pending) then
             love.timer.sleep(0.1)               -- screens off: check for a press now and then
         end
