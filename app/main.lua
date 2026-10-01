@@ -1329,16 +1329,20 @@ local function open_book(path)
     -- A comic opened the first time: which way it reads (manga: how to turn
     -- the pages), and the first comic ever, the magnifier.
     if b.comic then
+        -- (Each said once, ever: the first manga, the first comic.)
         local tips = {}
-        if Store.get_opened(path) == nil and app.comic_rtl() then     -- (opened before: it's saved after the first frame)
-            tips[#tips + 1] = "Manga: read right to left.\nTurn with left, or tap the left half"
+        if not S.manga_tip and app.comic_rtl() then
+            S.manga_tip = true
+            tips[#tips + 1] = "Manga reads right to left: turn with left, or tap the left half"
         end
         if not S.comic_tip then
             S.comic_tip = true
-            Store.save_settings(S)
             tips[#tips + 1] = "Y, or holding a page, shows the magnifier"
         end
-        if #tips > 0 then app.toast(table.concat(tips, "\n"), 6) end
+        if #tips > 0 then
+            Store.save_settings(S)
+            app.toast(table.concat(tips, "\n"))
+        end
     end
     if b.comic and b.comic.later > 0 then
         app.toast(b.comic.later .. (b.comic.later == 1 and " page is a WebP picture" or " pages are WebP pictures")

@@ -441,8 +441,8 @@ from its `ComicInfo.xml`, or else from its file name: "One-Punch Man v01
   half). It's set from the comic's `ComicInfo.xml` when it says so, or else
   from a manga publisher's name in its file names (Kodansha, VIZ Media, Yen
   Press, Seven Seas and others); change it in **Settings → Reading
-  direction** while reading (kept for that comic). The first time a manga
-  opens, a note says how to turn its pages.
+  direction** while reading (kept for that comic). The first manga you open
+  has a note on how to turn its pages.
 - **The magnifier,** for small print in speech bubbles: press **Y**, or hold
   a page. The page is on the touchscreen with a box on it, and what's in the
   box is enlarged on the other screen. Drag the box, or move it with the
