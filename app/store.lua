@@ -23,6 +23,7 @@ local DEFAULTS = {
     seen_version = "", -- the version last run: after an update, "what's new" is offered once
     update_notices = true, -- check for a newer version on launch and say so
     night_theme = "off", -- a theme used automatically at night ("off" or a theme's name)
+    hidden_themes = "", -- built-in themes left out of the lists, by name: "Dracula,Nord"
     hl_color = "yellow", -- highlights: "yellow" | "green" | "blue" | "pink" | "subtle" (the selection colour)
     dim_pictures = true, -- pictures in books drawn darker on a dark theme
     night_from = 21,   -- ... from this hour (0-23, the device's clock)

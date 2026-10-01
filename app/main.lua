@@ -1015,7 +1015,7 @@ function app.look_bar(side)
     if look.hl_start or w.side == side then
         -- Over the page's text: a band of page colour under the buttons.
         local m = margins()
-        local top = list[1].y - (look.hl_start and ui.small:getHeight() + 22 or 16)
+        local top = list[1].y - (look.hl_start and ui.hint:getHeight() + 22 or 16)
         color(th.bg)
         love.graphics.rectangle("fill", 0, top, PAGE_W, PAGE_H - top)
         color(th.dim, 0.5)
@@ -1023,7 +1023,7 @@ function app.look_bar(side)
         if look.hl_start then
             -- How to choose the rest: by touch on this screen, or the cursor
             -- when the words are on the other one.
-            love.graphics.setFont(ui.small)
+            love.graphics.setFont(ui.hint)
             color(th.fg)
             love.graphics.printf(w.side == side and "Tap or drag to choose the words, then Save"
                 or "Move the cursor to the last word, then Save", 0, top + 8, PAGE_W, "center")
@@ -3046,7 +3046,7 @@ function app.night_preview(side)
     -- The Themes page: the book's page in the theme highlighted.
     if side == "left" and app.mode == "themes" then
         local t = app.themes.list[app.themes.sel]
-        return t and not t.new and t.name or nil
+        return t and not t.new and not t.hidden_row and t.name or nil
     end
     -- Making a theme: the book in its colours as they change.
     if side == "left" and app.mode == "theme_edit" then return app.EDIT_THEME.name end
@@ -3061,7 +3061,10 @@ end
 -- The Night Mode page: which theme, and when.
 function app.night_items()
     local names = { "off" }
-    for _, t in ipairs(THEMES) do if not t.hidden then names[#names + 1] = t.name end end
+    for _, t in ipairs(THEMES) do
+        -- (not the hidden ones, unless it's the one chosen now)
+        if not t.hidden and (not app.theme_hidden(t) or t.name == S.night_theme) then names[#names + 1] = t.name end
+    end
     local rows = {
         { label = "Theme", value = S.night_theme == "off" and "Off" or S.night_theme,
           adjust = function(d)
@@ -3575,31 +3578,43 @@ end
 
 -- Button hints at the foot of a page, the same everywhere: each button in the
 -- text colour, what it does dimmed, e.g. app.hints(x, y, { "A", "open", "B", "back" }).
+app.HINT_SIZE = 26
 -- y defaults to the foot of the page.
+-- (In the hint size, HINT_SIZE, a bit larger than other small text so the
+-- buttons are easy to read; a line too long for the page at that size uses
+-- the small size instead.)
 function app.hints(x, y, list)
     local th = theme()
     y = y or PAGE_H - 70
+    local function width(f, fb)
+        local w = 0
+        for i = 1, #list, 2 do w = w + fb:getWidth(app.key(list[i])) + 9 + f:getWidth(list[i + 1]) + 32 end
+        return w - 32
+    end
+    local f, fb = ui.hint or ui.small, ui.hint_bold or ui.small_bold
+    if x + width(f, fb) > PAGE_W - 20 then f, fb = ui.small, ui.small_bold end
+    y = y + ui.small:getBaseline() - f:getBaseline()      -- (the same baseline whichever size)
     for i = 1, #list, 2 do
         local key = app.key(list[i])
-        love.graphics.setFont(ui.small_bold)
+        love.graphics.setFont(fb)
         color(th.fg)
         love.graphics.print(key, x, y)
-        x = x + ui.small_bold:getWidth(key) + 9
-        love.graphics.setFont(ui.small)
+        x = x + fb:getWidth(key) + 9
+        love.graphics.setFont(f)
         color(th.dim)
         love.graphics.print(list[i + 1], x, y)
-        x = x + ui.small:getWidth(list[i + 1]) + 32
+        x = x + f:getWidth(list[i + 1]) + 32
     end
 end
 
 -- "3 / 12" at the right of a list's foot.
 function app.count(x, w, sel, n, more, note)
     if n < 1 and not note then return end
-    love.graphics.setFont(ui.small)
+    love.graphics.setFont(ui.hint)
     color(theme().dim)
     local text = n > 0 and (sel .. " / " .. n .. (more and "+" or "")) or ""
     if note then text = text .. (text ~= "" and "  ·  " or "") .. note end
-    love.graphics.printf(text, x, PAGE_H - 70, w, "right")
+    love.graphics.printf(text, x, PAGE_H - 70 + ui.small:getBaseline() - ui.hint:getBaseline(), w, "right")
 end
 
 local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
@@ -3641,6 +3656,51 @@ end
 
 -- Show all themes, or only light or dark ones, keeping the highlighted theme
 -- if it's still listed.
+-- Built-in themes you've hidden (S.hidden_themes, "Dracula,Nord"): left out
+-- of the lists, and listed under "N hidden themes" at the end of All, where
+-- they can be shown again. Your own themes are deleted instead.
+function app.theme_hidden(t)
+    if not t or t.custom then return false end
+    for n in (S.hidden_themes or ""):gmatch("[^,]+") do if n == t.name then return true end end
+    return false
+end
+
+function app.theme_set_hidden(t, hide)
+    local names = {}
+    for n in (S.hidden_themes or ""):gmatch("[^,]+") do if n ~= t.name then names[#names + 1] = n end end
+    if hide then names[#names + 1] = t.name end
+    S.hidden_themes = table.concat(names, ",")
+    app.themes.changed = true
+end
+
+-- Hide or show the highlighted built-in theme. Hiding the one in use (the
+-- highlighted theme is the one in use: picking it uses it) moves to the
+-- next one in the list, which is then used.
+function app.theme_hide(t, hide)
+    local T = app.themes
+    local in_use = t.name == app.theme_current()
+    local keep_sel = T.sel
+    app.theme_set_hidden(t, hide)
+    app.theme_set_filter(T.filter, in_use and "" or nil)
+    local n = #T.list
+    if n > 0 and T.list[n].hidden_row then n = n - 1 end     -- (not the "hidden themes" row)
+    if in_use and hide and n == 0 then
+        app.theme_set_hidden(t, false)                     -- the only one left: not hidden
+        app.theme_set_filter(T.filter)
+        app.toast("That's the only theme here")
+        redraw()
+        return
+    end
+    T.sel = math.max(n > 0 and 1 or 0, math.min(keep_sel, n))
+    if in_use and hide then
+        app.theme_pick()
+        app.toast(t.name .. " hidden · now " .. T.list[T.sel].name)
+    else
+        app.toast(hide and (t.name .. " hidden") or (t.name .. " shown again"))
+    end
+    redraw()
+end
+
 function app.theme_set_filter(filter, keep)
     local T = app.themes
     keep = keep or app.theme_current()
@@ -3651,12 +3711,20 @@ function app.theme_set_filter(filter, keep)
         -- Your own themes, after a row for making a new one.
         T.list[1] = app.NEW_THEME
         for _, t in ipairs(THEMES) do if t.custom and not t.hidden then T.list[#T.list + 1] = t end end
+    elseif filter == "hidden" then
+        for _, t in ipairs(THEMES) do if not t.hidden and app.theme_hidden(t) then T.list[#T.list + 1] = t end end
+        table.sort(T.list, function(a, b) return a.name:lower() < b.name:lower() end)
     else
-        -- Built-in themes and yours together, A to Z.
+        -- Built-in themes and yours together, A to Z (not the ones hidden).
+        local hidden = 0
         for _, t in ipairs(THEMES) do
-            if not t.hidden and (filter == "all" or app.theme_kind(t) == filter) then T.list[#T.list + 1] = t end
+            if not t.hidden and app.theme_hidden(t) then hidden = hidden + 1
+            elseif not t.hidden and (filter == "all" or app.theme_kind(t) == filter) then T.list[#T.list + 1] = t end
         end
         table.sort(T.list, function(a, b) return a.name:lower() < b.name:lower() end)
+        if filter == "all" and hidden > 0 then
+            T.list[#T.list + 1] = { name = hidden .. (hidden == 1 and " hidden theme" or " hidden themes"), hidden_row = true }
+        end
     end
     -- The theme in use highlighted; if it isn't in this list, none is (0),
     -- so switching lists never changes the theme.
@@ -3678,7 +3746,7 @@ end
 -- way it shows on the other screen; it's saved on leaving the page.
 function app.theme_pick()
     local t = app.themes.list[app.themes.sel]
-    if not t or t.new then return end
+    if not t or t.new or t.hidden_row then return end
     if app.night then S.night_theme = t.name else S.theme = t.name end
     app.themes.changed = true
 end
@@ -3693,6 +3761,7 @@ end
 function app.theme_use()
     local t = app.themes.list[app.themes.sel]
     if t and t.new then app.tedit_new() return end
+    if t and t.hidden_row then app.theme_set_filter("hidden"); redraw() return end
     app.theme_pick()
     app.theme_leave()
 end
@@ -3700,6 +3769,12 @@ end
 function app.theme_action(a)
     local T = app.themes
     if a == "toc" then app.theme_options(T.list[T.sel]) return end      -- Y: copy (or change) it
+    -- The hidden themes' list: B (or left/right) goes back to All.
+    if T.filter == "hidden" and (a == "back" or a == "menu" or a == "left" or a == "right" or a == "prev" or a == "next") then
+        app.theme_set_filter("all")
+        redraw()
+        return
+    end
     if a == "up" then T.sel = math.max(1, T.sel - 1); app.theme_pick()
     elseif a == "down" then T.sel = math.min(math.max(1, #T.list), T.sel + 1); app.theme_pick()
     elseif a == "left" or a == "prev" or a == "right" or a == "next" then
@@ -3723,8 +3798,15 @@ end
 -- Y on a theme: a built-in one is copied; one of yours offers changing it
 -- or making a copy.
 function app.theme_options(t)
-    if not t or t.new then return end
-    if not t.custom then app.theme_copy(t) return end
+    if not t or t.new or t.hidden_row then return end
+    if not t.custom then
+        local hidden = app.theme_hidden(t)
+        app.choose({ title = t.name, options = {
+            { "Make a Copy", function() app.theme_copy(t) end },
+            { hidden and "Show It Again" or "Hide It", function() app.theme_hide(t, not hidden) end },
+        } })
+        return
+    end
     app.choose({ title = t.name, options = {
         { "Change It", function() app.tedit_open(t) end },
         { "Make a Copy", function() app.theme_copy(t) end },
@@ -3734,8 +3816,9 @@ end
 -- The highlighted row's buttons, for touch: Copy, and Change for yours.
 -- { which, label, x, y, w, h }, right-aligned in the row before the ✓.
 function app.theme_row_buttons(t, rx, ry, rw, h)
-    if not t or t.new then return {} end
-    local list = t.custom and { { "change", "Change" }, { "copy", "Copy" } } or { { "copy", "Copy" } }
+    if not t or t.new or t.hidden_row then return {} end
+    local list = t.custom and { { "change", "Change" }, { "copy", "Copy" } }
+        or { { "copy", "Copy" }, app.theme_hidden(t) and { "show", "Show" } or { "hide", "Hide" } }
     local bh, gap = 44, 10
     local right = rx + rw - 40
     for i = #list, 1, -1 do
@@ -3754,7 +3837,9 @@ function app.theme_tap(side, u, v)
         local p = app.TAP_PAD
         if u >= b.x - p and u <= b.x + b.w + p and v >= b.y - p and v <= b.y + b.h + p then
             local t = T.list[T.sel]
-            if b[1] == "change" then app.tedit_open(t) else app.theme_copy(t) end
+            if b[1] == "change" then app.tedit_open(t)
+            elseif b[1] == "hide" or b[1] == "show" then app.theme_hide(t, b[1] == "hide")
+            else app.theme_copy(t) end
             return
         end
     end
@@ -3767,7 +3852,8 @@ function app.theme_tap(side, u, v)
     local rows = list_rows(app.THEME_ROW_H)
     local idx = T.top + math.floor((v - 160) / app.THEME_ROW_H)
     if idx < T.top + rows and T.list[idx] then
-        if idx == T.sel then app.theme_use() else T.sel = idx; app.theme_pick(); redraw() end
+        if idx == T.sel or T.list[idx].hidden_row then T.sel = idx; app.theme_use()
+        else T.sel = idx; app.theme_pick(); redraw() end
     end
 end
 
@@ -3782,7 +3868,7 @@ function app.theme_draw(side)
     if T.sel >= T.top + rows then T.top = T.sel - rows + 1 end
     love.graphics.setFont(ui.title)
     color(th.fg)
-    local title = app.night and "Night Mode Theme" or "Themes"
+    local title = T.filter == "hidden" and "Hidden Themes" or app.night and "Night Mode Theme" or "Themes"
     love.graphics.print(title, x, 60)
     -- All / Light / Dark, right-aligned on the title line; the current one bold.
     T.tabs = {}
@@ -3809,6 +3895,12 @@ function app.theme_draw(side)
     T.row_btns = {}
     draw_list(side, T.list, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw, selected)
         local h = row_h - 4
+        if t.hidden_row then
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.print(t.name .. "  ›", rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
+            return
+        end
         if t.new then
             -- "New Theme": a dashed-looking swatch with a plus.
             color(th.dim)
@@ -3865,7 +3957,9 @@ function app.theme_draw(side)
         app.hints(x, nil, { "A", T.list[T.sel] and T.list[T.sel].new and "new" or "use", "Y", "options", "‹ ›", "filter", "B", "back" })
     else
         local t = T.list[T.sel]
-        app.hints(x, nil, { "A", "use", "Y", t and t.custom and "options" or "copy", "‹ ›", "filter", "B", "back" })
+        if t and t.hidden_row then app.hints(x, nil, { "A", "show them", "‹ ›", "filter", "B", "back" })
+        elseif T.filter == "hidden" then app.hints(x, nil, { "A", "use", "Y", "options", "B", "back to All" })
+        else app.hints(x, nil, { "A", "use", "Y", "options", "‹ ›", "filter", "B", "back" }) end
     end
     if T.filter ~= "custom" and T.sel > 0 then app.count(x, w, T.sel, #T.list) end
 end
@@ -5133,9 +5227,9 @@ function look.draw_panel(side)
         look.page = math.max(1, math.min(look.page, #pages))
         draw_page(pages[look.page], side, top + 50)
     end
-    local hint = { "‹ ›", "word", "Up/Down", "line", "Select", app.hl_at(look.words[look.sel]) and "remove highlight" or "highlight",
+    local hint = { "‹ ›", "word", "↕", "line", "Select", app.hl_at(look.words[look.sel]) and "unhighlight" or "highlight",
         "B", "close" }
-    if pages and #pages > 1 then table.insert(hint, 1, "more (" .. look.page .. "/" .. #pages .. ")"); table.insert(hint, 1, "A") end
+    if pages and #pages > 1 then table.insert(hint, 1, "more " .. look.page .. "/" .. #pages); table.insert(hint, 1, "A") end
     app.hints(ox, PAGE_H - 26 - ui.small:getHeight(), hint)
 end
 
@@ -9976,6 +10070,8 @@ function love.load()
     ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
     ui.bold = load_font("GentiumBookPlus-Bold.ttf", UI_SIZE)
     ui.small_bold = load_font("GentiumBookPlus-Bold.ttf", SMALL_SIZE)
+    ui.hint = load_font("GentiumBookPlus-Regular.ttf", app.HINT_SIZE)           -- what the buttons do
+    ui.hint_bold = load_font("GentiumBookPlus-Bold.ttf", app.HINT_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
     ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
     ui.menu = load_font("GentiumBookPlus-Regular.ttf", app.MENU_SIZE)       -- Settings rows
