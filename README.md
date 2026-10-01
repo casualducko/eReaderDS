@@ -321,7 +321,8 @@ in the highlighted one on the top screen. **A** uses it. Along the title,
 - **New Theme** asks **Light** or **Dark** to start from. Or, on any other
   list, press **Y** on a theme to **copy** it (say, Sepia that's almost
   right) and change the copy.
-- **Y** on one of yours changes it.
+- **Y** on one of yours changes it. Yours are also listed under All, and
+  Light or Dark by their page, tagged **Custom**.
 - In the editor, the top screen shows your book in the colors as you go:
   - **Name**: tap it (or A) to type one; the **×** clears it.
   - **Page color** / **Text color**: which one the rest changes (**Y**
