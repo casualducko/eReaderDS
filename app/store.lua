@@ -25,7 +25,8 @@ local DEFAULTS = {
     night_theme = "off", -- a theme used automatically at night ("off" or a theme's name)
     hidden_themes = "", -- built-in themes left out of the lists, by name: "Dracula,Nord"
     hl_color = "yellow", -- highlights: "yellow" | "green" | "blue" | "pink" | "subtle" (the selection colour)
-    hl_bright = false,   -- highlights on a dark theme: bright, with dark text (else muted, the text light)
+    hl_bright = false,
+    comic_tip = false,   -- the magnifier's been pointed out (the first comic opened)   -- highlights on a dark theme: bright, with dark text (else muted, the text light)
     dim_pictures = true, -- pictures in books drawn darker on a dark theme
     night_from = 21,   -- ... from this hour (0-23, the device's clock)
     night_to = 7,      -- ... until this one
@@ -417,6 +418,34 @@ function M.get_last()
 end
 
 function M.set_last(p) write_atomic(path("last.txt"), p .. "\n") end
+
+-- comics.txt: the reading direction chosen for a comic, where it isn't the
+-- one its ComicInfo.xml gives: path \t rtl | ltr.
+local comics
+local function load_comics()
+    if comics then return comics end
+    comics = {}
+    local f = io.open(path("comics.txt"), "rb")
+    if f then
+        for line in lines(f) do
+            local p, d = line:match("^(.-)\t(%a+)$")
+            if p and (d == "rtl" or d == "ltr") then comics[p] = d end
+        end
+        f:close()
+    end
+    return comics
+end
+
+-- "rtl", "ltr", or nil (as the comic says).
+function M.get_comic_dir(p) return load_comics()[p] end
+
+function M.set_comic_dir(p, d)
+    load_comics()[p] = d
+    local out = {}
+    for k, v in pairs(comics) do out[#out + 1] = k .. "\t" .. v end
+    table.sort(out)
+    write_atomic(path("comics.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
+end
 
 -- opened.txt: when each book was last opened: path \t unix time.
 local opened

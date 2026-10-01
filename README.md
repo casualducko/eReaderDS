@@ -28,7 +28,7 @@ steps for your firmware.
 1. Put the SD card in your computer. From the unzipped `Ports` folder, copy
    **`eReaderDS.sh`** and the **`eReaderDS`** folder into the `Ports` folder on
    the card, and `Imgs/eReaderDS.png` (the menu icon) into `Ports/Imgs`.
-2. Put `.epub` or `.txt` books in the card's `Ebook` folder. Folders inside it
+2. Put `.epub` or `.txt` books (and `.cbz` comics) in the card's `Ebook` folder. Folders inside it
    are fine: you can copy a whole Calibre library, or keep your own folders.
 3. On the device, open **Ports → eReaderDS**.
 
@@ -248,6 +248,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   fonts lacked) stay in the line and take the theme's ink, and characters a
   font doesn't have (Russian, Greek, special spaces and symbols) are drawn
   from Gentium Book Plus instead of showing as boxes.
+- **Comics and manga** (`.cbz`): a page on each screen like an open book,
+  spreads across both, right to left for manga, and a magnifier for small
+  print ([below](#comics-and-manga)).
 - **Footnotes on the facing page:** press A and the note appears on the other
   page while the text stays put.
 - **Dictionary on the facing page:** press Y and move a cursor over the words;
@@ -415,6 +418,31 @@ it to another handheld or system:
   closes: open it again. Brightness starts at 50% on the stock firmware and
   60% on ROCKNIX (on GammaOS it follows the system's).
 
+## Comics and Manga
+
+Put `.cbz` comics in the `Ebook` folder like any book (or send them from a
+phone or computer); they're listed in My Books with their covers.
+
+- **A page on each screen,** like an open book: the cover on its own, then
+  pages in pairs. A two-page spread (a picture wider than it's tall) is split
+  across both screens, its halves meeting where the screens do.
+- **Manga reads right to left:** the first page of a pair is on the right,
+  and you turn with **left** (or a swipe to the right, or a tap on the left
+  half). It's set from the comic's `ComicInfo.xml` when it says so; change it
+  in **Settings → Reading direction** while reading (kept for that comic).
+- **The magnifier,** for small print in speech bubbles: press **Y**, or hold
+  a page. The page is on the touchscreen with a box on it, and what's in the
+  box is enlarged on the other screen. Drag the box, or move it with the
+  D-pad; **A** switches to the other page; **B** closes it.
+- **The next volume:** at the end, turning the page again opens the next
+  comic in the same folder ("Vol 2" after "Vol 1").
+- Your place, bookmarks, Jump to %, and the Table of Contents (when the
+  pages are in a folder for each chapter) work as in a book. Pictures are
+  dimmed on dark themes, like a book's.
+- `.cbz` files with JPEG or PNG pages work; WebP pages and `.cbr` (RAR) files
+  can't be shown yet (convert or repack them as `.cbz` with JPEG pages).
+  KOReader Sync is for EPUB books only.
+
 ## Night Mode
 
 **Settings → Night Mode** picks a second theme (a dark one such as
@@ -430,7 +458,7 @@ In the library press **Select** (or tap **Get Books**) and choose **Send from
 Your Phone or Computer**. The screens show an address (such as
 `192.168.1.50:2045`) and a QR code. On a phone or computer on the same Wi-Fi,
 scan the code or type the address into a web browser, then tap **Choose
-files** (or drop files on the page). Books (`.epub`, `.txt`) go into the
+files** (or drop files on the page). Books (`.epub`, `.cbz`, `.txt`) go into the
 books folder and fonts (`.ttf`, `.otf`) into the fonts folder; each is listed
 on the device as it arrives. Press **B** or tap **Done** when they're sent:
 the new books are in My Books. The page only works while this screen is open.
@@ -684,7 +712,7 @@ name) only shows one weight.
 | Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems) (GammaOS has no log file: just describe it). |
 | GammaOS: only on one screen | Close eReaderDS and open it again. If it stays on one screen, please [report it](#reporting-problems). |
 | GammaOS: page turns stutter after a while | Restart the handheld: GammaOS runs short of memory over a long session. |
-| "No books found" | Put `.epub` or `.txt` files in the `Ebook` folder at the top of the card (or in folders inside it). |
+| "No books found" | Put `.epub`, `.cbz` or `.txt` files in the `Ebook` folder at the top of the card (or in folders inside it). |
 | A book won't open or looks wrong | Unusual EPUBs may not display well; DRM-protected books, PDF and MOBI aren't supported. |
 | Get Books is greyed out | Turn on Wi-Fi in the device's settings and wait for it to connect. |
 | Pages upside down | Turn the device the other way, with the buttons on your right. |
@@ -716,6 +744,7 @@ problem (on ROCKNIX `roms/ports/eReaderDS/log.txt`; GammaOS has no log file).
 - When a chapter runs over several files in the EPUB, its pages in files not
   opened yet are estimated (usually within a few pages) until you reach them.
 - No tables, fixed-layout EPUBs, PDF, MOBI or DRM-protected books.
+- Comics: `.cbz` with JPEG or PNG pages; not `.cbr` (RAR) or WebP pages yet.
 - Hyphenation and the built-in dictionary are English only.
 - Chinese, Japanese and a few other scripts show as boxes: no built-in font
   has them.

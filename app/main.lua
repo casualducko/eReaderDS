@@ -262,9 +262,10 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
 -- scaled down once, smoothly (through mipmaps), and only the small copy kept.
 -- Books' illustrations are often 2000 pixels or more, several times the
 -- memory a page needs.
-function app.fit_image(id)
+-- (mw, mh: another box to fit, such as a comic's spread across both screens.)
+function app.fit_image(id, mw, mh)
     local w, h = id:getDimensions()
-    local s = math.min(1, PAGE_W / w, PAGE_H / h)
+    local s = math.min(1, (mw or PAGE_W) / w, (mh or PAGE_H) / h)
     if s > 0.9 then return love.graphics.newImage(id) end
     -- (Mipmaps, for smooth scaling, where the driver allows them for any size.)
     local okm, full = pcall(love.graphics.newImage, id, { mipmaps = true })
@@ -310,6 +311,7 @@ local function get_image(src)
         if data then
             local ok, res = pcall(function()
                 local id = love.image.newImageData(love.filesystem.newFileData(data, src))
+                if book.comic then return app.comic_fit(id) end
                 local okl, line = pcall(app.is_line_art, id)
                 app.image_ink[src] = okl and line or nil
                 local okf, image = pcall(app.fit_image, id)
@@ -382,7 +384,9 @@ end
 
 local function pages_for(ch)
     local p = pages_cache[ch]
-    if not p then
+    if not p and book.comic then
+        p = app.comic_pages()                  -- (a comic: its pictures, paired for the two screens)
+    elseif not p then
         local c = book:chapter(ch)
         if not c then return nil end
         local w, h = content_size()
@@ -400,6 +404,12 @@ local function pages_for(ch)
             hyphenate = S.hyphenate and (not book.language or book.language == "" or book.language:match("^en") ~= nil),
             image_size = get_image_size,
         })
+        if os.getenv("READER_DEBUG") then
+            print(string.format("layout ch=%d pages=%d %.0fms lua=%.0fMB", ch, #p, (love.timer.getTime() - t0) * 1000,
+                collectgarbage("count") / 1024))
+        end
+    end
+    if not pages_cache[ch] then
         pages_cache[ch] = p
         pages_order[#pages_order + 1] = ch
         local offs = {}
@@ -410,10 +420,6 @@ local function pages_for(ch)
             local k = 1
             if spread and pages_order[k] == spread.ch then k = 2 end
             pages_cache[table.remove(pages_order, k)] = nil
-        end
-        if os.getenv("READER_DEBUG") then
-            print(string.format("layout ch=%d pages=%d %.0fms lua=%.0fMB", ch, #p, (love.timer.getTime() - t0) * 1000,
-                collectgarbage("count") / 1024))
         end
     end
     return p
@@ -426,6 +432,7 @@ local function set_spread(ch, pi)
     if pi % 2 == 0 then pi = pi - 1 end
     spread = { ch = ch, pi = pi, pages = pages }
     pos.ch, pos.off = ch, pages[pi].off
+    if book.comic then app.comic_prefetch() end       -- (the next pair's pictures, meanwhile)
     redraw()
 end
 
@@ -447,7 +454,7 @@ end
 
 local function learn_speed()
     local now = love.timer.getTime()
-    if reading.since and app.mode == "reader" then
+    if reading.since and app.mode == "reader" and not book.comic then
         local dt = now - reading.since
         local chars = spread_end_off(spread) - spread.pages[spread.pi].off
         if dt >= SPEED_MIN_S and dt <= SPEED_MAX_S and chars > 50 then
@@ -500,7 +507,10 @@ local function next_spread()
     elseif spread.ch < #book.chapters then
         set_spread(spread.ch + 1, 1)
     else
-        app.check_finished()                   -- already on the last page (a one-spread book)
+        -- Already on the last page: a comic goes on to the next volume.
+        local nxt = book.comic and app.comic_next_path()
+        if nxt then app.open_book(nxt) return end
+        app.check_finished()                   -- (a one-spread book)
         return
     end
     save_progress_soon()
@@ -846,6 +856,7 @@ function look.only()
 end
 
 function look.open(word)
+    if book and book.comic then app.zoom_open() return end       -- (a comic: the magnifier)
     look.scan()
     look.words = look.collect()
     if #look.words == 0 then app.toast("No words on these pages"); return end
@@ -1286,6 +1297,7 @@ local function open_book(path)
     -- Find results belong to one book; drop them (and the old book they hold).
     if app.find and app.find.book ~= b then app.find_stop(); app.find, app.find_mark = nil, nil end
     book = b
+    if app.zoom then app.zoom.img:release(); app.zoom = nil end      -- (the magnifier's picture: the old book's)
     clear_book_caches()
     app.previews_clear()
     local pr = Store.get_progress(path)
@@ -1307,7 +1319,18 @@ local function open_book(path)
     app.sync.checked[path], app.sync.pushed[path], app.sync.asked[path] = nil, nil, nil
     app.sync.moved[path] = nil                 -- (what's been seen there is kept: app.sync_seen)
     app.sync_pull("open")                  -- where another device has got to
+    if b.comic and not S.comic_tip then
+        S.comic_tip = true
+        Store.save_settings(S)
+        app.toast("A comic: Y, or holding a page, shows the magnifier", 5)
+    end
+    if b.comic and b.comic.later > 0 then
+        app.toast(b.comic.later .. (b.comic.later == 1 and " page is a WebP picture" or " pages are WebP pictures")
+            .. ", which can't be shown yet", 5)
+    end
 end
+
+app.open_book = open_book           -- (for code above it: a comic's next volume)
 
 -- Highlights and bookmarks as a file to read on a computer, like a Kindle's
 -- "My Clippings": Ebook/Highlights/<Title - Author>.md, one per book, written
@@ -1413,7 +1436,12 @@ function app.check_finished()
     if not book or not spread or spread.ch < #book.chapters or spread.pi + 2 <= #spread.pages then return end
     if not Store.get_finished(book.path) then
         Store.set_finished(book.path, true)
-        app.toast("Finished!")
+        local nxt = book.comic and app.comic_next_path()
+        if nxt then
+            app.toast("Finished! Turn the page for\n" .. Layout.sanitize((nxt:match("([^/]+)%.[^.]+$") or nxt)), 5)
+        else
+            app.toast("Finished!")
+        end
     end
 end
 
@@ -1520,7 +1548,7 @@ function app.find_books(dir)
         local SKIP = { fonts = true, dictionaries = true, highlights = true }
         return A.find_files(dir, 6, function(name)
             local ext = (name:match("%.([^.]+)$") or ""):lower()
-            return not name:match("^%.") and (ext == "epub" or ext == "txt" or ext == "part")
+            return not name:match("^%.") and (ext == "epub" or ext == "cbz" or ext == "txt" or ext == "part")
         end, function(rel)
             return rel:match("^%.") or rel:find("/%.") or (not rel:find("/") and SKIP[rel:lower()])
         end)
@@ -1542,7 +1570,7 @@ function app.find_books(dir)
         p:close()
         return out
     end
-    local match = '-maxdepth 6 -type f \\( -iname "*.epub" -o -iname "*.txt" -o -iname "*.part" \\)'
+    local match = '-maxdepth 6 -type f \\( -iname "*.epub" -o -iname "*.cbz" -o -iname "*.txt" -o -iname "*.part" \\)'
     local found = run('find "' .. dir .. '" ' .. match .. ' -exec stat -c "%s|%n" {} + 2>/dev/null')
     -- No stat that way (not the device's busybox): without the sizes.
     if #found == 0 then found = run('find "' .. dir .. '" ' .. match .. ' 2>/dev/null') end
@@ -1568,7 +1596,7 @@ local function scan_library()
                 local base = name:gsub("%.[^.]+$", "")
                 local title, author = base:match("^(.-)%s+%-%s+(.+)$")
                 local it = { path = path, title = Layout.sanitize(title or base), author = Layout.sanitize(author or "") }
-                if ext == "epub" then
+                if ext == "epub" or ext == "cbz" then
                     local m = Store.get_meta(path, f.size)
                     if not m then
                         it.size = f.size
@@ -2440,9 +2468,9 @@ function app.sync_pull(how)
     if (how == "open" and app.sync_auto() == "off") or (how == "check" and app.sync_auto() ~= "on") then return end
     local now = how == "now" or how == "get"          -- (by hand: say what happens)
     local b = book
-    if not (b and b.zip and app.sync_on()) then
+    if not (b and b.zip and not b.comic and app.sync_on()) then
         if now then
-            if b and not b.zip then app.sync_say("Sync works with EPUB books only")
+            if b and (not b.zip or b.comic) then app.sync_say("Sync works with EPUB books only")
             else app.sync_say("Log in to KOReader Sync first") end
         end
         return
@@ -2832,7 +2860,7 @@ end
 -- briefly. skip: a name not to send under (the server has it already).
 function app.sync_push(now, skip)
     local b = book
-    if not (b and b.zip and app.sync_on() and spread) then return end
+    if not (b and b.zip and not b.comic and app.sync_on() and spread) then return end
     -- (Not during or after a restore or reset, until it closes: what's in
     -- memory is the old settings, not the sync id it will have.)
     if Store.frozen then return end
@@ -2882,7 +2910,7 @@ end
 -- After a page turn: every few minutes, check the server and send (or ask,
 -- if another device has moved on meanwhile); check if that hasn't happened yet.
 function app.sync_tick()
-    if not (book and book.zip and app.sync_on()) then return end
+    if not (book and book.zip and not book.comic and app.sync_on()) then return end
     app.sync.moved[book.path] = true                -- (every mode: Sync with KOReader goes by it)
     if app.sync_auto() ~= "on" then return end
     local t = love.timer.getTime()
@@ -3282,13 +3310,21 @@ local function menu_items()
             end },
             { label = "Bookmarks and Highlights", value = tostring(#Store.get_bookmarks(book.path) + #Store.get_highlights(book.path)),
               act = function() open_bookmarks("menu") end },
-            { label = "Find in Book", act = function() app.find_open() end },
+            },
+            not book.comic and { { label = "Find in Book", act = function() app.find_open() end } } or {},
+            {
             { label = "Jump to %", value = "Currently " .. math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%",
               act = function() app.open_jump() end },
             },
+            -- A comic: which way it reads (manga: right to left).
+            book.comic and { { label = "Reading direction", value = app.comic_rtl() and "Right to left" or "Left to right",
+              adjust = function()
+                  Store.set_comic_dir(book.path, app.comic_rtl() and "ltr" or "rtl")
+                  redraw()
+              end } } or {},
             -- KOReader sync users: fetch another device's place (or send this one) now.
-            app.sync_on() and { { label = "Sync with KOReader", act = function() app.sync_pull("now") end } } or {}))),
-        app.menu_on_page(1, section("Reading", {
+            app.sync_on() and not book.comic and { { label = "Sync with KOReader", act = function() app.sync_pull("now") end } } or {}))),
+        app.menu_on_page(1, section("Reading", join({
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
                   or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "Normal"),
@@ -3305,20 +3341,20 @@ local function menu_items()
                       S.brightness = Backlight.step(cur, d)
                       Backlight.set(S.brightness)
                   end
-              end },
-            { label = "Text size", value = tostring(S.font_size), adjust = function(d)
+              end } },
+            -- (A comic has no text to size, or fonts.)
+            not book.comic and { { label = "Text size", value = tostring(S.font_size), adjust = function(d)
                 S.font_size = math.max(18, math.min(64, S.font_size + d * 2)); build_fonts(); goto_pos(pos.ch, pos.off)
-            end },
+            end } } or {},
             -- Changes the theme on screen: at night, the night theme.
             -- Opens the Themes page (tap or A), which shows each on your book.
-            { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), act = app.theme_open },
+            { { label = "Theme", value = th.name .. (app.night and "  (night)" or ""), act = app.theme_open } },
             -- The font's name is drawn in the font itself: a preview, and the only way
             -- names in other scripts (e.g. Chinese firmware fonts) can display.
-            { label = "Fonts", value = fonts.name or S.font,
+            not book.comic and { { label = "Fonts", value = fonts.name or S.font,
               value_font = Fonts.preview(fonts.name or S.font, app.MENU_SIZE),
-              act = function() app.font_open() end },
-        })),
-        app.menu_on_page(2, section("Page layout", {
+              act = function() app.font_open() end } } or {}))),
+        book.comic and {} or app.menu_on_page(2, section("Page layout", {
             { label = "Line spacing", value = string.format("%.2f", S.spacing), adjust = function(d)
                 S.spacing = math.floor(math.max(0.75, math.min(2.0, S.spacing + d * 0.05)) * 100 + 0.5) / 100
                 relayout()
@@ -3571,7 +3607,341 @@ function app.section_extent(cur, nxt)
     return math.floor(before + 0.5), math.floor(after + 0.5), after_chars
 end
 
+---------------------------------------------------------------- comics
+
+-- A comic (.cbz) reads like a book: its pictures are the pages
+-- (comic.lua pairs them for the two screens, the cover alone and each
+-- spread's halves side by side), drawn as big as each screen allows, with
+-- no status bars. Manga reads right to left: the first page of a pair is
+-- on the right, and turning goes the other way.
+
+-- Right to left: as chosen for this comic (Settings while reading it), else
+-- as its ComicInfo.xml says.
+function app.comic_rtl()
+    if not (book and book.comic) then return false end
+    local d = Store.get_comic_dir(book.path)
+    if d then return d == "rtl" end
+    return book.comic.rtl == true
+end
+
+-- The pages of the open comic, its pictures' sizes read from their headers
+-- (kept with the other images' sizes).
+function app.comic_pages()
+    local Comic = require("comic")
+    local t0 = love.timer.getTime()
+    local pages = Comic.pages(book.comic.names, function(src)
+        local d = image_dims[src]
+        if d == nil then
+            local w, h = Comic.dims(book.zip, src)
+            d = (w and h and w > 0 and h > 0) and { w, h } or false
+            image_dims[src] = d
+        end
+        if d then return d[1], d[2] end
+    end)
+    for _, pg in ipairs(pages) do pg.items = {} end
+    print(string.format("[comic] %d pictures, %d pages, sizes read in %.2fs", #book.comic.names, #pages,
+        love.timer.getTime() - t0))
+    return pages
+end
+
+-- A decoded page picture, no bigger than its screen (a spread: both
+-- screens); the decoded data is released.
+function app.comic_fit(id)
+    local w, h = id:getDimensions()
+    local ok, img = pcall(app.fit_image, id, require("comic").wide(w, h) and PAGE_W * 2 or PAGE_W, PAGE_H)
+    id:release()
+    if not ok then error(img, 0) end
+    return img
+end
+
+-- Which page of the pair a side shows: the first on the left, or right to
+-- left, on the right.
+function app.comic_side_page(side)
+    local first, second = spread.pages[spread.pi], spread.pages[spread.pi + 1]
+    if (side == "left") ~= app.comic_rtl() then return first end
+    return second
+end
+
+-- Where a page's picture goes: the part shown (rx, rw, rh: a spread's half),
+-- and x, y and the scale to draw it at. A spread's halves meet where the
+-- two screens do.
+function app.comic_place(pg, side, img)
+    local iw, ih = img:getDimensions()
+    local rx, rw = 0, iw
+    if pg.half then
+        rw = iw / 2
+        if (pg.half == 1) == app.comic_rtl() then rx = iw / 2 end
+    end
+    local sc = math.min(PAGE_W / rw, PAGE_H / ih)
+    local dw, dh = rw * sc, ih * sc
+    local x = (PAGE_W - dw) / 2
+    if pg.half then x = side == "left" and PAGE_W - dw or 0 end
+    return rx, rw, ih, x, (PAGE_H - dh) / 2, sc
+end
+
+function app.comic_draw(pg, side)
+    if not pg or pg.blank then return end
+    local img = get_image(pg.src)
+    if not img then
+        color(theme().dim)
+        love.graphics.setFont(ui.font)
+        love.graphics.printf("This page can't be shown", 40, PAGE_H / 2 - 20, PAGE_W - 80, "center")
+        return
+    end
+    local rx, rw, rh, x, y, sc = app.comic_place(pg, side, img)
+    local k = app.dim_pictures(theme()) and 0.68 or 1          -- (a dark theme: dimmed, as other pictures)
+    love.graphics.setColor(k, k, k)
+    local q = love.graphics.newQuad(rx, 0, rw, rh, img:getDimensions())
+    love.graphics.draw(img, q, x, y, 0, sc, sc)
+    q:release()
+end
+
+-- The reader's painter for a comic: a page on each screen, and the
+-- bookmark ribbon.
+function app.comic_painter()
+    local marked = bookmark_here() ~= nil
+    return function(side)
+        app.comic_draw(app.comic_side_page(side), side)
+        if marked and side == app.touch_side() then
+            local w, h = 24, 66
+            local x = side == "left" and 30 or PAGE_W - 30 - w
+            love.graphics.setColor(0.72, 0.22, 0.20, 0.95)
+            love.graphics.polygon("fill", x, 0, x + w, 0, x + w, h, x + w / 2, h - 10, x, h)
+        end
+    end
+end
+
+-- The next pair's pictures decoded on a thread meanwhile (the cover
+-- thread's work, on its own channels), so a page turn needn't wait.
+app.pages_waiting, app.page_jobs = 0, {}
+function app.comic_prefetch()
+    if not (book and book.comic and spread) then return end
+    for k = spread.pi + 2, spread.pi + 3 do
+        local pg = spread.pages[k]
+        if pg and pg.src and images[pg.src] == nil and not app.page_jobs[pg.src] then
+            local data = book:read_resource(pg.src)
+            if data then
+                if not app.page_thread then
+                    app.page_thread = love.thread.newThread("coverworker.lua")
+                    app.page_thread:start("page_jobs", "page_out")
+                end
+                love.thread.getChannel("page_jobs"):push({ path = book.path, name = pg.src, data = data })
+                app.page_jobs[pg.src] = true
+                app.pages_waiting = app.pages_waiting + 1
+            end
+        end
+    end
+end
+
+-- Pictures decoded since last time: kept with the others (the least
+-- recently drawn go, as in get_image).
+function app.comic_poll()
+    if app.pages_waiting == 0 then return false end
+    local got = false
+    while true do
+        local msg = love.thread.getChannel("page_out"):pop()
+        if not msg then break end
+        app.pages_waiting = math.max(0, app.pages_waiting - 1)
+        app.page_jobs[msg.name] = nil
+        if msg.image then
+            if book and book.comic and book.path == msg.path and images[msg.name] == nil then
+                local ok, img = pcall(app.comic_fit, msg.image)
+                if ok then
+                    images[msg.name] = img
+                    images_order[#images_order + 1] = msg.name
+                    if #images_order > IMAGES_KEEP then
+                        local old = table.remove(images_order, 1)
+                        if images[old] then images[old]:release() end
+                        images[old] = nil
+                    end
+                end
+            else
+                msg.image:release()
+            end
+        elseif msg.error then
+            print("[comic] " .. tostring(msg.name) .. ": " .. msg.error)
+        end
+        got = true
+    end
+    return got
+end
+
+-- The next volume: the comic after this one in its folder (by name, as
+-- My Books would: "Vol 2" after "Vol 1"), or nil.
+function app.comic_next_path()
+    if not (book and book.comic) then return nil end
+    local dir, name = book.path:match("^(.*)/([^/]+)$")
+    if not dir then return nil end
+    local list = {}
+    for _, e in ipairs(require("android").ls(dir)) do
+        if e:lower():match("%.cbz$") and not e:match("^%.") then list[#list + 1] = e end
+    end
+    table.sort(list, require("comic").natural_less)
+    for i, e in ipairs(list) do
+        if e == name then return list[i + 1] and (dir .. "/" .. list[i + 1]) or nil end
+    end
+end
+
+---------------------------------------------------------------- the magnifier
+
+-- In a comic, Y (or holding a page) shows the magnifier: the page on the
+-- touchscreen with a box on it, and what's in the box enlarged on the other
+-- screen, for speech bubbles' small print. Drag the box, or move it with the
+-- D-pad; A switches to the other page of the pair; B closes it.
+app.ZOOM = 2.5            -- how much bigger than the page as shown
+
+-- Open it on a page (the first of the pair that has a picture, or the one
+-- held), centred where it was held (u, v on that screen) or on the page.
+function app.zoom_open(side, u, v)
+    if not (book and book.comic and spread) then return end
+    local pg = side and app.comic_side_page(side)
+    if not (pg and pg.src) then
+        pg = nil
+        for k = spread.pi, spread.pi + 1 do
+            local c = spread.pages[k]
+            if not pg and c and c.src then pg = c end
+        end
+    end
+    if not pg then return end
+    if not app.zoom_load(pg) then app.toast("This page can't be shown") return end
+    local z = app.zoom
+    z.cx, z.cy = 0.5, 0.5
+    if u then
+        -- Where it was held, on the picture as the screen showed it.
+        local small = get_image(pg.src)
+        if small then
+            local _, rw, rh, x, y, sc = app.comic_place(pg, side, small)
+            z.cx, z.cy = (u - x) / (rw * sc), (v - y) / (rh * sc)
+        end
+    end
+    app.zoom_clamp()
+    app.zoom_back = app.mode
+    app.mode = "zoom"
+    redraw()
+end
+
+-- The page's picture decoded bigger (app.ZOOM times the screen), for the
+-- enlarged view. False if it can't be.
+function app.zoom_load(pg)
+    if app.zoom and app.zoom.img then app.zoom.img:release() end
+    app.zoom = nil
+    local data = book:read_resource(pg.src)
+    if not data then return false end
+    local ok, img = pcall(function()
+        local id = love.image.newImageData(love.filesystem.newFileData(data, pg.src))
+        local w, h = id:getDimensions()
+        local wide = require("comic").wide(w, h)
+        local okf, im = pcall(app.fit_image, id, PAGE_W * app.ZOOM * (wide and 2 or 1), PAGE_H * app.ZOOM)
+        id:release()
+        if not okf then error(im, 0) end
+        return im
+    end)
+    if not ok then print("[comic] magnifier: " .. tostring(img)) return false end
+    local iw, ih = img:getDimensions()
+    local z = { pg = pg, img = img, rx = 0, rw = iw, rh = ih, cx = 0.5, cy = 0.5 }
+    if pg.half then
+        z.rw = iw / 2
+        if (pg.half == 1) == app.comic_rtl() then z.rx = iw / 2 end
+    end
+    -- The box: the part of the page the other screen shows, as a share of it.
+    local fit = math.min(PAGE_W / z.rw, PAGE_H / z.rh)
+    z.bw = math.min(1, PAGE_W / (fit * app.ZOOM * z.rw))
+    z.bh = math.min(1, PAGE_H / (fit * app.ZOOM * z.rh))
+    app.zoom = z
+    return true
+end
+
+function app.zoom_clamp()
+    local z = app.zoom
+    z.cx = math.max(z.bw / 2, math.min(1 - z.bw / 2, z.cx))
+    z.cy = math.max(z.bh / 2, math.min(1 - z.bh / 2, z.cy))
+end
+
+function app.zoom_close()
+    if app.zoom and app.zoom.img then app.zoom.img:release() end
+    app.zoom = nil
+    app.mode = app.zoom_back or "reader"
+    app.zoom_back = nil
+    redraw()
+end
+
+-- Where the whole page is drawn on the touchscreen: x, y, scale.
+function app.zoom_page_place()
+    local z = app.zoom
+    local sc = math.min(PAGE_W / z.rw, PAGE_H / z.rh)
+    return (PAGE_W - z.rw * sc) / 2, (PAGE_H - z.rh * sc) / 2, sc
+end
+
+function app.zoom_draw(side)
+    local z = app.zoom
+    if not z then return end
+    local th = theme()
+    local k = app.dim_pictures(th) and 0.68 or 1
+    local iw, ih = z.img:getDimensions()
+    if side == app.touch_side() then
+        -- The whole page, the box on it, and what the buttons do.
+        local x, y, sc = app.zoom_page_place()
+        love.graphics.setColor(k, k, k)
+        local q = love.graphics.newQuad(z.rx, 0, z.rw, z.rh, iw, ih)
+        love.graphics.draw(z.img, q, x, y, 0, sc, sc)
+        q:release()
+        local bx, by = x + (z.cx - z.bw / 2) * z.rw * sc, y + (z.cy - z.bh / 2) * z.rh * sc
+        local bw, bh = z.bw * z.rw * sc, z.bh * z.rh * sc
+        love.graphics.setLineWidth(6)
+        love.graphics.setColor(0, 0, 0, 0.6)
+        love.graphics.rectangle("line", bx, by, bw, bh, 6, 6)
+        love.graphics.setLineWidth(3)
+        love.graphics.setColor(1, 0.62, 0.15, 1)
+        love.graphics.rectangle("line", bx, by, bw, bh, 6, 6)
+        color(th.bg, 0.9)
+        love.graphics.rectangle("fill", 0, PAGE_H - 92, PAGE_W, 92)
+        app.hints(48, nil, { "‹ ›", "move", "A", "other page", "B", "close" })
+    else
+        -- The box's part, as big as the screen.
+        local sw, sh = z.bw * z.rw, z.bh * z.rh
+        local sx, sy = z.rx + (z.cx - z.bw / 2) * z.rw, (z.cy - z.bh / 2) * z.rh
+        local sc = math.min(PAGE_W / sw, PAGE_H / sh)
+        love.graphics.setColor(k, k, k)
+        local q = love.graphics.newQuad(sx, sy, sw, sh, iw, ih)
+        love.graphics.draw(z.img, q, (PAGE_W - sw * sc) / 2, (PAGE_H - sh * sc) / 2, 0, sc, sc)
+        q:release()
+    end
+end
+
+-- The box moved to a point on the touchscreen's page.
+function app.zoom_touch(u, v)
+    local z = app.zoom
+    if not z then return end
+    local x, y, sc = app.zoom_page_place()
+    z.cx, z.cy = (u - x) / (z.rw * sc), (v - y) / (z.rh * sc)
+    app.zoom_clamp()
+    redraw()
+end
+
+function app.zoom_action(a)
+    local z = app.zoom
+    if not z then app.zoom_close() return end
+    -- A press moves the box most of its own size, so nothing is skipped.
+    if a == "left" or a == "prev" then z.cx = z.cx - z.bw * 0.6
+    elseif a == "right" or a == "next" then z.cx = z.cx + z.bw * 0.6
+    elseif a == "up" then z.cy = z.cy - z.bh * 0.6
+    elseif a == "down" then z.cy = z.cy + z.bh * 0.6
+    elseif a == "confirm" then
+        -- The other page of the pair (when it has a picture).
+        local other
+        for k = spread.pi, spread.pi + 1 do
+            local c = spread.pages[k]
+            if c and c.src and c ~= z.pg then other = c end
+        end
+        if other and app.zoom_load(other) then app.zoom_clamp() end
+    elseif a == "back" or a == "toc" or a == "menu" then app.zoom_close() return
+    end
+    if app.zoom then app.zoom_clamp() end
+    redraw()
+end
+
 local function draw_reader_pages()
+    if book.comic then return app.comic_painter() end
     local sec = current_section()
     local frac = book:fraction(pos.ch, pos.off)
     local left, right = spread.pages[spread.pi], spread.pages[spread.pi + 1]
@@ -8033,6 +8403,7 @@ local function render_canvases()
         painter = function(side)
             if side == r.side then reader(side); note.highlight(r) else note.draw_panel(side) end
         end
+    elseif app.mode == "zoom" then painter = app.zoom_draw
     elseif app.mode == "about" then painter = draw_about
     elseif app.mode == "help" then painter = app.draw_help
     elseif app.mode == "keyboard" then painter = app.kb_draw
@@ -8326,6 +8697,13 @@ local function turn(dir, fn)
     redraw()
 end
 
+-- Turn on (fwd) or back. A comic read right to left turns the other way
+-- on screen (the page flips toward the right).
+function app.turn_way(fwd)
+    local rtl = app.comic_rtl()
+    if fwd then turn(rtl and -1 or 1, next_spread) else turn(rtl and 1 or -1, prev_spread) end
+end
+
 ---------------------------------------------------------------- touch brightness
 
 -- Brightness popup shown while sliding a finger on the touchscreen.
@@ -8381,7 +8759,7 @@ local function touch_event(kind, sx, sy)
     -- percentage and a sample line) and applies it when the fingers lift.
     -- The size follows the square root of the pinch, so it changes gently.
     if kind == "pinch_start" then
-        gesture = app.mode == "reader" and { mode = "pinch", d0 = math.max(40, sx), size0 = S.font_size }
+        gesture = app.mode == "reader" and not book.comic and { mode = "pinch", d0 = math.max(40, sx), size0 = S.font_size }
             or { mode = "ignore" }
         return
     elseif kind == "pinch" then
@@ -8408,6 +8786,18 @@ local function touch_event(kind, sx, sy)
         return
     end
     local side, u, v = touch_to_page(sx, sy)
+    -- The magnifier: a finger on the page moves the box to it (the hints
+    -- along the foot are tapped as usual).
+    if app.mode == "zoom" and side == app.touch_side() and not app.asking then
+        if kind == "down" and v < PAGE_H - 92 then
+            gesture = { mode = "zoom" }
+            app.zoom_touch(u, v)
+            return
+        elseif gesture and gesture.mode == "zoom" then
+            if kind == "move" then app.zoom_touch(u, v) elseif kind == "up" then gesture = nil end
+            return
+        end
+    end
     -- Making a theme: dragging along a slider sets it directly (the slider
     -- under the finger when it went down, until it lifts).
     -- (A drag that's still going when the editor closed, A or B pressed,
@@ -8498,7 +8888,7 @@ local function touch_event(kind, sx, sy)
             -- Swipe left (toward the page's left edge) = next page, like a book.
             local du = gesture.u - gesture.u0
             if app.mode == "reader" and math.abs(du) > 60 and app.touch_clock() - gesture.t0 < 1.0 then
-                if du < 0 then turn(1, next_spread) else turn(-1, prev_spread) end
+                app.turn_way((du < 0) ~= app.comic_rtl())          -- (manga: a swipe the other way is on)
             elseif app.mode == "whatsnew" and math.abs(du) > 60 then
                 app.whatsnew_action(du < 0 and "next" or "prev")
             elseif app.mode == "menu" and math.abs(du) > 60 then
@@ -8885,8 +9275,10 @@ function handle_action(a)
         return
     end
 
+    if mode == "zoom" then app.zoom_action(a) return end
     if mode == "reader" then
-        if a == "next" or a == "right" or a == "down" then turn(1, next_spread)
+        if (a == "left" or a == "right") and app.comic_rtl() then app.turn_way(a == "left")    -- (manga: left is on)
+        elseif a == "next" or a == "right" or a == "down" then turn(1, next_spread)
         elseif a == "up" and app.flipped() then look.open()   -- turned round: D-pad up does Y's job
         elseif a == "prev" or a == "left" or a == "up" then turn(-1, prev_spread)
         elseif a == "bookmark" then toggle_bookmark()
@@ -8894,7 +9286,7 @@ function handle_action(a)
         elseif a == "prev_section" then jump_section(-1)
         elseif a == "menu" or a == "back" then app.mode = "menu"; menu.sel = app.MENU_START; menu.page = "main"; menu.top = nil
         elseif a == "toc" then look.open()          -- Y: look up a word
-        elseif a == "confirm" then note.open()
+        elseif a == "confirm" and not book.comic then note.open()      -- (a comic has no notes)
         end
         redraw()
         return
@@ -9076,6 +9468,10 @@ end
 -- Pressing and holding on the touchscreen: look up the word under the finger.
 function app.on_hold(side, u, v)
     if app.mode ~= "reader" and app.mode ~= "lookup" or app.asking or app.choosing then return end
+    if book and book.comic then
+        if app.mode == "reader" then app.zoom_open(side, u, v) end
+        return
+    end
     -- In look-up mode the other page is the definition: holds there do nothing.
     local cur = look.words[look.sel]
     if app.mode == "lookup" and cur and side ~= cur.side then return end
@@ -9147,7 +9543,7 @@ function app.on_tap(side, u, v)
             Store.save_settings(S)
         elseif S.tap == "next" then
             -- Turn pages: right half of the page goes forward, left half back.
-            if u >= PAGE_W / 2 then turn(1, next_spread) else turn(-1, prev_spread) end
+            app.turn_way((u >= PAGE_W / 2) ~= app.comic_rtl())     -- (manga: the left half is on)
         else
             action("menu")
         end
@@ -10853,6 +11249,7 @@ function love.run()
         if shop.net_poll() then got = true end
         if app.update_poll() then got = true end
         if app.cover_poll() then got = true end
+        if app.comic_poll() then got = true end
         if app.recv and app.recv_poll() then got = true end
         if app.cal and app.cal_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
@@ -10906,7 +11303,7 @@ function love.run()
                 if S.sb_show and S.sb_clock ~= "off" and app.CLOCK_MODES[app.mode] then redraw() end
             end
         end
-        if app.anim or app.task or library.pending or app.covers_waiting > 0 then
+        if app.anim or app.task or library.pending or app.covers_waiting > 0 or app.pages_waiting > 0 then
             love.timer.sleep(0.001)            -- animating or working: next frame
         elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or app.cal or app.bk or app.bk_quit_at
                 or (S.idle_min or 0) > 0 then

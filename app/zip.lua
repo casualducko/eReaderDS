@@ -76,6 +76,22 @@ function M:read(name)
     return nil, "unsupported compression " .. e.method
 end
 
+-- The first n bytes of a stored (not compressed) entry, without reading
+-- the rest (a comic's page pictures, to read their sizes); a compressed
+-- one whole. nil if it isn't there.
+function M:read_head(name, n)
+    local e = self.entries[name] or self.lower[name:lower()]
+    if not e then return nil end
+    if e.method ~= 0 then return self:read(name) end
+    local f = self.file
+    if not f then return nil end
+    f:seek("set", e.offset)
+    local hdr = f:read(30)
+    if not hdr or #hdr < 30 or hdr:sub(1, 4) ~= "PK\3\4" then return nil end
+    f:seek("cur", u16(hdr, 27) + u16(hdr, 29))
+    return f:read(math.min(n, e.csize)) or ""
+end
+
 function M:close()
     if self.file then self.file:close(); self.file = nil end
 end

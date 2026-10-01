@@ -627,12 +627,61 @@ local function open_txt(path)
     return book
 end
 
+-- A comic (.cbz): one picture a page, in a single "chapter" whose offsets
+-- count pictures (comic.lua: picture i is at (i-1)*2), so a place, a
+-- percentage and a bookmark work as in any book. book.comic holds the
+-- pages' names, and rtl when ComicInfo.xml says it's read right to left.
+local function comic_title(path, info)
+    if info.series then
+        return info.series .. (info.number and (" " .. info.number) or ""), info
+    end
+    return info.title or basename_title(path), info
+end
+
+local function open_cbz(path)
+    local z, err = Zip.open(path)
+    if not z then return nil, err end
+    local Comic = require("comic")
+    local ok, book, why = pcall(function()
+        local names, later = Comic.list(z)
+        if #names == 0 then
+            return nil, later > 0
+                and "its pages are WebP pictures, which eReaderDS can't show yet (convert them to JPEG)"
+                or "it has no pictures"
+        end
+        local info = Comic.info(z)
+        local b = setmetatable({ path = path, zip = z, toc = {}, classes = {},
+            comic = { names = names, rtl = info.rtl, later = later },
+            author = clean(info.writer or "") or "", cover = names[1] }, Book)
+        b.title = clean((comic_title(path, info)))
+        b.chapters = { { blocks = { { kind = "blank", off = 0 } }, anchors = {}, length = #names * 2,
+            weight = 1, start = 0 } }
+        b.total = 1
+        for _, c in ipairs(Comic.chapters(names)) do
+            b.toc[#b.toc + 1] = { title = clean(c.title), chapter = 1, off = (c.page - 1) * 2 }
+        end
+        return b
+    end)
+    if ok and book then return book end
+    z:close()
+    return nil, ok and why or book
+end
+
 -- Title, author, the author's sort name ("Suarez, Daniel") and the series
 -- (name and number) from an EPUB's package file, without opening the rest of
 -- the book: for the library list. nil if it can't be read.
 function M.meta(path)
     local okz, z = pcall(Zip.open, path)
     if not okz or not z then return nil end
+    if path:lower():match("%.cbz$") then
+        -- A comic: its ComicInfo.xml (series and number, writer), else its file name.
+        local ok, info = pcall(require("comic").info, z)
+        z:close()
+        if not ok then return nil end
+        local title = clean((comic_title(path, info)))
+        return { title = title, author = clean(info.writer), series = clean(info.series),
+            index = tonumber(info.number or "") }
+    end
     local ok, res = pcall(function()
         local container = z:read("META-INF/container.xml")
         local opf_path = container and (container:match('full%-path%s*=%s*"([^"]+)"')
@@ -694,6 +743,7 @@ end
 function M.open(path)
     local ext = (path:match("%.([^.]+)$") or ""):lower()
     if ext == "txt" then return open_txt(path) end
+    if ext == "cbz" then return open_cbz(path) end
     return open_epub(path)
 end
 
@@ -719,7 +769,7 @@ end
 
 -- The XPointer of the paragraph at chapter i, offset off (nil for TXT books).
 function Book:xpointer(i, off)
-    if not self.zip then return nil end
+    if not self.zip or self.comic then return nil end
     local c = self:chapter(i)
     if not c then return nil end
     local node
@@ -736,7 +786,7 @@ end
 -- the chapter alone (offset nil) if nothing in it matched.
 function Book:resolve_xpointer(xp)
     local i = tonumber((xp or ""):match("^/body/DocFragment%[(%d+)%]"))
-    if not i or not self.zip or not self.chapters[i] then return nil end
+    if not i or not self.zip or self.comic or not self.chapters[i] then return nil end
     local c = self:chapter(i)
     local rest = xp:match("^/body/DocFragment%[%d+%]/body(.*)$") or ""
     local steps = {}
@@ -821,7 +871,7 @@ local NOTE_BLOCKS = { p = true, li = true, aside = true, div = true, dd = true, 
     section = true, blockquote = true, td = true, span = false }
 -- The raw HTML of a file and the position of the tag with id `frag`.
 function Book:find_id(file, frag)
-    if not self.zip then return nil end
+    if not self.zip or self.comic then return nil end
     if self.html_cache and self.html_cache.file == file then
     else
         self.html_cache = { file = file, html = self.zip:read(file) }

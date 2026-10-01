@@ -2,7 +2,7 @@
 -- while the "Send books over Wi-Fi" screen is open. A phone or computer on the
 -- same network opens the page it serves, picks files, and they're uploaded
 -- one at a time (POST /upload?name=…, the file as the body) straight into the
--- books folder (.epub, .txt) or the fonts folder (.ttf, .otf).
+-- books folder (.epub, .cbz, .txt) or the fonts folder (.ttf, .otf).
 --
 -- Started with { books = dir, fonts = dir, version }. Control on "recv_ctl" ("stop");
 -- reports on "recv_out":
@@ -82,7 +82,7 @@ footer { margin-top: 28px; font-size: 15px; color: var(--dim); text-align: cente
 <div><h1>Send to eReaderDS</h1><div id="conn"><i></i><span>Connecting…</span></div></div>
 </header>
 <div id="drop">
-<label class="btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Choose books<input id="pick" type="file" multiple accept=".epub,.txt,.ttf,.otf"></label>
+<label class="btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Choose books<input id="pick" type="file" multiple accept=".epub,.cbz,.txt,.ttf,.otf"></label>
 <div class="hint">or drop them here</div>
 <div class="chips"><span>EPUB</span><span>TXT</span><span>TTF</span><span>OTF</span></div>
 </div>
@@ -90,7 +90,7 @@ footer { margin-top: 28px; font-size: 15px; color: var(--dim); text-align: cente
 <ul id="list"></ul>
 <footer>Books go to My Books and fonts to Settings → Fonts.<br>Keep eReaderDS on its Send Books screen until they're sent.</footer>
 </main><script>
-var OK = /\.(epub|txt|ttf|otf)$/i, FONT = /\.(ttf|otf)$/i, queue = [], busy = false, have = {}, tally = { books: 0, fonts: 0, bad: 0 };
+var OK = /\.(epub|cbz|txt|ttf|otf)$/i, FONT = /\.(ttf|otf)$/i, queue = [], busy = false, have = {}, tally = { books: 0, fonts: 0, bad: 0 };
 var list = document.getElementById('list'), conn = document.getElementById('conn');
 var ICON = {
   book: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5zM12 6.5v13"/></svg>',
@@ -127,7 +127,7 @@ function add(files) {
     li.querySelector('.ic').innerHTML = FONT.test(f.name) ? ICON.font : ICON.book;
     li.querySelector('.t').innerHTML = title(f.name);
     list.insertBefore(li, list.firstChild);
-    if (!OK.test(f.name)) { finish(li, false, 'Not a book or font (eReaderDS takes .epub, .txt, .ttf and .otf)'); tally.bad++; continue; }
+    if (!OK.test(f.name)) { finish(li, false, 'Not a book or font (eReaderDS takes .epub, .cbz, .txt, .ttf and .otf)'); tally.bad++; continue; }
     if (f.size > 300 * 1024 * 1024) { finish(li, false, 'Too big (the limit is 300 MB)'); tally.bad++; continue; }
     var job = { f: f, li: li };
     wait(job);
@@ -291,8 +291,8 @@ local function upload(client, query, headers)
     local name = clean_name(query:match("[?&]name=([^&]*)"))
     local ext = (name:match("%.([^.]+)$") or ""):lower()
     local font = ext == "ttf" or ext == "otf"
-    if name == "" or not (ext == "epub" or ext == "txt" or font) then
-        return reply(client, 415, false, { error = "Only books (.epub, .txt) and fonts (.ttf, .otf)" })
+    if name == "" or not (ext == "epub" or ext == "cbz" or ext == "txt" or font) then
+        return reply(client, 415, false, { error = "Only books (.epub, .cbz, .txt) and fonts (.ttf, .otf)" })
     end
     local dir = font and dirs.fonts or dirs.books
     if not dir then return reply(client, 500, false, { error = "There's no fonts folder" }) end
@@ -380,7 +380,7 @@ local function handle(client)
         send(client, 200, "text/html; charset=utf-8", PAGE)
     elseif method == "GET" and p == "/info" then
         send(client, 200, "application/json", '{"version":' .. json_str(dirs.version or "") .. ',"books":['
-            .. table.concat(names(dirs.books, { epub = true, txt = true }), ",") .. '],"fonts":['
+            .. table.concat(names(dirs.books, { epub = true, cbz = true, txt = true }), ",") .. '],"fonts":['
             .. table.concat(names(dirs.fonts, { ttf = true, otf = true }), ",") .. "]}")
     elseif method == "GET" and FONT_FILES[p] then
         local data = love.filesystem.read(FONT_FILES[p])

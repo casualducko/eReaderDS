@@ -5,8 +5,11 @@
 require("love.filesystem")
 require("love.image")
 
-local jobs = love.thread.getChannel("cover_jobs")
-local out = love.thread.getChannel("cover_out")
+-- (Started with other channels' names, the same work for a comic's next
+-- pages: "page_jobs", "page_out".)
+local jobs_name, out_name = ...
+local jobs = love.thread.getChannel(jobs_name or "cover_jobs")
+local out = love.thread.getChannel(out_name or "cover_out")
 
 while true do
     local job = jobs:demand()
@@ -15,6 +18,6 @@ while true do
         return love.image.newImageData(love.filesystem.newFileData(job.data, job.name))
     end)
     job.data = nil
-    if ok then out:push({ path = job.path, image = id })
-    else out:push({ path = job.path, error = tostring(id) }) end
+    if ok then out:push({ path = job.path, name = job.name, image = id })
+    else out:push({ path = job.path, name = job.name, error = tostring(id) }) end
 end
