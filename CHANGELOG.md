@@ -2,21 +2,32 @@
 
 ## v1.19.0
 
-- **Themes:** grouped as All, Light, Dark and Custom (your own themes are listed in All, Light and Dark too, tagged Custom). Make your own in a theme editor: page and text colours set with Brightness, Warmth and Tint sliders (OKLab, so steps look even), curated starting swatches for light and dark pages, a Light or Dark template, a name typed on the keyboard (with a clear button and Cancel that asks first), Save, Reset Colors and Delete (which asks). Copy any theme straight into the editor. The Themes pages use a neutral grey. A theme you tap is kept at once (saved on leaving); sliding the list only scrolls it.
-- **Hide built-in themes:** Hide on a theme's row; the list's foot counts the hidden ones, and Hidden Themes (from that count or the last row) restores one or all (Restore All, Restore All Light, Restore All Dark). Hiding the theme in use moves to the next one.
-- **Highlight by touch:** hold a word to look it up; hold and drag to choose words. In look-up, Start Highlight / Save Highlight / Remove Highlight with Cancel; after Start Highlight, dragging on the page chooses words; the buttons move to the top when the word is near the bottom, and the definition leaves room for them.
-- **Highlight colours:** Yellow, Green, Blue, Pink or Subtle (Settings → Reading & Device), shaded to suit each theme; **Highlights on dark themes: Bright** uses highlighter colours with the words on them in dark ink. A highlight over several lines is drawn as one block.
-- **Dim pictures on dark themes** (on by default; line art keeps taking the theme's ink).
-- **Back Up & Restore** (Settings): My Settings & Reading, or Everything with Books (zips in the books folder's Backups, written on a thread with progress). Restore lists your backups first (made here, then from another system, marked Stock / ROCKNIX / GammaOS), then the automatic copies; a copy of your settings is made before every restore and reset (the newest 3 kept). Places are stored relative to the books folder, so a backup restores on another system. Restoring writes the settings all at once (nothing changes if it fails), skips books the card can't hold, removes data files the backup lacks (not logins), and keeps this device's sync and Calibre ids (taking the backup's after a reset only if it was made on this system). Each step is shown; quitting waits for a restore or reset to finish.
-- **Reset eReaderDS** (Back Up & Restore → Start fresh): clears settings, places, bookmarks, highlights, themes and logins, after a backup, and closes. The launcher brings Book Reader settings over only on the very first start, not after a reset.
-- **Swipe up from the bottom edge** while reading opens Settings (brightness slides start above it).
-- **Tappable, larger hints:** the button hints along the touchscreen's foot are 26 px and can be tapped (A, B, X, Y, Select, Start); not A under a question card.
-- **Sync:** your place is sent without asking unless another device's place on the server is newer; the question names that device. Stay or Jump deals with every new place for the book (one under each of its names). Another device's place in the paragraph your page starts in counts as here. Nothing is sent during or after a restore or reset.
-- **Word cursor (Y):** up and down stay on the same page, going round at its top and bottom.
-- **Default brightness:** 50% on the stock firmware, 60% on ROCKNIX (was 20% and 40%).
-- **Messages:** shorter, and shown for as long as they take to read (1.2 s plus a quarter second a word after the third, up to 6 s). The update notice shows both versions.
-- **Fixes from a full review:** crashes, data safety (fsync'd atomic writes), memory and network; thread errors no longer crash the app; My Books keeps the open or chosen book selected when it's sorted again.
-- **tools/gammaos-ready.sh:** says when GammaOS has finished starting.
+Make eReaderDS look the way you like, highlight with your finger, and never lose your reading again.
+
+- **Themes, your way.** Themes are now grouped as All, Light, Dark and Custom, and you can make your own. Start from a light or dark template (or copy any theme), then set the page and text colours with three sliders, Brightness, Warmth and Tint, plus hand-picked starting colours. Give it a name, and it's listed alongside the built-in ones. Tap a theme and it's kept straight away. Don't use some of the built-in themes? Hide them, and bring them back from Hidden Themes, one at a time or all at once.
+- **Highlight with your finger.** Hold a word to look it up, or hold and drag across a passage to highlight it. Start Highlight, Save Highlight and Remove Highlight buttons sit right under the words (they move up when the word is near the bottom). A highlight over several lines is now one smooth block of colour.
+- **Highlight colours.** Yellow, Green, Blue, Pink or Subtle, shaded to suit every theme. On dark themes choose Muted, or Bright for real highlighter colours with the words in dark ink. (Settings → Reading & Device.)
+- **Back Up & Restore.** Save your settings, places, bookmarks, highlights and themes, or everything including your books, as one zip in the Backups folder. Restore it any time, on the same handheld or on another system: a stock backup restores on ROCKNIX or GammaOS, with your places finding the books there. A copy of your settings is made before every restore, so you can always go back.
+- **Reset eReaderDS.** Start fresh, like a new install, without losing your books. A backup is made first, so Restore can undo it.
+- **Swipe up for Settings.** While reading, swipe up from the bottom edge of the touchscreen to open Settings.
+- **Tap the hints.** The button hints along the bottom of the touchscreen are bigger, and you can tap them: tap "B back" to go back, "A select" to choose.
+- **Quieter sync.** Your place is sent without asking unless another device has a newer one, and then the question says which device. Places that only look different because the other device breaks its lines differently no longer ask at all.
+
+Also new:
+
+- **Dim pictures on dark themes**, so a bright picture doesn't glare at night (Settings → Reading & Device; line art still takes the theme's ink).
+- **The word cursor (Y)** goes round from the top line of the page to the bottom, and back.
+- **Brighter start:** 50% on the stock firmware, 60% on ROCKNIX (was 20% and 40%).
+- **Shorter messages**, each shown as long as it takes to read. The update notice shows both versions (v1.18.0 → v1.19.0).
+- **Theme pages** on a neutral grey, so colours are easy to judge; the keyboard for a theme's name has a clear button, and Cancel asks before throwing away what you typed.
+- **tools/gammaos-ready.sh** (for developers): says when GammaOS has finished starting.
+
+Fixes and details:
+
+- A full review fixed crashes, made saving safer (files written whole, then swapped in, and flushed to the card), cut memory use and tidied the network code. An error in a background task no longer crashes the app.
+- Restoring writes your settings all at once (nothing changes if it fails), skips books the card can't hold and says how many, and keeps each system's own sync and Calibre identity. Restore, Reset and backups show each step; quitting waits for a restore to finish. The restore list puts backups made here first, then ones from other systems (marked Stock, ROCKNIX or GammaOS), then the automatic copies (the newest 3 are kept).
+- Sync: Stay or Jump deals with every new place for a book (a book can be on the server under two names), and nothing is sent during a restore or reset.
+- My Books keeps the open or chosen book selected when the list is sorted again. The launcher brings Book Reader settings over only on the very first start, not after a reset.
 
 ## v1.18.0
 
