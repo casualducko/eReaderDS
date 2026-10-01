@@ -167,6 +167,7 @@ one-page summary of the buttons and touchscreen.
 - Slide up/down to change brightness; keep going below 1% for Extra dim. (On
   a list longer than the screen, such as My Books, Get Books, Table of
   Contents or Fonts, sliding up/down scrolls it instead.)
+- Swipe up from the bottom edge to open Settings (as X does).
 - Pinch with two fingers to make the text bigger or smaller.
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.

@@ -6100,6 +6100,7 @@ app.HELP = {
         { "Pinch", "Text size" },
         { "Top-right corner", "Bookmark" },
         { "Top edge", "Show or hide the status bars" },
+        { "Bottom edge", "Swipe up: Settings" },
         { "Hold a word", "Look it up" },
         { "Tap a word", "While highlighting: highlight up to it" },
         { "Note number", "Show the footnote" },
@@ -8405,7 +8406,7 @@ local function touch_event(kind, sx, sy)
     elseif kind == "move" and gesture then
         local du, dv = u - gesture.u0, v - gesture.v0
         gesture.moved = math.max(gesture.moved, math.abs(du), math.abs(dv))
-        gesture.u = u
+        gesture.u, gesture.v = u, v
         if gesture.held then
             -- A press-and-hold (look-up) doesn't turn into a swipe or slide;
             -- dragging on (past a wobble, and only from a word it opened)
@@ -8419,6 +8420,9 @@ local function touch_event(kind, sx, sy)
             app.hl_drag(side, u, v)
         elseif not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
             gesture.mode = "swipe"          -- mostly horizontal: page turn on release
+        elseif not gesture.mode and app.mode == "reader" and gesture.v0 > PAGE_H - app.EDGE_H
+                and dv < -24 and -dv > math.abs(du) * 1.5 then
+            gesture.mode = "edge"           -- up from the bottom edge: Settings on release (not brightness)
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5
                 and gesture.side == "right" and app.list_scrolls() then
             -- On a list longer than the screen, a vertical slide scrolls it
@@ -8456,6 +8460,8 @@ local function touch_event(kind, sx, sy)
         if gesture.mode == "brightness" then
             if overlay then overlay.hide_at = now + 0.9 end
             Store.save_settings(S)
+        elseif gesture.mode == "edge" then
+            if app.mode == "reader" and gesture.v0 - (gesture.v or gesture.v0) > 90 then app.press_hint("menu") end
         elseif gesture.mode == "swipe" then
             -- Swipe left (toward the page's left edge) = next page, like a book.
             local du = gesture.u - gesture.u0
@@ -8475,6 +8481,10 @@ local function touch_event(kind, sx, sy)
         gesture = nil
     end
 end
+
+-- How far up from the touchscreen's bottom a swipe up opens Settings (above
+-- that, sliding up is brightness).
+app.EDGE_H = 90
 
 -- The list on screen that a slide scrolls: its state (with sel and top), the
 -- number of entries, how many show at once (both pages for two-page lists) and
