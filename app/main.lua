@@ -3828,7 +3828,7 @@ function app.theme_set_filter(filter, keep)
     end
     -- The theme in use highlighted; if it isn't in this list, none is (0),
     -- so switching lists never changes the theme.
-    T.sel, T.top = 0, 1
+    T.sel, T.top, T.seen_sel = 0, 1, nil
     for i, t in ipairs(T.list) do if t.name == keep then T.sel = i end end
 end
 
@@ -3979,8 +3979,12 @@ function app.theme_draw(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     local row_h = app.THEME_ROW_H
     local rows = list_rows(row_h)
-    if T.sel < T.top then T.top = math.max(1, T.sel) end
-    if T.sel >= T.top + rows then T.top = T.sel - rows + 1 end
+    -- (Kept in view when the highlight moves; slid away from it, it stays.)
+    if T.sel ~= T.seen_sel then
+        T.seen_sel = T.sel
+        if T.sel < T.top then T.top = math.max(1, T.sel) end
+        if T.sel >= T.top + rows then T.top = T.sel - rows + 1 end
+    end
     love.graphics.setFont(ui.title)
     color(th.fg)
     local title = T.filter == "hidden" and "Hidden Themes" or app.night and "Night Mode Theme" or "Themes"
@@ -8478,10 +8482,9 @@ function app.list_scroll(top)
     top = math.max(1, math.min(math.max(1, n - shown + 1), top))
     if top == l.top then return end
     l.top = top
-    local was = l.sel
-    l.sel = math.max(top, math.min(top + shown - 1, l.sel))
-    -- (Themes: the one highlighted is the one shown, and kept.)
-    if app.mode == "themes" and l.sel ~= was and app.themes.list[l.sel] and not app.themes.list[l.sel].hidden_row then app.theme_pick() end
+    -- (Not on Themes: there the highlighted one is the one in use, chosen
+    -- by a tap or the D-pad, so sliding the list only scrolls it.)
+    if app.mode ~= "themes" then l.sel = math.max(top, math.min(top + shown - 1, l.sel)) end
     if app.mode == "shop" then shop.move(0) end            -- near the end: load more
     redraw()
 end
