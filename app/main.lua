@@ -6074,7 +6074,7 @@ function app.update_check(by_hand)
             end)
             if app.mode ~= "update" and not rel.skipped then
                 -- Tapping it opens the update (so do Settings, and Start in the library).
-                app.toast("v" .. rel.version .. " is available\nTap to update", 8, app.update_open)
+                app.toast("Update: v" .. app.update_current() .. " → v" .. rel.version .. "\nTap to update", 8, app.update_open)
             end
         else
             app.upd = { state = (by_hand and err) and "error" or "none", message = err, checked = not err }
