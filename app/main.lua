@@ -2704,7 +2704,12 @@ function app.sync_decide(b, how, docs, results)
             return stands(stale, (saved_note and (saved_note .. " · ") or "") .. device .. " was at " .. there, saved_head)
         end
     end
-    local function go() app.sync_go(b, r, rdoc, ch, off) end
+    -- (Answered: every new place there is dealt with, not just the one
+    -- shown. A book can be under two names, each with its own copy.)
+    local function seen_all()
+        for _, e in ipairs(new) do app.sync_set_seen(b.path, e.doc, e.r.timestamp) end
+    end
+    local function go() seen_all(); app.sync_go(b, r, rdoc, ch, off) end
     if now and not moved then go() return end
     -- Until it's answered, nothing is sent for this book (not even on quitting).
     app.sync.checked[b.path] = nil
@@ -2718,7 +2723,7 @@ function app.sync_decide(b, how, docs, results)
         on_no = function()
             if book ~= b then return end
             app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
-            app.sync_set_seen(b.path, rdoc, r.timestamp)       -- dealt with
+            seen_all()                                          -- dealt with
             if app.sync_auto() == "on" then
                 app.sync.pushed[b.path] = nil
                 app.sync_push()
