@@ -216,7 +216,8 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
    margins, Justify text, Hyphenation. **More settings:** **Night Mode**
    ([below](#night-mode)), **Status Bar ›** (what the top and bottom lines
    show, and the clock style), **Reading & Device ›** (page-turn animation,
-   what a tap does, dictionary, which hand holds the buttons, screens off
+   what a tap does, highlight color, dimming pictures on dark themes,
+   dictionary, which hand holds the buttons, screens off
    after a while, closing the lid, time zone), **KOReader Sync ›**
    ([below](#koreader-sync)). Then **Help**, **About eReaderDS ›** (What's
    New, Check for Updates, Update notices, Report a Problem, About &
@@ -312,17 +313,19 @@ buttons for the field you're in.
 
 ## Themes
 
-**Settings → Theme** shows every theme with a swatch, your book previewed
-in the highlighted one on the top screen. **A** uses it. Along the title,
-**All · Light · Dark · Custom** narrow the list: press left/right, or tap one.
+**Settings → Theme** shows every theme with a swatch. Tap one, or move to it,
+and it's your theme at once (your book shows it on the top screen); B or A
+goes back. Along the title, **All · Light · Dark · Custom** narrow the list:
+press left/right, or tap one (that alone doesn't change your theme).
 
 **Custom** holds themes you make:
 
-- **New Theme** asks **Light** or **Dark** to start from. Or, on any other
-  list, press **Y** on a theme to **copy** it (say, Sepia that's almost
-  right) and change the copy.
-- **Y** on one of yours changes it. Yours are also listed under All, and
-  Light or Dark by their page, tagged **Custom**.
+- **New Theme** asks **Light** or **Dark** to start from.
+- **Copy any theme** (say, Sepia that's almost right): **Y** on a built-in
+  theme, or **Y → Make a Copy** on one of yours, or tap **Copy** on the
+  highlighted row. The copy opens in the editor.
+- **Change one of yours:** **Y → Change It**, or tap **Change**. Yours are
+  also listed under All, and Light or Dark by their page, tagged **Custom**.
 - In the editor, the top screen shows your book in the colors as you go:
   - **Name**: tap it (or A) to type one; the **×** clears it.
   - **Page color** / **Text color**: which one the rest changes (**Y**
@@ -428,10 +431,17 @@ self-signed certificate. To hide a built-in catalog, add `gutenberg = off` or
 ## Highlights
 
 **By touch:** hold a word on the touchscreen (its definition opens on the
-other page) and tap **Highlight**, or keep holding and **drag** to choose
-more words, then tap **Highlight** (**Cancel** to keep just looking it up).
-Hold a highlighted word for **Remove Highlight**. This works on the
-touchscreen's page; for the other one, use the buttons:
+other page) and tap **Start Highlight**, then tap or drag to the last word
+and tap **Save Highlight**. Or keep holding after the definition opens and
+**drag** over the words, then **Save Highlight**. **Cancel** leaves it.
+Hold a highlighted word for **Remove Highlight**. (A word picked with the Y
+cursor gets the same buttons on the touchscreen; move the cursor to the
+last word, then Save.)
+
+**Highlight color:** Yellow (the default), Green, Blue, Pink or Subtle, in
+Settings → Reading & Device; it's shaded to suit each theme, light or dark.
+
+**With the buttons:** press **Y** for the word cursor, move to the first word, press **Select**, move
 
 **With the buttons:** press **Y** for the word cursor, move to the first word, press **Select**, move
 to the last word (the highlight grows as you go, across both pages), and press

@@ -23,6 +23,8 @@ local DEFAULTS = {
     seen_version = "", -- the version last run: after an update, "what's new" is offered once
     update_notices = true, -- check for a newer version on launch and say so
     night_theme = "off", -- a theme used automatically at night ("off" or a theme's name)
+    hl_color = "yellow", -- highlights: "yellow" | "green" | "blue" | "pink" | "subtle" (the selection colour)
+    dim_pictures = true, -- pictures in books drawn darker on a dark theme
     night_from = 21,   -- ... from this hour (0-23, the device's clock)
     night_to = 7,      -- ... until this one
     skip_version = "", -- a version the reader chose to skip (not mentioned again)
@@ -232,6 +234,7 @@ function M.load_settings()
         lid = { sleep = true, screen = true },
         tap = { next = true, menu = true },
         anim = { flip = true, fade = true, off = true },
+        hl_color = { yellow = true, green = true, blue = true, pink = true, subtle = true },
         kosync_match = { binary = true, filename = true },
         kosync_auto = { off = true, ask = true, on = true },
     }

@@ -934,6 +934,29 @@ function app.hl_at(w)
     end
 end
 
+-- The highlighter's colour on a theme: Settings → Reading & Device. A soft
+-- shade of it a little darker than a light page, or a deeper one a little
+-- lighter than a dark page, so the text on it reads the same. "Subtle":
+-- the theme's own selection colour.
+app.HL_HUES = { yellow = 100, green = 145, blue = 245, pink = 345 }
+function app.hl_colour(th)
+    local hue = app.HL_HUES[S.hl_color]
+    if not hue then return th.sel end
+    local L = app.rgb_lab(th.bg[1], th.bg[2], th.bg[3])[1]
+    local dark = L < 50
+    local l, c = dark and L + 17 or L - 8, dark and 0.055 or 0.085
+    -- (Yellow is only highlighter-yellow when light and strong; darker, it's khaki.)
+    if S.hl_color == "yellow" and not dark then l, c = L - 2, 0.13 end
+    local h = math.rad(hue)
+    local function axis(v) return math.max(-100, math.min(100, math.floor(v / app.TEDIT_CHROMA * 100 + 0.5))) end
+    return app.lab_rgb({ math.max(0, math.min(100, l)), axis(c * math.sin(h)), axis(c * math.cos(h)) })
+end
+
+-- Pictures drawn darker on a dark theme (a bright one glares at night).
+function app.dim_pictures(th)
+    return S.dim_pictures and app.theme_kind(th) == "dark"
+end
+
 -- Bands behind the highlighted words of a page (drawn before the text). A
 -- band runs on across the space to the next highlighted word on its line.
 function app.hl_bands(page, ox, oy)
@@ -947,7 +970,7 @@ function app.hl_bands(page, ox, oy)
         end
     end
     if #marked == 0 then return end
-    color(theme().sel)
+    color(app.hl_colour(theme()))
     for i, it in ipairs(marked) do
         local x2 = it.x + it.font:getWidth(it.text)
         local nx = seq[i + 1] == seq[i] + 1 and marked[i + 1]   -- only the very next word, not one further on
@@ -969,8 +992,9 @@ function app.look_buttons()
     local w = look.words[look.sel]
     if not w then return {} end
     local list
-    if look.hl_start then list = { { "save", "Highlight" }, { "cancel", "Cancel" } }
-    else list = { { "toggle", app.hl_at(w) and "Remove Highlight" or "Highlight" }, { "close", "Cancel" } } end
+    if look.hl_start then list = { { "save", "Save Highlight" }, { "cancel", "Cancel" } }
+    elseif app.hl_at(w) then list = { { "remove", "Remove Highlight" }, { "close", "Cancel" } }
+    else list = { { "start", "Start Highlight" }, { "close", "Cancel" } } end
     local gap, total = 24, -24
     for _, b in ipairs(list) do b.w = ui.font:getWidth(b[2]) + 72; total = total + b.w + gap end
     local on_text = look.hl_start or w.side == app.touch_side()
@@ -997,13 +1021,16 @@ function app.look_bar(side)
         color(th.dim, 0.5)
         love.graphics.line(m.inner, top, PAGE_W - m.outer, top)
         if look.hl_start then
+            -- How to choose the rest: by touch on this screen, or the cursor
+            -- when the words are on the other one.
             love.graphics.setFont(ui.small)
             color(th.fg)
-            love.graphics.printf("Drag or tap to choose the words", 0, top + 8, PAGE_W, "center")
+            love.graphics.printf(w.side == side and "Tap or drag to choose the words, then Save"
+                or "Move the cursor to the last word, then Save", 0, top + 8, PAGE_W, "center")
         end
     end
     for _, b in ipairs(list) do
-        app.button(b.x, b.y, b.w, b.h, b[2], nil, (b[1] == "save" or b[1] == "toggle") and "strong" or "soft")
+        app.button(b.x, b.y, b.w, b.h, b[2], nil, b[1] ~= "close" and b[1] ~= "cancel" and "strong" or "soft")
     end
 end
 
@@ -1015,11 +1042,8 @@ function app.look_bar_tap(side, u, v)
             if b[1] == "save" then app.hl_select()
             elseif b[1] == "cancel" then look.hl_start = nil; look.find()
             elseif b[1] == "close" then app.on_back()        -- (out of look-up, as B does)
-            else
-                -- One word: highlighted (start and end on it), or its highlight removed.
-                if not app.hl_at(look.words[look.sel]) then look.hl_start = look.sel end
-                app.hl_select()
-            end
+            elseif b[1] == "start" then look.hl_start = look.sel   -- (then choose the rest, and Save)
+            else app.hl_select() end                         -- remove: the highlight this word is in
             redraw()
             return true
         end
@@ -3072,6 +3096,14 @@ local function more_items()
                 S.tap = S.tap == "next" and "menu" or "next"
             end },
         }),
+        section("Highlights and pictures", {
+            { label = "Highlight color", value = ({ yellow = "Yellow", green = "Green", blue = "Blue", pink = "Pink",
+                subtle = "Subtle" })[S.hl_color] or "Yellow",
+              adjust = function(d) S.hl_color = cycle({ "yellow", "green", "blue", "pink", "subtle" }, S.hl_color, d) end },
+            { label = "Dim pictures on dark themes", value = S.dim_pictures and "On" or "Off", adjust = function()
+                S.dim_pictures = not S.dim_pictures
+            end },
+        }),
         section("Look up", {
             { label = "Dictionary", value = look.only() or "All", adjust = function(d)
                 local names = { "all" }
@@ -3231,9 +3263,11 @@ local function draw_page(page, side, top)
         elseif it.kind == "image" then
             local img = get_image(it.src)
             if img then
-                love.graphics.setColor(1, 1, 1)
-                local iw, ih = img:getDimensions()
                 local ink = app.image_ink[it.src] and app.ink_shader()
+                -- (Line art takes the theme's ink; a picture on a dark theme is dimmed.)
+                local k = not ink and app.dim_pictures(th) and 0.68 or 1
+                love.graphics.setColor(k, k, k)
+                local iw, ih = img:getDimensions()
                 if ink then
                     ink:send("ink", { th.fg[1], th.fg[2], th.fg[3] })
                     love.graphics.setShader(ink)
@@ -3595,7 +3629,7 @@ end
 -- if it's still listed.
 function app.theme_set_filter(filter, keep)
     local T = app.themes
-    keep = keep or (T.list[T.sel] and T.list[T.sel].name)
+    keep = keep or app.theme_current()
     T.filter = filter
     app.theme_filter_last = filter
     T.list = {}
@@ -3610,7 +3644,9 @@ function app.theme_set_filter(filter, keep)
         end
         table.sort(T.list, function(a, b) return a.name:lower() < b.name:lower() end)
     end
-    T.sel, T.top = 1, 1
+    -- The theme in use highlighted; if it isn't in this list, none is (0),
+    -- so switching lists never changes the theme.
+    T.sel, T.top = 0, 1
     for i, t in ipairs(T.list) do if t.name == keep then T.sel = i end end
 end
 
@@ -3624,28 +3660,34 @@ function app.theme_open()
     redraw()
 end
 
-function app.theme_use()
+-- The highlighted theme is used at once (moving to it or tapping it), the
+-- way it shows on the other screen; it's saved on leaving the page.
+function app.theme_pick()
     local t = app.themes.list[app.themes.sel]
-    if t and t.new then app.tedit_new() return end
-    if not t then return end
+    if not t or t.new then return end
     if app.night then S.night_theme = t.name else S.theme = t.name end
-    Store.save_settings(S)
+    app.themes.changed = true
+end
+
+function app.theme_leave()
+    if app.themes.changed then Store.save_settings(S); app.themes.changed = nil end
     app.mode = "menu"
     redraw()
 end
 
+-- A (or tapping the highlighted theme again): done; on New Theme, make one.
+function app.theme_use()
+    local t = app.themes.list[app.themes.sel]
+    if t and t.new then app.tedit_new() return end
+    app.theme_pick()
+    app.theme_leave()
+end
+
 function app.theme_action(a)
     local T = app.themes
-    if a == "toc" then
-        local t = T.list[T.sel]
-        if t and t.custom then app.tedit_open(t)                 -- Y: change one of yours
-        elseif t and not t.new then                           -- Y: copy a built-in one to change
-            app.tedit_open(nil, { name = "My " .. t.name, fg = t.fg, bg = t.bg })
-        end
-        return
-    end
-    if a == "up" then T.sel = math.max(1, T.sel - 1)
-    elseif a == "down" then T.sel = math.min(math.max(1, #T.list), T.sel + 1)
+    if a == "toc" then app.theme_options(T.list[T.sel]) return end      -- Y: copy (or change) it
+    if a == "up" then T.sel = math.max(1, T.sel - 1); app.theme_pick()
+    elseif a == "down" then T.sel = math.min(math.max(1, #T.list), T.sel + 1); app.theme_pick()
     elseif a == "left" or a == "prev" or a == "right" or a == "next" then
         -- All / Light / Dark, like the switch at the top of the list.
         local idx = 1
@@ -3653,13 +3695,54 @@ function app.theme_action(a)
         idx = idx + ((a == "left" or a == "prev") and -1 or 1)
         app.theme_set_filter(app.THEME_FILTERS[math.max(1, math.min(#app.THEME_FILTERS, idx))][1])
     elseif a == "confirm" then app.theme_use() return
-    elseif a == "back" or a == "menu" then app.mode = "menu" end
+    elseif a == "back" or a == "menu" then app.theme_leave() return end
     redraw()
+end
+
+-- Copy a theme (any: built-in or yours) into a new one of yours, straight
+-- into the editor: "My Sepia", "Crimson Copy".
+function app.theme_copy(t)
+    app.tedit_open(nil, { name = t.custom and (t.name .. " Copy") or ("My " .. t.name),
+        fg = t.fg, bg = t.bg, c_fg = t.c_fg, c_bg = t.c_bg })
+end
+
+-- Y on a theme: a built-in one is copied; one of yours offers changing it
+-- or making a copy.
+function app.theme_options(t)
+    if not t or t.new then return end
+    if not t.custom then app.theme_copy(t) return end
+    app.choose({ title = t.name, options = {
+        { "Change It", function() app.tedit_open(t) end },
+        { "Make a Copy", function() app.theme_copy(t) end },
+    } })
+end
+
+-- The highlighted row's buttons, for touch: Copy, and Change for yours.
+-- { which, label, x, y, w, h }, right-aligned in the row before the ✓.
+function app.theme_row_buttons(t, rx, ry, rw, h)
+    if not t or t.new then return {} end
+    local list = t.custom and { { "change", "Change" }, { "copy", "Copy" } } or { { "copy", "Copy" } }
+    local bh, gap = 44, 10
+    local right = rx + rw - 40
+    for i = #list, 1, -1 do
+        local b = list[i]
+        b.w = ui.small:getWidth(b[2]) + 36
+        b.x, b.y, b.h = right - b.w, ry + math.floor((h - bh) / 2), bh
+        right = b.x - gap
+    end
+    return list
 end
 
 function app.theme_tap(side, u, v)
     if side ~= "right" then return end
     local T = app.themes
+    for _, b in ipairs(T.row_btns or {}) do
+        if u >= b.x - 8 and u <= b.x + b.w + 8 and v >= b.y - 10 and v <= b.y + b.h + 10 then
+            local t = T.list[T.sel]
+            if b[1] == "change" then app.tedit_open(t) else app.theme_copy(t) end
+            return
+        end
+    end
     if v < 160 then                                 -- the All / Light / Dark switch
         for _, t in ipairs(T.tabs or {}) do
             if u >= t.x0 - 12 and u <= t.x1 + 12 then app.theme_set_filter(t.filter); redraw() end
@@ -3669,7 +3752,7 @@ function app.theme_tap(side, u, v)
     local rows = list_rows(app.THEME_ROW_H)
     local idx = T.top + math.floor((v - 160) / app.THEME_ROW_H)
     if idx < T.top + rows and T.list[idx] then
-        if idx == T.sel then app.theme_use() else T.sel = idx; redraw() end
+        if idx == T.sel then app.theme_use() else T.sel = idx; app.theme_pick(); redraw() end
     end
 end
 
@@ -3680,7 +3763,7 @@ function app.theme_draw(side)
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     local row_h = app.THEME_ROW_H
     local rows = list_rows(row_h)
-    if T.sel < T.top then T.top = T.sel end
+    if T.sel < T.top then T.top = math.max(1, T.sel) end
     if T.sel >= T.top + rows then T.top = T.sel - rows + 1 end
     love.graphics.setFont(ui.title)
     color(th.fg)
@@ -3708,7 +3791,8 @@ function app.theme_draw(side)
         end
     end
     local cur = app.theme_current()
-    draw_list(side, T.list, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw)
+    T.row_btns = {}
+    draw_list(side, T.list, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw, selected)
         local h = row_h - 4
         if t.new then
             -- "New Theme": a dashed-looking swatch with a plus.
@@ -3735,7 +3819,10 @@ function app.theme_draw(side)
         love.graphics.setColor(t.fg[1], t.fg[2], t.fg[3])
         love.graphics.printf("Aa", rx, centered_y(ui.font, UI_SIZE, sy, sh), sw, "center")
         color(th.fg)
-        local shown = fit_text(ui.font, t.name, rw - sw - 24 - 150)
+        local btns = selected and app.theme_row_buttons(t, rx, ry, rw, h) or {}
+        local room = rw - sw - 24 - 150
+        if #btns > 0 then room = btns[1].x - (rx + sw + 24) - (t.custom and T.filter ~= "custom" and 90 or 12) end
+        local shown = fit_text(ui.font, t.name, room)
         love.graphics.print(shown, rx + sw + 24, centered_y(ui.font, UI_SIZE, ry, h))
         if t.custom and T.filter ~= "custom" then
             -- One of yours, among the built-in ones: a small tag after its name.
@@ -3749,14 +3836,23 @@ function app.theme_draw(side)
             color(th.dim)
             love.graphics.printf("✓", rx, centered_y(ui.font, UI_SIZE, ry, h), rw, "right")
         end
+        for _, b in ipairs(btns) do
+            color(th.bg)
+            love.graphics.rectangle("fill", b.x, b.y, b.w, b.h, b.h / 2, b.h / 2)
+            love.graphics.setFont(ui.small)
+            color(th.fg)
+            love.graphics.printf(b[2], b.x, centered_y(ui.small, SMALL_SIZE, b.y, b.h), b.w, "center")
+            love.graphics.setFont(ui.font)
+            T.row_btns[#T.row_btns + 1] = b
+        end
     end)
     if T.filter == "custom" then
-        app.hints(x, nil, { "A", T.list[T.sel] and T.list[T.sel].new and "new" or "use", "Y", "change", "‹ ›", "filter", "B", "back" })
+        app.hints(x, nil, { "A", T.list[T.sel] and T.list[T.sel].new and "new" or "use", "Y", "options", "‹ ›", "filter", "B", "back" })
     else
         local t = T.list[T.sel]
-        app.hints(x, nil, { "A", "use", "Y", t and t.custom and "change" or "copy", "‹ ›", "filter", "B", "back" })
+        app.hints(x, nil, { "A", "use", "Y", t and t.custom and "options" or "copy", "‹ ›", "filter", "B", "back" })
     end
-    if T.filter ~= "custom" then app.count(x, w, T.sel, #T.list) end
+    if T.filter ~= "custom" and T.sel > 0 then app.count(x, w, T.sel, #T.list) end
 end
 
 ---------------------------------------------------------------- your own themes
