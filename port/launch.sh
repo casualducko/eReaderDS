@@ -131,10 +131,14 @@ else
     export READER_DATA="${READER_DATA:-$APP_DIR/data}"
 fi
 export READER_BOOKS="${READER_BOOKS:-/mnt/mmc/Ebook:/mnt/sdcard/Ebook}"
-mkdir -p "$READER_DATA"
-# Bring settings over from older versions (named "Book Reader") once. Copy
+# Bring settings over from older versions (named "Book Reader") once: only
+# on the very first start, when there's no data folder yet (after Settings →
+# Reset there is one, emptied, and old settings mustn't come back). Copy
 # rather than move, so the old files stay as a backup.
-if [ ! -f "$READER_DATA/settings.txt" ]; then
+FIRST_START=""
+[ -d "$READER_DATA" ] || FIRST_START=1
+mkdir -p "$READER_DATA"
+if [ -n "$FIRST_START" ] && [ ! -f "$READER_DATA/settings.txt" ]; then
     for old in /mnt/mmc/Ebook/.bookreader /mnt/mmc/Ports/BookReader/data "$APP_DIR/data"; do
         [ "$old" != "$READER_DATA" ] && [ -f "$old/settings.txt" ] || continue
         for f in settings.txt progress.txt last.txt; do
