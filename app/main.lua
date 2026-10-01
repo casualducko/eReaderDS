@@ -2395,7 +2395,7 @@ function app.sync_distance(b, ch, off, frac)
 end
 
 function app.sync_device_id()
-    if S.kosync_device == "" then
+    if S.kosync_device == "" and not Store.frozen then      -- (frozen: it couldn't be saved)
         local t = {}
         for i = 1, 16 do t[i] = string.format("%02x", love.math.random(0, 255)) end
         S.kosync_device = table.concat(t)
@@ -2822,6 +2822,9 @@ end
 function app.sync_push(now, skip)
     local b = book
     if not (b and b.zip and app.sync_on() and spread) then return end
+    -- (Not during or after a restore or reset, until it closes: what's in
+    -- memory is the old settings, not the sync id it will have.)
+    if Store.frozen then return end
     if not app.sync.checked[b.path] then
         -- Not checked yet (offline when it opened): check first.
         if not now and not app.sync.pulling and not app.sync.asked[b.path] and shop.online() then app.sync_pull("check") end

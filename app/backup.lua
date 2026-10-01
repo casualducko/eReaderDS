@@ -365,8 +365,10 @@ function M.restore(path, root, data_dir, progress)
     -- they replace the old ones.
     M.mkdir_p(data_dir)
     local mine = {
-        ["settings.txt"] = { "\nkosync_device=[^\n]*", read_file(data_dir .. "/settings.txt") },
-        ["calibre.json"] = { '"uuid"%s*:%s*"[^"]*"', read_file(data_dir .. "/calibre.json") },
+        -- (Only an id there is: after a reset there's none yet, and the
+        -- backup's, from this device, is the one to have.)
+        ["settings.txt"] = { "\nkosync_device=[^\n]+", read_file(data_dir .. "/settings.txt") },
+        ["calibre.json"] = { '"uuid"%s*:%s*"[^"]+"', read_file(data_dir .. "/calibre.json") },
     }
     local written, from_backup = {}, {}
     local function undo() for _, n in ipairs(written) do os.remove(data_dir .. "/" .. n .. ".tmp") end end
