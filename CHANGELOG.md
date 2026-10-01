@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.20.0
+
+Manga and comics on two screens, like an open book.
+
+- **Manga support (BETA).** Read manga and comics (`.cbz` files): put them in the Ebook folder like any book (or send them with **Get Books → Send from Your Phone or Computer**). A page on each screen, the cover on its own, then pages in pairs.
+- **Right to left for manga.** The first page of a pair is on the right, and you turn with left (or a swipe to the right, or a tap on the left half). It's set from the comic's `ComicInfo.xml`, or else from a manga publisher's name in its file names (Kodansha, VIZ Media, Yen Press, Seven Seas and others); change it in **Settings → Reading direction** while reading. The first manga you open says how to turn its pages.
+- **Two-page spreads** (a picture wider than it's tall) are split across both screens, their halves meeting where the screens do; pages pair up so a spread is never split across two turns.
+- **The magnifier:** press **Y**, or hold a page. The page is on the touchscreen with a box on it, and the box's part is enlarged on the other screen: drag the box or move it with the D-pad; **A** switches to the other page, **B** closes it.
+- **A Manga section in My Books,** after your books, with covers, in series and volume order. Titles and volumes come from `ComicInfo.xml` or the file name ("One-Punch Man v01 (2014) (Digital)" is listed as **One-Punch Man, Vol. 1**).
+- **The next volume:** at the end of a comic, turning the page again opens the next one in the same folder.
+- **Where you are:** tap the top edge for the pages on screen ("Pages 44–45 of 192 · 23%"); bookmarks are listed by page, with the page itself shown. Your place, Jump to % and the Table of Contents (a folder for each chapter) work as in a book.
+
+Also:
+
+- **Quick page turns, even on GammaOS:** pages are decoded and shrunk to the screen on a background thread (two pairs ahead), so the screens never wait; a full-size scan never reaches the graphics chip (it made GammaOS's 1 GB run short). A page's size is read from its first bytes, so a 200-page comic opens in a fraction of a second.
+- A comic isn't reopened when eReaderDS starts: My Books opens on it, so A opens it.
+- Pictures in comics are dimmed on dark themes, like a book's.
+- Not yet: WebP pages and `.cbr` (RAR) files (repack them as `.cbz` with JPEG pages). KOReader Sync is for EPUB books only.
+- The Help page mentions holding and dragging over words to highlight them; the update note in My Books points to Settings → Help & About.
+
 ## v1.19.0
 
 Make eReaderDS look the way you like, highlight with your finger, and never lose your reading again.

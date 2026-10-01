@@ -2,6 +2,18 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.20.0
+Manga support (BETA): read manga and comics (.cbz files) with a page on each screen, like an open book. Put them in the Ebook folder like any book.
+Manga reads right to left: turn with left, or tap the left half. It's set from the comic itself or its publisher's name; change it in Settings → Reading direction.
+Two-page spreads fill both screens, meeting in the middle.
+The magnifier: press Y, or hold a page, to enlarge the small print in speech bubbles.
+My Books has a Manga section with covers, in series and volume order ("One-Punch Man, Vol. 1").
+At the end of a volume, turn the page again to open the next one.
+Tap the top edge of the screen to see which page you're on; bookmarks show their page too.
+Pages load in the background, so turning stays quick even with big scans.
+Comics with WebP pictures, and .cbr files, aren't supported yet.
+The Help page now mentions holding and dragging over words to highlight them.
+
 v1.19.0
 New theme editor: make your own themes. Choose the page and text colours with Brightness, Warmth and Tint, starting from a light or dark template, or copy any theme and change it. Themes are now grouped as All, Light, Dark and Custom.
 Highlight by touch: hold a word to look it up, or hold and drag to choose words. Start Highlight, Save Highlight and Remove Highlight buttons do the rest.
