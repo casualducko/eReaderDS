@@ -123,7 +123,7 @@ if [ -n "$ROCKNIX" ]; then
     export READER_DATA="${READER_DATA:-/storage/roms/ebook/.ereaderds}"
     export READER_BOOKS="${READER_BOOKS:-/storage/roms/ebook}"
     export READER_FONTS="${READER_FONTS:-/storage/roms/ebook/Fonts}"
-    export READER_DEFAULT_BRIGHTNESS=40     # 20% (the stock default) is too dim here
+    export READER_DEFAULT_BRIGHTNESS=60     # (ROCKNIX's panels look dimmer at the same level than stock's 50%)
     mkdir -p /storage/roms/ebook/Fonts /storage/roms/ebook/Dictionaries 2>/dev/null
 elif [ -d /mnt/mmc ]; then
     export READER_DATA="${READER_DATA:-/mnt/mmc/Ebook/.ereaderds}"

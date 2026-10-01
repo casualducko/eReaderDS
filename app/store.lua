@@ -18,7 +18,7 @@ local DEFAULTS = {
     read_cps = 20,     -- learned reading speed, characters per second (~250 words/min to start)
     -- Backlight in percent; -1 = leave the system setting alone. ROCKNIX's
     -- panels are dimmer at the same level, so its launcher asks for more.
-    brightness = tonumber(os.getenv("READER_DEFAULT_BRIGHTNESS") or "") or (Android.active and -1 or 20),
+    brightness = tonumber(os.getenv("READER_DEFAULT_BRIGHTNESS") or "") or (Android.active and -1 or 50),
     extra_dim = 0,     -- 0-3: dark layer over the page, dimmer than the backlight allows
     seen_version = "", -- the version last run: after an update, "what's new" is offered once
     update_notices = true, -- check for a newer version on launch and say so
