@@ -9839,8 +9839,27 @@ function app.backup_list()
             end
         end
     end
-    table.sort(out, function(a, b) return (a.info.date or "") > (b.info.date or "") end)
+    -- Yours first, newest first; then the copies made by themselves before
+    -- a restore or a reset.
+    for _, b in ipairs(out) do b.auto = b.name:match("^eReaderDS%-before%-") ~= nil end
+    table.sort(out, function(a, b)
+        if a.auto ~= b.auto then return not a.auto end
+        return (a.info.date or "") > (b.info.date or "")
+    end)
     return out
+end
+
+-- How a backup is listed: "1 Oct 12:21 · 13 books · Settings", or "Before
+-- reset · 1 Oct 12:27 · 1 book".
+function app.backup_label(b)
+    local y, mo, d, hm = (b.info.date or ""):match("^(%d+)%-(%d+)%-(%d+) (%d+:%d+)$")
+    local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+    local when = y and (tonumber(d) .. " " .. MONTHS[tonumber(mo)] .. " " .. hm) or b.name
+    local books = (b.info.places or 0) == 1 and "1 book" or ((b.info.places or 0) .. " books")
+    local kind = b.info.kind == "everything" and "Everything" or "Settings"
+    local before = b.name:match("^eReaderDS%-before%-(%a+)")
+    if before then return "Before " .. before .. " · " .. when .. " · " .. books end
+    return when .. " · " .. books .. " · " .. kind
 end
 
 function app.backup_items(section, join, close_sub)
@@ -9899,10 +9918,9 @@ function app.backup_choose()
         return
     end
     local opts = {}
-    for i = 1, math.min(6, #list) do
+    for i = 1, math.min(8, #list) do
         local b = list[i]
-        local label = (b.info.date or b.name) .. " · " .. (b.info.kind == "everything" and "Everything" or "Settings")
-        opts[#opts + 1] = { label, function() app.backup_confirm(b) end }
+        opts[#opts + 1] = { app.backup_label(b), function() app.backup_confirm(b) end }
     end
     app.choose({ title = "Restore which backup?", options = opts })
 end

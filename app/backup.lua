@@ -248,10 +248,15 @@ function M.manifest(path)
     local ok, zf = pcall(require("zip").open, path)
     if not ok or not zf then return nil end
     local text = zf:read(M.MANIFEST)
+    -- (How many books it has a place in: to tell backups apart.)
+    local progress = text and zf:read(".ereaderds/progress.txt") or ""
     zf:close()
     if not text then return nil end
     local t = {}
     for k, v in text:gmatch("([%w_]+)=([^\n]*)") do t[k] = v end
+    local n = 0
+    for _ in progress:gmatch("[^\n]+") do n = n + 1 end
+    t.places = n
     return t
 end
 
