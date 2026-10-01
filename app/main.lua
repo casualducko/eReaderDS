@@ -846,7 +846,7 @@ function look.open(word)
     look.scan()
     look.words = look.collect()
     if #look.words == 0 then app.toast("No words on these pages"); return end
-    look.sel, look.hl_start = 1, nil
+    look.sel, look.hl_start, look.drag = 1, nil, nil
     for i, w in ipairs(look.words) do
         if word and w.side == word.side and w.x == word.x and w.y == word.y then look.sel = i end
     end
@@ -960,18 +960,100 @@ function app.hl_bands(page, ox, oy)
     end
 end
 
--- While choosing: what to do, over the bottom of the touchscreen page.
-function app.hl_hint()
+-- Highlighting by touch, in look-up (the touchscreen's page): while
+-- choosing, Highlight and Cancel over the bottom of the page; otherwise a
+-- Highlight (or Remove Highlight) button, at the bottom of the page when the
+-- word is on the touchscreen, or above the definition's hints when the
+-- definition is. { which, label, x, y, w, h } on the touchscreen's page.
+function app.look_buttons()
+    local w = look.words[look.sel]
+    if not w then return {} end
+    local list
+    if look.hl_start then list = { { "save", "Highlight" }, { "cancel", "Cancel" } }
+    else list = { { "toggle", app.hl_at(w) and "Remove Highlight" or "Highlight" }, { "close", "Cancel" } } end
+    local gap, total = 24, -24
+    for _, b in ipairs(list) do b.w = ui.font:getWidth(b[2]) + 72; total = total + b.w + gap end
+    local on_text = look.hl_start or w.side == app.touch_side()
+    local y = on_text and PAGE_H - 86 or PAGE_H - 26 - ui.small:getHeight() - 82
+    local x = math.floor((PAGE_W - total) / 2)
+    for _, b in ipairs(list) do
+        b.x, b.y, b.h = x, y, 58
+        x = x + b.w + gap
+    end
+    return list
+end
+
+function app.look_bar(side)
     local th = theme()
-    local m = margins()
-    love.graphics.setFont(ui.small)
-    local h = ui.small:getHeight() + 24
-    color(th.bg)
-    love.graphics.rectangle("fill", 0, PAGE_H - h - 8, PAGE_W, h + 8)
-    color(th.fg)
-    love.graphics.print("Highlighting: move to the last word", m.inner, PAGE_H - h + 4)
-    app.hints(m.inner + ui.small:getWidth("Highlighting: move to the last word") + 32, PAGE_H - h + 4,
-        { "Select", "save", "B", "cancel" })
+    local list = app.look_buttons()
+    if #list == 0 then return end
+    local w = look.words[look.sel]
+    if look.hl_start or w.side == side then
+        -- Over the page's text: a band of page colour under the buttons.
+        local m = margins()
+        local top = list[1].y - (look.hl_start and ui.small:getHeight() + 22 or 16)
+        color(th.bg)
+        love.graphics.rectangle("fill", 0, top, PAGE_W, PAGE_H - top)
+        color(th.dim, 0.5)
+        love.graphics.line(m.inner, top, PAGE_W - m.outer, top)
+        if look.hl_start then
+            love.graphics.setFont(ui.small)
+            color(th.fg)
+            love.graphics.printf("Drag or tap to choose the words", 0, top + 8, PAGE_W, "center")
+        end
+    end
+    for _, b in ipairs(list) do
+        app.button(b.x, b.y, b.w, b.h, b[2], nil, (b[1] == "save" or b[1] == "toggle") and "strong" or "soft")
+    end
+end
+
+-- A tap on one of those buttons; true if it was one.
+function app.look_bar_tap(side, u, v)
+    if side ~= app.touch_side() then return false end
+    for _, b in ipairs(app.look_buttons()) do
+        if u >= b.x - 10 and u <= b.x + b.w + 10 and v >= b.y - 10 and v <= b.y + b.h + 10 then
+            if b[1] == "save" then app.hl_select()
+            elseif b[1] == "cancel" then look.hl_start = nil; look.find()
+            elseif b[1] == "close" then app.on_back()        -- (out of look-up, as B does)
+            else
+                -- One word: highlighted (start and end on it), or its highlight removed.
+                if not app.hl_at(look.words[look.sel]) then look.hl_start = look.sel end
+                app.hl_select()
+            end
+            redraw()
+            return true
+        end
+    end
+    return false
+end
+
+-- Holding a word and dragging: the words from the held one to the one
+-- nearest the finger are chosen (back on the held word: just looking it up).
+function app.hl_drag(side, u, v)
+    local cur = look.words[look.sel]
+    if not cur or side ~= (look.drag and look.drag.side or cur.side) then return end
+    look.drag = look.drag or { anchor = look.sel, side = cur.side }
+    local best, bd
+    for i, w in ipairs(look.words) do
+        if w.side == side then
+            local dx = u < w.x and w.x - u or (u > w.x2 and u - w.x2 or 0)
+            local dy = v < w.y and w.y - v or (v > w.y2 and v - w.y2 or 0)
+            local d = dx + dy * 3                  -- (lines count for more than columns)
+            if not bd or d < bd then best, bd = i, d end
+        end
+    end
+    if not best then return end
+    if best == look.drag.anchor then look.hl_start, look.sel = nil, best
+    else look.hl_start, look.sel = look.drag.anchor, best end
+    redraw()
+end
+
+-- The finger lifted after holding: a single word is just looked up.
+function app.hl_drag_end()
+    if not look.drag then return end
+    look.drag = nil
+    if not look.hl_start then look.find() end
+    redraw()
 end
 
 -- Select in look-up: start a highlight, save it, or remove the one here.
@@ -7536,8 +7618,8 @@ local function render_canvases()
                 -- Choosing a highlight: both pages, the words so far marked.
                 reader(side)
                 if side == wd.side then note.highlight(wd) end
-                if side == "right" then app.hl_hint() end
             elseif side == wd.side then reader(side); note.highlight(wd) else look.draw_panel(side) end
+            if side == app.touch_side() then app.look_bar(side) end
         end
     elseif app.mode == "note" then
         local reader = draw_reader_pages()
@@ -7947,7 +8029,9 @@ local function touch_event(kind, sx, sy)
         gesture.moved = math.max(gesture.moved, math.abs(du), math.abs(dv))
         gesture.u = u
         if gesture.held then
-            -- A press-and-hold (look-up) doesn't turn into a swipe or slide.
+            -- A press-and-hold (look-up) doesn't turn into a swipe or slide;
+            -- dragging on chooses words to highlight.
+            if app.mode == "lookup" then app.hl_drag(side, u, v) end
         elseif not gesture.mode and math.abs(du) > 24 and math.abs(du) > math.abs(dv) * 1.5 then
             gesture.mode = "swipe"          -- mostly horizontal: page turn on release
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5
@@ -7998,7 +8082,8 @@ local function touch_event(kind, sx, sy)
                 app.menu_page(du < 0 and 1 or -1)           -- the next / previous settings page
             end
         elseif gesture.held then
-            -- Already handled while the finger was down.
+            -- Already handled while the finger was down (and any drag).
+            if app.mode == "lookup" then app.hl_drag_end() end
         elseif gesture.moved < 30 and app.touch_clock() - gesture.t0 < 0.5 and app.on_tap then
             app.on_tap(gesture.side, gesture.u0, gesture.v0)
         end
@@ -8493,7 +8578,7 @@ function handle_action(a)
         elseif a == "confirm" then look.page = look.page + 1
             if look.pages and look.page > #look.pages then look.page = 1 end
         elseif a == "back" or a == "menu" or a == "toc" then
-            look.hl_start = nil
+            look.hl_start, look.drag = nil, nil
             app.mode = "reader"
             reading.since = love.timer.getTime()
         end
@@ -8665,6 +8750,7 @@ function app.on_tap(side, u, v)
             end
         end
     elseif mode == "lookup" then
+        if app.look_bar_tap(side, u, v) then return end
         -- Another word on this page: look that up. Anywhere else: close.
         -- (Only on the page with the text; the other page is the definition.)
         local cur = look.words[look.sel]

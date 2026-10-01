@@ -427,7 +427,13 @@ self-signed certificate. To hide a built-in catalog, add `gutenberg = off` or
 
 ## Highlights
 
-Press **Y** for the word cursor, move to the first word, press **Select**, move
+**By touch:** hold a word on the touchscreen (its definition opens on the
+other page) and tap **Highlight**, or keep holding and **drag** to choose
+more words, then tap **Highlight** (**Cancel** to keep just looking it up).
+Hold a highlighted word for **Remove Highlight**. This works on the
+touchscreen's page; for the other one, use the buttons:
+
+**With the buttons:** press **Y** for the word cursor, move to the first word, press **Select**, move
 to the last word (the highlight grows as you go, across both pages), and press
 **Select** again. **B** cancels. To remove one, put the cursor on it and press
 **Select**. Highlights show as a band behind the words in every theme, stay
