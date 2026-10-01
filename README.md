@@ -428,7 +428,10 @@ it to another handheld or system:
 
 Put `.cbz` comics in the `Ebook` folder like any book (or send them from a
 phone or computer); they're listed in My Books with their covers, in a
-**Manga** section after your books (in whichever order My Books is sorted).
+**Manga** section after your books: by series and volume (by recency or
+progress when My Books is sorted that way). A comic's title and volume come
+from its `ComicInfo.xml`, or else from its file name: "One-Punch Man v01
+(2014) (Digital).cbz" is listed as **One-Punch Man, Vol. 1**.
 
 - **A page on each screen,** like an open book: the cover on its own, then
   pages in pairs. A two-page spread (a picture wider than it's tall) is split
@@ -446,8 +449,11 @@ phone or computer); they're listed in My Books with their covers, in a
   D-pad; **A** switches to the other page; **B** closes it.
 - **The next volume:** at the end, turning the page again opens the next
   comic in the same folder ("Vol 2" after "Vol 1").
-- Your place, bookmarks, Jump to %, and the Table of Contents (when the
-  pages are in a folder for each chapter) work as in a book. Pictures are
+- **Where you are:** tap the top edge of the touchscreen for the pages on
+  screen ("Pages 44–45 of 192 · 23%", and the chapter when it has them).
+- Your place, bookmarks (listed by page, with the page itself shown), Jump
+  to %, and the Table of Contents (when the pages are in a folder for each
+  chapter) work as in a book. Pictures are
   dimmed on dark themes, like a book's.
 - Page turns don't wait: the next pair of pages is made ready while you read.
   Jumping somewhere, or going back, can take half a second with big scans.

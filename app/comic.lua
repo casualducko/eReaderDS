@@ -86,12 +86,35 @@ function M.info(z)
     local manga = (tag("Manga") or ""):lower()
     return {
         manga = manga ~= "" and manga or nil,      -- (said at all: then it isn't guessed)
-        title = tag("Title"), series = tag("Series"), number = tag("Number"),
+        title = tag("Title"), series = tag("Series"), number = tag("Number"), volume = tag("Volume"),
         writer = tag("Writer") or tag("Penciller"),
         -- "YesAndRightToLeft" is manga read right to left; plain "Yes" only
         -- says it's manga (often already turned to read left to right).
         rtl = manga == "yesandrighttoleft" or nil,
     }
+end
+
+-- The series and volume from a file name, and the name tidied (release
+-- details in brackets left out): "One-Punch Man v01 (2014) (Digital)
+-- (LuCaZ).cbz" is "One-Punch Man", 1; also "Title Vol. 2", "Title -
+-- Volume 3". The series is nil when there's no volume number.
+function M.from_name(path)
+    local base = (path:match("[^/]+$") or path):gsub("%.[^.]+$", "")
+    local clean = base:gsub("%b()", ""):gsub("%b[]", ""):gsub("%b{}", ""):gsub("_", " ")
+        :gsub("%s+", " "):gsub("^%s+", ""):gsub("[%s%-]+$", "")
+    if clean == "" then clean = base end
+    for _, p in ipairs({ "^(.-)[%s%-,]+[Vv]olume%s*(%d+%.?%d*)$", "^(.-)[%s%-,]+[Vv]ol%.?%s*(%d+%.?%d*)$",
+            "^(.-)[%s%-,]+[Vv](%d+%.?%d*)$" }) do
+        local s, n = clean:match(p)
+        if s and s ~= "" and tonumber(n) then return s, tonumber(n), clean end
+    end
+    return nil, nil, clean
+end
+
+-- A volume's number to show: 1, or 1.5.
+function M.number_text(n)
+    if not n then return "" end
+    return n == math.floor(n) and string.format("%d", n) or tostring(n)
 end
 
 -- Publishers of Japanese manga in English, whose names release groups put

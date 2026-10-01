@@ -631,11 +631,20 @@ end
 -- count pictures (comic.lua: picture i is at (i-1)*2), so a place, a
 -- percentage and a bookmark work as in any book. book.comic holds the
 -- pages' names, and rtl when ComicInfo.xml says it's read right to left.
+-- Its title, series and number: ComicInfo.xml's ("Series, Vol. 2", or
+-- "Series 12" for an issue), else from the file name ("One-Punch Man v01
+-- (2014) (Digital)" is "One-Punch Man, Vol. 1").
 local function comic_title(path, info)
+    local Comic = require("comic")
+    local vol = tonumber(info.volume or "")
     if info.series then
-        return info.series .. (info.number and (" " .. info.number) or ""), info
+        if vol then return info.series .. ", Vol. " .. Comic.number_text(vol), info.series, vol end
+        return info.series .. (info.number and (" " .. info.number) or ""), info.series, tonumber(info.number or "")
     end
-    return info.title or basename_title(path), info
+    local s, v, clean = Comic.from_name(path)
+    if info.title then return info.title, s, v end
+    if s then return s .. ", Vol. " .. Comic.number_text(v), s, v end
+    return clean, nil, nil
 end
 
 local function open_cbz(path)
@@ -680,9 +689,8 @@ function M.meta(path)
         local ok, info = pcall(require("comic").info, z)
         z:close()
         if not ok then return nil end
-        local title = clean((comic_title(path, info)))
-        return { title = title, author = clean(info.writer), series = clean(info.series),
-            index = tonumber(info.number or "") }
+        local title, series, index = comic_title(path, info)
+        return { title = clean(title), author = clean(info.writer), series = clean(series), index = index }
     end
     local ok, res = pcall(function()
         local container = z:read("META-INF/container.xml")

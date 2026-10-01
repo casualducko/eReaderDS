@@ -1237,6 +1237,7 @@ end
 
 -- The first words on the left page, to recognise the bookmark by.
 local function page_snippet()
+    if book and book.comic then return app.comic_page_text(pos.off) end
     local words, n = {}, 0
     local pg = spread and spread.pages[spread.pi]
     for _, it in ipairs(pg and pg.items or {}) do
@@ -1482,6 +1483,8 @@ function library.sort(items)
             k.pct = pct
         end
         k.comic = it.path:lower():match("%.cbz$") ~= nil
+        -- (Comics by series, then volume: "Vol. 10" after "Vol. 2".)
+        if k.comic then k.cs, k.ci = title_key(it.series or it.title), it.index or math.huge end
         key[it] = k
     end
     -- Comics (.cbz) after the books, under their own heading (app.library_group).
@@ -1490,6 +1493,10 @@ function library.sort(items)
     table.sort(items, function(a, b)
         local x, y = key[a], key[b]
         if x.comic ~= y.comic then return y.comic end
+        if x.comic and mode ~= "recent" and mode ~= "progress" then
+            if x.cs ~= y.cs then return x.cs < y.cs end
+            if x.ci ~= y.ci then return x.ci < y.ci end
+        end
         if mode == "recent" and x.t ~= y.t then return x.t > y.t end
         if mode == "author" and x.a ~= y.a then
             if x.a == "" or y.a == "" then return y.a == "" end   -- no author: last
@@ -1612,6 +1619,8 @@ local function scan_library()
                 local it = { path = path, title = Layout.sanitize(title or base), author = Layout.sanitize(author or "") }
                 if ext == "epub" or ext == "cbz" then
                     local m = Store.get_meta(path, f.size)
+                    -- (A comic listed before volumes were read from names: again.)
+                    if m and ext == "cbz" and not m.series and require("comic").from_name(path) then m = nil end
                     if not m then
                         it.size = f.size
                         pending[#pending + 1] = it
@@ -3666,6 +3675,28 @@ function app.comic_fit(id)
     id:release()
     if not ok then error(img, 0) end
     return img
+end
+
+-- "Page 45 of 192": the picture a place in a comic is on.
+function app.comic_page_text(off)
+    return "Page " .. (math.floor((off or 0) / 2) + 1) .. " of " .. #book.comic.names
+end
+
+-- Where you are in a comic (tapping the top edge): the chapter, the pages
+-- on screen and how far through.
+function app.comic_where()
+    local nums = {}
+    for k = spread.pi, spread.pi + 1 do
+        local pg = spread.pages[k]
+        local n = pg and pg.src and (math.floor(pg.off / 2) + 1)
+        if n and nums[#nums] ~= n then nums[#nums + 1] = n end
+    end
+    local total = #book.comic.names
+    local pages = #nums == 0 and "" or #nums == 1 and ("Page " .. nums[1] .. " of " .. total)
+        or ("Pages " .. nums[1] .. "–" .. nums[2] .. " of " .. total)
+    local sec = current_section()
+    local pct = math.floor(book:fraction(pos.ch, pos.off) * 100 + 0.5) .. "%"
+    return (sec and (book.toc[sec].title .. "\n") or "") .. pages .. "  ·  " .. pct
 end
 
 -- Which page of the pair a side shows: the first on the left, or right to
@@ -6130,7 +6161,7 @@ local function draw_bookmarks(side)
         love.graphics.print(title, rx, ty)
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.print(fit_text(ui.small, e.snippet, rw), rx, ty + 40)
+        love.graphics.print(fit_text(ui.small, book.comic and app.comic_page_text(e.off) or e.snippet, rw), rx, ty + 40)
     end)
     love.graphics.setFont(ui.small)
     color(th.dim)
@@ -6233,6 +6264,8 @@ function app.bm_draw_left(entries, x, w)
         pct = it.pct
         body = (e.hl and it.text or it.snippet) or ""
     end
+    local comic_off = book.comic and (e.action and pos.off or e.item.off)
+    if comic_off then label = label .. "  ·  " .. app.comic_page_text(comic_off):upper() end
     love.graphics.setFont(ui.small)
     color(th.dim)
     love.graphics.print(label .. "  ·  " .. math.floor(pct * 100 + 0.5) .. "%", x, y)
@@ -6241,6 +6274,18 @@ function app.bm_draw_left(entries, x, w)
     color(th.fg)
     love.graphics.print(fit_text(ui.bold, title, w), x, y)
     y = y + ui.bold:getHeight() + 14
+    if comic_off then
+        -- A comic: the page itself.
+        local src = book.comic.names[math.floor(comic_off / 2) + 1]
+        local img = src and get_image(src)
+        if img then
+            local iw, ih = img:getDimensions()
+            local sc = math.min(w / iw, (PAGE_H - 110 - y) / ih)
+            love.graphics.setColor(1, 1, 1)
+            love.graphics.draw(img, x + (w - iw * sc) / 2, y, 0, sc, sc)
+        end
+        return
+    end
     -- The words: a highlight marked as on the page, as many lines as fit.
     love.graphics.setFont(ui.font)
     local text = e.hl and ("“" .. (body or "") .. "”") or ((body or "") .. (body ~= "" and "…" or ""))
@@ -9561,6 +9606,8 @@ function app.on_tap(side, u, v)
         elseif touch and v < 90 and outer > PAGE_W - 230 then
             -- A gap between the bookmark corner and the status bar strip, so a
             -- slightly-off bookmark tap does nothing rather than the wrong thing.
+        elseif touch and v < 90 and book.comic then
+            app.toast(app.comic_where())      -- (a comic has no status bars: where you are)
         elseif touch and v < 90 then
             -- The top edge (left of the bookmark corner): show or hide all
             -- the status bars.
