@@ -11,8 +11,8 @@ device sideways like an open book: each screen shows one page.
 ![eReaderDS on the RG DS Plus: My Books, turning pages, a bookmark, brightness and text size by touch, Settings and the Themes page, looking up and highlighting a word, the bookmarks and highlights list, and syncing with KOReader](docs/demo.gif)
 
 > For the **RG DS Plus on its stock firmware, ROCKNIX or GammaOS** (not the
-> original RG DS, and not other custom firmware such as KNULLI). GammaOS
-> (Android) support is new: see [GammaOS](#gammaos-android). Found a problem? Please
+> original RG DS, and not other custom firmware such as KNULLI). For GammaOS
+> (Android), see [GammaOS](#gammaos-android). Found a problem? Please
 > [report it](#reporting-problems).
 
 ## Install
@@ -118,11 +118,11 @@ On GammaOS:
 ### Updating
 
 When it's online, eReaderDS checks for a newer version each time it starts and
-says so (with the version you have). Tap that note to update, or use
-**Settings → About eReaderDS** (or **Start** in the library with no book
-open). The update screen lists what's new in plain words; **Update now**
+says so with both versions ("Update: v1.18.0 → v1.19.0"). Tap that note to
+update, or use **Settings → Help & About** (or **Start** in the library with
+no book open). The update screen lists what's new in plain words; **Update now**
 downloads it. Your books, settings and progress are kept. After an update, a
-note offers to show **What's New** (also in Settings → About eReaderDS).
+note offers to show **What's New** (also in Settings → Help & About).
 
 - **Stock firmware and ROCKNIX:** it saves only the files that changed and
   restarts by itself.
@@ -153,27 +153,29 @@ to do the same.
 | D-pad or stick | Turn pages (right/down forward) | Up/down move; left/right change a value, page through a list, or change the library's sort order |
 | A | Show the notes on these pages | Select |
 | B | Settings | Back |
-| Y | Look up (or highlight) a word | In My Books: options (mark finished, hide finished books, delete); in Bookmarks and Highlights: delete |
+| Y | Look up (or highlight) a word | In My Books: options (mark finished, hide finished books, delete); in Bookmarks and Highlights: delete; on Themes: options (copy, hide, or change one of yours) |
 | Select | Bookmark the page (again to remove) | Close; in the library: Get Books |
 | Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
 | Menu (Anbernic button) | Quit | Quit |
 
-The L/R and L2/R2 shoulder buttons aren't used. **Help** in Settings is a
-one-page summary of the buttons and touchscreen.
+The L/R and L2/R2 shoulder buttons aren't used. **Help** (Settings → Help &
+About) is a one-page summary of the buttons and touchscreen.
 
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
   open Settings instead: **Settings → Reading & Device → Tap**.)
 - Slide up/down to change brightness; keep going below 1% for Extra dim. (On
   a list longer than the screen, such as My Books, Get Books, Table of
-  Contents or Fonts, sliding up/down scrolls it instead.)
-- Swipe up from the bottom edge to open Settings (as X does).
+  Contents, Fonts or Themes, sliding up/down scrolls it instead; on Themes
+  that never changes your theme.)
+- Swipe up from the very bottom edge to open Settings (as X does).
 - Pinch with two fingers to make the text bigger or smaller.
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.
-- Press and hold a word to look it up.
-- While highlighting (**Y**, then **Select**), tap a word to extend the
-  highlight to it.
+- Press and hold a word to look it up; keep holding and drag over words to
+  highlight them ([below](#highlights)).
+- While highlighting (**Start Highlight**, or **Y** then **Select**), tap a
+  word to extend the highlight to it.
 - In the library and Get Books, tap an entry to see it on the other screen,
   and tap it again to open (or download) it. The same goes for Table of
   Contents (the other screen shows where that chapter is in the book),
@@ -211,15 +213,17 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
    library, with how many books it has; Settings opens on the row below it).
    **This book:** Table of Contents, Bookmarks and Highlights, Find in Book,
    Jump to %, and **Sync with KOReader** when sync is on. **Reading:** Brightness, Text size,
-   **Theme** (tap it or press A: a page of all the themes, your book previewed
-   in each, and your own; [below](#themes)), **Fonts** (its own page,
+   **Theme** (tap it or press A: a page of all the themes, each with a
+   swatch and your book shown in the one highlighted, and your own;
+   [below](#themes)), **Fonts** (its own page,
    [below](#fonts)). (**Update to v…** is
    first in This book when one is waiting.)
 2. What's set once. **Page layout:** Line spacing, Margins, Top/bottom
    margins, Justify text, Hyphenation. **More settings:** **Night Mode**
    ([below](#night-mode)), **Status Bar ›** (what the top and bottom lines
    show, and the clock style), **Reading & Device ›** (page-turn animation,
-   what a tap does, highlight color, dimming pictures on dark themes,
+   what a tap does, highlight color, highlights on dark themes (Bright or
+   Muted), dimming pictures on dark themes,
    dictionary, which hand holds the buttons, screens off
    after a while, closing the lid, time zone), **Back Up & Restore ›**
    ([below](#back-up-and-restore)), **KOReader Sync ›**
@@ -234,9 +238,11 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   ink, so it sits on any theme instead of in a white box);
   justified text with optional hyphenation (English); 18 built-in fonts plus
   your own; 25 themes (Sepia by default, plus E-ink, Paper, Mint, Sky,
-  Midnight, Gruvbox, Nord, Red Night and more), grouped into Light and Dark
-  and picked on a page that shows your book in each, which the whole app
-  follows, and [themes of your own](#themes); Night Mode, another theme
+  Midnight, Gruvbox, Nord, Red Night and more), listed under All, Light,
+  Dark and Custom and picked on a page that shows your book in the one
+  highlighted (hide the ones you never use), which the whole app follows,
+  and [themes of your own](#themes); pictures dimmed a little on dark themes
+  (you can turn that off); Night Mode, another theme
   that switches on by itself in the evening; page-flip or fade animation.
   Letters that some older books draw as tiny pictures (for characters their
   fonts lacked) stay in the line and take the theme's ink, and characters a
@@ -246,7 +252,7 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   page while the text stays put.
 - **Dictionary on the facing page:** press Y and move a cursor over the words;
   English is built in, and you can add your own ([below](#dictionaries)).
-- **Highlights:** mark passages and find them again in the list of bookmarks
+- **Highlights:** hold and drag over a passage, or use the word cursor; mark passages and find them again in the list of bookmarks
   and highlights ([below](#highlights)); they're also saved as a file for each
   book, to read on a computer.
 - **Get books over Wi-Fi:** Project Gutenberg and Standard Ebooks built in,
@@ -325,9 +331,10 @@ press left/right, or tap one (that alone doesn't change your theme).
 **Custom** holds themes you make:
 
 - **New Theme** asks **Light** or **Dark** to start from.
-- **Copy any theme** (say, Sepia that's almost right): **Y** on a built-in
-  theme, or **Y → Make a Copy** on one of yours, or tap **Copy** on the
-  highlighted row. The copy opens in the editor.
+- **Copy any theme** (say, Sepia that's almost right): **Y → Make a Copy**,
+  or tap **Copy** on the highlighted row. A copy of a built-in theme is
+  named like "My Sepia", a copy of one of yours "… Copy". It opens in the
+  editor.
 - **Change one of yours:** **Y → Change It**, or tap **Change**. Yours are
   also listed under All, and Light or Dark by their page, tagged **Custom**.
 - **Hide built-in themes you never use:** tap **Hide** (or **Y → Hide It**).
@@ -336,7 +343,8 @@ press left/right, or tap one (that alone doesn't change your theme).
   back, **Restore All** (Light, Dark) by the title brings back them all.
   Hiding the theme in use moves to the next one.
 - In the editor, the top screen shows your book in the colors as you go:
-  - **Name**: tap it (or A) to type one; the **×** clears it.
+  - **Name**: tap it (or A) to type one (24 letters at most); the **×**
+    clears it, and **Cancel** asks before throwing away what you typed.
   - **Page color** / **Text color**: which one the rest changes (**Y**
     switches).
   - A row of colors to start from, picked for reading: soft page colors
@@ -346,13 +354,16 @@ press left/right, or tap one (that alone doesn't change your theme).
   - **Brightness**, **Warmth** (cooler to warmer) and **Tint** (greener to
     pinker), like adjusting a photo: drag them, or press left/right (hold to
     keep going). Warmth and Tint are neutral in the middle.
-  - **Reset Colors** goes back to the light or dark start; **Delete Theme**
-    removes one of yours. Both ask first.
-- **A** saves the theme and uses it. **B** goes back; if you've changed
-  anything it asks first, and B again keeps editing.
+  - **Save**, **Reset Colors** (back to the light or dark start, keeping
+    the name) and **Delete Theme** are buttons under the sample; Reset and
+    Delete ask first. Deleting the theme in use goes back to Sepia (and
+    deleting your night theme turns Night Mode off).
+- **A** (or **Save**) saves the theme and uses it. **B** goes back; if
+  you've changed anything it asks first, and B again keeps editing.
 
-The Themes pages themselves stay plain (white, or dark when your theme is
-dark), so a tinted theme doesn't color the swatches. Your themes are kept
+The Themes pages themselves are a neutral grey, like a photo editor's, so a
+tinted theme doesn't color the swatches; naming a theme uses the same grey
+keyboard. Hidden built-in themes are left out of Night Mode's list. Your themes are kept
 in `Ebook/.ereaderds/themes.txt` (on ROCKNIX `ebook/.ereaderds`; on GammaOS
 `Ebook/.ereaderds` in the device's storage), and work as the night theme too.
 
@@ -366,29 +377,43 @@ it to another handheld or system:
   Small.
 - **Back up → Everything, with Books:** all that, plus your books, fonts and
   dictionaries (it shows the size, and asks first).
-- Backups are zips in **`Ebook/Backups`** (on ROCKNIX `roms/ebook/Backups`),
-  named by date. They include your logins, so keep them to yourself.
+- Backups are zips in **`Ebook/Backups`** (on ROCKNIX `roms/ebook/Backups`;
+  on GammaOS `Ebook/Backups` in the device's storage), named by date:
+  `eReaderDS-backup-2026-10-01-1215.zip`, or `…-settings.zip` for settings
+  only. They include your logins, so keep them to yourself.
 - **Restore from a Backup** lists the backups it finds there (or loose in the
-  books folder), newest first. Your settings, places, bookmarks, highlights
-  and themes become the backup's, its books are added, and eReaderDS closes:
-  open it again and you're where the backup left you. Your settings as they
-  were are saved first (`eReaderDS-before-restore-….zip`), in case it was the
-  wrong one. The list shows each backup's date, its kind, the system it
-  came from if it's another, and "nothing read yet" for one with no place in
-  any book (such as one made just after a reset). Yours come first (those
-  made on this system, then those from another), then the automatic copies. Of these automatic copies (and
-  the ones before a reset) the newest 3 are kept.
+  books folder), up to 8: yours first (those made on this system, newest
+  first, then those from another), then the copies it makes by itself before
+  a restore or a reset (the newest 3 are kept, and the newest is always
+  listed). Each shows its date and kind, such as **1 Oct 12:21 · Settings**
+  or **Before reset · 1 Oct 12:27**, with **Stock**, **ROCKNIX** or
+  **GammaOS** added for one made on another system (its times are by that
+  system's clock), and **nothing read yet** for one with no place in any
+  book.
+- Restoring: your settings, places, bookmarks, highlights, themes and logins
+  become the backup's (logins it doesn't have are kept), its books are added
+  (ones already here aren't copied again), and eReaderDS closes: open it
+  again and you're where the backup left you. Your settings as they were are
+  saved first (`eReaderDS-before-restore-….zip`), in case it was the wrong
+  one. It says each step as it goes (backing up your settings first,
+  restoring, saving to the SD card).
 - **Another handheld or system:** copy the zip into its `Ebook/Backups` and
   restore. Books are found by their place in the books folder, so a backup
-  from the stock firmware restores on ROCKNIX or GammaOS. The handheld keeps
-  its own sync and Calibre identity. A book whose name the card can't hold
+  from the stock firmware restores on ROCKNIX or GammaOS. Each handheld and
+  system keeps its own sync and Calibre identity (right after a reset, when
+  it has none yet, it takes the backup's only if the backup was made on this
+  system), so two never share one. A book whose name the card can't hold
   (such as `:` from ROCKNIX onto the stock firmware's card) is skipped, and
   the message says how many were.
 - If a restore can't finish, your settings are left as they were. Closing
-  eReaderDS while it restores waits for it to finish.
-- **Reset eReaderDS** (Start fresh) clears everything it has saved, like a
-  new install, but not your books, fonts or dictionaries. A backup is made
-  first (`eReaderDS-before-reset-….zip`), so Restore can undo it.
+  eReaderDS while it restores waits for it to finish, and nothing is sent to
+  the sync server until it's open again.
+- **Reset eReaderDS** (Start fresh) asks, then clears your settings, places,
+  bookmarks, highlights, themes and logins, like a new install, but not your
+  books, fonts or dictionaries. A backup is made first
+  (`eReaderDS-before-reset-….zip`), so Restore can undo it. Then eReaderDS
+  closes: open it again. Brightness starts at 50% on the stock firmware and
+  60% on ROCKNIX (on GammaOS it follows the system's).
 
 ## Night Mode
 
@@ -476,27 +501,28 @@ self-signed certificate. To hide a built-in catalog, add `gutenberg = off` or
 **By touch:** hold a word on the touchscreen (its definition opens on the
 other page) and tap **Start Highlight**, then tap or drag to the last word
 and tap **Save Highlight**. Or keep holding after the definition opens and
-**drag** over the words, then **Save Highlight**. **Cancel** leaves it.
+**drag** over the words, then **Save Highlight**. When the word is near the
+foot of the page, the buttons move to the top. **Cancel** stops choosing (or
+closes the definition).
 Hold a highlighted word for **Remove Highlight**. (A word picked with the Y
 cursor gets the same buttons on the touchscreen; move the cursor to the
 last word, then Save.)
+
+**With the buttons:** press **Y** for the word cursor, move to the first word, press **Select**, move
+to the last word (the highlight grows as you go, across both pages), and press
+**Select** again. **B** cancels. To remove one, put the cursor on it and press
+**Select**. Highlights show as one block of color behind the words (a
+passage over several lines joins up) in every theme, stay
+put when you change the font or text size, and are listed with your bookmarks
+in **Settings → Bookmarks and Highlights** (A goes there; Y deletes one after you
+confirm; left/right, or a tap on the label at the top, shows All, just
+Highlights or just Bookmarks).
 
 **Highlight color:** Yellow (the default), Green, Blue, Pink or Subtle, in
 Settings → Reading & Device; it's shaded to suit each theme, light or dark.
 On a dark theme highlights are muted, so the light text on them stays easy
 to read; **Highlights on dark themes → Bright** makes them highlighter
 bright there too, with the highlighted words in dark ink.
-
-**With the buttons:** press **Y** for the word cursor, move to the first word, press **Select**, move
-
-**With the buttons:** press **Y** for the word cursor, move to the first word, press **Select**, move
-to the last word (the highlight grows as you go, across both pages), and press
-**Select** again. **B** cancels. To remove one, put the cursor on it and press
-**Select**. Highlights show as a band behind the words in every theme, stay
-put when you change the font or text size, and are listed with your bookmarks
-in **Settings → Bookmarks and Highlights** (A goes there; Y deletes one after you
-confirm; left/right, or a tap on the label at the top, shows All, just
-Highlights or just Bookmarks).
 
 Your highlights and bookmarks are also saved as a file for each book, to read
 or copy on a computer (like a Kindle's "My Clippings"):
@@ -529,7 +555,8 @@ off.
      the chapter and percentage beside yours). If the server is behind you,
      your place is sent when it only has this device's own earlier place (or
      nothing yet), since nothing else is replaced; if another device's place
-     there is newer, it asks **Send your place to the sync server?** first
+     there is newer, it asks **Send your place to the sync server?** first,
+     saying which device is there and when
      (not for a book opened at its very start that the server knows nothing
      about yet). Another device's place is never replaced without asking.
    - **On:** as above, but your place is also sent on its own: when the book
@@ -611,8 +638,9 @@ server.
 ## Dictionaries
 
 While reading, press **Y**: a cursor appears on a word. Left/right move it
-word by word and up/down line by line, across both pages, and the definition
-shows on the facing page (A for more of a long entry, B to close).
+word by word, across both pages; up/down move it line by line on the same
+page, going round from its last line to its first. The definition shows on
+the facing page (A for more of a long entry, B to close).
 
 ![Looking up a word](docs/screenshots/lookup.png)
 
@@ -671,8 +699,8 @@ If eReaderDS runs into a problem it says so, keeps your place in the book, and
 quits when you press a button. The next time you open it, a note offers to
 report it: tap it for a QR code that opens a bug report on your phone with the
 version and what went wrong filled in (no book titles). Nothing is sent from
-the device; you read the report and send it yourself. **Settings → About
-eReaderDS → Report a Problem** shows the same code any time.
+the device; you read the report and send it yourself. **Settings → Help
+& About → Report a Problem** shows the same code any time.
 
 Or tell whoever sent you eReaderDS, or
 [open a bug report](https://github.com/casualducko/eReaderDS/issues/new?template=bug_report.yml).
@@ -706,7 +734,7 @@ their own licenses (below, and in the download's `LICENSES` folder).
 
 ## Credits
 
-eReaderDS is created by **casualducko** (also in **Settings → About eReaderDS →
+eReaderDS is created by **casualducko** (also in **Settings → Help & About →
 About & Credits**).
 
 - **Fonts**, all under the SIL Open Font License 1.1 (license files in

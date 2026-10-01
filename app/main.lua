@@ -3166,7 +3166,7 @@ function app.night_items()
     return join(section(nil, rows), section("", { { label = "Back", act = close_sub } }))
 end
 
--- About eReaderDS: what's new, updates and credits.
+-- Help & About: help, what's new, updates and credits.
 function app.about_items()
     local u = app.upd
     return join(
@@ -4910,7 +4910,7 @@ local function draw_library(side)
         love.graphics.setFont(ui.small_bold)
         color(th.fg)
         love.graphics.printf("eReaderDS v" .. app.upd.version .. " is available: "
-            .. (book and "Settings → About eReaderDS" or "press Start"), x, PAGE_H - 110, w, "left")
+            .. (book and "Settings → Help & About" or "press Start"), x, PAGE_H - 110, w, "left")
     end
     if #library.items == 0 and (library.hidden or 0) > 0 then
         love.graphics.setFont(ui.title)
@@ -6133,7 +6133,7 @@ app.HELP = {
         { "Top-right corner", "Bookmark" },
         { "Top edge", "Show or hide the status bars" },
         { "Bottom edge", "Swipe up: Settings" },
-        { "Hold a word", "Look it up" },
+        { "Hold a word", "Look it up (drag: highlight)" },
         { "Tap a word", "While highlighting: highlight up to it" },
         { "Note number", "Show the footnote" },
     }, "B back" },

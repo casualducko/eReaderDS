@@ -1,4 +1,4 @@
-# What's new, newest first, shown in Settings → About eReaderDS.
+# What's new, newest first, shown in Settings → Help & About.
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
