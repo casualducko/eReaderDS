@@ -428,8 +428,11 @@ phone or computer); they're listed in My Books with their covers.
   across both screens, its halves meeting where the screens do.
 - **Manga reads right to left:** the first page of a pair is on the right,
   and you turn with **left** (or a swipe to the right, or a tap on the left
-  half). It's set from the comic's `ComicInfo.xml` when it says so; change it
-  in **Settings → Reading direction** while reading (kept for that comic).
+  half). It's set from the comic's `ComicInfo.xml` when it says so, or else
+  from a manga publisher's name in its file names (Kodansha, VIZ Media, Yen
+  Press, Seven Seas and others); change it in **Settings → Reading
+  direction** while reading (kept for that comic). The first time a manga
+  opens, a note says how to turn its pages.
 - **The magnifier,** for small print in speech bubbles: press **Y**, or hold
   a page. The page is on the touchscreen with a box on it, and what's in the
   box is enlarged on the other screen. Drag the box, or move it with the

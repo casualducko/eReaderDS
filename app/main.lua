@@ -1319,10 +1319,19 @@ local function open_book(path)
     app.sync.checked[path], app.sync.pushed[path], app.sync.asked[path] = nil, nil, nil
     app.sync.moved[path] = nil                 -- (what's been seen there is kept: app.sync_seen)
     app.sync_pull("open")                  -- where another device has got to
-    if b.comic and not S.comic_tip then
-        S.comic_tip = true
-        Store.save_settings(S)
-        app.toast("A comic: Y, or holding a page, shows the magnifier", 5)
+    -- A comic opened the first time: which way it reads (manga: how to turn
+    -- the pages), and the first comic ever, the magnifier.
+    if b.comic then
+        local tips = {}
+        if Store.get_opened(path) == nil and app.comic_rtl() then     -- (opened before: it's saved after the first frame)
+            tips[#tips + 1] = "Manga: read right to left.\nTurn with left, or tap the left half"
+        end
+        if not S.comic_tip then
+            S.comic_tip = true
+            Store.save_settings(S)
+            tips[#tips + 1] = "Y, or holding a page, shows the magnifier"
+        end
+        if #tips > 0 then app.toast(table.concat(tips, "\n"), 6) end
     end
     if b.comic and b.comic.later > 0 then
         app.toast(b.comic.later .. (b.comic.later == 1 and " page is a WebP picture" or " pages are WebP pictures")

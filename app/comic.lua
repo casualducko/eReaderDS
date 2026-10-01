@@ -85,12 +85,32 @@ function M.info(z)
     local function tag(t) return xml_text(x:match("<" .. t .. "[^>]*>(.-)</" .. t .. ">")) end
     local manga = (tag("Manga") or ""):lower()
     return {
+        manga = manga ~= "" and manga or nil,      -- (said at all: then it isn't guessed)
         title = tag("Title"), series = tag("Series"), number = tag("Number"),
         writer = tag("Writer") or tag("Penciller"),
         -- "YesAndRightToLeft" is manga read right to left; plain "Yes" only
         -- says it's manga (often already turned to read left to right).
         rtl = manga == "yesandrighttoleft" or nil,
     }
+end
+
+-- Publishers of Japanese manga in English, whose names release groups put
+-- in the file and page names ("[Kodansha Comics]", "[VIZ Media]"): with no
+-- ComicInfo.xml to say, their comics read right to left. (Not ones that
+-- publish Korean manhwa or Western comics too, which read left to right.)
+M.MANGA_PUBLISHERS = { "kodansha", "viz media", "viz signature", "yen press", "seven seas", "square enix manga",
+    "vertical comics", "vertical inc", "shueisha", "shogakukan", "denpa", "ghost ship", "j-novel", "one peace books",
+    "kaiten books", "airship", "dark horse manga", "sublime" }
+
+-- Read right to left, by its names (with no ComicInfo.xml to say).
+function M.guess_rtl(path, names)
+    local text = { (path:match("[^/]+$") or path):lower() }
+    for i = 1, math.min(3, #names) do text[#text + 1] = names[i]:lower() end
+    local all = table.concat(text, "\n")
+    for _, p in ipairs(M.MANGA_PUBLISHERS) do
+        if all:find(p, 1, true) then return true end
+    end
+    return false
 end
 
 -- Width and height from a picture file's header (PNG, JPEG, GIF, BMP), or nil.

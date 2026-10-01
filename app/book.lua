@@ -651,7 +651,9 @@ local function open_cbz(path)
         end
         local info = Comic.info(z)
         local b = setmetatable({ path = path, zip = z, toc = {}, classes = {},
-            comic = { names = names, rtl = info.rtl, later = later },
+            comic = { names = names, later = later,
+                -- Right to left as ComicInfo.xml says, else by a manga publisher's name.
+                rtl = info.rtl or (info.manga == nil and Comic.guess_rtl(path, names)) or nil },
             author = clean(info.writer or "") or "", cover = names[1] }, Book)
         b.title = clean((comic_title(path, info)))
         b.chapters = { { blocks = { { kind = "blank", off = 0 } }, anchors = {}, length = #names * 2,
