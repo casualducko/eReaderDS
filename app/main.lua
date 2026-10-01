@@ -1225,7 +1225,7 @@ function app.check_finished()
     if not book or not spread or spread.ch < #book.chapters or spread.pi + 2 <= #spread.pages then return end
     if not Store.get_finished(book.path) then
         Store.set_finished(book.path, true)
-        app.toast("Finished!\nIt's marked as finished in My Books", 3)
+        app.toast("Finished!")
     end
 end
 
@@ -2242,15 +2242,15 @@ function app.sync_pull(how)
     local b = book
     if not (b and b.zip and app.sync_on()) then
         if now then
-            if b and not b.zip then app.sync_say("KOReader Sync is for EPUB books", "This book's places can't be shared with KOReader.")
-            else app.sync_say("Log in to KOReader Sync first", "Settings → KOReader Sync → Account") end
+            if b and not b.zip then app.sync_say("Sync works with EPUB books only")
+            else app.sync_say("Log in to KOReader Sync first") end
         end
         return
     end
     local docs = app.sync_docs(b)
     if #docs == 0 then return end
     if not shop.online() then
-        if now then app.sync_say("Not connected to Wi-Fi", "Your place is sent when you're back online.") end
+        if now then app.sync_say("No Wi-Fi", "Sends when you're back online") end
         return
     end
     app.sync.pulling, app.sync.last_try = true, love.timer.getTime()
@@ -2326,7 +2326,7 @@ function app.sync_results_ok(results, now)
         end
         if msg.status ~= 200 and msg.status ~= 404 then        -- (404: some servers' "nothing yet")
             print("[sync] pull: status " .. tostring(msg.status))
-            if now then app.sync_say("The sync server had a problem", app.sync_server_name() .. " answered " .. tostring(msg.status) .. ". Try again later.") end
+            if now then app.sync_say("Sync server error (" .. tostring(msg.status) .. ")", "Try again later") end
             return
         end
     end
@@ -2376,7 +2376,8 @@ function app.sync_go(b, r, rdoc, ch, off)
     app.sync.moved[b.path] = nil
     app.sync.pushed[b.path] = nil
     app.sync_push(nil, rdoc)
-    app.sync_say("Moved to where you were on " .. device, app.sync_where(ch, off) .. " · " .. ago(r.timestamp))
+    app.sync_say("Moved to your place from " .. device,
+        math.floor(b:fraction(ch, off) * 100 + 0.5) .. "% · " .. ago(r.timestamp))
 end
 
 function app.sync_decide(b, how, docs, results)
@@ -2412,14 +2413,14 @@ function app.sync_decide(b, how, docs, results)
                     if book ~= b then return end
                     app.sync.pushed[b.path] = nil
                     app.sync_push()
-                    app.sync_say("Sent your place to the sync server", where)
+                    app.sync_say("Place sent", where)
                 end })
             return
         end
         if moved or send then
             if send then app.sync.pushed[b.path] = nil end
             app.sync_push()
-            if now then app.sync_say("Sent your place to the sync server", where) end
+            if now then app.sync_say("Place sent", where) end
         elseif now then
             app.sync_say(head or "Already in sync", where)
         end
@@ -2536,7 +2537,7 @@ function app.sync_get_decide(b, docs, results)
     local sp = spread
     if sp and ch == sp.ch and off >= sp.pages[sp.pi].off and off < spread_end_off(sp) then
         app.sync_set_seen(b.path, rdoc, r.timestamp)
-        app.sync_say("You're already there", app.sync_where(ch, off) .. " · where you were on " .. device)
+        app.sync_say("Already there", app.sync_where(ch, off))
         return
     end
     local here = b:fraction(pos.ch, pos.off)
@@ -2556,11 +2557,11 @@ end
 function app.sync_send()
     local b = book
     if not (b and b.zip and app.sync_on()) then
-        if b and not b.zip then app.sync_say("KOReader Sync is for EPUB books", "This book's places can't be shared with KOReader.")
-        else app.sync_say("Log in to KOReader Sync first", "Settings → KOReader Sync → Account") end
+        if b and not b.zip then app.sync_say("Sync works with EPUB books only")
+        else app.sync_say("Log in to KOReader Sync first") end
         return
     end
-    if not shop.online() then app.sync_say("Not connected to Wi-Fi", "Try again when you're online.") return end
+    if not shop.online() then app.sync_say("Not connected to Wi-Fi") return end
     local docs = app.sync_docs(b)
     local xp = b:xpointer(pos.ch, pos.off)
     if #docs == 0 or not xp then return end
@@ -2591,7 +2592,7 @@ function app.sync_send()
                     app.sync.pushed[b.path], app.sync.moved[b.path] = place, nil
                 end
                 app.sync.failed = nil
-                app.sync_say("Sent your place to the sync server", where .. " · " .. app.sync_server_name())
+                app.sync_say("Place sent", where)
             else
                 app.sync.failed = love.timer.getTime()
                 app.sync_say("Couldn't send your place", app.sync_server_name() .. ": " .. tostring(err), 4)
@@ -2834,7 +2835,7 @@ function app.sync_auth(user, key)
             S.kosync_user, S.kosync_key = user, key
             Store.save_settings(S)
             app.sync.checked, app.sync.pushed = {}, {}
-            app.sync_say("Logged in as " .. user, "on " .. app.sync_server_name() .. ". Your place syncs as you read.")
+            app.sync_say("Logged in as " .. user)
             app.sync_pull()
         elseif msg.status == 401 then
             app.untoast()
@@ -2842,7 +2843,7 @@ function app.sync_auth(user, key)
                 .. "If it is yours, check the password instead.", yes = "Make it", no = "Cancel",
                 on_yes = function() app.sync_register(user, key) end })
         else
-            app.sync_say("The sync server had a problem", app.sync_server_name() .. " answered " .. tostring(msg.status) .. ". Try again later.")
+            app.sync_say("Sync server error (" .. tostring(msg.status) .. ")", "Try again later")
         end
     end)
 end
@@ -2858,12 +2859,12 @@ function app.sync_register(user, key)
             S.kosync_user, S.kosync_key = user, key
             Store.save_settings(S)
             app.sync.checked, app.sync.pushed = {}, {}
-            app.sync_say("Account made. Logged in as " .. user, "on " .. app.sync_server_name() .. ". Use the same name and password on your other device.", 5)
+            app.sync_say("Account made", "Use the same login on your other device")
             app.sync_pull()
         elseif msg.status == 402 then
-            app.sync_say("That name is taken", "If it's yours, check the password and log in again.", 4)
+            app.sync_say("That name is taken", "Is it yours? Check the password")
         else
-            app.sync_say("The sync server had a problem", app.sync_server_name() .. " answered " .. tostring(msg.status) .. ". Try again later.")
+            app.sync_say("Sync server error (" .. tostring(msg.status) .. ")", "Try again later")
         end
     end)
 end
@@ -6073,8 +6074,7 @@ function app.update_check(by_hand)
             end)
             if app.mode ~= "update" and not rel.skipped then
                 -- Tapping it opens the update (so do Settings, and Start in the library).
-                app.toast("Update available: v" .. rel.version .. "\nYou have v" .. app.update_current()
-                    .. "  ·  Tap here to update", 8, app.update_open)
+                app.toast("v" .. rel.version .. " is available\nTap to update", 8, app.update_open)
             end
         else
             app.upd = { state = (by_hand and err) and "error" or "none", message = err, checked = not err }
@@ -6205,7 +6205,7 @@ function app.update_skip()
     -- Quiet from now on: no bold Update, no library line (Check for Updates
     -- still finds it).
     u.skipped, u.state, u.quiet = true, "none", true
-    app.toast("Skipped v" .. u.version .. ". You'll hear about the next version.", 3)
+    app.toast("Skipped v" .. u.version)
     app.mode = app.update_back or (book and "menu" or "library")
     redraw()
 end
@@ -8892,7 +8892,7 @@ function app.crash_check()
     if not r then return end
     os.rename(Store.data_path("crash.txt"), Store.data_path("crash-last.txt"))
     if r.version == VERSION then
-        app.toast("eReaderDS closed unexpectedly last time\nTap here to report it", 10, app.report_open)
+        app.toast("eReaderDS crashed last time\nTap to report", 10, app.report_open)
     end
 end
 
@@ -9027,7 +9027,7 @@ function app.recv_open()
     if app.recv then app.mode = "receive"; redraw(); return end   -- already running
     if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
     local ip = app.recv_ip()
-    if not ip then app.toast("Couldn't find this device's address on the network"); return end
+    if not ip then app.toast("Can't find this device on Wi-Fi"); return end
     love.thread.getChannel("recv_ctl"):clear()
     love.thread.getChannel("recv_out"):clear()
     local r = { ip = ip, files = {}, back = app.mode, books = 0, fonts = 0 }
@@ -9665,7 +9665,7 @@ function love.load()
     -- Just updated? Offer what's new, once. (A new install has no seen_version.)
     if S.seen_version ~= VERSION then
         if S.seen_version ~= "" then
-            app.toast("Updated to v" .. VERSION .. "\nTap here to see what's new", 8, app.whatsnew_open)
+            app.toast("Updated to v" .. VERSION .. "\nTap for what's new", 8, app.whatsnew_open)
         end
         S.seen_version = VERSION
         Store.save_settings(S)
