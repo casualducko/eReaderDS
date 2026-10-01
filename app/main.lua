@@ -330,7 +330,7 @@ local function get_image(src)
         -- (One that failed is only remembered, not kept in the count.)
         if img then
             images_order[#images_order + 1] = src
-            if #images_order > IMAGES_KEEP then
+            if #images_order > app.images_keep() then
                 local old = table.remove(images_order, 1)
                 if images[old] then images[old]:release() end
                 images[old], app.image_ink[old] = nil, nil
@@ -3645,6 +3645,10 @@ end
 -- no status bars. Manga reads right to left: the first page of a pair is
 -- on the right, and turning goes the other way.
 
+-- How many decoded pictures are kept: a comic's are small (a screen's
+-- worth), and the pairs on screen, ahead and just behind all count.
+function app.images_keep() return book and book.comic and math.max(IMAGES_KEEP, 10) or IMAGES_KEEP end
+
 -- Right to left: as chosen for this comic (Settings while reading it), else
 -- as its ComicInfo.xml says.
 function app.comic_rtl()
@@ -3774,8 +3778,8 @@ app.pages_waiting, app.page_jobs = 0, {}
 app.page_failed = {}
 function app.comic_prefetch()
     if not (book and book.comic and spread) then return end
-    -- (This pair's first, then the next.)
-    for k = spread.pi, spread.pi + 3 do
+    -- (This pair's first, then the next two: a page takes half a second.)
+    for k = spread.pi, spread.pi + 5 do
         local pg = spread.pages[k]
         if pg and pg.src then app.comic_request(pg.src) end
     end
@@ -3813,7 +3817,7 @@ function app.comic_poll()
                 if ok then
                     images[msg.name] = img
                     images_order[#images_order + 1] = msg.name
-                    if #images_order > IMAGES_KEEP then
+                    if #images_order > app.images_keep() then
                         local old = table.remove(images_order, 1)
                         if images[old] then images[old]:release() end
                         images[old] = nil

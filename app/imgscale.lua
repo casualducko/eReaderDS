@@ -16,28 +16,43 @@ function M.fit(id, mw, mh)
     if s > 0.9 or id:getFormat() ~= "rgba8" then return id end
     local dw, dh = math.max(1, math.floor(w * s + 0.5)), math.max(1, math.floor(h * s + 0.5))
     local out = love.image.newImageData(dw, dh)
+    -- Row by row, each source row in one long straight loop that adds every
+    -- pixel into its column (which column, worked out once), then each
+    -- finished row of columns averaged. (Not a little loop for each new pixel:
+    -- the compiler handles those poorly on ARM, several times slower.)
     local src = ffi.cast("uint8_t *", id:getFFIPointer())
     local dst = ffi.cast("uint8_t *", out:getFFIPointer())
-    local xs = {}
-    for dx = 0, dw do xs[dx] = math.floor(dx * w / dw) end
+    local col = ffi.new("int32_t[?]", w)            -- source x -> 4 * its column
+    local cw = ffi.new("int32_t[?]", dw)            -- how many source columns each has
+    for x = 0, w - 1 do
+        local dx = math.min(dw - 1, math.floor(x * dw / w))
+        col[x] = dx * 4
+        cw[dx] = cw[dx] + 1
+    end
+    local acc = ffi.new("uint32_t[?]", dw * 4)
+    local sy, row = 0, w * 4
     for dy = 0, dh - 1 do
-        local sy0 = math.floor(dy * h / dh)
-        local sy1 = math.max(sy0 + 1, math.floor((dy + 1) * h / dh))
-        local o = dy * dw * 4
-        for dx = 0, dw - 1 do
-            local sx0, sx1 = xs[dx], math.max(xs[dx] + 1, xs[dx + 1])
-            local r, g, b, a = 0, 0, 0, 0
-            for sy = sy0, sy1 - 1 do
-                local i = (sy * w + sx0) * 4
-                for _ = sx0, sx1 - 1 do
-                    r, g, b, a = r + src[i], g + src[i + 1], b + src[i + 2], a + src[i + 3]
-                    i = i + 4
-                end
+        local sy1 = math.max(sy + 1, math.min(h, math.floor((dy + 1) * h / dh)))
+        ffi.fill(acc, dw * 16)
+        for y = sy, sy1 - 1 do
+            local p = src + y * row
+            for x = 0, w - 1 do
+                local c, i = col[x], x * 4
+                acc[c] = acc[c] + p[i]
+                acc[c + 1] = acc[c + 1] + p[i + 1]
+                acc[c + 2] = acc[c + 2] + p[i + 2]
+                acc[c + 3] = acc[c + 3] + p[i + 3]
             end
-            local n = (sy1 - sy0) * (sx1 - sx0)
-            dst[o], dst[o + 1], dst[o + 2], dst[o + 3] = r / n, g / n, b / n, a / n
-            o = o + 4
         end
+        local rows, o = sy1 - sy, dy * dw * 4
+        for dx = 0, dw - 1 do
+            local n, c = rows * cw[dx], dx * 4
+            dst[o + c] = acc[c] / n
+            dst[o + c + 1] = acc[c + 1] / n
+            dst[o + c + 2] = acc[c + 2] / n
+            dst[o + c + 3] = acc[c + 3] / n
+        end
+        sy = sy1
     end
     return out
 end
