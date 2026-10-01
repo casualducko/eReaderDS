@@ -9981,29 +9981,27 @@ function app.backup_list()
     return out
 end
 
--- How a backup is listed: "1 Oct 12:21 · 13 books started · Settings", or
--- "Before reset · 1 Oct 12:27 · 1 book started"; "· Stock" (or ROCKNIX, GammaOS) on the end
--- when it was made on another system.
+-- How a backup is listed: "1 Oct 12:21 · Settings", "1 Oct 12:15 ·
+-- Everything", or "Before reset · 1 Oct 12:27"; "· Stock" (or ROCKNIX,
+-- GammaOS) on the end when it was made on another system, and "· nothing read
+-- yet" when it has no place in any book (one made just after a reset).
 function app.backup_label(b)
     local y, mo, d, hm = (b.info.date or ""):match("^(%d+)%-(%d+)%-(%d+) (%d+:%d+)$")
     local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
     local when = y and (tonumber(d) .. " " .. MONTHS[tonumber(mo)] .. " " .. hm) or b.name
-    -- (The books it has a place in, not books it holds: a settings backup has
-    -- none, and they may not be on this card.)
-    local n = b.info.places or 0
-    local books = n .. (n == 1 and " book started" or " books started")
     local kind = b.info.kind == "everything" and "Everything" or "Settings"
     -- (Made on another system: which, as its times are by that one's clock.)
     local SHORT = { ["stock firmware"] = "Stock", ROCKNIX = "ROCKNIX", ["GammaOS (Android)"] = "GammaOS", computer = "Computer" }
     local from = b.info.system and b.info.system ~= app.system_name() and SHORT[b.info.system]
+    local empty = (b.info.places or 0) == 0 and " · nothing read yet" or ""
     from = from and (" · " .. from) or ""
     local before = b.name:match("^eReaderDS%-before%-(%a+)")
     local function label()
-        if before then return "Before " .. before .. " · " .. when .. " · " .. books .. from end
-        return when .. " · " .. books .. " · " .. kind .. from
+        if before then return "Before " .. before .. " · " .. when .. from .. empty end
+        return when .. " · " .. kind .. from .. empty
     end
     local m = MARGINS[2]
-    if ui.font:getWidth(label()) > PAGE_W - m.outer - m.inner - 20 then books = n .. " started" end   -- (too long for the row)
+    if empty ~= "" and ui.font:getWidth(label()) > PAGE_W - m.outer - m.inner - 20 then empty = " · empty" end   -- (too long for the row)
     return label()
 end
 
