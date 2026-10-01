@@ -857,13 +857,16 @@ function look.open(word)
 end
 
 -- Move the cursor: by words (left/right) or to the nearest word on the
--- line above or below (up/down).
+-- line above or below (up/down). Up on the first line goes round to the
+-- last, and down on the last to the first.
 function look.move(a)
     local ws, cur = look.words, look.words[look.sel]
     if a == "left" or a == "right" then
         look.sel = math.max(1, math.min(#ws, look.sel + (a == "right" and 1 or -1)))
     else
+        local first, last = ws[1].line, ws[#ws].line
         local target = cur.line + (a == "down" and 1 or -1)
+        if target < first then target = last elseif target > last then target = first end
         -- Lines with no words (images, blank) are skipped.
         local best, best_d
         for _ = 1, 20 do
@@ -876,6 +879,7 @@ function look.move(a)
             end
             if best then break end
             target = target + (a == "down" and 1 or -1)
+            if target < first then target = last elseif target > last then target = first end
         end
         if best then look.sel = best end
     end
