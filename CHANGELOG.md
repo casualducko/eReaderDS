@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.19.0
+
+- **Themes:** grouped as All, Light, Dark and Custom (your own themes are listed in All, Light and Dark too, tagged Custom). Make your own in a theme editor: page and text colours set with Brightness, Warmth and Tint sliders (OKLab, so steps look even), curated starting swatches for light and dark pages, a Light or Dark template, a name typed on the keyboard (with a clear button and Cancel that asks first), Save, Reset Colors and Delete (which asks). Copy any theme straight into the editor. The Themes pages use a neutral grey. A theme you tap is kept at once (saved on leaving); sliding the list only scrolls it.
+- **Hide built-in themes:** Hide on a theme's row; the list's foot counts the hidden ones, and Hidden Themes (from that count or the last row) restores one or all (Restore All, Restore All Light, Restore All Dark). Hiding the theme in use moves to the next one.
+- **Highlight by touch:** hold a word to look it up; hold and drag to choose words. In look-up, Start Highlight / Save Highlight / Remove Highlight with Cancel; after Start Highlight, dragging on the page chooses words; the buttons move to the top when the word is near the bottom, and the definition leaves room for them.
+- **Highlight colours:** Yellow, Green, Blue, Pink or Subtle (Settings → Reading & Device), shaded to suit each theme; **Highlights on dark themes: Bright** uses highlighter colours with the words on them in dark ink. A highlight over several lines is drawn as one block.
+- **Dim pictures on dark themes** (on by default; line art keeps taking the theme's ink).
+- **Back Up & Restore** (Settings): My Settings & Reading, or Everything with Books (zips in the books folder's Backups, written on a thread with progress). Restore lists your backups first (made here, then from another system, marked Stock / ROCKNIX / GammaOS), then the automatic copies; a copy of your settings is made before every restore and reset (the newest 3 kept). Places are stored relative to the books folder, so a backup restores on another system. Restoring writes the settings all at once (nothing changes if it fails), skips books the card can't hold, removes data files the backup lacks (not logins), and keeps this device's sync and Calibre ids (taking the backup's after a reset only if it was made on this system). Each step is shown; quitting waits for a restore or reset to finish.
+- **Reset eReaderDS** (Back Up & Restore → Start fresh): clears settings, places, bookmarks, highlights, themes and logins, after a backup, and closes. The launcher brings Book Reader settings over only on the very first start, not after a reset.
+- **Swipe up from the bottom edge** while reading opens Settings (brightness slides start above it).
+- **Tappable, larger hints:** the button hints along the touchscreen's foot are 26 px and can be tapped (A, B, X, Y, Select, Start); not A under a question card.
+- **Sync:** your place is sent without asking unless another device's place on the server is newer; the question names that device. Stay or Jump deals with every new place for the book (one under each of its names). Another device's place in the paragraph your page starts in counts as here. Nothing is sent during or after a restore or reset.
+- **Word cursor (Y):** up and down stay on the same page, going round at its top and bottom.
+- **Default brightness:** 50% on the stock firmware, 60% on ROCKNIX (was 20% and 40%).
+- **Messages:** shorter, and shown for as long as they take to read (1.2 s plus a quarter second a word after the third, up to 6 s). The update notice shows both versions.
+- **Fixes from a full review:** crashes, data safety (fsync'd atomic writes), memory and network; thread errors no longer crash the app; My Books keeps the open or chosen book selected when it's sorted again.
+- **tools/gammaos-ready.sh:** says when GammaOS has finished starting.
+
 ## v1.18.0
 
 - **Connect to Calibre** (Get Books): eReaderDS works as a Calibre wireless device. Start the wireless device connection in Calibre and open Connect to Calibre: Calibre finds eReaderDS, sends books to it (with Send to device), shows which ones are on it, and can delete them; the screen lists each book as it arrives or is deleted. Books are kept in the books folder's Calibre folder, named "Title - Author". Where Calibre can't be found by itself (some office networks), save its computer under Computers & Password (Y) with an address and a name, such as Home or Work: eReaderDS looks for Calibre, then tries each saved computer. A Calibre password goes there too.

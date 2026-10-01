@@ -2,6 +2,23 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.19.0
+Themes are grouped as All, Light, Dark and Custom, and you can make your own: choose the page and text colours with Brightness, Warmth and Tint, starting from a light or dark template. Copy any theme to make it yours.
+Hide themes you don't use; Hidden Themes brings them back, one at a time or all at once.
+Highlight by touch: hold a word to look it up, or hold and drag to choose words. Start Highlight, Save Highlight and Remove Highlight buttons do the rest.
+Highlight colours: Yellow, Green, Blue, Pink or Subtle, in Settings → Reading & Device. On dark themes highlights can be Muted or Bright.
+A highlight over several lines is now one block of colour.
+Pictures are dimmed on dark themes (you can turn this off).
+Back Up & Restore, in Settings: save your settings, places, bookmarks, highlights and themes (or everything, with your books), and restore them here or on another system.
+Reset eReaderDS starts fresh but keeps your books. A backup is made first, so Restore can undo it.
+Swipe up from the bottom of the touchscreen to open Settings.
+The button hints at the bottom of the touchscreen are bigger, and you can tap them.
+Sync asks less: your place is sent by itself unless another device has a newer one, and then it says which device.
+The word cursor (Y) goes round from the top line to the bottom of the same page, and back.
+A brighter start: 50% on the stock firmware, 60% on ROCKNIX.
+Messages are shorter and stay up as long as they take to read.
+Lots of fixes from a full review: fewer crashes and safer saving.
+
 v1.18.0
 Connect to Calibre: in Get Books, eReaderDS works as a Calibre wireless device. Start the wireless device connection in Calibre, then send books to eReaderDS as to any e-reader; Calibre shows which are on it and can delete them.
 If Calibre isn't found by itself, save its computer (with a name like Home or Work) under Computers & Password.
