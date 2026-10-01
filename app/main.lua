@@ -305,6 +305,11 @@ local function get_image(src)
             if images_order[i] == src then table.remove(images_order, i) break end
         end
         images_order[#images_order + 1] = src
+    elseif img == nil and book and book.comic then
+        -- A comic's page: decoded on the page thread, and drawn once it's
+        -- there (meanwhile "Loading…"), so the screens never wait for it.
+        app.comic_request(src)
+        return nil
     elseif img == nil then
         img = false
         local data = book and book:read_resource(src)
@@ -1299,6 +1304,7 @@ local function open_book(path)
     if app.find and app.find.book ~= b then app.find_stop(); app.find, app.find_mark = nil, nil end
     book = b
     if app.zoom then app.zoom.img:release(); app.zoom = nil end      -- (the magnifier's picture: the old book's)
+    app.page_failed = {}
     clear_book_caches()
     app.previews_clear()
     local pr = Store.get_progress(path)
@@ -1835,7 +1841,8 @@ local function library_preview()
                 cover_thread = love.thread.newThread("coverworker.lua")
                 cover_thread:start()
             end
-            love.thread.getChannel("cover_jobs"):push({ path = it.path, name = b.cover, data = data })
+            love.thread.getChannel("cover_jobs"):push({ path = it.path, name = b.cover, data = data,
+                fit = { w = PAGE_W, h = PREVIEW_H } })
             app.covers_waiting = app.covers_waiting + 1
         end
         if b ~= book then b:close() end
@@ -3671,8 +3678,12 @@ end
 -- screens); the decoded data is released.
 function app.comic_fit(id)
     local w, h = id:getDimensions()
-    local ok, img = pcall(app.fit_image, id, require("comic").wide(w, h) and PAGE_W * 2 or PAGE_W, PAGE_H)
-    id:release()
+    local mw = require("comic").wide(w, h) and PAGE_W * 2 or PAGE_W
+    -- Shrunk on the processor first: the GPU never gets the full-size scan.
+    local small = require("imgscale").fit(id, mw, PAGE_H)
+    if small ~= id then id:release() end
+    local ok, img = pcall(app.fit_image, small, mw, PAGE_H)
+    small:release()
     if not ok then error(img, 0) end
     return img
 end
@@ -3730,7 +3741,8 @@ function app.comic_draw(pg, side)
     if not img then
         color(theme().dim)
         love.graphics.setFont(ui.font)
-        love.graphics.printf("This page can't be shown", 40, PAGE_H / 2 - 20, PAGE_W - 80, "center")
+        love.graphics.printf(app.page_failed[pg.src] and "This page can't be shown" or "Loading…",
+            40, PAGE_H / 2 - 20, PAGE_W - 80, "center")
         return
     end
     local rx, rw, rh, x, y, sc = app.comic_place(pg, side, img)
@@ -3759,23 +3771,30 @@ end
 -- The next pair's pictures decoded on a thread meanwhile (the cover
 -- thread's work, on its own channels), so a page turn needn't wait.
 app.pages_waiting, app.page_jobs = 0, {}
+app.page_failed = {}
 function app.comic_prefetch()
     if not (book and book.comic and spread) then return end
-    for k = spread.pi + 2, spread.pi + 3 do
+    -- (This pair's first, then the next.)
+    for k = spread.pi, spread.pi + 3 do
         local pg = spread.pages[k]
-        if pg and pg.src and images[pg.src] == nil and not app.page_jobs[pg.src] then
-            local data = book:read_resource(pg.src)
-            if data then
-                if not app.page_thread then
-                    app.page_thread = love.thread.newThread("coverworker.lua")
-                    app.page_thread:start("page_jobs", "page_out")
-                end
-                love.thread.getChannel("page_jobs"):push({ path = book.path, name = pg.src, data = data })
-                app.page_jobs[pg.src] = true
-                app.pages_waiting = app.pages_waiting + 1
-            end
-        end
+        if pg and pg.src then app.comic_request(pg.src) end
     end
+end
+
+-- A page picture for the page thread to decode (and shrink), unless it's
+-- here, on its way, or couldn't be.
+function app.comic_request(src)
+    if images[src] ~= nil or app.page_jobs[src] or app.page_failed[src] then return end
+    local data = book:read_resource(src)
+    if not data then app.page_failed[src] = true return end
+    if not app.page_thread then
+        app.page_thread = love.thread.newThread("coverworker.lua")
+        app.page_thread:start("page_jobs", "page_out")
+    end
+    love.thread.getChannel("page_jobs"):push({ path = book.path, name = src, data = data,
+        fit = { w = PAGE_W, h = PAGE_H, wide = true } })
+    app.page_jobs[src] = true
+    app.pages_waiting = app.pages_waiting + 1
 end
 
 -- Pictures decoded since last time: kept with the others (the least
@@ -3805,9 +3824,11 @@ function app.comic_poll()
             end
         elseif msg.error then
             print("[comic] " .. tostring(msg.name) .. ": " .. msg.error)
+            if book and book.path == msg.path then app.page_failed[msg.name] = true end
         end
         got = true
     end
+    if got then redraw() end
     return got
 end
 
@@ -3876,7 +3897,11 @@ function app.zoom_load(pg)
         local id = love.image.newImageData(love.filesystem.newFileData(data, pg.src))
         local w, h = id:getDimensions()
         local wide = require("comic").wide(w, h)
-        local okf, im = pcall(app.fit_image, id, PAGE_W * app.ZOOM * (wide and 2 or 1), PAGE_H * app.ZOOM)
+        -- (Not as sharp on Android, whose memory is short: the view is enlarged
+        -- as much, just from a smaller picture.)
+        local z = require("android").active and 1.6 or app.ZOOM
+        local mw, mh = PAGE_W * z * (wide and 2 or 1), PAGE_H * z
+        local okf, im = pcall(app.fit_image, id, mw, mh)
         id:release()
         if not okf then error(im, 0) end
         return im
@@ -11064,8 +11089,17 @@ function love.load()
     local tl = love.timer.getTime()
     local last = Store.get_last()
     local f = last and io.open(last, "rb")
+    -- A comic isn't reopened at the start (big pictures to load before
+    -- anything shows): My Books, on it, so A opens it.
+    local comic = last and last:lower():match("%.cbz$")
+    if f and comic then f:close(); f = nil end
     -- Reopening a book: My Books is filled in just after it's on screen.
     if f then app.library_later = true else scan_library() end
+    if comic then
+        for i, it in ipairs(library.items) do
+            if it.path == last then library.sel, library.picked = i, true end
+        end
+    end
     local to = love.timer.getTime()
     if f then f:close(); open_book(last) end
     print(string.format("[startup] fonts %.2fs, library %.2fs, book %.2fs", tl - tf, to - tl, love.timer.getTime() - to))
