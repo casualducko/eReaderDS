@@ -3596,6 +3596,7 @@ function app.hints(x, y, list)
     y = y + ui.small:getBaseline() - f:getBaseline()      -- (the same baseline whichever size)
     for i = 1, #list, 2 do
         local key = app.key(list[i])
+        local x0 = x
         love.graphics.setFont(fb)
         color(th.fg)
         love.graphics.print(key, x, y)
@@ -3604,8 +3605,17 @@ function app.hints(x, y, list)
         color(th.dim)
         love.graphics.print(list[i + 1], x, y)
         x = x + f:getWidth(list[i + 1]) + 32
+        -- On the touchscreen, a hint for a button can be tapped instead of
+        -- pressing it (see app.hint_tap).
+        if app.hint_boxes and app.HINT_ACTIONS[list[i]] then
+            app.hint_boxes[#app.hint_boxes + 1] = { x0, y, x - 32 - x0, f:getHeight(), app.HINT_ACTIONS[list[i]] }
+        end
     end
 end
+
+-- What tapping a hint does: what its button does. (Directions, "‹ ›" and
+-- "↕", are for moving about, not one action, so they're left out.)
+app.HINT_ACTIONS = { A = "confirm", B = "back", X = "menu", Y = "toc", Select = "bookmark", Start = "menu" }
 
 -- "3 / 12" at the right of a list's foot.
 function app.count(x, w, sel, n, more, note)
@@ -7939,9 +7949,14 @@ local function render_canvases()
         love.graphics.setCanvas(canvases[i])
         love.graphics.clear(bg[1], bg[2], bg[3], 1)
         love.graphics.origin()
+        -- (The touchscreen's hints, to be tapped; a card's replace the page's.)
+        local touch = side == app.touch_side()
+        if touch then app.hint_boxes = {} end
         painter(side)
-        if side == app.touch_side() and app.choosing then app.choose_draw() end
-        if side == app.touch_side() and app.asking then app.ask_draw() end
+        if touch and (app.choosing or app.asking) then app.hint_boxes = {} end
+        if touch and app.choosing then app.choose_draw() end
+        if touch and app.asking then app.ask_draw() end
+        app.touch_hints, app.hint_boxes = touch and app.hint_boxes or app.touch_hints, nil
         if (app.mode == "menu" and menu.page ~= "status" or app.mode == "jump") and side == "left" then
             love.graphics.setColor(th.bg[1], th.bg[2], th.bg[3], 0.55)
             love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
@@ -8711,6 +8726,7 @@ local function action(a)
     if app.mode ~= "reader" then reading_pause() end
 end
 function app.on_back() action("menu") end   -- see app.on_raw_key
+function app.press_hint(a) action(a) end    -- a tapped hint (app.hint_tap)
 
 function handle_action(a)
     if lid.closed then return end         -- pocket presses while the lid is shut
@@ -8939,7 +8955,23 @@ function app.on_hold(side, u, v)
 end
 
 -- A quick tap on the touchscreen (page coordinates of the touched side).
+-- A tap on a hint along the touchscreen's foot: what its button does. True
+-- if it was one.
+function app.hint_tap(side, u, v)
+    if side ~= app.touch_side() then return false end
+    for _, b in ipairs(app.touch_hints or {}) do
+        if u >= b[1] - 10 and u <= b[1] + b[3] + 10 and v >= b[2] - 14 and v <= b[2] + b[4] + 14 then
+            app.press_hint(b[5])
+            return true
+        end
+    end
+    return false
+end
+
 function app.on_tap(side, u, v)
+    if overlay == nil or not overlay.on_tap then
+        if app.hint_tap(side, u, v) then return end
+    end
     -- A toast that does something when tapped (e.g. "Update available"):
     -- a tap on it does that; a tap anywhere else just dismisses it.
     local o = overlay

@@ -144,7 +144,9 @@ replacing `Ports` deletes your other ports.) On GammaOS, install the newer
 
 Hold the device turned counter-clockwise, buttons under your right hand.
 Directions are as you hold it. (To hold it the other way round, see
-[below](#holding-it-the-other-way-round).)
+[below](#holding-it-the-other-way-round).) The line along the foot of the
+touchscreen says what the buttons do there; tap one ("A select", "B back")
+to do the same.
 
 | Button | While reading | In lists and menus |
 |---|---|---|
