@@ -2898,14 +2898,19 @@ function app.night_preview(side)
         return S.night_theme
     end
     -- The Themes page: the book's page in the theme highlighted.
-    if side == "left" and app.mode == "themes" then return THEMES[app.themes.sel].name end
+    if side == "left" and app.mode == "themes" then
+        local t = app.themes.list[app.themes.sel]
+        return t and not t.new and t.name or nil
+    end
+    -- Making a theme: the book in its colours as they change.
+    if side == "left" and app.mode == "theme_edit" then return app.EDIT_THEME.name end
 end
 
 
 -- The Night Mode page: which theme, and when.
 function app.night_items()
     local names = { "off" }
-    for _, t in ipairs(THEMES) do names[#names + 1] = t.name end
+    for _, t in ipairs(THEMES) do if not t.hidden then names[#names + 1] = t.name end end
     local rows = {
         { label = "Theme", value = S.night_theme == "off" and "Off" or S.night_theme,
           adjust = function(d)
@@ -3459,20 +3464,55 @@ local function list_rows(row_h) return math.floor((PAGE_H - 200) / row_h) end
 -- with a swatch in its own colours, and your book's page on the other screen
 -- in the one highlighted, to see it before choosing. A (or a second tap) uses
 -- it. While the night theme is on, this chooses the night theme.
-app.themes = { sel = 1, top = 1 }
+-- Left/right (or a tap on the switch by the title) show all themes, or only
+-- light or dark ones, as the Fonts page does.
+app.themes = { sel = 1, top = 1, list = THEMES, filter = "all" }
 app.THEME_ROW_H = 70
+app.THEME_FILTERS = { { "all", "All" }, { "light", "Light" }, { "dark", "Dark" }, { "custom", "Custom" } }
 
 function app.theme_current() return app.night and S.night_theme or S.theme end
 
+-- Light or dark, by how bright its page is.
+function app.theme_kind(t)
+    local bg = t.bg
+    return 0.2126 * bg[1] + 0.7152 * bg[2] + 0.0722 * bg[3] >= 0.5 and "light" or "dark"
+end
+
+-- Show all themes, or only light or dark ones, keeping the highlighted theme
+-- if it's still listed.
+function app.theme_set_filter(filter, keep)
+    local T = app.themes
+    keep = keep or (T.list[T.sel] and T.list[T.sel].name)
+    T.filter = filter
+    app.theme_filter_last = filter
+    T.list = {}
+    if filter == "custom" then
+        -- Your own themes, after a row for making a new one.
+        T.list[1] = app.NEW_THEME
+        for _, t in ipairs(THEMES) do if t.custom and not t.hidden then T.list[#T.list + 1] = t end end
+    else
+        for _, t in ipairs(THEMES) do
+            if not t.custom and (filter == "all" or app.theme_kind(t) == filter) then T.list[#T.list + 1] = t end
+        end
+    end
+    T.sel, T.top = 1, 1
+    for i, t in ipairs(T.list) do if t.name == keep then T.sel = i end end
+end
+
 function app.theme_open()
-    app.themes.sel, app.themes.top = 1, 1
-    for i, t in ipairs(THEMES) do if t.name == app.theme_current() then app.themes.sel = i end end
+    app.themes.list, app.themes.sel = THEMES, 1
+    local cur = app.theme_current()
+    local mine = false
+    for _, t in ipairs(THEMES) do if t.custom and t.name == cur then mine = true end end
+    app.theme_set_filter(mine and "custom" or (app.theme_filter_last or "all"), cur)
     app.mode = "themes"
     redraw()
 end
 
 function app.theme_use()
-    local t = THEMES[app.themes.sel]
+    local t = app.themes.list[app.themes.sel]
+    if t and t.new then app.tedit_new() return end
+    if not t then return end
     if app.night then S.night_theme = t.name else S.theme = t.name end
     Store.save_settings(S)
     app.mode = "menu"
@@ -3481,8 +3521,23 @@ end
 
 function app.theme_action(a)
     local T = app.themes
+    if a == "toc" then
+        local t = T.list[T.sel]
+        if T.filter == "custom" then                          -- Y: change one of yours
+            if t and t.custom then app.tedit_open(t) end
+        elseif t then                                         -- Y: copy a theme to change
+            app.tedit_open(nil, { name = "My " .. t.name, fg = t.fg, bg = t.bg })
+        end
+        return
+    end
     if a == "up" then T.sel = math.max(1, T.sel - 1)
-    elseif a == "down" then T.sel = math.min(#THEMES, T.sel + 1)
+    elseif a == "down" then T.sel = math.min(math.max(1, #T.list), T.sel + 1)
+    elseif a == "left" or a == "prev" or a == "right" or a == "next" then
+        -- All / Light / Dark, like the switch at the top of the list.
+        local idx = 1
+        for i, f in ipairs(app.THEME_FILTERS) do if f[1] == T.filter then idx = i end end
+        idx = idx + ((a == "left" or a == "prev") and -1 or 1)
+        app.theme_set_filter(app.THEME_FILTERS[math.max(1, math.min(#app.THEME_FILTERS, idx))][1])
     elseif a == "confirm" then app.theme_use() return
     elseif a == "back" or a == "menu" then app.mode = "menu" end
     redraw()
@@ -3491,9 +3546,15 @@ end
 function app.theme_tap(side, u, v)
     if side ~= "right" then return end
     local T = app.themes
+    if v < 160 then                                 -- the All / Light / Dark switch
+        for _, t in ipairs(T.tabs or {}) do
+            if u >= t.x0 - 12 and u <= t.x1 + 12 then app.theme_set_filter(t.filter); redraw() end
+        end
+        return
+    end
     local rows = list_rows(app.THEME_ROW_H)
     local idx = T.top + math.floor((v - 160) / app.THEME_ROW_H)
-    if v >= 160 and idx < T.top + rows and THEMES[idx] then
+    if idx < T.top + rows and T.list[idx] then
         if idx == T.sel then app.theme_use() else T.sel = idx; redraw() end
     end
 end
@@ -3509,10 +3570,45 @@ function app.theme_draw(side)
     if T.sel >= T.top + rows then T.top = T.sel - rows + 1 end
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(app.night and "Night Mode Theme" or "Themes", x, 60)
+    local title = app.night and "Night Mode Theme" or "Themes"
+    love.graphics.print(title, x, 60)
+    -- All / Light / Dark, right-aligned on the title line; the current one bold.
+    T.tabs = {}
+    local tx = x + w
+    local ty = 60 + ui.title:getBaseline() - ui.font:getBaseline()
+    for k = #app.THEME_FILTERS, 1, -1 do
+        local t = app.THEME_FILTERS[k]
+        local on = T.filter == t[1]
+        local f = on and ui.bold or ui.font
+        local tw = f:getWidth(t[2])
+        tx = tx - tw
+        love.graphics.setFont(f)
+        color(on and th.fg or th.dim)
+        love.graphics.print(t[2], tx, ty)
+        T.tabs[#T.tabs + 1] = { x0 = tx, x1 = tx + tw, filter = t[1] }
+        if k > 1 then
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            tx = tx - ui.font:getWidth("  ·  ")
+            love.graphics.print("  ·  ", tx, ty)
+        end
+    end
     local cur = app.theme_current()
-    draw_list(side, THEMES, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw)
+    draw_list(side, T.list, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw)
         local h = row_h - 4
+        if t.new then
+            -- "New Theme": a dashed-looking swatch with a plus.
+            color(th.dim)
+            love.graphics.setLineWidth(2)
+            love.graphics.rectangle("line", rx, ry + 8, 96, h - 16, 8, 8)
+            love.graphics.setLineWidth(1)
+            love.graphics.setFont(ui.title)
+            love.graphics.printf("+", rx, centered_y(ui.title, UI_SIZE, ry + 4, h - 8), 96, "center")
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.print(t.name, rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
+            return
+        end
         -- A swatch: the theme's page with "Aa" in its ink.
         local sw, sh = 96, h - 16
         local sy = ry + 8
@@ -3531,8 +3627,492 @@ function app.theme_draw(side)
             love.graphics.printf("✓", rx, centered_y(ui.font, UI_SIZE, ry, h), rw, "right")
         end
     end)
-    app.hints(x, nil, { "A", "use", "B", "back" })
-    app.count(x, w, T.sel, #THEMES)
+    if T.filter == "custom" then
+        app.hints(x, nil, { "A", T.list[T.sel] and T.list[T.sel].new and "new" or "use", "Y", "change", "‹ ›", "filter", "B", "back" })
+    else
+        app.hints(x, nil, { "A", "use", "Y", "copy", "‹ ›", "filter", "B", "back" })
+    end
+    if T.filter ~= "custom" then app.count(x, w, T.sel, #T.list) end
+end
+
+---------------------------------------------------------------- your own themes
+
+-- Themes the reader makes (Themes → Custom): a name, and the text and page
+-- colours, each set like a photo's in a phone's editor: Brightness, Warmth
+-- (bluish to yellowish) and Tint (greenish to pinkish), Warmth and Tint
+-- neutral in the middle. Underneath, OKLab (a colour space made so equal
+-- steps look equal): lightness, and its two colour axes. The dimmed text
+-- and the highlight are mixed from the two colours. Kept in themes.txt
+-- (store.lua) and listed in THEMES like the others (custom = true), so one
+-- can be the reading theme or the night theme.
+app.NEW_THEME = { name = "New Theme", new = true }
+app.EDIT_THEME = { name = "\0editing", custom = true, hidden = true }
+THEMES[#THEMES + 1] = app.EDIT_THEME
+-- The sliders: { label, lowest, highest, words at the two ends }. A colour
+-- is { brightness 0-100, warmth -100-100, tint -100-100 }.
+app.TEDIT_SLIDERS = { { "Brightness", 0, 100, "Darker", "Lighter" }, { "Warmth", -100, 100, "Cooler", "Warmer" },
+    { "Tint", -100, 100, "Greener", "Pinker" } }
+app.TEDIT_CHROMA = 0.2           -- OKLab a/b at the ends of Warmth and Tint
+-- The editor's rows, top to bottom (up/down move between them).
+app.TEDIT_ROW = { name = 1, which = 2, picks = 3, slider = 4, delete = 7 }      -- (sliders: 4, 5, 6)
+-- Ready-made colours to start from: the rainbow (and neutral), soft for the
+-- page and deep for the text. { name, hue angle in OKLab (nil: neutral) }.
+app.TEDIT_PICKS = { { "Neutral" }, { "Red", 29 }, { "Orange", 55 }, { "Yellow", 100 }, { "Green", 142 },
+    { "Blue", 255 }, { "Purple", 305 }, { "Pink", 350 } }
+app.TEDIT_PICK_LOOK = { bg = { 93, 0.045 }, fg = { 38, 0.10 } }    -- brightness, colourfulness
+
+-- Pick i as a colour { brightness, warmth, tint } for the page or the text.
+function app.tedit_pick_colour(i, which)
+    local p, look = app.TEDIT_PICKS[i], app.TEDIT_PICK_LOOK[which]
+    if not p[2] then return { which == "bg" and 97 or 15, 0, 0 } end
+    local h = math.rad(p[2])
+    local function clamp(v) return math.max(-100, math.min(100, math.floor(v + 0.5))) end
+    return { look[1], clamp(look[2] * math.sin(h) / app.TEDIT_CHROMA * 100), clamp(look[2] * math.cos(h) / app.TEDIT_CHROMA * 100) }
+end
+
+-- OKLab <-> sRGB (Björn Ottosson's formulas); colours off the screen's
+-- range are clipped.
+function app.lab_rgb(c)
+    local L, A, B = c[1] / 100, c[3] / 100 * app.TEDIT_CHROMA, c[2] / 100 * app.TEDIT_CHROMA
+    local l = (L + 0.3963377774 * A + 0.2158037573 * B) ^ 3
+    local m = (L - 0.1055613458 * A - 0.0638541728 * B) ^ 3
+    local s = (L - 0.0894841775 * A - 1.2914855480 * B) ^ 3
+    local lin = { 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s }
+    for i, v in ipairs(lin) do
+        v = math.max(0, math.min(1, v))
+        lin[i] = v <= 0.0031308 and 12.92 * v or 1.055 * v ^ (1 / 2.4) - 0.055
+    end
+    return lin
+end
+
+function app.rgb_lab(r, g, b)
+    local function lin(v) return v <= 0.04045 and v / 12.92 or ((v + 0.055) / 1.055) ^ 2.4 end
+    r, g, b = lin(r), lin(g), lin(b)
+    local function cbrt(v) return v < 0 and -(-v) ^ (1 / 3) or v ^ (1 / 3) end
+    local l = cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+    local m = cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+    local s = cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+    local L = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s
+    local A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s
+    local B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+    local function clamp(v, lo, hi) return math.max(lo, math.min(hi, math.floor(v + 0.5))) end
+    return { clamp(L * 100, 0, 100), clamp(B / app.TEDIT_CHROMA * 100, -100, 100), clamp(A / app.TEDIT_CHROMA * 100, -100, 100) }
+end
+
+-- A saved colour: "brightness/warmth/tint". (Themes made by a test version
+-- were saved as "h,s,l".)
+function app.colour_parse(str, default)
+    local l, w, t = tostring(str):match("^(%d+)/(%-?%d+)/(%-?%d+)$")
+    if l then
+        return { math.min(100, tonumber(l)), math.max(-100, math.min(100, tonumber(w))), math.max(-100, math.min(100, tonumber(t))) }
+    end
+    local h, sat, li = tostring(str):match("^(%d+),(%d+),(%d+)$")
+    if h then
+        h, sat, li = tonumber(h) / 360, tonumber(sat) / 100, tonumber(li) / 100
+        local q = li < 0.5 and li * (1 + sat) or li + sat - li * sat
+        local p = 2 * li - q
+        local function hue(x)
+            x = x % 1
+            if x < 1 / 6 then return p + (q - p) * 6 * x end
+            if x < 1 / 2 then return q end
+            if x < 2 / 3 then return p + (q - p) * (2 / 3 - x) * 6 end
+            return p
+        end
+        return app.rgb_lab(hue(h + 1 / 3), hue(h), hue(h - 1 / 3))
+    end
+    return { default[1], default[2], default[3] }
+end
+function app.colour_string(c) return c[1] .. "/" .. c[2] .. "/" .. c[3] end
+
+app.TEDIT_DEFAULT = { fg = app.rgb_lab(0.357, 0.275, 0.212), bg = app.rgb_lab(0.965, 0.945, 0.905) }
+
+-- A theme's colours from its text and page colours.
+function app.theme_colours(t, fg, bg)
+    t.c_fg, t.c_bg = { fg[1], fg[2], fg[3] }, { bg[1], bg[2], bg[3] }
+    t.fg = app.lab_rgb(fg)
+    t.bg = app.lab_rgb(bg)
+    local function mix(a, b, k) return { a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k, a[3] + (b[3] - a[3]) * k } end
+    t.dim = mix(t.fg, t.bg, 0.45)
+    t.sel = mix(t.bg, t.fg, 0.14)
+    return t
+end
+app.theme_colours(app.EDIT_THEME, app.TEDIT_DEFAULT.fg, app.TEDIT_DEFAULT.bg)
+
+-- Your themes into THEMES (after the built-in ones, in the order made).
+function app.my_themes_load()
+    for i = #THEMES, 1, -1 do
+        if THEMES[i].custom and not THEMES[i].hidden then table.remove(THEMES, i) end
+    end
+    for _, saved in ipairs(Store.load_themes()) do
+        THEMES[#THEMES + 1] = app.theme_colours({ name = saved.name, custom = true },
+            app.colour_parse(saved.fg, app.TEDIT_DEFAULT.fg), app.colour_parse(saved.bg, app.TEDIT_DEFAULT.bg))
+    end
+end
+
+function app.my_themes_save()
+    local list = {}
+    for _, t in ipairs(THEMES) do
+        if t.custom and not t.hidden then
+            list[#list + 1] = { name = t.name, fg = app.colour_string(t.c_fg), bg = app.colour_string(t.c_bg) }
+        end
+    end
+    Store.save_themes(list)
+end
+
+function app.theme_named(name)
+    for _, t in ipairs(THEMES) do if t.name == name and not t.hidden then return t end end
+end
+
+-- A name not taken by another theme: "My Theme", "My Theme 2", ...
+function app.theme_free_name(base, except)
+    local name, n = base, 1
+    while app.theme_named(name) and app.theme_named(name) ~= except do
+        n = n + 1
+        name = base .. " " .. n
+    end
+    return name
+end
+
+-- Where a new theme can start: light or dark, to tweak.
+app.TEDIT_TEMPLATES = {
+    { "Light: dark text on a light page", { name = "My Light Theme", fg = { 0.16, 0.15, 0.14 }, bg = { 0.96, 0.95, 0.92 } } },
+    { "Dark: light text on a dark page", { name = "My Dark Theme", fg = { 0.82, 0.80, 0.76 }, bg = { 0.11, 0.11, 0.12 } } },
+}
+
+-- New Theme: light or dark to start from.
+function app.tedit_new()
+    local opts = {}
+    for _, tpl in ipairs(app.TEDIT_TEMPLATES) do
+        opts[#opts + 1] = { tpl[1], function() app.tedit_open(nil, tpl[2]) end }
+    end
+    app.choose({ title = "Start From", options = opts })
+end
+
+-- The editor: for one of your themes (t), or a new one, starting from
+-- another theme's colours (from: a template or any theme) or the default.
+function app.tedit_open(t, from)
+    local function colours(x, key)
+        if x[key == "fg" and "c_fg" or "c_bg"] then return { unpack(x[key == "fg" and "c_fg" or "c_bg"]) } end
+        return app.rgb_lab(x[key][1], x[key][2], x[key][3])
+    end
+    local src = t or from
+    app.tedit = {
+        theme = t,
+        back = app.themes.filter,            -- (cancelling goes back to that list)
+        name = t and t.name or app.theme_free_name(from and from.name or "My Theme"),
+        fg = src and colours(src, "fg") or { unpack(app.TEDIT_DEFAULT.fg) },
+        bg = src and colours(src, "bg") or { unpack(app.TEDIT_DEFAULT.bg) },
+        which = "bg",
+        row = app.TEDIT_ROW.picks,
+    }
+    app.theme_colours(app.EDIT_THEME, app.tedit.fg, app.tedit.bg)
+    app.mode = "theme_edit"
+    redraw()
+end
+
+function app.tedit_rows() return app.tedit.theme and app.TEDIT_ROW.delete or app.TEDIT_ROW.delete - 1 end
+
+function app.tedit_close(saved)
+    local back = app.tedit and app.tedit.back or "custom"
+    app.tedit, app.tedit_hold = nil, nil
+    app.theme_set_filter(saved and "custom" or back)
+    app.mode = "themes"
+    redraw()
+end
+
+-- Save: a new theme is added, a changed one updated (and the reading or
+-- night theme renamed with it). With A it's then the one used; leaving with
+-- B saves it too (nothing made is lost; Delete removes one).
+function app.tedit_save(use)
+    local e = app.tedit
+    local t = e.theme
+    local name = app.theme_free_name(e.name, t)
+    if not t then
+        t = { custom = true }
+        THEMES[#THEMES + 1] = t
+    end
+    local old = t.name
+    t.name = name
+    app.theme_colours(t, e.fg, e.bg)
+    if old and S.theme == old then S.theme = name end
+    if old and S.night_theme == old then S.night_theme = name end
+    if use then
+        if app.night then S.night_theme = name else S.theme = name end
+    end
+    app.my_themes_save()
+    Store.save_settings(S)
+    app.tedit_close(true)
+    app.theme_set_filter("custom", name)
+    if use then app.mode = "menu" end
+    redraw()
+end
+
+function app.tedit_delete()
+    local t = app.tedit.theme
+    app.ask({ question = "Delete " .. t.name .. "?", yes = "Delete", on_yes = function()
+        for i, x in ipairs(THEMES) do if x == t then table.remove(THEMES, i) break end end
+        if S.theme == t.name then S.theme = "Sepia" end
+        if S.night_theme == t.name then S.night_theme = "off" end
+        app.my_themes_save()
+        Store.save_settings(S)
+        app.tedit_close()
+    end })
+end
+
+function app.tedit_rename()
+    app.kb_open({ title = "Theme Name", text = app.tedit.name, ok = "Done", submit = function(text)
+        app.tedit.name = text
+        redraw()
+    end })
+end
+
+function app.tedit_set(k, value)
+    local e = app.tedit
+    local hsl = e[e.which]
+    local s = app.TEDIT_SLIDERS[k]
+    hsl[k] = math.max(s[2], math.min(s[3], math.floor(value + 0.5)))
+    e.pick = nil
+    app.theme_colours(app.EDIT_THEME, e.fg, e.bg)
+    redraw()
+end
+
+function app.tedit_action(a)
+    local e, R = app.tedit, app.TEDIT_ROW
+    local now = love.timer.getTime()
+    local slider = e.row >= R.slider and e.row < R.slider + 3 and e.row - R.slider + 1
+    if a == "up" then e.row = math.max(1, e.row - 1)
+    elseif a == "down" then e.row = math.min(app.tedit_rows(), e.row + 1)
+    elseif a == "left" or a == "right" or a == "prev" or a == "next" then
+        local d = (a == "left" or a == "prev") and -1 or 1
+        if e.row == R.which then e.which = d < 0 and "bg" or "fg"
+        elseif e.row == R.picks then app.tedit_pick((e.pick or 0) + d)
+        elseif slider then
+            app.tedit_set(slider, e[e.which][slider] + d)
+            app.tedit_hold = { d = d, k = slider, t0 = now, next = now + 0.4 }
+        end
+    elseif a == "toc" then e.which = e.which == "fg" and "bg" or "fg"; e.pick = nil   -- Y: text / page
+    elseif a == "confirm" then
+        if e.row == R.name then app.tedit_rename() return end
+        if e.row == R.delete then app.tedit_delete() return end
+        app.tedit_save(true)
+        return
+    elseif a == "back" or a == "menu" then app.tedit_save(false) return
+    end
+    redraw()
+end
+
+-- A ready-made colour (i, wrapping round) for the text or the page.
+function app.tedit_pick(i)
+    local e = app.tedit
+    i = (i - 1) % #app.TEDIT_PICKS + 1
+    e.pick = i
+    e[e.which] = app.tedit_pick_colour(i, e.which)
+    app.theme_colours(app.EDIT_THEME, e.fg, e.bg)
+    redraw()
+end
+
+-- Held left/right on a slider: keeps going, faster after a second.
+function app.tedit_tick()
+    local h = app.tedit_hold
+    if not h or not app.tedit or app.mode ~= "theme_edit" then app.tedit_hold = nil return end
+    local held = love.keyboard.isDown(h.d < 0 and "left" or "right")
+    for _, j in ipairs(love.joystick.getJoysticks()) do
+        if j:isGamepad() then
+            if j:isGamepadDown(h.d < 0 and "dpleft" or "dpright") then held = true end
+            local x = j:getGamepadAxis("leftx")
+            if math.abs(x) > 0.5 and (x < 0) == (h.d < 0) then held = true end
+        end
+    end
+    if not held then app.tedit_hold = nil return end
+    local now = love.timer.getTime()
+    if now < h.next then return end
+    local e = app.tedit
+    app.tedit_set(h.k, e[e.which][h.k] + h.d * (now - h.t0 > 1.2 and 5 or 1))
+    h.next = now + 0.05
+end
+
+-- Where things are on the touchscreen (the hints sit at PAGE_H - 70).
+function app.tedit_layout()
+    local m = MARGINS[2]
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    return {
+        x = x, w = w,
+        name = { y = 160, h = 56 },
+        switch = { y = 236, h = 52 },
+        picks = { y = 310, h = 56 },
+        slider = function(k) return 426 + (k - 1) * 112, 40 end,     -- track y, h
+        sample = { y = 740, h = 64 },
+        delete = { y = 852, h = 50 },
+    }
+end
+
+function app.tedit_slider_at(v)
+    local L = app.tedit_layout()
+    for k = 1, 3 do
+        local ty, th = L.slider(k)
+        if v >= ty - 40 and v <= ty + th + 24 then return k end
+    end
+end
+
+function app.tedit_drag(k, u)
+    local L = app.tedit_layout()
+    app.tedit.row = app.TEDIT_ROW.slider + k - 1
+    local s = app.TEDIT_SLIDERS[k]
+    app.tedit_set(k, s[2] + math.max(0, math.min(1, (u - L.x) / L.w)) * (s[3] - s[2]))
+end
+
+function app.tedit_tap(side, u, v)
+    if side ~= "right" then return end
+    local e, L, R = app.tedit, app.tedit_layout(), app.TEDIT_ROW
+    if v >= L.name.y - 8 and v < L.name.y + L.name.h + 8 then e.row = R.name; app.tedit_rename() return end
+    if v >= L.switch.y - 8 and v < L.switch.y + L.switch.h + 8 then
+        e.row, e.which, e.pick = R.which, u < L.x + L.w / 2 and "bg" or "fg", nil
+        redraw()
+        return
+    end
+    if v >= L.picks.y - 8 and v < L.picks.y + L.picks.h + 8 then
+        local n = #app.TEDIT_PICKS
+        e.row = R.picks
+        app.tedit_pick(math.max(1, math.min(n, math.floor((u - L.x) / L.w * n) + 1)))
+        return
+    end
+    if e.theme and v >= L.delete.y - 10 and v < L.delete.y + L.delete.h + 10 then e.row = R.delete; app.tedit_delete() return end
+end
+
+function app.tedit_draw(side)
+    if side ~= "right" then return end
+    local th = theme()
+    local e, L, R = app.tedit, app.tedit_layout(), app.TEDIT_ROW
+    local x, w = L.x, L.w
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print(e.theme and "Change Theme" or "New Theme", x, 60)
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print("Tap a color to start from, then adjust it like a photo.", x, 118)
+    local function focus(y, h, r)
+        color(th.fg)
+        love.graphics.setLineWidth(3)
+        love.graphics.rectangle("line", x - 10, y - 8, w + 20, h + 16, r or 14, r or 14)
+        love.graphics.setLineWidth(1)
+    end
+    -- Name
+    color(th.sel)
+    love.graphics.rectangle("fill", x, L.name.y, w, L.name.h, 12, 12)
+    love.graphics.setFont(ui.font)
+    color(th.fg)
+    love.graphics.print(fit_text(ui.font, e.name, w - 200), x + 18, centered_y(ui.font, UI_SIZE, L.name.y, L.name.h))
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.printf("Rename", x, centered_y(ui.small, SMALL_SIZE, L.name.y, L.name.h), w - 18, "right")
+    if e.row == R.name then focus(L.name.y, L.name.h) end
+    -- Page color / Text color
+    for i, which in ipairs({ "bg", "fg" }) do
+        local bx, bw = x + (i - 1) * (w / 2 + 6), w / 2 - 6
+        local on = e.which == which
+        color(on and th.fg or th.dim)
+        love.graphics.rectangle(on and "fill" or "line", bx, L.switch.y, bw, L.switch.h, 26, 26)
+        love.graphics.setFont(on and ui.bold or ui.font)
+        color(on and th.bg or th.fg)
+        love.graphics.printf(which == "fg" and "Text color" or "Page color", bx,
+            centered_y(ui.font, UI_SIZE, L.switch.y, L.switch.h), bw, "center")
+    end
+    if e.row == R.which then focus(L.switch.y, L.switch.h, 32) end
+    -- Ready-made colours: a swatch each (the page's with "Aa" in the text colour).
+    local picks = app.TEDIT_PICKS
+    local n = #picks
+    local gap = 10
+    local sw = (w - gap * (n - 1)) / n
+    for i, p in ipairs(picks) do
+        local sx = x + (i - 1) * (sw + gap)
+        local rgb = app.lab_rgb(app.tedit_pick_colour(i, e.which))
+        love.graphics.setColor(rgb[1], rgb[2], rgb[3])
+        love.graphics.rectangle("fill", sx, L.picks.y, sw, L.picks.h, 10, 10)
+        color(th.dim, 0.7)
+        love.graphics.rectangle("line", sx, L.picks.y, sw, L.picks.h, 10, 10)
+        if e.pick == i then
+            color(th.fg)
+            love.graphics.setLineWidth(4)
+            love.graphics.rectangle("line", sx - 4, L.picks.y - 4, sw + 8, L.picks.h + 8, 12, 12)
+            love.graphics.setLineWidth(1)
+        end
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.printf(e.pick and picks[e.pick][1] or "", x, L.picks.y + L.picks.h + 4, w, "center")
+    if e.row == R.picks then focus(L.picks.y, L.picks.h) end
+    -- The sliders: each track shows the colours it leads to.
+    local hsl = e[e.which]
+    for k, s in ipairs(app.TEDIT_SLIDERS) do
+        local ty, tht = L.slider(k)
+        local on = e.row == R.slider + k - 1
+        love.graphics.setFont(on and ui.bold or ui.font)
+        color(th.fg)
+        love.graphics.print(s[1], x, ty - 38)
+        local steps = 96
+        for i = 0, steps - 1 do
+            -- Brightness shows the colour itself, dark to light. Warmth and
+            -- Tint show which way they go (blue to yellow, green to pink) at
+            -- a middle brightness, so they read even for black or white.
+            local col = k == 1 and { hsl[1], hsl[2], hsl[3] } or { 68, 0, 0 }
+            col[k] = s[2] + (i + 0.5) / steps * (s[3] - s[2])
+            local rgb = app.lab_rgb(col)
+            love.graphics.setColor(rgb[1], rgb[2], rgb[3])
+            love.graphics.rectangle("fill", x + i * w / steps, ty, w / steps + 1, tht)
+        end
+        color(th.dim, 0.7)
+        love.graphics.rectangle("line", x, ty, w, tht, 6, 6)
+        if s[2] < 0 then
+            -- Neutral: a mark in the middle.
+            color(th.dim)
+            love.graphics.rectangle("fill", x + w / 2 - 1, ty - 6, 3, tht + 12)
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print(s[4], x, ty + tht + 2)
+        love.graphics.printf(s[5], x, ty + tht + 2, w, "right")
+        if s[2] < 0 then love.graphics.printf("Neutral", x, ty + tht + 2, w, "center") end
+        -- The handle: rings in the page's paper and ink, so it shows on any colour.
+        local hx = x + (hsl[k] - s[2]) / (s[3] - s[2]) * w
+        love.graphics.setLineWidth(on and 7 or 5)
+        color(th.bg)
+        love.graphics.circle("line", hx, ty + tht / 2, tht / 2 + 4)
+        love.graphics.setLineWidth(2)
+        color(th.fg)
+        love.graphics.circle("line", hx, ty + tht / 2, tht / 2 + 9)
+        love.graphics.setLineWidth(1)
+    end
+    -- A sample in the colours, and a word if it's hard to read.
+    local t = app.EDIT_THEME
+    local sy, sh = L.sample.y, L.sample.h
+    love.graphics.setColor(t.bg[1], t.bg[2], t.bg[3])
+    love.graphics.rectangle("fill", x, sy, w, sh, 12, 12)
+    color(th.dim, 0.6)
+    love.graphics.rectangle("line", x, sy, w, sh, 12, 12)
+    love.graphics.setFont(ui.font)
+    love.graphics.setColor(t.fg[1], t.fg[2], t.fg[3])
+    love.graphics.printf("It was a dark and stormy night", x, centered_y(ui.font, UI_SIZE, sy, sh), w, "center")
+    local function lum(c)
+        local function ch(v) return v <= 0.03928 and v / 12.92 or ((v + 0.055) / 1.055) ^ 2.4 end
+        return 0.2126 * ch(c[1]) + 0.7152 * ch(c[2]) + 0.0722 * ch(c[3])
+    end
+    local a, b = lum(t.fg), lum(t.bg)
+    if (math.max(a, b) + 0.05) / (math.min(a, b) + 0.05) < 3 then
+        love.graphics.setFont(ui.small_bold)
+        color(th.fg)
+        love.graphics.printf("Hard to read: the text and page colors are too alike", x, sy + sh + 6, w, "center")
+    end
+    -- Delete (yours only)
+    if e.theme then
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.printf("Delete This Theme", x, centered_y(ui.font, UI_SIZE, L.delete.y, L.delete.h), w, "center")
+        if e.row == R.delete then focus(L.delete.y, L.delete.h) end
+    end
+    app.hints(x, nil, { "A", e.row == R.name and "rename" or e.row == R.delete and "delete" or "use",
+        "Y", "text/page", "‹ ›", "change", "B", "save" })
 end
 
 -- Sorted by progress or by series, My Books has a header over each group:
@@ -6723,10 +7303,11 @@ local function render_canvases()
     elseif app.mode == "help" then painter = app.draw_help
     elseif app.mode == "keyboard" then painter = app.kb_draw
     elseif app.mode == "fonts" then painter = app.font_draw
-    elseif app.mode == "themes" then
+    elseif app.mode == "themes" or app.mode == "theme_edit" then
         local reader = draw_reader_pages()
+        local panel = app.mode == "themes" and app.theme_draw or app.tedit_draw
         painter = function(side)
-            if side == "right" then app.theme_draw(side) elseif book then reader(side) end
+            if side == "right" then panel(side) elseif book then reader(side) end
         end
     elseif app.mode == "update" then painter = app.update_draw
     elseif app.mode == "whatsnew" then painter = app.whatsnew_draw
@@ -7088,6 +7669,19 @@ local function touch_event(kind, sx, sy)
         return
     end
     local side, u, v = touch_to_page(sx, sy)
+    -- Making a theme: dragging along a slider sets it directly (the slider
+    -- under the finger when it went down, until it lifts).
+    if app.mode == "theme_edit" and side == "right" then
+        if kind == "down" then
+            local k = app.tedit_slider_at(v)
+            -- (mode set: the press-and-hold check leaves it alone)
+            if k then gesture = { mode = "slider", slider = k }; app.tedit_drag(k, u) return end
+        elseif gesture and gesture.slider then
+            if kind == "move" then app.tedit_drag(gesture.slider, u) end
+            if kind == "up" then gesture = nil end
+            return
+        end
+    end
     if app.mode == "jump" and side == "right" and kind ~= "up" and math.abs(v - JP_BAR_Y) < 140 then
         -- Dragging along the picker's bar sets the percentage directly.
         local bx, bw = jp_bar()
@@ -7174,7 +7768,7 @@ function app.scroll_list()
     elseif m == "toc" and book then l, n, row_h = toc, #book.toc, 58; shown = app.toc_rows()
     elseif m == "bookmarks" and book then l, n, shown = bm, #bookmark_entries(), list_rows(96)
     elseif m == "find" and app.find then l, n, shown = app.find, #app.find.results, list_rows(96)
-    elseif m == "themes" then l, n, shown, row_h = app.themes, #THEMES, list_rows(app.THEME_ROW_H), app.THEME_ROW_H
+    elseif m == "themes" then l, n, shown, row_h = app.themes, #app.themes.list, list_rows(app.THEME_ROW_H), app.THEME_ROW_H
     elseif m == "fonts" and app.font_pick then
         l, n, shown, row_h = app.font_pick, #app.font_pick.list, app.font_rows(), app.FONT_ROW_H
     elseif m == "fontget" and app.fget.list then
@@ -7557,6 +8151,7 @@ function handle_action(a)
     if mode == "keyboard" then app.kb_action(a) return end
     if mode == "fonts" then app.font_action(a) return end
     if mode == "themes" then app.theme_action(a) return end
+    if mode == "theme_edit" then app.tedit_action(a) return end
     if mode == "update" then app.update_action(a) return end
     if mode == "whatsnew" then app.whatsnew_action(a) return end
     if mode == "find" then app.find_action(a) return end
@@ -7845,6 +8440,8 @@ function app.on_tap(side, u, v)
         app.font_tap(side, u, v)
     elseif mode == "themes" then
         app.theme_tap(side, u, v)
+    elseif mode == "theme_edit" then
+        app.tedit_tap(side, u, v)
     elseif mode == "fontget" then
         app.fget_tap(side, u, v)
     elseif mode == "receive" then
@@ -8878,6 +9475,7 @@ function love.load()
     print("[reader] eReaderDS v" .. VERSION .. " (uptime " .. app.uptime() .. ")")
     local ts = love.timer.getTime()
     S = Store.load_settings()
+    app.my_themes_load()
     if S.chrome == false then
         -- "Page info: Off" from older versions: hide the status bar text.
         S.sb_title, S.sb_pages, S.sb_percent = "none", "hide", false
@@ -9185,6 +9783,7 @@ function love.run()
             if shop.online() ~= was and was ~= nil then redraw() end
         end
         app.idle_tick()
+        if app.tedit_hold then app.tedit_tick() end
         if app.idle.state == "off" and not lid.closed and not (app.task or library.pending) then
             love.timer.sleep(0.1)               -- screens off: check for a press now and then
         end

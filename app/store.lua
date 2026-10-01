@@ -133,6 +133,26 @@ end
 
 function M.data_path(name) return path(name) end
 
+-- Themes the reader made (Settings → Themes → Custom): themes.txt, one per
+-- line, "name <tab> text colour <tab> page colour", each "brightness/warmth/tint".
+function M.load_themes()
+    local out = {}
+    local f = io.open(path("themes.txt"), "rb")
+    if not f then return out end
+    for line in lines(f) do
+        local name, fg, bg = line:match("^([^\t]+)\t([%d,/%-]+)\t([%d,/%-]+)$")
+        if name then out[#out + 1] = { name = name, fg = fg, bg = bg } end
+    end
+    f:close()
+    return out
+end
+
+function M.save_themes(list)
+    local out = {}
+    for _, t in ipairs(list) do out[#out + 1] = t.name .. "\t" .. t.fg .. "\t" .. t.bg end
+    write_atomic(path("themes.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
+end
+
 -- The books folder as people see it, for messages: "Ebook" (on the stock
 -- firmware's SD card, /mnt/mmc/Ebook) or "roms/ebook" (ROCKNIX,
 -- /storage/roms/ebook). Returns the name and where it is (or nil).
