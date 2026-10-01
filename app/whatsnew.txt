@@ -4,13 +4,13 @@
 
 v1.19.0
 New theme editor: make your own themes. Choose the page and text colours with Brightness, Warmth and Tint, starting from a light or dark template, or copy any theme and change it. Themes are now grouped as All, Light, Dark and Custom.
-Hide themes you don't use; Hidden Themes brings them back, one at a time or all at once.
 Highlight by touch: hold a word to look it up, or hold and drag to choose words. Start Highlight, Save Highlight and Remove Highlight buttons do the rest.
-Highlight colours: Yellow, Green, Blue, Pink or Subtle, in Settings → Reading & Device. On dark themes highlights can be Muted or Bright.
-A highlight over several lines is now one block of colour.
 Back Up & Restore, in Settings: save your settings, places, bookmarks, highlights and themes (or everything, with your books), and restore them here or on another system.
-Reset eReaderDS starts fresh but keeps your books. A backup is made first, so Restore can undo it.
 Swipe up from the bottom of the touchscreen to open Settings.
+Highlight colours: Yellow, Green, Blue, Pink or Subtle, in Settings → Reading & Device. On dark themes highlights can be Muted or Bright.
+Reset eReaderDS starts fresh but keeps your books. A backup is made first, so Restore can undo it.
+Hide themes you don't use; Hidden Themes brings them back, one at a time or all at once.
+A highlight over several lines is now one block of colour.
 The button hints at the bottom of the touchscreen are bigger, and you can tap them.
 Sync asks less: your place is sent by itself unless another device has a newer one, and then it says which device.
 Pictures are dimmed on dark themes (you can turn this off).

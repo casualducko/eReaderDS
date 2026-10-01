@@ -6,10 +6,10 @@ Make eReaderDS look the way you like, highlight with your finger, and never lose
 
 - **New theme editor.** Make your own themes: start from a light or dark template (or copy any theme), then set the page and text colours with three sliders, Brightness, Warmth and Tint, plus hand-picked starting colours. Give it a name, and it's listed alongside the built-in ones. Themes are now grouped as All, Light, Dark and Custom. Tap a theme and it's kept straight away. Don't use some of the built-in themes? Hide them, and bring them back from Hidden Themes, one at a time or all at once.
 - **Highlight with your finger.** Hold a word to look it up, or hold and drag across a passage to highlight it. Start Highlight, Save Highlight and Remove Highlight buttons sit right under the words (they move up when the word is near the bottom). A highlight over several lines is now one smooth block of colour.
-- **Highlight colours.** Yellow, Green, Blue, Pink or Subtle, shaded to suit every theme. On dark themes choose Muted, or Bright for real highlighter colours with the words in dark ink. (Settings → Reading & Device.)
 - **Back Up & Restore.** Save your settings, places, bookmarks, highlights and themes, or everything including your books, as one zip in the Backups folder. Restore it any time, on the same handheld or on another system: a stock backup restores on ROCKNIX or GammaOS, with your places finding the books there. A copy of your settings is made before every restore, so you can always go back.
-- **Reset eReaderDS.** Start fresh, like a new install, without losing your books. A backup is made first, so Restore can undo it.
 - **Swipe up for Settings.** While reading, swipe up from the bottom edge of the touchscreen to open Settings.
+- **Highlight colours.** Yellow, Green, Blue, Pink or Subtle, shaded to suit every theme. On dark themes choose Muted, or Bright for real highlighter colours with the words in dark ink. (Settings → Reading & Device.)
+- **Reset eReaderDS.** Start fresh, like a new install, without losing your books. A backup is made first, so Restore can undo it.
 - **Tap the hints.** The button hints along the bottom of the touchscreen are bigger, and you can tap them: tap "B back" to go back, "A select" to choose.
 - **Quieter sync.** Your place is sent without asking unless another device has a newer one, and then the question says which device. Places that only look different because the other device breaks its lines differently no longer ask at all.
 
