@@ -3046,7 +3046,7 @@ function app.night_preview(side)
     -- The Themes page: the book's page in the theme highlighted.
     if side == "left" and app.mode == "themes" then
         local t = app.themes.list[app.themes.sel]
-        return t and not t.new and not t.hidden_row and t.name or nil
+        return t and not t.new and not t.hidden_row and not t.show_all and t.name or nil
     end
     -- Making a theme: the book in its colours as they change.
     if side == "left" and app.mode == "theme_edit" then return app.EDIT_THEME.name end
@@ -3714,6 +3714,8 @@ function app.theme_set_filter(filter, keep)
     elseif filter == "hidden" then
         for _, t in ipairs(THEMES) do if not t.hidden and app.theme_hidden(t) then T.list[#T.list + 1] = t end end
         table.sort(T.list, function(a, b) return a.name:lower() < b.name:lower() end)
+        -- First: a row that shows them all again.
+        if #T.list > 0 then table.insert(T.list, 1, { name = "Show All Hidden Themes", show_all = true }) end
     else
         -- Built-in themes and yours together, A to Z (not the ones hidden).
         local hidden = 0
@@ -3746,7 +3748,7 @@ end
 -- way it shows on the other screen; it's saved on leaving the page.
 function app.theme_pick()
     local t = app.themes.list[app.themes.sel]
-    if not t or t.new or t.hidden_row then return end
+    if not t or t.new or t.hidden_row or t.show_all then return end
     if app.night then S.night_theme = t.name else S.theme = t.name end
     app.themes.changed = true
 end
@@ -3762,6 +3764,17 @@ function app.theme_use()
     local t = app.themes.list[app.themes.sel]
     if t and t.new then app.tedit_new() return end
     if t and t.hidden_row then app.theme_set_filter("hidden"); redraw() return end
+    if t and t.show_all then
+        -- Every hidden theme back, and back to All.
+        local n = 0
+        for _ in (S.hidden_themes or ""):gmatch("[^,]+") do n = n + 1 end
+        S.hidden_themes = ""
+        app.themes.changed = true
+        app.theme_set_filter("all")
+        app.toast(n == 1 and "1 theme shown again" or (n .. " themes shown again"))
+        redraw()
+        return
+    end
     app.theme_pick()
     app.theme_leave()
 end
@@ -3798,7 +3811,7 @@ end
 -- Y on a theme: a built-in one is copied; one of yours offers changing it
 -- or making a copy.
 function app.theme_options(t)
-    if not t or t.new or t.hidden_row then return end
+    if not t or t.new or t.hidden_row or t.show_all then return end
     if not t.custom then
         local hidden = app.theme_hidden(t)
         app.choose({ title = t.name, options = {
@@ -3816,7 +3829,7 @@ end
 -- The highlighted row's buttons, for touch: Copy, and Change for yours.
 -- { which, label, x, y, w, h }, right-aligned in the row before the ✓.
 function app.theme_row_buttons(t, rx, ry, rw, h)
-    if not t or t.new or t.hidden_row then return {} end
+    if not t or t.new or t.hidden_row or t.show_all then return {} end
     local list = t.custom and { { "change", "Change" }, { "copy", "Copy" } }
         or { { "copy", "Copy" }, app.theme_hidden(t) and { "show", "Show" } or { "hide", "Hide" } }
     local bh, gap = 44, 10
@@ -3852,7 +3865,7 @@ function app.theme_tap(side, u, v)
     local rows = list_rows(app.THEME_ROW_H)
     local idx = T.top + math.floor((v - 160) / app.THEME_ROW_H)
     if idx < T.top + rows and T.list[idx] then
-        if idx == T.sel or T.list[idx].hidden_row then T.sel = idx; app.theme_use()
+        if idx == T.sel or T.list[idx].hidden_row or T.list[idx].show_all then T.sel = idx; app.theme_use()
         else T.sel = idx; app.theme_pick(); redraw() end
     end
 end
@@ -3895,6 +3908,12 @@ function app.theme_draw(side)
     T.row_btns = {}
     draw_list(side, T.list, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw, selected)
         local h = row_h - 4
+        if t.show_all then
+            love.graphics.setFont(ui.bold)
+            color(th.fg)
+            love.graphics.print(t.name, rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
+            return
+        end
         if t.hidden_row then
             love.graphics.setFont(ui.font)
             color(th.dim)
@@ -3958,6 +3977,7 @@ function app.theme_draw(side)
     else
         local t = T.list[T.sel]
         if t and t.hidden_row then app.hints(x, nil, { "A", "show them", "‹ ›", "filter", "B", "back" })
+        elseif t and t.show_all then app.hints(x, nil, { "A", "show them all", "B", "back to All" })
         elseif T.filter == "hidden" then app.hints(x, nil, { "A", "use", "Y", "options", "B", "back to All" })
         else app.hints(x, nil, { "A", "use", "Y", "options", "‹ ›", "filter", "B", "back" }) end
     end
