@@ -3090,6 +3090,7 @@ function app.about_items()
             { label = "Update to v" .. u.version, act = app.update_open },
         }) or {},
         section(u.state == "available" and "" or nil, {
+            { label = "Help", act = function() app.mode = "help" end },
             { label = "What's New", act = app.whatsnew_open },
             { label = "Check for Updates",
               value = app.update_status(), act = app.update_check_open },
@@ -3164,6 +3165,7 @@ end
 local function menu_items()
     if menu.page == "status" then return status_items() end
     if menu.page == "more" then return more_items() end
+    if menu.page == "backup" then return app.backup_items(section, join, close_sub) end
     if menu.page == "night" then return app.night_items() end
     if menu.page == "about" then return app.about_items() end
     if menu.page == "sync" then return app.sync_items() end
@@ -3251,11 +3253,12 @@ local function menu_items()
             { label = "Night Mode", value = app.night_summary(), opens = true, act = function() open_sub("night") end },
             { label = "Status Bar", value = "›", act = function() open_sub("status") end },
             { label = "Reading & Device", value = "›", act = function() open_sub("more") end },
+            { label = "Back Up & Restore", value = "›", act = function() open_sub("backup") end },
             { label = "KOReader Sync", value = app.sync_on() and "On" or "Off", opens = true, act = function() open_sub("sync") end },
         })),
         app.menu_on_page(2, section("", {
-            { label = "Help", act = function() app.mode = "help" end },
-            { label = "About eReaderDS", value = app.upd.state ~= "available" and "›" or nil,
+            -- (Help is inside: page 2 holds 12 rows at full size.)
+            { label = "Help & About", value = app.upd.state ~= "available" and "›" or nil,
               value_bold = app.upd.state == "available" and "Update" or nil,
               act = function() open_sub("about") end },
             { label = "Quit", act = function() love.event.quit() end },
@@ -5154,7 +5157,8 @@ local function draw_menu_panel(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(({ status = "Status Bar", more = "Reading & Device", night = "Night Mode",
-        about = "About eReaderDS", sync = "KOReader Sync", server = "Sync Server" })[menu.page] or "Settings", x, 60)
+        about = "Help & About", sync = "KOReader Sync", server = "Sync Server",
+        backup = "Back Up & Restore" })[menu.page] or "Settings", x, 60)
     if menu.page == "main" then
         love.graphics.setFont(ui.font)               -- the version, on the title's baseline
         color(th.dim)
@@ -9784,6 +9788,201 @@ function app.recv_draw(side)
     app.button(bx, by, bw, bh, "Done", "B", "soft")
 end
 
+---------------------------------------------------------------- back up & restore
+
+-- Settings → Back Up & Restore (backup.lua does the work, on its own thread,
+-- backupworker.lua): your settings and reading (places, bookmarks,
+-- highlights, themes, logins), or everything including the books, in a zip
+-- in Backups/ in the books folder; and restoring one, here or on another
+-- handheld or system. app.bk while one runs: { kind, out, done, total }.
+function app.backup_where()
+    local data_dir = Store.data_dir()
+    local root = data_dir:match("^(.*)/%.ereaderds$") or Store.book_dirs()[1]
+    return root, data_dir
+end
+
+-- A size in words: "12 MB", "1.3 GB".
+function app.size_words(n)
+    if n >= 1024 ^ 3 then return string.format("%.1f GB", n / 1024 ^ 3) end
+    if n >= 1024 ^ 2 then return math.max(1, math.floor(n / 1024 ^ 2 + 0.5)) .. " MB" end
+    return math.max(1, math.floor(n / 1024 + 0.5)) .. " KB"
+end
+
+-- What a whole backup would hold (looked at again after 30 seconds).
+function app.backup_size()
+    local now = love.timer.getTime()
+    if not app.bk_size or now - app.bk_size.t > 30 then
+        local root, data_dir = app.backup_where()
+        local _, total = require("backup").collect(root, data_dir, true)
+        app.bk_size = { t = now, n = total }
+    end
+    return app.bk_size.n
+end
+
+-- The backups here, newest first: { { path, name, info } } (info: the manifest).
+function app.backup_list()
+    local root = app.backup_where()
+    local Backup, out = require("backup"), {}
+    for _, dir in ipairs({ root .. "/Backups", root }) do
+        for _, e in ipairs(require("android").ls(dir)) do
+            if e:lower():match("%.zip$") then
+                local info = Backup.manifest(dir .. "/" .. e)
+                if info then out[#out + 1] = { path = dir .. "/" .. e, name = e, info = info } end
+            end
+        end
+    end
+    table.sort(out, function(a, b) return (a.info.date or "") > (b.info.date or "") end)
+    return out
+end
+
+function app.backup_items(section, join, close_sub)
+    local busy = app.bk ~= nil
+    return join(
+        section("Back up", {
+            { label = "My Settings & Reading", value = busy and "…" or nil, act = function() app.backup_start(false) end },
+            { label = "Everything, with Books", value = app.size_words(app.backup_size()),
+              act = function() app.backup_start(true) end },
+        }),
+        section("Restore", {
+            { label = "Restore from a Backup", value = "›", act = app.backup_choose },
+        }),
+        section("Start fresh", {
+            { label = "Reset eReaderDS", act = app.reset_ask },
+        }),
+        section("", { { label = "Back", act = close_sub } })
+    )
+end
+
+function app.backup_start(whole)
+    if app.bk then app.toast("A backup is still going") return end
+    local root, data_dir = app.backup_where()
+    local function go()
+        -- Your place and settings saved first, so the backup has them as they are now.
+        app.pending_save()
+        Store.save_settings(S)
+        local stamp = os.date("%Y-%m-%d-%H%M")
+        local out = root .. "/Backups/eReaderDS-backup-" .. stamp .. (whole and "" or "-settings") .. ".zip"
+        love.thread.getChannel("backup_out"):clear()
+        local t = love.thread.newThread("backupworker.lua")
+        t:start({ kind = "backup", out = out, root = root, data_dir = data_dir, whole = whole,
+            manifest = app.backup_manifest(whole, root) })
+        app.bk = { kind = "backup", thread = t, out = out, done = 0, total = whole and app.backup_size() or 0 }
+        app.toast("Backing up…", 3600)
+    end
+    if not whole then go() return end
+    app.ask({ question = "Back up everything?", yes = "Back Up", no = "Cancel",
+        detail = app.size_words(app.backup_size()) .. ", with your books, fonts and dictionaries.\n"
+            .. "It's saved in " .. Store.books_folder() .. "/Backups.",
+        on_yes = go })
+end
+
+function app.backup_manifest(whole, root)
+    return "eReaderDS backup\nversion=" .. VERSION .. "\ndate=" .. os.date("%Y-%m-%d %H:%M")
+        .. "\nkind=" .. (whole and "everything" or "settings") .. "\nsystem=" .. app.system_name()
+        .. "\nbooks=" .. root .. "\n"
+end
+
+-- Restore: a backup to choose (newest first), then a question.
+function app.backup_choose()
+    if app.bk then app.toast("A backup is still going") return end
+    local list = app.backup_list()
+    if #list == 0 then
+        app.toast("No backups found\nPut one in " .. Store.books_folder() .. "/Backups", 4)
+        return
+    end
+    local opts = {}
+    for i = 1, math.min(6, #list) do
+        local b = list[i]
+        local label = (b.info.date or b.name) .. " · " .. (b.info.kind == "everything" and "Everything" or "Settings")
+        opts[#opts + 1] = { label, function() app.backup_confirm(b) end }
+    end
+    app.choose({ title = "Restore which backup?", options = opts })
+end
+
+function app.backup_confirm(b)
+    app.ask({ question = "Restore this backup?", yes = "Restore", no = "Cancel",
+        -- (Three lines at most, the card's room.)
+        detail = (b.info.kind == "everything"
+            and "Your settings, places, highlights and themes become the backup's, and its books are added."
+            or "Your settings, places, bookmarks, highlights and themes become the backup's.")
+            .. "\neReaderDS closes when it's done.",
+        on_yes = function() app.backup_restore(b) end })
+end
+
+function app.backup_restore(b)
+    local root, data_dir = app.backup_where()
+    app.pending_save()
+    Store.save_settings(S)
+    -- From here nothing of the app's is written (it would put the old
+    -- settings back), until it closes.
+    Store.frozen = true
+    love.thread.getChannel("backup_out"):clear()
+    local t = love.thread.newThread("backupworker.lua")
+    t:start({ kind = "restore", zip = b.path, root = root, data_dir = data_dir,
+        before = { out = root .. "/Backups/eReaderDS-before-restore-" .. os.date("%Y-%m-%d-%H%M") .. ".zip",
+            manifest = app.backup_manifest(false, root) } })
+    app.bk = { kind = "restore", thread = t, done = 0, total = 0 }
+    app.toast("Restoring…", 3600)
+end
+
+-- Reset: everything eReaderDS has saved cleared (not your books, fonts or
+-- dictionaries), after a backup of it, so Restore can undo it; then it closes.
+function app.reset_ask()
+    if app.bk then app.toast("A backup is still going") return end
+    app.ask({ question = "Reset eReaderDS?", yes = "Reset", no = "Cancel",
+        detail = "Settings, places, bookmarks, highlights, themes and logins are cleared. Your books stay.\n"
+            .. "A backup is made first.",
+        on_yes = function()
+            local root, data_dir = app.backup_where()
+            Store.frozen = true            -- (nothing of the app's written from here: see backup_restore)
+            love.thread.getChannel("backup_out"):clear()
+            local t = love.thread.newThread("backupworker.lua")
+            t:start({ kind = "reset", root = root, data_dir = data_dir,
+                before = { out = root .. "/Backups/eReaderDS-before-reset-" .. os.date("%Y-%m-%d-%H%M") .. ".zip",
+                    manifest = app.backup_manifest(false, root) } })
+            app.bk = { kind = "reset", thread = t, done = 0, total = 0 }
+            app.toast("Resetting…", 3600)
+        end })
+end
+
+function app.backup_poll()
+    local bk = app.bk
+    local ch = love.thread.getChannel("backup_out")
+    while true do
+        local msg = ch:pop()
+        if not msg then break end
+        if msg.kind == "progress" then
+            bk.done, bk.total = msg.done, msg.total
+            local pct = bk.total > 0 and math.floor(bk.done / bk.total * 100) or 0
+            app.toast((bk.kind == "restore" and "Restoring… " or "Backing up… ") .. pct .. "%", 3600)
+        elseif msg.kind == "done" then
+            app.bk = nil
+            app.bk_size = nil
+            if bk.kind == "restore" or bk.kind == "reset" then
+                app.toast((bk.kind == "reset" and "Reset" or "Restored") .. "\neReaderDS is closing: open it again", 3600)
+                app.bk_quit_at = love.timer.getTime() + 3
+            else
+                app.toast("Backed up\n" .. Store.books_folder() .. "/Backups/" .. bk.out:match("([^/]+)$"))
+            end
+            redraw()
+        elseif msg.kind == "failed" then
+            app.bk = nil
+            if bk.kind == "restore" or bk.kind == "reset" then Store.frozen = false end
+            app.toast((bk.kind == "restore" and "Couldn't restore it\n" or bk.kind == "reset" and "Couldn't reset\n"
+                or "Couldn't back up\n") .. msg.message)
+            redraw()
+        end
+    end
+    if app.bk and not app.bk.thread:isRunning() and app.bk.thread:getError() then
+        local err = tostring(app.bk.thread:getError()):gsub("^[^:]*:%d+: ", "")
+        print("[backup] " .. err)
+        if app.bk.kind == "restore" or app.bk.kind == "reset" then Store.frozen = false end
+        app.bk = nil
+        app.toast("Couldn't finish: " .. err)
+        redraw()
+    end
+end
+
 ---------------------------------------------------------------- Calibre
 
 -- "Connect to Calibre" (Get Books): Calibre's wireless device connection, on
@@ -10237,7 +10436,8 @@ function love.quit()
     if app.idle.state == "off" or lid.closed then pcall(Backlight.power, true, app.idle.pct or lid.pct or 50) end
     -- Your place and settings first: what follows can wait on the network,
     -- and the system may not wait for it. (Saved again at the end; writes
-    -- that change nothing are skipped.)
+    -- that change nothing are skipped. After a restore nothing is written:
+    -- Store.frozen.)
     app.pending_save()
     save_progress()
     Store.save_settings(S)
@@ -10469,6 +10669,8 @@ function love.run()
         end
         app.idle_tick()
         if app.tedit_hold then app.tedit_tick() end
+        if app.bk then app.backup_poll() end
+        if app.bk_quit_at and love.timer.getTime() > app.bk_quit_at then app.bk_quit_at = nil; love.event.quit() end
         if app.kb and app.kb.flash and love.timer.getTime() > app.kb.flash.t then app.kb.flash = nil; redraw() end
         if app.idle.state == "off" and not lid.closed and not (app.task or library.pending) then
             love.timer.sleep(0.1)               -- screens off: check for a press now and then

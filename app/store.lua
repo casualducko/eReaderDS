@@ -83,7 +83,12 @@ end
 local OFTEN = { ["progress.txt"] = true, ["last.txt"] = true, ["opened.txt"] = true }
 local last_fsync = {}
 
+-- While a backup is being restored (and until eReaderDS closes after it),
+-- nothing is written: the app's own saves would put the old settings back.
+M.frozen = false
+
 local function write_atomic(file, text)
+    if M.frozen then return true end
     if last_written[file] == nil then
         -- First write of this file this session: if it already says this,
         -- there's nothing to do (reopening a book rewrote several files).
@@ -167,6 +172,9 @@ function M.book_dirs()
 end
 
 function M.data_path(name) return path(name) end
+
+-- The data folder itself (no trailing slash).
+function M.data_dir() return (path(""):gsub("/$", "")) end
 
 -- Themes the reader made (Settings → Themes → Custom): themes.txt, one per
 -- line, "name <tab> text colour <tab> page colour", each "brightness:warmth:tint".

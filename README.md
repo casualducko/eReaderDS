@@ -220,10 +220,11 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
    show, and the clock style), **Reading & Device ›** (page-turn animation,
    what a tap does, highlight color, dimming pictures on dark themes,
    dictionary, which hand holds the buttons, screens off
-   after a while, closing the lid, time zone), **KOReader Sync ›**
-   ([below](#koreader-sync)). Then **Help**, **About eReaderDS ›** (What's
-   New, Check for Updates, Update notices, Report a Problem, About &
-   Credits) and **Quit**.
+   after a while, closing the lid, time zone), **Back Up & Restore ›**
+   ([below](#back-up-and-restore)), **KOReader Sync ›**
+   ([below](#koreader-sync)). Then **Help & About ›** (Help, What's New,
+   Check for Updates, Update notices, Report a Problem, About & Credits)
+   and **Quit**.
 
 ## Features
 
@@ -353,6 +354,31 @@ The Themes pages themselves stay plain (white, or dark when your theme is
 dark), so a tinted theme doesn't color the swatches. Your themes are kept
 in `Ebook/.ereaderds/themes.txt` (on ROCKNIX `ebook/.ereaderds`; on GammaOS
 `Ebook/.ereaderds` in the device's storage), and work as the night theme too.
+
+## Back Up and Restore
+
+**Settings → Back Up & Restore** keeps what you've built up safe, and moves
+it to another handheld or system:
+
+- **Back up → My Settings & Reading:** your settings, your place in every
+  book, bookmarks, highlights, themes and logins (sync, Calibre, catalogs).
+  Small.
+- **Back up → Everything, with Books:** all that, plus your books, fonts and
+  dictionaries (it shows the size, and asks first).
+- Backups are zips in **`Ebook/Backups`** (on ROCKNIX `roms/ebook/Backups`),
+  named by date. They include your logins, so keep them to yourself.
+- **Restore from a Backup** lists the backups it finds there (or loose in the
+  books folder), newest first. Your settings, places, bookmarks, highlights
+  and themes become the backup's, its books are added, and eReaderDS closes:
+  open it again and you're where the backup left you. Your settings as they
+  were are saved first (`eReaderDS-before-restore-….zip`), in case it was the
+  wrong one.
+- **Another handheld or system:** copy the zip into its `Ebook/Backups` and
+  restore. Books are found by their place in the books folder, so a backup
+  from the stock firmware restores on ROCKNIX or GammaOS.
+- **Reset eReaderDS** (Start fresh) clears everything it has saved, like a
+  new install, but not your books, fonts or dictionaries. A backup is made
+  first (`eReaderDS-before-reset-….zip`), so Restore can undo it.
 
 ## Night Mode
 
