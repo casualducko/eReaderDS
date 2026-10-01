@@ -27,6 +27,7 @@ if job.kind == "reset" then
     Backup.mkdir_p(job.before.out:match("^(.*)/"))
     ok, err = Backup.write(job.before.out, files, job.before.manifest, job.root)
     if ok then
+        Backup.prune(job.before.out:match("^(.*)/"), 3)
         for _, f in ipairs(files) do os.remove(f.path) end
     else
         err = "the backup couldn't be made first, so nothing was cleared (" .. tostring(err) .. ")"
@@ -41,6 +42,7 @@ else
     if job.before then
         Backup.mkdir_p(job.before.out:match("^(.*)/"))
         Backup.write(job.before.out, Backup.collect(job.root, job.data_dir, false), job.before.manifest, job.root)
+        Backup.prune(job.before.out:match("^(.*)/"), 3)
     end
     ok, err = Backup.restore(job.zip, job.root, job.data_dir, progress)
 end

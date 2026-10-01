@@ -372,7 +372,9 @@ it to another handheld or system:
   and themes become the backup's, its books are added, and eReaderDS closes:
   open it again and you're where the backup left you. Your settings as they
   were are saved first (`eReaderDS-before-restore-….zip`), in case it was the
-  wrong one.
+  wrong one. The list shows each backup's date, how many books it has a
+  place in, and its kind; yours come first. Of these automatic copies (and
+  the ones before a reset) the newest 3 are kept.
 - **Another handheld or system:** copy the zip into its `Ebook/Backups` and
   restore. Books are found by their place in the books folder, so a backup
   from the stock firmware restores on ROCKNIX or GammaOS.

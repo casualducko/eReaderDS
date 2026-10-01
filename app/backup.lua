@@ -241,6 +241,19 @@ function M.write(out, files, manifest, root, progress)
     return true
 end
 
+-- The copies made by themselves before a restore or a reset
+-- ("eReaderDS-before-…zip") beyond the newest `keep` are deleted, so they
+-- don't pile up. Your own backups are never touched.
+function M.prune(dir, keep)
+    local found = {}
+    for _, e in ipairs(list(dir)) do
+        local stamp = not e.dir and e.name:match("^eReaderDS%-before%-%a+%-(%d+%-%d+%-%d+%-%d+)%.zip$")
+        if stamp then found[#found + 1] = { name = e.name, stamp = stamp } end
+    end
+    table.sort(found, function(a, b) return a.stamp > b.stamp end)
+    for i = keep + 1, #found do os.remove(dir .. "/" .. found[i].name) end
+end
+
 ---------------------------------------------------------------- restoring
 
 -- The manifest's fields ("key=value" lines) of a backup, or nil if it isn't one.
