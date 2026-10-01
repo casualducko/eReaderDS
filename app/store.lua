@@ -134,13 +134,13 @@ end
 function M.data_path(name) return path(name) end
 
 -- Themes the reader made (Settings → Themes → Custom): themes.txt, one per
--- line, "name <tab> text colour <tab> page colour", each "brightness/warmth/tint".
+-- line, "name <tab> text colour <tab> page colour", each "brightness:warmth:tint".
 function M.load_themes()
     local out = {}
     local f = io.open(path("themes.txt"), "rb")
     if not f then return out end
     for line in lines(f) do
-        local name, fg, bg = line:match("^([^\t]+)\t([%d,/%-]+)\t([%d,/%-]+)$")
+        local name, fg, bg = line:match("^([^\t]+)\t([%d,/:%-]+)\t([%d,/:%-]+)$")
         if name then out[#out + 1] = { name = name, fg = fg, bg = bg } end
     end
     f:close()

@@ -3672,7 +3672,8 @@ THEMES[#THEMES + 1] = app.PANEL_THEME
 -- is { brightness 0-100, warmth -100-100, tint -100-100 }.
 app.TEDIT_SLIDERS = { { "Brightness", 0, 100, "Darker", "Lighter" }, { "Warmth", -100, 100, "Cooler", "Warmer" },
     { "Tint", -100, 100, "Greener", "Pinker" } }
-app.TEDIT_CHROMA = 0.2           -- OKLab a/b at the ends of Warmth and Tint
+app.TEDIT_CHROMA = 0.16          -- OKLab a/b at the ends of Warmth and Tint (the strongest pick, Night Red)
+app.TEDIT_COLOUR_STEP = 4        -- a press on Warmth or Tint moves this many (1 on Brightness)
 -- The editor's rows, top to bottom (up/down move between them).
 app.TEDIT_ROW = { name = 1, which = 2, picks = 3, slider = 4, buttons = 7 }     -- (sliders: 4, 5, 6)
 -- Ready-made colours to start from, chosen for reading: muted page
@@ -3740,12 +3741,21 @@ function app.rgb_lab(r, g, b)
     return { clamp(L * 100, 0, 100), clamp(B / app.TEDIT_CHROMA * 100, -100, 100), clamp(A / app.TEDIT_CHROMA * 100, -100, 100) }
 end
 
--- A saved colour: "brightness/warmth/tint". (Themes made by a test version
--- were saved as "h,s,l".)
+-- A saved colour: "brightness:warmth:tint". (Before, "brightness/warmth/
+-- tint" with Warmth and Tint reaching 0.2, and in a test version "h,s,l":
+-- turned into the nearest colour now, by how it looked.)
 function app.colour_parse(str, default)
-    local l, w, t = tostring(str):match("^(%d+)/(%-?%d+)/(%-?%d+)$")
+    local l, w, t = tostring(str):match("^(%d+):(%-?%d+):(%-?%d+)$")
     if l then
         return { math.min(100, tonumber(l)), math.max(-100, math.min(100, tonumber(w))), math.max(-100, math.min(100, tonumber(t))) }
+    end
+    l, w, t = tostring(str):match("^(%d+)/(%-?%d+)/(%-?%d+)$")
+    if l then
+        local now = app.TEDIT_CHROMA
+        app.TEDIT_CHROMA = 0.2
+        local rgb = app.lab_rgb({ tonumber(l), tonumber(w), tonumber(t) })
+        app.TEDIT_CHROMA = now
+        return app.rgb_lab(rgb[1], rgb[2], rgb[3])
     end
     local h, sat, li = tostring(str):match("^(%d+),(%d+),(%d+)$")
     if h then
@@ -3763,7 +3773,7 @@ function app.colour_parse(str, default)
     end
     return { default[1], default[2], default[3] }
 end
-function app.colour_string(c) return c[1] .. "/" .. c[2] .. "/" .. c[3] end
+function app.colour_string(c) return c[1] .. ":" .. c[2] .. ":" .. c[3] end
 
 app.TEDIT_DEFAULT = { fg = app.rgb_lab(0.357, 0.275, 0.212), bg = app.rgb_lab(0.965, 0.945, 0.905) }
 
@@ -3951,7 +3961,8 @@ function app.tedit_action(a)
             for i, b in ipairs(list) do if b[1] == (e.btn or "save") then at = i end end
             e.btn = list[math.max(1, math.min(#list, at + d))][1]
         elseif slider then
-            app.tedit_set(slider, e[e.which][slider] + d)
+            local step = slider > 1 and app.TEDIT_COLOUR_STEP or 1
+            app.tedit_set(slider, e[e.which][slider] + d * step)
             app.tedit_hold = { d = d, k = slider, t0 = now, next = now + 0.4 }
         end
     elseif a == "toc" then e.which = e.which == "fg" and "bg" or "fg"; e.pick = nil   -- Y: text / page
@@ -3995,7 +4006,8 @@ function app.tedit_tick()
     local now = love.timer.getTime()
     if now < h.next then return end
     local e = app.tedit
-    app.tedit_set(h.k, e[e.which][h.k] + h.d * (now - h.t0 > 1.2 and 5 or 1))
+    local step = h.k > 1 and app.TEDIT_COLOUR_STEP or 1
+    app.tedit_set(h.k, e[e.which][h.k] + h.d * step * (now - h.t0 > 1.2 and 5 or 1))
     h.next = now + 0.05
 end
 
