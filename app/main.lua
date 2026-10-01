@@ -3919,7 +3919,10 @@ function app.tedit_action(a)
         local d = (a == "left" or a == "prev") and -1 or 1
         if e.row == R.which then e.which = d < 0 and "bg" or "fg"
         elseif e.row == R.picks then app.tedit_pick((e.pick or 0) + d)
-        elseif e.row == R.buttons and e.theme then e.btn = d < 0 and "reset" or "delete"
+        elseif e.row == R.buttons then
+            local list, at = app.tedit_buttons(), 1
+            for i, b in ipairs(list) do if b[1] == (e.btn or "save") then at = i end end
+            e.btn = list[math.max(1, math.min(#list, at + d))][1]
         elseif slider then
             app.tedit_set(slider, e[e.which][slider] + d)
             app.tedit_hold = { d = d, k = slider, t0 = now, next = now + 0.4 }
@@ -3928,7 +3931,10 @@ function app.tedit_action(a)
     elseif a == "confirm" then
         if e.row == R.name then app.tedit_rename() return end
         if e.row == R.buttons then
-            if e.btn == "delete" and e.theme then app.tedit_delete() else app.tedit_reset() end
+            local which = e.btn or "save"
+            if which == "delete" and e.theme then app.tedit_delete()
+            elseif which == "reset" then app.tedit_reset()
+            else app.tedit_save(true) end
             return
         end
         app.tedit_save(true)
@@ -3981,14 +3987,20 @@ function app.tedit_layout()
     }
 end
 
--- The buttons under the sample: Reset Colors, and Delete (yours only),
--- centred side by side. { which, label, x, y, w, h }.
+-- The buttons under the sample: Save, Reset Colors, and Delete (yours
+-- only), centred side by side. { which, label, x, y, w, h }.
 function app.tedit_buttons()
     local L = app.tedit_layout()
-    local list = { { "reset", "Reset Colors" } }
-    if app.tedit.theme then list[2] = { "delete", "Delete Theme" } end
-    local gap, total = 24, -24
-    for _, b in ipairs(list) do b.w = ui.font:getWidth(b[2]) + 72; total = total + b.w + gap end
+    local list = { { "save", "Save" }, { "reset", "Reset Colors" } }
+    if app.tedit.theme then list[3] = { "delete", "Delete Theme" } end
+    local gap, pad = 20, 64
+    local function measure()
+        local total = -gap
+        for _, b in ipairs(list) do b.w = ui.font:getWidth(b[2]) + pad; total = total + b.w + gap end
+        return total
+    end
+    local total = measure()
+    if total > L.w then pad, gap = 36, 12; total = measure() end      -- (three buttons: a little closer)
     local bx = math.floor(L.x + (L.w - total) / 2)
     for _, b in ipairs(list) do
         b.x, b.y, b.h = bx, L.delete.y, L.delete.h
@@ -4046,7 +4058,9 @@ function app.tedit_tap(side, u, v)
     for _, b in ipairs(app.tedit_buttons()) do
         if u >= b.x - 12 and u <= b.x + b.w + 12 and v >= b.y - 12 and v <= b.y + b.h + 12 then
             e.row, e.btn = R.buttons, b[1]
-            if b[1] == "delete" then app.tedit_delete() else app.tedit_reset() end
+            if b[1] == "delete" then app.tedit_delete()
+            elseif b[1] == "reset" then app.tedit_reset()
+            else app.tedit_save(true) end
             return
         end
     end
@@ -4173,16 +4187,17 @@ function app.tedit_draw(side)
     love.graphics.setFont(ui.font)
     love.graphics.setColor(t.fg[1], t.fg[2], t.fg[3])
     love.graphics.printf("It was a dark and stormy night", x, centered_y(ui.font, UI_SIZE, sy, sh), w, "center")
-    -- Reset Colors and Delete (yours only): buttons; both ask first.
-    local chosen = e.theme and e.btn or "reset"
+    -- Save, Reset Colors and Delete (yours only): buttons; Reset and Delete
+    -- ask first.
+    local chosen = e.btn or "save"
     for _, b in ipairs(app.tedit_buttons()) do
         if e.row == R.buttons and b[1] == chosen then
             color(th.sel, 0.55)
-            love.graphics.rectangle("fill", b.x - 12, b.y - 12, b.w + 24, b.h + 24, b.h / 2 + 12, b.h / 2 + 12)
+            love.graphics.rectangle("fill", b.x - 10, b.y - 10, b.w + 20, b.h + 20, b.h / 2 + 10, b.h / 2 + 10)
         end
-        app.button(b.x, b.y, b.w, b.h, b[2], nil, "soft")
+        app.button(b.x, b.y, b.w, b.h, b[2], nil, b[1] == "save" and "strong" or "soft")
     end
-    app.hints(x, nil, { "A", e.row == R.name and "rename" or e.row == R.buttons and (chosen == "delete" and "delete" or "reset") or "save",
+    app.hints(x, nil, { "A", e.row == R.name and "rename" or e.row == R.buttons and chosen or "save",
         "Y", "text/page", "‹ ›", "change", "B", "cancel" })
 end
 
