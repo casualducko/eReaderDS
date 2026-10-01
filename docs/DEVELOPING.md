@@ -145,9 +145,10 @@ Ports/eReaderDS/
 | File | Purpose |
 |---|---|
 | `app/main.lua` | App states (library, reader, settings, contents), drawing, input, main loop |
-| `app/book.lua` | EPUB/TXT loading: OPF, spine, NCX/nav TOC, basic CSS, HTML to blocks |
+| `app/book.lua` | EPUB/TXT/CBZ loading: OPF, spine, NCX/nav TOC, basic CSS, HTML to blocks; a comic as one chapter of pictures |
+| `app/comic.lua` | Comics (`.cbz`): page order, ComicInfo.xml, picture sizes from headers, right to left by publisher, pairing pages for the two screens |
 | `app/layout.lua` | Line breaking, justification and pagination |
-| `app/zip.lua` | Minimal ZIP reader (stored and deflate); reads entries on demand |
+| `app/zip.lua` | Minimal ZIP reader (stored and deflate); reads entries on demand, or just their start (zlib) |
 | `app/store.lua` | Settings and progress files |
 | `app/backlight.lua` | Screen brightness through sysfs |
 | `app/touch.lua` | Raw evdev touchscreen reader (LuaJIT FFI) |

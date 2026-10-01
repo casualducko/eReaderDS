@@ -6,7 +6,8 @@ that being said, I have gladly been using Claude Code to help me bring this idea
 to its full potential.
 
 eReaderDS is a two-page ebook reader for the **Anbernic RG DS Plus**. Hold the
-device sideways like an open book: each screen shows one page.
+device sideways like an open book: each screen shows one page. It reads
+EPUB and text books, and comics and manga (`.cbz`) too.
 
 ![eReaderDS on the RG DS Plus: My Books, turning pages, a bookmark, brightness and text size by touch, Settings and the Themes page, looking up and highlighting a word, the bookmarks and highlights list, and syncing with KOReader](docs/demo.gif)
 
@@ -150,10 +151,10 @@ to do the same.
 
 | Button | While reading | In lists and menus |
 |---|---|---|
-| D-pad or stick | Turn pages (right/down forward) | Up/down move; left/right change a value, page through a list, or change the library's sort order |
-| A | Show the notes on these pages | Select |
+| D-pad or stick | Turn pages (right/down forward; in a manga, left forward) | Up/down move; left/right change a value, page through a list, or change the library's sort order |
+| A | Show the notes on these pages (in the magnifier: the other page) | Select |
 | B | Settings | Back |
-| Y | Look up (or highlight) a word | In My Books: options (mark finished, hide finished books, delete); in Bookmarks and Highlights: delete; on Themes: options (copy, hide, or change one of yours) |
+| Y | Look up (or highlight) a word; in a comic, the magnifier | In My Books: options (mark finished, hide finished books, delete); in Bookmarks and Highlights: delete; on Themes: options (copy, hide, or change one of yours) |
 | Select | Bookmark the page (again to remove) | Close; in the library: Get Books |
 | Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
 | Menu (Anbernic button) | Quit | Quit |
@@ -163,17 +164,19 @@ About) is a one-page summary of the buttons and touchscreen.
 
 **Touch (bottom screen only):**
 - Swipe left/right, or tap the right/left half, to turn pages. (To make a tap
-  open Settings instead: **Settings → Reading & Device → Tap**.)
+  open Settings instead: **Settings → Reading & Device → Tap**.) In a manga
+  it's the other way round: swipe right, or tap the left half, to go on.
 - Slide up/down to change brightness; keep going below 1% for Extra dim. (On
   a list longer than the screen, such as My Books, Get Books, Table of
   Contents, Fonts or Themes, sliding up/down scrolls it instead; on Themes
   that never changes your theme.)
 - Swipe up from the very bottom edge to open Settings (as X does).
-- Pinch with two fingers to make the text bigger or smaller.
+- Pinch with two fingers to make the text bigger or smaller (not in a comic).
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.
 - Press and hold a word to look it up; keep holding and drag over words to
-  highlight them ([below](#highlights)).
+  highlight them ([below](#highlights)). In a comic, hold a page for the
+  magnifier there, then drag the box ([below](#comics-and-manga)).
 - While highlighting (**Start Highlight**, or **Y** then **Select**), tap a
   word to extend the highlight to it.
 - In the library and Get Books, tap an entry to see it on the other screen,
@@ -217,7 +220,10 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
    swatch and your book shown in the one highlighted, and your own;
    [below](#themes)), **Fonts** (its own page,
    [below](#fonts)). (**Update to v…** is
-   first in This book when one is waiting.)
+   first in This book when one is waiting.) In a comic, This book also has
+   **Reading direction** (left to right, or right to left for manga), and
+   what's only for text (Find in Book, Text size, Fonts, Page layout) is
+   left out.
 2. What's set once. **Page layout:** Line spacing, Margins, Top/bottom
    margins, Justify text, Hyphenation. **More settings:** **Night Mode**
    ([below](#night-mode)), **Status Bar ›** (what the top and bottom lines
@@ -443,6 +449,12 @@ phone or computer); they're listed in My Books with their covers, in a
 - Your place, bookmarks, Jump to %, and the Table of Contents (when the
   pages are in a folder for each chapter) work as in a book. Pictures are
   dimmed on dark themes, like a book's.
+- Page turns don't wait: the next pair of pages is made ready while you read.
+  Jumping somewhere, or going back, can take half a second with big scans.
+- **A comic that came as a folder of pictures** (a chapter downloaded page
+  by page): zip the folder and rename the `.zip` to `.cbz`. Name it like
+  "One-Punch Man - Chapter 1.cbz"; pages are put in order by their names
+  (page 2 before page 10).
 - `.cbz` files with JPEG or PNG pages work; WebP pages and `.cbr` (RAR) files
   can't be shown yet (convert or repack them as `.cbz` with JPEG pages).
   KOReader Sync is for EPUB books only.
