@@ -327,9 +327,10 @@ press left/right, or tap one (that alone doesn't change your theme).
 - **Change one of yours:** **Y → Change It**, or tap **Change**. Yours are
   also listed under All, and Light or Dark by their page, tagged **Custom**.
 - **Hide built-in themes you never use:** tap **Hide** (or **Y → Hide It**).
-  They're listed under **"N hidden themes"** at the end of All, where
-  **Show** brings one back (or **Show All**, by the title). Hiding
-  the theme in use moves to the next one.
+  The foot of the list says how many are hidden ("4 / 22 · 3 hidden"; tap it),
+  and the last row of All, Light and Dark opens them: **Restore** brings one
+  back, **Restore All** (Light, Dark) by the title brings back them all.
+  Hiding the theme in use moves to the next one.
 - In the editor, the top screen shows your book in the colors as you go:
   - **Name**: tap it (or A) to type one; the **×** clears it.
   - **Page color** / **Text color**: which one the rest changes (**Y**

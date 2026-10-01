@@ -3658,7 +3658,7 @@ end
 -- if it's still listed.
 -- Built-in themes you've hidden (S.hidden_themes, "Dracula,Nord"): left out
 -- of the lists, and listed under "N hidden themes" at the end of All, where
--- they can be shown again. Your own themes are deleted instead.
+-- they can be restored. Your own themes are deleted instead.
 function app.theme_hidden(t)
     if not t or t.custom then return false end
     for n in (S.hidden_themes or ""):gmatch("[^,]+") do if n == t.name then return true end end
@@ -3696,27 +3696,45 @@ function app.theme_hide(t, hide)
         app.theme_pick()
         app.toast(t.name .. " hidden · now " .. T.list[T.sel].name)
     else
-        app.toast(hide and (t.name .. " hidden") or (t.name .. " shown again"))
+        app.toast(hide and (t.name .. " hidden") or (t.name .. " restored"))
     end
+    -- (The last hidden one restored: nothing left here, so back.)
+    if T.filter == "hidden" and #T.list == 0 then app.theme_close_hidden() end
     redraw()
 end
 
--- Every hidden theme back (the Show All button on Hidden Themes), and back to All.
+-- Hidden Themes: those hidden from the list being shown (all, light or dark).
+function app.theme_open_hidden()
+    local T = app.themes
+    if T.filter ~= "hidden" then T.hidden_of = T.filter end
+    app.theme_set_filter("hidden")
+    redraw()
+end
+
+-- Back from Hidden Themes to the list it was opened from.
+function app.theme_close_hidden()
+    app.theme_set_filter(app.themes.hidden_of or "all")
+    redraw()
+end
+
+-- Every theme on Hidden Themes back (its Restore All button), and back.
 function app.theme_show_all()
     local n = 0
-    for _ in (S.hidden_themes or ""):gmatch("[^,]+") do n = n + 1 end
-    S.hidden_themes = ""
-    app.themes.changed = true
-    app.theme_set_filter("all")
-    app.toast(n == 1 and "1 theme shown again" or (n .. " themes shown again"))
-    redraw()
+    for _, t in ipairs(app.themes.list) do
+        if app.theme_hidden(t) then app.theme_set_hidden(t, false); n = n + 1 end
+    end
+    app.theme_close_hidden()
+    app.toast(n == 1 and "1 theme restored" or (n .. " themes restored"))
 end
 
--- The Show All button, on the Hidden Themes title line: x, y, w, h.
+-- The Restore All button, on the Hidden Themes title line: its label
+-- ("Restore All", or "Restore All Light"/"Dark" for those lists), x, y, w, h.
 function app.theme_show_all_button()
     local m = MARGINS[2]
-    local w, h = ui.font:getWidth("Show All") + 56, 50
-    return PAGE_W - m.outer - w, math.floor(60 + (ui.title:getHeight() - h) / 2), w, h
+    local of = app.themes.hidden_of
+    local label = (of == "light" or of == "dark") and ("Restore All " .. (of == "light" and "Light" or "Dark")) or "Restore All"
+    local w, h = ui.font:getWidth(label) + 56, 50
+    return PAGE_W - m.outer - w, math.floor(60 + (ui.title:getHeight() - h) / 2), w, h, label
 end
 
 function app.theme_set_filter(filter, keep)
@@ -3730,20 +3748,29 @@ function app.theme_set_filter(filter, keep)
         T.list[1] = app.NEW_THEME
         for _, t in ipairs(THEMES) do if t.custom and not t.hidden then T.list[#T.list + 1] = t end end
     elseif filter == "hidden" then
-        for _, t in ipairs(THEMES) do if not t.hidden and app.theme_hidden(t) then T.list[#T.list + 1] = t end end
+        -- (Those of the list it was opened from: all, or just light or dark ones.)
+        local of = T.hidden_of or "all"
+        for _, t in ipairs(THEMES) do
+            if not t.hidden and app.theme_hidden(t) and (of == "all" or app.theme_kind(t) == of) then T.list[#T.list + 1] = t end
+        end
         table.sort(T.list, function(a, b) return a.name:lower() < b.name:lower() end)
 
     else
         -- Built-in themes and yours together, A to Z (not the ones hidden).
+        -- (The hidden ones of this list: counted, and a last row to see them.)
         local hidden = 0
         for _, t in ipairs(THEMES) do
-            if not t.hidden and app.theme_hidden(t) then hidden = hidden + 1
-            elseif not t.hidden and (filter == "all" or app.theme_kind(t) == filter) then T.list[#T.list + 1] = t end
+            local here = not t.hidden and (filter == "all" or app.theme_kind(t) == filter)
+            if here and app.theme_hidden(t) then hidden = hidden + 1
+            elseif here then T.list[#T.list + 1] = t end
         end
         table.sort(T.list, function(a, b) return a.name:lower() < b.name:lower() end)
-        if filter == "all" and hidden > 0 then
-            T.list[#T.list + 1] = { name = hidden .. (hidden == 1 and " hidden theme" or " hidden themes"), hidden_row = true }
+        if hidden > 0 then
+            local kind = filter == "all" and "" or (filter .. " ")
+            T.list[#T.list + 1] = { name = hidden .. " hidden " .. kind .. (hidden == 1 and "theme" or "themes"),
+                hidden_row = true }
         end
+        T.hidden_count = hidden
     end
     -- The theme in use highlighted; if it isn't in this list, none is (0),
     -- so switching lists never changes the theme.
@@ -3780,7 +3807,7 @@ end
 function app.theme_use()
     local t = app.themes.list[app.themes.sel]
     if t and t.new then app.tedit_new() return end
-    if t and t.hidden_row then app.theme_set_filter("hidden"); redraw() return end
+    if t and t.hidden_row then app.theme_open_hidden() return end
 
     app.theme_pick()
     app.theme_leave()
@@ -3791,8 +3818,7 @@ function app.theme_action(a)
     if a == "toc" then app.theme_options(T.list[T.sel]) return end      -- Y: copy (or change) it
     -- The hidden themes' list: B (or left/right) goes back to All.
     if T.filter == "hidden" and (a == "back" or a == "menu" or a == "left" or a == "right" or a == "prev" or a == "next") then
-        app.theme_set_filter("all")
-        redraw()
+        app.theme_close_hidden()
         return
     end
     if a == "up" then T.sel = math.max(1, T.sel - 1); app.theme_pick()
@@ -3822,8 +3848,8 @@ function app.theme_options(t)
     if not t.custom then
         local hidden = app.theme_hidden(t)
         app.choose({ title = t.name, options = hidden and {
-            { "Show It Again", function() app.theme_hide(t, false) end },
-            { "Show All Hidden Themes", app.theme_show_all },
+            { "Restore It", function() app.theme_hide(t, false) end },
+            { select(5, app.theme_show_all_button()), app.theme_show_all },
             { "Make a Copy", function() app.theme_copy(t) end },
         } or {
             { "Make a Copy", function() app.theme_copy(t) end },
@@ -3842,7 +3868,7 @@ end
 function app.theme_row_buttons(t, rx, ry, rw, h)
     if not t or t.new or t.hidden_row then return {} end
     local list = t.custom and { { "change", "Change" }, { "copy", "Copy" } }
-        or { { "copy", "Copy" }, app.theme_hidden(t) and { "show", "Show" } or { "hide", "Hide" } }
+        or { { "copy", "Copy" }, app.theme_hidden(t) and { "show", "Restore" } or { "hide", "Hide" } }
     local bh, gap = 44, 10
     local right = rx + rw - 40
     for i = #list, 1, -1 do
@@ -3867,7 +3893,12 @@ function app.theme_tap(side, u, v)
             return
         end
     end
-    if v < 160 and T.filter == "hidden" then        -- Show All
+    local nb = T.note_box                           -- "3 hidden" at the foot
+    if nb and u >= nb[1] - 16 and u <= nb[1] + nb[3] + 16 and v >= nb[2] - 16 and v <= nb[2] + nb[4] + 16 then
+        app.theme_open_hidden()
+        return
+    end
+    if v < 160 and T.filter == "hidden" then        -- Restore All
         local bx, by, bw, bh = app.theme_show_all_button()
         local p = app.TAP_PAD
         if u >= bx - p and u <= bx + bw + p and v >= by - p and v <= by + bh + p then app.theme_show_all() end
@@ -3901,13 +3932,13 @@ function app.theme_draw(side)
     local title = T.filter == "hidden" and "Hidden Themes" or app.night and "Night Mode Theme" or "Themes"
     love.graphics.print(title, x, 60)
     -- All / Light / Dark, right-aligned on the title line; the current one bold.
-    -- (Hidden Themes: a Show All button there instead; B goes back to All.)
+    -- (Hidden Themes: a Restore All button there instead; B goes back.)
     T.tabs = {}
     local tx = x + w
     local ty = 60 + ui.title:getBaseline() - ui.font:getBaseline()
     if T.filter == "hidden" then
-        local bx, by, bw, bh = app.theme_show_all_button()
-        app.button(bx, by, bw, bh, "Show All", nil, "soft")
+        local bx, by, bw, bh, label = app.theme_show_all_button()
+        app.button(bx, by, bw, bh, label, nil, "soft")
     end
     for k = T.filter == "hidden" and 0 or #app.THEME_FILTERS, 1, -1 do
         local t = app.THEME_FILTERS[k]
@@ -3993,10 +4024,21 @@ function app.theme_draw(side)
     else
         local t = T.list[T.sel]
         if t and t.hidden_row then app.hints(x, nil, { "A", "show them", "‹ ›", "filter", "B", "back" })
-        elseif T.filter == "hidden" then app.hints(x, nil, { "A", "use", "Y", "options", "B", "back to All" })
+        elseif T.filter == "hidden" then app.hints(x, nil, { "A", "use", "Y", "options", "B", "back" })
         else app.hints(x, nil, { "A", "use", "Y", "options", "‹ ›", "filter", "B", "back" }) end
     end
-    if T.filter ~= "custom" and T.sel > 0 then app.count(x, w, T.sel, #T.list) end
+    -- The foot: "4 / 22 · 3 hidden" (a tap on "3 hidden" shows them).
+    T.note_box = nil
+    if T.filter ~= "custom" and T.filter ~= "hidden" then
+        local n = #T.list - ((T.hidden_count or 0) > 0 and 1 or 0)
+        local note = (T.hidden_count or 0) > 0 and (T.hidden_count .. " hidden") or nil
+        local sel = T.list[T.sel] and not T.list[T.sel].hidden_row and T.sel or 0
+        app.count(x, w, sel, sel > 0 and n or 0, nil, note)
+        if note then
+            local nw = ui.hint:getWidth(note)
+            T.note_box = { x + w - nw, PAGE_H - 70, nw, ui.hint:getHeight() }
+        end
+    end
 end
 
 ---------------------------------------------------------------- your own themes
