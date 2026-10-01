@@ -3,7 +3,7 @@
 # Add the new version's lines at the top with each release.
 
 v1.19.0
-Themes are grouped as All, Light, Dark and Custom, and you can make your own: choose the page and text colours with Brightness, Warmth and Tint, starting from a light or dark template. Copy any theme to make it yours.
+New theme editor: make your own themes. Choose the page and text colours with Brightness, Warmth and Tint, starting from a light or dark template, or copy any theme and change it. Themes are now grouped as All, Light, Dark and Custom.
 Hide themes you don't use; Hidden Themes brings them back, one at a time or all at once.
 Highlight by touch: hold a word to look it up, or hold and drag to choose words. Start Highlight, Save Highlight and Remove Highlight buttons do the rest.
 Highlight colours: Yellow, Green, Blue, Pink or Subtle, in Settings → Reading & Device. On dark themes highlights can be Muted or Bright.
