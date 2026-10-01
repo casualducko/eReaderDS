@@ -1563,9 +1563,17 @@ function app.library_meta_step()
     end
     if #q == 0 then
         library.pending = nil
-        local cur = library.items[library.sel]
+        -- Sorted again by the real titles, keeping the selected book selected;
+        -- but one still at the top (not moved to yet: after a reset or on a
+        -- new card every book is read again) stays at the top, rather than
+        -- following that book far down the list.
+        local cur = library.sel > 1 and library.items[library.sel]
         library.sort(library.items)
-        for i, it in ipairs(library.items) do if it == cur then library.sel = i end end
+        if cur then
+            for i, it in ipairs(library.items) do if it == cur then library.sel = i end end
+        else
+            library.sel, library.top = 1, 1
+        end
         local t2 = love.timer.getTime()
         Store.save_meta(library.seen)
         print(string.format("[library] new books done after %.2fs (saving the list %.2fs)",
