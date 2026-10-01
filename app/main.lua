@@ -2905,13 +2905,11 @@ function app.night_preview(side)
     end
     -- Making a theme: the book in its colours as they change.
     if side == "left" and app.mode == "theme_edit" then return app.EDIT_THEME.name end
-    -- The Themes pages themselves on a neutral page (White, or Midnight when
-    -- the current theme is dark), so a tinted theme doesn't colour the
-    -- swatches and sliders, without a bright flash at night.
-    if side == "right" and (app.mode == "themes" or app.mode == "theme_edit") then
-        local cur = app.theme_named(app.theme_current()) or THEMES[1]
-        return app.theme_kind(cur) == "dark" and "Midnight" or "White"
-    end
+    -- The Themes pages themselves on a neutral grey, as photo editors are,
+    -- so a tinted theme doesn't colour the swatches and sliders.
+    if side == "right" and (app.mode == "themes" or app.mode == "theme_edit") then return app.PANEL_THEME.name end
+    -- Naming a theme: the keyboard in the same grey (both screens).
+    if app.mode == "keyboard" and app.kb and app.kb.back == "theme_edit" then return app.PANEL_THEME.name end
 end
 
 
@@ -3656,6 +3654,10 @@ end
 app.NEW_THEME = { name = "New Theme", new = true }
 app.EDIT_THEME = { name = "\0editing", custom = true, hidden = true }
 THEMES[#THEMES + 1] = app.EDIT_THEME
+-- The Themes pages' own look: a neutral mid-dark grey.
+app.PANEL_THEME = { name = "\0panel", custom = true, hidden = true,
+    bg = { 0.21, 0.21, 0.22 }, fg = { 0.92, 0.92, 0.92 }, dim = { 0.64, 0.64, 0.65 }, sel = { 0.32, 0.32, 0.34 } }
+THEMES[#THEMES + 1] = app.PANEL_THEME
 -- The sliders: { label, lowest, highest, words at the two ends }. A colour
 -- is { brightness 0-100, warmth -100-100, tint -100-100 }.
 app.TEDIT_SLIDERS = { { "Brightness", 0, 100, "Darker", "Lighter" }, { "Warmth", -100, 100, "Cooler", "Warmer" },
