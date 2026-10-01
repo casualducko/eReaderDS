@@ -2682,6 +2682,12 @@ function app.sync_decide(b, how, docs, results)
     -- The same place means on the spread you're looking at.
     local sp = spread
     local same = sp and ch == sp.ch and off >= sp.pages[sp.pi].off and off < spread_end_off(sp)
+    -- (Or the paragraph the page starts in: places go by paragraph, and
+    -- another device's lines break differently, so where it starts can be on
+    -- the page before though you're reading it here.)
+    if not same and sp and ch == sp.ch and off < sp.pages[sp.pi].off then
+        same = b:xpointer(ch, off) == b:xpointer(sp.ch, sp.pages[sp.pi].off)
+    end
     print(string.format("[sync] pull: %s at %.1f%% (%s) -> chapter %d offset %d; %s, moved here: %s, same spread: %s (ts %s, seen %s, %s of %d)",
         tostring(r.device), frac * 100, tostring(r.progress), ch, off, new_there and "new" or "seen before",
         tostring(moved), tostring(same), tostring(r.timestamp), tostring(seen),
