@@ -272,18 +272,31 @@ end
 
 ---------------------------------------------------------------- HTTP
 
+-- Connecting doesn't block: it's started, then waited for a second at a
+-- time, so quitting or cancelling (M.abort) stops it at once instead of
+-- after the whole limit (a computer that's off can take that long).
 local function connect(u, verify, limit)
+    -- (A numeric address is used as it is: LuaSocket's lookup of one tries a
+    -- reverse lookup, which fails on a home network.)
+    local ip = (u.host:match("^%d+%.%d+%.%d+%.%d+$") or u.host:find(":", 1, true)) and u.host
+        or socket.dns.toip(u.host)
+    if not ip then error("couldn't find " .. u.host .. " (is Wi-Fi on?)") end
     local sock = socket.tcp()
-    sock:settimeout(limit or TIMEOUT)
-    local ok, err = sock:connect(u.host, u.port)
-    if not ok then
-        sock:close()
-        if err == "host not found" or tostring(err):find("not known") then
-            error("couldn't find " .. u.host .. " (is Wi-Fi on?)")
-        end
-        error("couldn't connect to " .. u.host .. " (" .. tostring(err) .. ")")
-    end
     sock:settimeout(0)
+    local deadline = socket.gettime() + (limit or TIMEOUT)
+    while true do
+        local ok, err = sock:connect(ip, u.port)
+        if ok or err == "already connected" then break end
+        err = tostring(err)
+        if err ~= "timeout" and not err:find("in progress") then
+            sock:close()
+            error("couldn't connect to " .. u.host .. " (" .. err .. ")")
+        end
+        if M.abort and M.abort() then sock:close(); error("cancelled", 0) end
+        local left = deadline - socket.gettime()
+        if left <= 0 then sock:close(); error("couldn't connect to " .. u.host .. " (timeout)") end
+        socket.select(nil, { sock }, math.min(1, left))
+    end
     if u.scheme == "https" then
         local ok, t = pcall(tls_wrap, sock, u.host, verify)
         if not ok then sock:close(); error(t, 0) end

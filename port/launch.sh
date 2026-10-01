@@ -157,11 +157,15 @@ exec > "$APP_DIR/log.txt" 2>&1
 printf '[launch] %s (uptime %s)\n' "$(date -Iseconds 2>/dev/null || date)" "${T0:-?}"
 printf '[launch] data=%s%s\n' "$READER_DATA" "${MIGRATED:+ (copied from $MIGRATED)}"
 chmod +x "$APP_DIR/runtime/love.aarch64" 2>/dev/null || true
-# Remember the system brightness so the reader's own level doesn't stick afterwards.
+# Remember the system brightness so the reader's own level doesn't stick
+# afterwards, and each backlight's power (the reader turns it off when the
+# screens sleep; if it's stopped then, they'd stay dark).
 BL_SAVED=""
+BLP_SAVED=""
 for d in /sys/class/backlight/*; do
     [ -r "$d/brightness" ] || continue
     BL_SAVED="$BL_SAVED $d=$(cat "$d/brightness")"
+    [ -r "$d/bl_power" ] && BLP_SAVED="$BLP_SAVED $d=$(cat "$d/bl_power")"
 done
 printf '[launch] backlight:%s\n' "${BL_SAVED:- none}"
 printf '[launch] power state: %s; mem_sleep: %s\n' "$(cat /sys/power/state 2>/dev/null)" "$(cat /sys/power/mem_sleep 2>/dev/null)"
@@ -184,11 +188,26 @@ restore() {
         swaymsg '[app_id="emulationstation"] focus' >/dev/null 2>&1
     fi
     [ -n "$TP_SAVED" ] && printf '%s\n' "$TP_SAVED" > "$TP" 2>/dev/null
+    for e in $BLP_SAVED; do
+        printf '%s\n' "${e##*=}" > "${e%=*}/bl_power" 2>/dev/null
+    done
     for e in $BL_SAVED; do
         printf '%s\n' "${e##*=}" > "${e%=*}/brightness" 2>/dev/null
     done
 }
-trap '[ -n "$pid" ] && kill "$pid" 2>/dev/null; restore; printf "[launch] stopped by a signal\n"; sync; exit 143' TERM INT HUP
+# (On a stop signal: the app is asked to quit, and given a few seconds to save
+# before the screens are put back.)
+stopped() {
+    if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null
+        for i in 1 2 3 4 5 6; do kill -0 "$pid" 2>/dev/null || break; sleep 0.5; done
+    fi
+    restore
+    printf "[launch] stopped by a signal\n"
+    sync
+    exit 143
+}
+trap stopped TERM INT HUP
 
 cd "$APP_DIR/app" || exit 1
 if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then

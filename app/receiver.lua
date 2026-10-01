@@ -345,25 +345,29 @@ local function upload(client, query, headers)
     reply(client, 200, true, { name = name, replaced = replaced, size = total })
 end
 
--- A line of the request, a second at a time until STALL (or "stop").
-local function receive_line(client)
-    local t0, got = love.timer.getTime(), ""
+-- A line of the request, until the deadline (love.timer time) or "stop":
+-- one slow or silent connection mustn't hold up the others (browsers open
+-- spare connections that send nothing).
+local function receive_line(client, deadline)
+    local got = ""
     while true do
         local line, e, partial = client:receive("*l")
         if line then return got .. line end
         got = got .. (partial or "")
-        if e ~= "timeout" or ctl:peek() == "stop" or love.timer.getTime() - t0 > STALL or #got > 16384 then return nil end
+        if e ~= "timeout" or ctl:peek() == "stop" or love.timer.getTime() > deadline or #got > 16384 then return nil end
     end
 end
 
 local function handle(client)
+    client:settimeout(0.5)
+    local t0 = love.timer.getTime()
+    local line = receive_line(client, t0 + 4)             -- (the first line: 4 s)
     client:settimeout(1)
-    local line = receive_line(client)
     if not line then return end
     local method, target = line:match("^(%u+)%s+(%S+)")
     local headers, n = {}, 0
     while true do
-        local h = receive_line(client)
+        local h = receive_line(client, t0 + 10)            -- (all the headers: 10 s)
         if not h or h == "" then break end
         n = n + 1
         if n > 100 then return end

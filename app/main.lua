@@ -289,15 +289,22 @@ end
 -- An image from a file's data, no bigger than a page (see fit_image).
 function app.image_from(filedata)
     local id = love.image.newImageData(filedata)
-    local image = app.fit_image(id)
-    id:release()
+    local ok, image = pcall(app.fit_image, id)
+    id:release()                        -- (also when it couldn't be made: it's big)
+    if not ok then error(image, 0) end
     return image
 end
 
--- Decoded image for drawing (the oldest ones are released).
+-- Decoded image for drawing (the ones least recently drawn are released).
 local function get_image(src)
     local img = images[src]
-    if img == nil then
+    if img then
+        -- Drawn again: the last to go.
+        for i = #images_order, 1, -1 do
+            if images_order[i] == src then table.remove(images_order, i) break end
+        end
+        images_order[#images_order + 1] = src
+    elseif img == nil then
         img = false
         local data = book and book:read_resource(src)
         if data then
@@ -305,18 +312,22 @@ local function get_image(src)
                 local id = love.image.newImageData(love.filesystem.newFileData(data, src))
                 local okl, line = pcall(app.is_line_art, id)
                 app.image_ink[src] = okl and line or nil
-                local image = app.fit_image(id)
-                id:release()
+                local okf, image = pcall(app.fit_image, id)
+                id:release()            -- (also when it couldn't be made: it's big)
+                if not okf then error(image, 0) end
                 return image
             end)
             if ok then img = res end
         end
         images[src] = img
-        images_order[#images_order + 1] = src
-        if #images_order > IMAGES_KEEP then
-            local old = table.remove(images_order, 1)
-            if images[old] then images[old]:release() end
-            images[old], app.image_ink[old] = nil, nil
+        -- (One that failed is only remembered, not kept in the count.)
+        if img then
+            images_order[#images_order + 1] = src
+            if #images_order > IMAGES_KEEP then
+                local old = table.remove(images_order, 1)
+                if images[old] then images[old]:release() end
+                images[old], app.image_ink[old] = nil, nil
+            end
         end
     end
     return img or nil
@@ -764,6 +775,8 @@ function look.layout()
     if look.pages then return look.pages end
     local size = math.max(18, math.floor(S.font_size * 0.8))
     if not look.fonts or look.fonts_key ~= S.font .. size then
+        -- (The set for the old font or size is released, not left to pile up.)
+        if look.fonts then for _, f in pairs(look.fonts) do pcall(f.release, f) end end
         look.fonts = Fonts.load(S.font, size)
         look.fonts_key = S.font .. size
     end
@@ -1202,7 +1215,7 @@ function app.export_notes(only_if_missing)
         if not f then return end
     end
     local ok = f:write(table.concat(out, "\n") .. "\n")
-    f:close()
+    ok = f:close() and ok                -- (a full card shows up at close: keep the old file then)
     if ok then os.remove(file); os.rename(file .. ".tmp", file) else os.remove(file .. ".tmp") end
 end
 
@@ -1379,7 +1392,7 @@ local function scan_library()
                 -- title and author are known (read in the background).
                 local base = name:gsub("%.[^.]+$", "")
                 local title, author = base:match("^(.-)%s+%-%s+(.+)$")
-                local it = { path = path, title = title or base, author = author or "" }
+                local it = { path = path, title = Layout.sanitize(title or base), author = Layout.sanitize(author or "") }
                 if ext == "epub" then
                     local m = Store.get_meta(path, f.size)
                     if not m then
@@ -1557,9 +1570,12 @@ function app.previews_clear()
     end
     previews, preview_order = {}, {}
     -- (Covers still waiting to be decoded aren't needed either.)
+    -- (Taken one at a time and counted: the worker may take one meanwhile,
+    -- and its result must still be counted as waiting.)
     local jobs = love.thread.getChannel("cover_jobs")
-    app.covers_waiting = math.max(0, app.covers_waiting - jobs:getCount())
-    jobs:clear()
+    local n = 0
+    while jobs:pop() do n = n + 1 end
+    app.covers_waiting = math.max(0, app.covers_waiting - n)
 end
 
 function app.cover_stop()
@@ -3628,12 +3644,13 @@ function app.theme_draw(side)
         love.graphics.setColor(t.fg[1], t.fg[2], t.fg[3])
         love.graphics.printf("Aa", rx, centered_y(ui.font, UI_SIZE, sy, sh), sw, "center")
         color(th.fg)
-        love.graphics.print(t.name, rx + sw + 24, centered_y(ui.font, UI_SIZE, ry, h))
+        local shown = fit_text(ui.font, t.name, rw - sw - 24 - 150)
+        love.graphics.print(shown, rx + sw + 24, centered_y(ui.font, UI_SIZE, ry, h))
         if t.custom and T.filter ~= "custom" then
             -- One of yours, among the built-in ones: a small tag after its name.
             love.graphics.setFont(ui.small)
             color(th.dim)
-            love.graphics.print("Custom", rx + sw + 24 + ui.font:getWidth(t.name) + 14,
+            love.graphics.print("Custom", rx + sw + 24 + ui.font:getWidth(shown) + 14,
                 centered_y(ui.small, SMALL_SIZE, ry, h))
             love.graphics.setFont(ui.font)
         end
@@ -3795,7 +3812,7 @@ function app.my_themes_load()
         if THEMES[i].custom and not THEMES[i].hidden then table.remove(THEMES, i) end
     end
     for _, saved in ipairs(Store.load_themes()) do
-        THEMES[#THEMES + 1] = app.theme_colours({ name = saved.name, custom = true },
+        THEMES[#THEMES + 1] = app.theme_colours({ name = app.theme_free_name(saved.name), custom = true },
             app.colour_parse(saved.fg, app.TEDIT_DEFAULT.fg), app.colour_parse(saved.bg, app.TEDIT_DEFAULT.bg))
     end
 end
@@ -3817,7 +3834,9 @@ end
 -- A name not taken by another theme: "My Theme", "My Theme 2", ...
 function app.theme_free_name(base, except)
     local name, n = base, 1
-    while app.theme_named(name) and app.theme_named(name) ~= except do
+    -- ("off" means no night theme in the settings: not a name to use.)
+    local function taken(x) return x:lower() == "off" or (app.theme_named(x) and app.theme_named(x) ~= except) end
+    while taken(name) do
         n = n + 1
         name = base .. " " .. n
     end
@@ -3923,6 +3942,7 @@ function app.tedit_delete()
         for i, x in ipairs(THEMES) do if x == t then table.remove(THEMES, i) break end end
         if S.theme == t.name then S.theme = "Sepia" end
         if S.night_theme == t.name then S.night_theme = "off" end
+        app.night_check()
         app.my_themes_save()
         Store.save_settings(S)
         app.tedit_close()
@@ -3930,7 +3950,8 @@ function app.tedit_delete()
 end
 
 function app.tedit_rename()
-    app.kb_open({ title = "Theme Name", text = app.tedit.name, ok = "Done", submit = function(text)
+    -- (24 letters at most: it fits the theme list and the Night Mode row)
+    app.kb_open({ title = "Theme Name", text = app.tedit.name, ok = "Done", max = 24, submit = function(text)
         app.tedit.name = text
         redraw()
     end })
@@ -3949,12 +3970,13 @@ end
 function app.tedit_action(a)
     local e, R = app.tedit, app.TEDIT_ROW
     local now = love.timer.getTime()
+    app.tedit_hold = nil                      -- (a new press: a held one has ended)
     local slider = e.row >= R.slider and e.row < R.slider + 3 and e.row - R.slider + 1
     if a == "up" then e.row = math.max(1, e.row - 1)
     elseif a == "down" then e.row = math.min(app.tedit_rows(), e.row + 1)
     elseif a == "left" or a == "right" or a == "prev" or a == "next" then
         local d = (a == "left" or a == "prev") and -1 or 1
-        if e.row == R.which then e.which = d < 0 and "bg" or "fg"
+        if e.row == R.which then e.which, e.pick = d < 0 and "bg" or "fg", nil
         elseif e.row == R.picks then app.tedit_pick((e.pick or 0) + d)
         elseif e.row == R.buttons then
             local list, at = app.tedit_buttons(), 1
@@ -3994,18 +4016,32 @@ end
 
 -- Held left/right on a slider: keeps going, faster after a second.
 function app.tedit_tick()
-    local h = app.tedit_hold
-    if not h or not app.tedit or app.mode ~= "theme_edit" then app.tedit_hold = nil return end
+    local h, e = app.tedit_hold, app.tedit
+    if not h or not e or app.mode ~= "theme_edit" or app.asking or app.choosing
+        or e.row ~= app.TEDIT_ROW.slider + h.k - 1 then
+        app.tedit_hold = nil
+        return
+    end
+    -- Which physical direction gives this "left" or "right": the handheld is
+    -- held sideways, so the D-pad is turned (app.ROTATE; the keyboard isn't).
+    local want = h.d < 0 and "left" or "right"
+    local phys
+    for p, a in pairs(app.ROTATE and app.ROTATE[S.orient] or {}) do if a == want then phys = p end end
     -- (The stick by its latched direction: its resting place isn't always
     -- the middle, see app.stick_rest.)
-    local held = love.keyboard.isDown(h.d < 0 and "left" or "right") or (app.stick and app.stick.x == h.d)
+    local held = love.keyboard.isDown(want)
+    if phys and app.stick then
+        local axis, sign = (phys == "left" or phys == "right") and "x" or "y", (phys == "left" or phys == "up") and -1 or 1
+        if app.stick[axis] == sign then held = true end
+    end
+    local hat = phys and phys:sub(1, 1)
     for _, j in ipairs(love.joystick.getJoysticks()) do
-        if j:isGamepad() and j:isGamepadDown(h.d < 0 and "dpleft" or "dpright") then held = true end
+        if phys and j:isGamepad() and j:isGamepadDown("dp" .. phys) then held = true end
+        if hat and not j:isGamepad() and j:getHatCount() > 0 and j:getHat(1):find(hat, 1, true) then held = true end
     end
     if not held then app.tedit_hold = nil return end
     local now = love.timer.getTime()
     if now < h.next then return end
-    local e = app.tedit
     local step = h.k > 1 and app.TEDIT_COLOUR_STEP or 1
     app.tedit_set(h.k, e[e.which][h.k] + h.d * step * (now - h.t0 > 1.2 and 5 or 1))
     h.next = now + 0.05
@@ -5682,7 +5718,8 @@ function app.kb_open(opts)
     -- No key is highlighted until the D-pad is used (r, c = nil).
     app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "",
         submit = opts.submit, cancel = opts.cancel, back = app.mode, ok = opts.ok, secret = opts.secret,
-        allow_empty = opts.allow_empty, url = opts.url, pos = #(opts.text or ""), start = opts.text or "" }
+        allow_empty = opts.allow_empty, url = opts.url, pos = #(opts.text or ""), start = opts.text or "",
+        max = opts.max or app.KB_MAX }                -- (max: bytes)
     app.kb_layer("lower")
     app.mode = "keyboard"
     redraw()
@@ -5719,7 +5756,7 @@ end
 
 function app.kb_type(t)
     local kb = app.kb
-    if not kb or #kb.text + #t > app.KB_MAX then return end
+    if not kb or #kb.text + #t > kb.max then return end
     kb.text = kb.text:sub(1, kb.pos) .. t .. kb.text:sub(kb.pos + 1)
     kb.pos = kb.pos + #t
     redraw()
@@ -6892,18 +6929,33 @@ function app.fget_download(e)
 end
 
 -- The zip's font files and licence, straight into the fonts folder.
+-- Each file to a .part first, renamed when it's complete; if anything fails
+-- (a full card), everything this install wrote is removed, so no half font
+-- is left to be listed.
 function app.fget_unpack(zip, dir)
     local z = assert(require("zip").open(zip))
-    for name in pairs(z.entries) do
-        if not name:find("/") and (name:match("%.[ot]tf$") or name:match("%.txt$")) then
-            local data = assert(z:read(name))
-            local f = assert(io.open(dir .. "/" .. name, "wb"))
-            local wrote = f:write(data)
-            wrote = f:close() and wrote        -- a full card shows up at close
-            assert(wrote, "write failed")
+    local done = {}
+    local ok, err = pcall(function()
+        for name in pairs(z.entries) do
+            if not name:find("/") and (name:match("%.[ot]tf$") or name:match("%.txt$")) then
+                local data = assert(z:read(name))
+                local part = dir .. "/." .. name .. ".part"
+                local f = assert(io.open(part, "wb"))
+                local wrote = f:write(data)
+                wrote = f:close() and wrote        -- a full card shows up at close
+                if not wrote then os.remove(part) end
+                assert(wrote, "write failed")
+                os.remove(dir .. "/" .. name)
+                assert(os.rename(part, dir .. "/" .. name), "couldn't save " .. name)
+                done[#done + 1] = dir .. "/" .. name
+            end
         end
-    end
+    end)
     z:close()
+    if not ok then
+        for _, path in ipairs(done) do os.remove(path) end
+        error(err, 0)
+    end
 end
 
 function app.fget_delete(e)
@@ -7209,7 +7261,11 @@ function app.find_snippet(r)
     while a > 1 and a < r.s0 and r.text:byte(a) >= 0x80 and r.text:byte(a) < 0xC0 do a = a - 1 end
     local pre = r.text:sub(a, r.s0 - 1)
     if a > 1 then pre = "…" .. pre:gsub("^%S*%s", "") end
-    return pre, r.text:sub(r.s0, r.s1), r.text:sub(r.s1 + 1, r.s1 + 160)
+    -- (The end of the line back to a whole character: cutting “ or é in
+    -- half can't be drawn.)
+    local e = math.min(#r.text, r.s1 + 160)
+    while e > r.s1 and (r.text:byte(e + 1) or 0) >= 0x80 and r.text:byte(e + 1) < 0xC0 do e = e - 1 end
+    return Layout.sanitize(pre), Layout.sanitize(r.text:sub(r.s0, r.s1)), Layout.sanitize(r.text:sub(r.s1 + 1, e))
 end
 
 function app.find_draw(side)
@@ -7852,16 +7908,20 @@ local function touch_event(kind, sx, sy)
     local side, u, v = touch_to_page(sx, sy)
     -- Making a theme: dragging along a slider sets it directly (the slider
     -- under the finger when it went down, until it lifts).
-    if app.mode == "theme_edit" and side == "right" then
-        if kind == "down" then
-            local k = app.tedit_slider_at(v)
-            -- (mode set: the press-and-hold check leaves it alone)
-            if k then gesture = { mode = "slider", slider = k }; app.tedit_drag(k, u) return end
-        elseif gesture and gesture.slider then
-            if kind == "move" then app.tedit_drag(gesture.slider, u) end
-            if kind == "up" then gesture = nil end
-            return
+    -- (A drag that's still going when the editor closed, A or B pressed,
+    -- just ends; and a card on top takes touches first.)
+    if gesture and gesture.slider then
+        if kind == "move" and app.mode == "theme_edit" and app.tedit and not app.asking then
+            app.tedit_drag(gesture.slider, u)
         end
+        if kind == "up" then gesture = nil end
+        return
+    end
+    if app.mode == "theme_edit" and side == "right" and kind == "down" and app.tedit
+        and not app.asking and not app.choosing then
+        local k = app.tedit_slider_at(v)
+        -- (mode set: the press-and-hold check leaves it alone)
+        if k then gesture = { mode = "slider", slider = k }; app.tedit_drag(k, u) return end
     end
     if app.mode == "jump" and side == "right" and kind ~= "up" and math.abs(v - JP_BAR_Y) < 140 then
         -- Dragging along the picker's bar sets the percentage directly.
@@ -8262,6 +8322,7 @@ local ROTATE = {
     left = { up = "left", right = "up", down = "right", left = "down" },
     right = { up = "right", right = "down", down = "left", left = "up" },
 }
+app.ROTATE = ROTATE                     -- (for holding a slider: see app.tedit_tick)
 
 local handle_action
 local function action(a)
@@ -9338,7 +9399,7 @@ function app.cal_stop()
     app.cal = nil
     love.thread.getChannel("calibre_out"):clear()
     if c.reopen and book then
-        -- The open book was deleted from Calibre.
+        -- The open book was deleted from Calibre, or replaced.
         save_progress()
         book:close()
         book, spread = nil, nil
@@ -9392,6 +9453,8 @@ function app.cal_edit(fn)
     app.cal_setting("address", "")                -- (the older single address is in the list now)
     app.cal_open()
     if app.cal and back then app.cal.back = back end
+    -- (Not reopened, offline: back where Calibre was opened from.)
+    if not app.cal and app.mode == "calibre" then app.mode = back or "library"; redraw() end
 end
 
 -- The saved Calibre computers: { { name, address }, ... }.
@@ -9480,6 +9543,9 @@ function app.cal_poll()
             local b = c.books[1]
             if b then b.done, b.failed = k == "done", msg.message end
             if k == "done" then c.received, c.last = c.received + 1, msg.path end
+            -- (The open book replaced with a new copy: closed on leaving, as
+            -- when it's deleted, so the new one is read when it's opened.)
+            if k == "done" and book and msg.path == book.path then c.reopen = true end
         elseif k == "deleted" then
             c.deleted = c.deleted + 1
             table.insert(c.books, 1, { title = msg.title or "A book", deleted = true })
@@ -9496,12 +9562,13 @@ function app.cal_poll()
 end
 
 function app.cal_action(a)
+    if not app.cal then app.mode = "library"; redraw() return end
     if a == "back" or a == "menu" then app.cal_close()
     elseif a == "toc" then app.cal_options() end
 end
 
 function app.cal_tap(side, u, v)
-    if side ~= "right" then return end
+    if side ~= "right" or not app.cal then return end
     local bx, by, bw, bh = app.recv_button()
     local ox, oy, ow, oh = app.cal_buttons()
     if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 10 and v <= by + bh + 30 then app.cal_close()
@@ -9511,6 +9578,7 @@ end
 function app.cal_draw(side)
     local th = theme()
     local c = app.cal
+    if not c then return end
     local m = MARGINS[2]
     local x = side == "left" and m.outer or m.inner
     local w = PAGE_W - m.outer - m.inner
@@ -9672,14 +9740,16 @@ function love.load()
         S.sb_title, S.sb_pages, S.sb_percent = "none", "hide", false
         S.chrome = true
     end
+    -- Old names, unless one of your own themes is called that now.
+    local function mine(name) return app.theme_named(name) ~= nil end
     local n = tonumber(S.theme)
-    if n then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
+    if n and not mine(S.theme) then S.theme = OLD_THEME_NUMBERS[n] or "Paper" end
     -- "Night" was renamed "Midnight" (the night theme setting made it confusing).
-    if S.theme == "Night" then S.theme = "Midnight" end
-    if S.night_theme == "Night" then S.night_theme = "Midnight" end
+    if S.theme == "Night" and not mine("Night") then S.theme = "Midnight" end
+    if S.night_theme == "Night" and not mine("Night") then S.night_theme = "Midnight" end
     -- "Green" (its name in test builds) is now "Mint".
-    if S.theme == "Green" then S.theme = "Mint" end
-    if S.night_theme == "Green" then S.night_theme = "Mint" end
+    if S.theme == "Green" and not mine("Green") then S.theme = "Mint" end
+    if S.night_theme == "Green" and not mine("Green") then S.night_theme = "Mint" end
     Timezone.apply(S.tz)
     app.night_check()
     Touch.open("gt9xx-0")
@@ -9747,6 +9817,14 @@ function love.quit()
         love.graphics.clear(0, 0, 0)
         love.graphics.present()
     end
+    -- Screens off (idle or the lid): back on, so the menu isn't left dark.
+    if app.idle.state == "off" or lid.closed then pcall(Backlight.power, true, app.idle.pct or lid.pct or 50) end
+    -- Your place and settings first: what follows can wait on the network,
+    -- and the system may not wait for it. (Saved again at the end; writes
+    -- that change nothing are skipped.)
+    app.pending_save()
+    save_progress()
+    Store.save_settings(S)
     local t0 = love.timer.getTime()
     if app.recv then app.recv_stop() end
     if app.cal then app.cal_stop() end

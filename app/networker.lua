@@ -17,8 +17,13 @@ local Opds = require("opds")
 local jobs = love.thread.getChannel("net_jobs")
 local out = love.thread.getChannel("net_out")
 local cancel = love.thread.getChannel("net_cancel")
--- Quitting pushes true: stop waiting on any server at once.
-Net.abort = function() return cancel:peek() == true end
+-- Quitting pushes true: stop waiting on any server at once. Cancelling the
+-- running job (its id) does too, even while the server sends nothing.
+local running
+Net.abort = function()
+    local c = cancel:peek()
+    return c == true or (running ~= nil and c == running)
+end
 
 local function run(job)
     local opts = { user = job.user, password = job.password, verify = job.verify }
@@ -90,7 +95,9 @@ end
 while true do
     local job = jobs:demand()
     if job.kind == "quit" then break end
+    running = job.id
     local ok, err = pcall(run, job)
+    running = nil
     if not ok then
         out:push({ id = job.id, kind = "error", message = tostring(err):gsub("^[^:]*:%d+: ", "") })
     end

@@ -55,6 +55,31 @@ end
 
 local last_written = {}          -- file -> text, to skip writes that change nothing
 
+-- Making sure a file is really on the card before it replaces the old one
+-- (fsync): without it, a sudden power-off right after a save could leave
+-- the renamed file empty on the SD card (FAT keeps no order between the
+-- two). Linux and Android only (through the C library).
+local fsync_file
+if jit.os == "Linux" then
+    local ok_ffi, ffi = pcall(require, "ffi")
+    if ok_ffi then
+        for _, decl in ipairs({ "int open(const char *path, int flags);", "int close(int fd);", "int fsync(int fd);" }) do
+            pcall(ffi.cdef, decl)
+        end
+        fsync_file = function(path)
+            local fd = ffi.C.open(path, 0)          -- (O_RDONLY: enough to flush it)
+            if fd < 0 then return end
+            ffi.C.fsync(fd)
+            ffi.C.close(fd)
+        end
+    end
+end
+-- Files written on nearly every page turn: flushed at most every 30 s (and
+-- by Store.flush on quitting, closing the lid and the screens going off),
+-- so turning pages doesn't wait on the card.
+local OFTEN = { ["progress.txt"] = true, ["last.txt"] = true, ["opened.txt"] = true }
+local last_fsync = {}
+
 local function write_atomic(file, text)
     if last_written[file] == nil then
         -- First write of this file this session: if it already says this,
@@ -77,6 +102,13 @@ local function write_atomic(file, text)
         if chk then chk:close() end
     end
     if not ok then os.remove(tmp); return false end
+    if fsync_file then
+        local base, now = file:match("([^/]+)$"), os.time()
+        if not OFTEN[base] or now - (last_fsync[base] or 0) >= 30 then
+            last_fsync[base] = now
+            pcall(fsync_file, tmp)
+        end
+    end
     -- rename() replaces the old file in one step, so a power cut leaves either
     -- the old file or the new one. (Remove first only if a rename over an
     -- existing file isn't allowed.)
@@ -205,6 +237,15 @@ function M.load_settings()
     }
     for k, allowed in pairs(ENUMS) do
         if allowed and not allowed[s[k]] then s[k] = DEFAULTS[k] end
+    end
+    -- Numbers edited by hand: real numbers (not nan or inf) in a sensible
+    -- range, or the default (a text size of 0 couldn't even start).
+    local RANGES = { font_size = { 18, 64 }, spacing = { 0.5, 2.5 }, extra_dim = { 0, 3 }, brightness = { -1, 100 },
+        idle_min = { 0, 1440 }, night_from = { 0, 23 }, night_to = { 0, 23 }, margins = { 1, 3 }, vmargins = { 1, 4 },
+        read_cps = { 1, 200 } }
+    for k, r in pairs(RANGES) do
+        local v = s[k]
+        if type(v) ~= "number" or v ~= v or v < r[1] or v > r[2] then s[k] = DEFAULTS[k] end
     end
     -- Settings saved by a version from before seen_version (v0.3.10 and
     -- older): that's an update, not a new install, so "what's new" is offered.

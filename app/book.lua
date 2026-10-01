@@ -10,6 +10,10 @@ local Zip = require("zip")
 
 local M = {}
 
+-- Text shown without being laid out (titles, authors, contents) made safe
+-- to draw: LÖVE can't draw invalid UTF-8 (a Latin-1 OPF, an odd file name).
+local function clean(s) return s and require("layout").sanitize(s) end
+
 ---------------------------------------------------------------- helpers
 
 local function utf8char(cp)
@@ -421,7 +425,7 @@ local function parse_ncx(xml, base)
         elseif name == "content" then
             local src = attr(tag, "src")
             if src then
-                toc[#toc + 1] = { title = pending or "?", depth = depth,
+                toc[#toc + 1] = { title = clean(pending or "?"), depth = depth,
                     file = resolve(base, src), anchor = src:match("#(.+)$") and urldecode(src:match("#(.+)$")) }
                 pending = false
             end
@@ -449,7 +453,7 @@ local function parse_nav(xhtml, base)
             local e = s:find("</a>", pos, true) or #s
             local title = decode(s:sub(pos, e - 1):gsub("<[^>]+>", "")):gsub("%s+", " ")
             if href then
-                toc[#toc + 1] = { title = title, depth = depth, file = resolve(base, href),
+                toc[#toc + 1] = { title = clean(title), depth = depth, file = resolve(base, href),
                     anchor = href:match("#(.+)$") and urldecode(href:match("#(.+)$")) }
             end
             pos = e
@@ -465,7 +469,7 @@ Book.__index = Book
 
 local function basename_title(path)
     local n = path:match("([^/]+)$") or path
-    return (n:gsub("%.[^.]+$", ""))
+    return clean((n:gsub("%.[^.]+$", "")))
 end
 
 local function open_epub_zip(path, z)
@@ -480,6 +484,7 @@ local function open_epub_zip(path, z)
     book.title = decode((opf:match("<dc:title[^>]*>(.-)</dc:title>") or basename_title(path)):gsub("<[^>]+>", ""))
     book.author = opf:match("<dc:creator[^>]*>(.-)</dc:creator>")
     book.author = book.author and decode(book.author:gsub("<[^>]+>", "")) or ""
+    book.title, book.author = clean(book.title), clean(book.author)
     book.language = (opf:match("<dc:language[^>]*>%s*(.-)%s*</dc:language>") or ""):lower()
 
     local manifest, ncx, nav = {}, nil, nil
@@ -635,7 +640,7 @@ function M.meta(path)
         local opf = opf_path and z:read(opf_path)
         if not opf then return nil end
         local function text(v)
-            return v and (decode(v:gsub("<[^>]+>", "")):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")) or nil
+            return v and clean((decode(v:gsub("<[^>]+>", "")):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", ""))) or nil
         end
         local t = { title = text(opf:match("<dc:title[^>]*>(.-)</dc:title>")) }
         -- The first author, and how it sorts: an EPUB 2 attribute, or an

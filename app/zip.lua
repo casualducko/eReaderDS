@@ -46,8 +46,12 @@ function M.open(path)
         local name = cd:sub(pos + 46, pos + 45 + nlen)
         local e = { method = u16(cd, pos + 10), csize = u32(cd, pos + 20),
             usize = u32(cd, pos + 24), offset = u32(cd, pos + 42) }
-        entries[name] = e
-        lower[name:lower()] = e
+        -- (A damaged entry said to reach past the end of the file is left
+        -- out: reading it would ask for gigabytes.)
+        if e.offset + e.csize <= size then
+            entries[name] = e
+            lower[name:lower()] = e
+        end
         pos = pos + 46 + nlen + xlen + clen
     end
     return setmetatable({ file = f, entries = entries, lower = lower }, M)

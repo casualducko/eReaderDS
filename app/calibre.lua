@@ -201,14 +201,15 @@ local function receive()
     end
 end
 
--- A book's bytes, straight into a file; true when it's all there.
+-- A book's bytes, straight into a file; true when it's all there (every
+-- byte written, the size right, and an EPUB whole).
 local function receive_book(path, size, title)
     local part = path .. ".part"
     local f = io.open(part, "wb")
-    local got, last = 0, 0
+    local got, last, wrote = 0, 0, true
     local function take(s)
         got = got + #s
-        if f then f:write(s) end
+        if f and wrote and not f:write(s) then wrote = false end
         local now = love.timer.getTime()
         if now - last > 0.3 then last = now; out:push({ kind = "progress", got = got, size = size }) end
     end
@@ -230,7 +231,22 @@ local function receive_book(path, size, title)
         end
     end
     if not f then return false, "couldn't write to the books folder" end
-    f:close()
+    if not f:close() then wrote = false end
+    local check = io.open(part, "rb")
+    local ok = wrote and size > 0 and check ~= nil
+    if check then
+        ok = ok and check:seek("end") == size
+        if ok and path:lower():match("%.epub$") then
+            -- A zip: its header at the start and its directory at the end.
+            check:seek("set", 0)
+            local head = check:read(4)
+            check:seek("set", math.max(0, size - 65557))
+            local tail = check:read("*a") or ""
+            ok = head == "PK\3\4" and tail:find("PK\5\6", 1, true) ~= nil
+        end
+        check:close()
+    end
+    if not ok then os.remove(part); return false, "couldn't save it (is the SD card full?)" end
     os.remove(path)
     if not os.rename(part, path) then os.remove(part); return false, "couldn't save it" end
     return true

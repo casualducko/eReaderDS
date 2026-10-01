@@ -368,4 +368,8 @@ function M.find_page(pages, off)
     return lo
 end
 
+-- (For text drawn without being laid out: titles, authors, contents,
+-- search results. LÖVE can't draw invalid UTF-8.)
+M.sanitize = sanitize
+
 return M
