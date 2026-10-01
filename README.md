@@ -262,7 +262,7 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
 - **KOReader Sync:** carry your place between eReaderDS and KOReader or
   CrossPoint (a phone, Kobo, Kindle, Xteink X4 or X3...): one smart Sync
   button, or Send my place and Get my place; opening a book asks before
-  anything is sent, or set Automatic sync to On or Off
+  another device's place is replaced, or set Automatic sync to On or Off
   ([below](#koreader-sync)).
 - **Finding your place:** bookmarks and highlights, Table of Contents, Jump to %, **Find in Book**
   (type a word or phrase on the touchscreen keyboard; every match is listed,
@@ -480,10 +480,12 @@ off.
      **Continue from your Kobo?** (Jump or Stay), with where that is and when
      it was saved: "3 pages ahead, in Chapter 10 · Saved on Kobo 3 minutes
      ago" (in the chapter you're reading it counts pages; elsewhere it gives
-     the chapter and percentage beside yours). If the server is behind you, it
-     asks **Send your place to the sync server?** (not for a book opened at
-     its very start that the server knows nothing about yet: there's no place
-     worth sending until you've read in). Nothing is sent without asking.
+     the chapter and percentage beside yours). If the server is behind you,
+     your place is sent when it only has this device's own earlier place (or
+     nothing yet), since nothing else is replaced; if another device's place
+     there is newer, it asks **Send your place to the sync server?** first
+     (not for a book opened at its very start that the server knows nothing
+     about yet). Another device's place is never replaced without asking.
    - **On:** as above, but your place is also sent on its own: when the book
      opens, every few minutes while reading, and when you leave the book,
      close the lid or the screens go off.
