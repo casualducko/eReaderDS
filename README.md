@@ -421,7 +421,8 @@ it to another handheld or system:
 ## Comics and Manga
 
 Put `.cbz` comics in the `Ebook` folder like any book (or send them from a
-phone or computer); they're listed in My Books with their covers.
+phone or computer); they're listed in My Books with their covers, in a
+**Manga** section after your books (in whichever order My Books is sorted).
 
 - **A page on each screen,** like an open book: the cover on its own, then
   pages in pairs. A two-page spread (a picture wider than it's tall) is split

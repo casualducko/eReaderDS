@@ -1481,10 +1481,15 @@ function library.sort(items)
             k.group = (Store.get_finished(it.path) and 3) or (pct > 0 and 1) or 2
             k.pct = pct
         end
+        k.comic = it.path:lower():match("%.cbz$") ~= nil
         key[it] = k
     end
+    -- Comics (.cbz) after the books, under their own heading (app.library_group).
+    library.has_comics = false
+    for _, k in pairs(key) do if k.comic then library.has_comics = true break end end
     table.sort(items, function(a, b)
         local x, y = key[a], key[b]
+        if x.comic ~= y.comic then return y.comic end
         if mode == "recent" and x.t ~= y.t then return x.t > y.t end
         if mode == "author" and x.a ~= y.a then
             if x.a == "" or y.a == "" then return y.a == "" end   -- no author: last
@@ -5157,6 +5162,18 @@ end
 app.LIB_GROUPS = { "READING", "NOT STARTED", "FINISHED" }
 app.LIB_HEADER_H = 44
 function app.library_group(it)
+    -- With any comics: they're a section of their own, MANGA, after the books
+    -- (BOOKS, or the books' own groups when sorted by series or progress).
+    if library.has_comics then
+        if it.path:lower():match("%.cbz$") then return "\0manga", "MANGA" end
+        local g, label = app.library_book_group(it)
+        if g == nil then return "\0books", "BOOKS" end
+        return g, label
+    end
+    return app.library_book_group(it)
+end
+
+function app.library_book_group(it)
     if S.lib_sort == "series" then
         if it.series then return it.series, it.series:upper() end
         return "", "NOT IN A SERIES"
