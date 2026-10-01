@@ -998,10 +998,10 @@ function app.look_buttons()
     local gap, total = 24, -24
     for _, b in ipairs(list) do b.w = ui.font:getWidth(b[2]) + 72; total = total + b.w + gap end
     local on_text = look.hl_start or w.side == app.touch_side()
-    local y = on_text and PAGE_H - 86 or PAGE_H - 26 - ui.small:getHeight() - 82
+    local y = on_text and PAGE_H - 88 or PAGE_H - 26 - ui.small:getHeight() - 84
     local x = math.floor((PAGE_W - total) / 2)
     for _, b in ipairs(list) do
-        b.x, b.y, b.h = x, y, 58
+        b.x, b.y, b.h = x, y, app.BUTTON_H
         x = x + b.w + gap
     end
     return list
@@ -1038,7 +1038,8 @@ end
 function app.look_bar_tap(side, u, v)
     if side ~= app.touch_side() then return false end
     for _, b in ipairs(app.look_buttons()) do
-        if u >= b.x - 10 and u <= b.x + b.w + 10 and v >= b.y - 10 and v <= b.y + b.h + 10 then
+        local p = app.TAP_PAD
+        if u >= b.x - p and u <= b.x + b.w + p and v >= b.y - p and v <= b.y + b.h + p then
             if b[1] == "save" then app.hl_select()
             elseif b[1] == "cancel" then look.hl_start = nil; look.find()
             elseif b[1] == "close" then app.on_back()        -- (out of look-up, as B does)
@@ -2529,17 +2530,30 @@ function app.sync_decide(b, how, docs, results)
         -- once you've read in). By hand it's still done.
         if not now and not moved and #own == 0 and here == 0 then return end
         local where = app.sync_where(pos.ch, pos.off) .. (note and (" · " .. note) or "")
-        if (moved or send) and not now and app.sync_auto() ~= "on" then
-            -- Ask when opening: offer to send, rather than sending on its own.
-            local last = own[1]
-            for _, e in ipairs(own) do
-                if (tonumber(e.r.timestamp) or 0) > (tonumber(last.r.timestamp) or 0) then last = e end
+        -- Another device's place on the server newer than this one's last
+        -- send: sending would replace it, so (set to ask) it asks first. Only
+        -- this device's own place there, or none: nothing to lose, sent.
+        local last = own[1]
+        for _, e in ipairs(own) do
+            if (tonumber(e.r.timestamp) or 0) > (tonumber(last.r.timestamp) or 0) then last = e end
+        end
+        local mine = last and (tonumber(last.r.timestamp) or 0) or -1
+        local other_newer = false
+        for _, list in ipairs({ old, new }) do
+            for _, e in ipairs(list) do
+                if (tonumber(e.r.timestamp) or 0) > mine then other_newer = true end
             end
+        end
+        if (moved or send) and not now and app.sync_auto() ~= "on" and other_newer then
+            -- Ask when opening: offer to send, rather than sending on its own.
             app.untoast()
             app.ask({ question = "Send your place to the sync server?",
-                detail = "You're at " .. where .. "\n" .. app.sync_server_name()
-                    .. (last and (" has " .. math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5) .. "%, from " .. ago(last.r.timestamp))
-                        or " has nothing for this book yet"),
+                -- (own: this device's own sends only, so it says "from here":
+                -- the server's name, such as CrossPoint, read like another device.)
+                detail = "You're at " .. where .. "\n"
+                    .. (last and ("Last sent from here: " .. math.floor((tonumber(last.r.percentage) or 0) * 100 + 0.5)
+                        .. "%, " .. ago(last.r.timestamp))
+                        or "The sync server has nothing for this book yet"),
                 yes = "Send", no = "Not now", on_yes = function()
                     if book ~= b then return end
                     app.sync.pushed[b.path] = nil
@@ -3737,7 +3751,8 @@ function app.theme_tap(side, u, v)
     if side ~= "right" then return end
     local T = app.themes
     for _, b in ipairs(T.row_btns or {}) do
-        if u >= b.x - 8 and u <= b.x + b.w + 8 and v >= b.y - 10 and v <= b.y + b.h + 10 then
+        local p = app.TAP_PAD
+        if u >= b.x - p and u <= b.x + b.w + p and v >= b.y - p and v <= b.y + b.h + p then
             local t = T.list[T.sel]
             if b[1] == "change" then app.tedit_open(t) else app.theme_copy(t) end
             return
@@ -4245,7 +4260,7 @@ function app.tedit_layout()
         picks = { y = 302, h = 52 },
         slider = function(k) return 432 + (k - 1) * 118, 34 end,     -- track y, h
         sample = { y = 768, h = 66 },
-        delete = { y = 866, h = 52 },
+        delete = { y = 862, h = 60 },
     }
 end
 
@@ -5574,6 +5589,10 @@ end
 -- dimmed text ("Get Books  Select", "Delete  A"). style: "strong" (dark),
 -- "soft" (the selection colour), "plain" (the page colour) or "off" (an
 -- outline, greyed out).
+-- Every action button along the bottom of a page is this tall, and a tap
+-- counts this far outside any button's edge.
+app.BUTTON_H, app.TAP_PAD = 60, 12
+
 function app.button(bx, by, bw, bh, label, key, style)
     local th = theme()
     if style == "off" then
@@ -5609,7 +5628,7 @@ end
 function app.ask_button(which)
     local m = MARGINS[2]
     local w = PAGE_W - m.outer - m.inner
-    local bw, bh = math.floor((w - 24) / 2), 70
+    local bw, bh = math.floor((w - 24) / 2), app.BUTTON_H
     local y = PAGE_H - 240
     return m.inner + (which == "yes" and 0 or bw + 24), y, bw, bh
 end
@@ -5732,9 +5751,11 @@ function app.ask_draw()
     for i = 1, n do
         love.graphics.printf(lines[i], x + 10, top + 84 + (i - 1) * lh, w - 20, "center")
     end
-    app.button(bx, by, bw, bh, q.yes or "Yes", "A", "strong")
+    -- (Their buttons, A and B, are in the hints along the bottom.)
+    app.button(bx, by, bw, bh, q.yes or "Yes", nil, "strong")
     bx, by, bw, bh = app.ask_button("no")
-    app.button(bx, by, bw, bh, q.no or "Keep", "B", "plain")
+    -- (The card is the soft colour: its other button is the page's, to show on it.)
+    app.button(bx, by, bw, bh, q.no or "Keep", nil, "plain")
     app.hints(x, nil, { "A", (q.yes or "yes"):lower(), "B", (q.no or "keep"):lower() })
 end
 
@@ -6518,14 +6539,15 @@ end
 
 -- The button on the touchscreen: what A does.
 function app.update_button()
-    local w, h = 420, 80
+    local w, h = 420, app.BUTTON_H
     return math.floor((PAGE_W - w) / 2), PAGE_H - 260, w, h
 end
 
 function app.update_tap(side, u, v)
     local bx, by, bw, bh = app.update_button()
     if side ~= "right" then return end
-    if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 20 then
+    local p = app.TAP_PAD
+    if u >= bx - p and u <= bx + bw + p and v >= by - p and v <= by + bh + p then
         app.update_action("confirm")
     elseif app.upd.state == "available" and v > by + bh + 20 and v < by + bh + 110 then
         app.update_skip()                               -- "Skip this version" under the button
@@ -6627,11 +6649,7 @@ function app.update_draw(side)
     end
     if button then
         local bx, by, bw, bh = app.update_button()
-        color(th.sel)
-        love.graphics.rectangle("fill", bx, by, bw, bh, bh / 2, bh / 2)
-        love.graphics.setFont(ui.title)
-        color(th.fg)
-        love.graphics.printf(button, bx, centered_y(ui.title, 44, by, bh), bw, "center")
+        app.button(bx, by, bw, bh, button, nil, "strong")
         if u.state == "available" then
             love.graphics.setFont(ui.font)
             color(th.dim)
@@ -6793,7 +6811,7 @@ function app.font_rows() return math.floor((PAGE_H - 90 - app.FONT_LIST_Y) / app
 
 -- "Get More Fonts", beside the "Fonts" title (always in view); Y does the same.
 function app.font_get_button()
-    local w, h = ui.font:getWidth("Get More Fonts") + ui.small:getWidth("   Y") + 44, 50
+    local w, h = ui.font:getWidth("Get More Fonts") + 44, 50
     local x = MARGINS[2].inner + ui.title:getWidth("Fonts") + 24
     return x, math.floor(60 + (ui.title:getHeight() - h) / 2), w, h
 end
@@ -6971,7 +6989,7 @@ function app.font_draw(side)
     if fp.sel < fp.top then fp.top = fp.sel end
     if fp.sel >= fp.top + rows then fp.top = fp.sel - rows + 1 end
     local bx, by, bw, bh = app.font_get_button()
-    app.button(bx, by, bw, bh, "Get More Fonts", "Y", "soft")
+    app.button(bx, by, bw, bh, "Get More Fonts", nil, "soft")       -- (Y: in the hints)
     draw_list(side, fp.list, fp.sel, fp.top, rows, x, app.FONT_LIST_Y, w, app.FONT_ROW_H, function(it, _, rx, ry, rw)
         local pf = Fonts.preview(it.name, UI_SIZE) or ui.font
         love.graphics.setFont(pf)
@@ -9445,7 +9463,7 @@ end
 
 -- The Done button, on the touchscreen: x, y, w, h.
 function app.recv_button()
-    local w, h = 240, 60
+    local w, h = 240, app.BUTTON_H
     return math.floor((PAGE_W - w) / 2), PAGE_H - 96, w, h
 end
 
@@ -9456,7 +9474,8 @@ end
 function app.recv_tap(side, u, v)
     if side ~= "right" then return end
     local bx, by, bw, bh = app.recv_button()
-    if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 20 and v <= by + bh + 30 then app.recv_close() end
+    local p = app.TAP_PAD
+    if u >= bx - p and u <= bx + bw + p and v >= by - p and v <= by + bh + p then app.recv_close() end
 end
 
 function app.recv_draw(side)
@@ -9762,8 +9781,9 @@ function app.cal_tap(side, u, v)
     if side ~= "right" or not app.cal then return end
     local bx, by, bw, bh = app.recv_button()
     local ox, oy, ow, oh = app.cal_buttons()
-    if u >= bx - 20 and u <= bx + bw + 20 and v >= by - 10 and v <= by + bh + 30 then app.cal_close()
-    elseif u >= ox - 20 and u <= ox + ow + 20 and v >= oy - 20 and v <= oy + oh + 10 then app.cal_options() end
+    local p = app.TAP_PAD
+    if u >= bx - p and u <= bx + bw + p and v >= by - p and v <= by + bh + p then app.cal_close()
+    elseif u >= ox - p and u <= ox + ow + p and v >= oy - p and v <= oy + oh + p then app.cal_options() end
 end
 
 function app.cal_draw(side)
@@ -9865,7 +9885,7 @@ end
 -- The "Computers & Password" button, above Done: x, y, w, h.
 function app.cal_buttons()
     local _, by = app.recv_button()
-    local w, h = 460, 60
+    local w, h = 460, app.BUTTON_H
     return math.floor((PAGE_W - w) / 2), by - 84, w, h
 end
 
