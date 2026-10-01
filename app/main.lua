@@ -966,7 +966,9 @@ function app.dim_pictures(th)
 end
 
 -- Bands behind the highlighted words of a page (drawn before the text). A
--- band runs on across the space to the next highlighted word on its line.
+-- band runs on across the space to the next highlighted word on its line,
+-- and a highlight that goes on to the next line meets it, filling the space
+-- between the lines, so a passage reads as one block.
 function app.hl_bands(page, ox, oy)
     local marked, seq, n = {}, {}, 0
     for _, it in ipairs(page.items) do
@@ -978,16 +980,43 @@ function app.hl_bands(page, ox, oy)
         end
     end
     if #marked == 0 then return end
+    -- The lines: { first, last (indexes in marked), top, bottom }, and each
+    -- word's line.
+    local lines, line_of = {}, {}
+    for i, it in ipairs(marked) do
+        local h = it.font:getHeight()
+        local base = it.y + it.font:getBaseline()
+        local top, bottom = it.y + math.floor(h * 0.06), it.y + math.floor(h * 0.06) + math.ceil(h * 0.92)
+        local l = lines[#lines]
+        if l and math.abs(base - l.base) < 4 then
+            l.last, l.top, l.bottom = i, math.min(l.top, top), math.max(l.bottom, bottom)
+        else
+            l = { first = i, last = i, base = base, top = top, bottom = bottom, h = h }
+            lines[#lines + 1] = l
+        end
+        line_of[i] = l
+    end
+    -- Lines the highlight runs on between meet halfway across the gap (a
+    -- little over, so their rounded corners don't leave notches). Not over
+    -- a big gap, such as a picture between them.
+    for k = 1, #lines - 1 do
+        local a, b = lines[k], lines[k + 1]
+        local gap = b.top - a.bottom
+        if seq[b.first] == seq[a.last] + 1 and gap >= 0 and gap < a.h * 0.8 then
+            local mid = math.floor((a.bottom + b.top) / 2)
+            a.bottom2, b.top2 = mid + 4, mid - 4
+        end
+    end
     color(app.hl_colour(theme()))
     for i, it in ipairs(marked) do
         local x2 = it.x + it.font:getWidth(it.text)
         local nx = seq[i + 1] == seq[i] + 1 and marked[i + 1]   -- only the very next word, not one further on
-        if nx and nx.x > it.x and math.abs((nx.y + nx.font:getBaseline()) - (it.y + it.font:getBaseline())) < 4 then
+        if nx and nx.x > it.x and line_of[i + 1] == line_of[i] then
             x2 = nx.x
         end
-        local h = it.font:getHeight()
-        love.graphics.rectangle("fill", ox + it.x - 3, oy + it.y + math.floor(h * 0.06), x2 - it.x + 6,
-            math.ceil(h * 0.92), 4, 4)
+        local l = line_of[i]
+        local top, bottom = l.top2 or l.top, l.bottom2 or l.bottom
+        love.graphics.rectangle("fill", ox + it.x - 3, oy + top, x2 - it.x + 6, bottom - top, 4, 4)
     end
 end
 
