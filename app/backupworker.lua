@@ -4,7 +4,8 @@
 -- before (a backup of the current settings to make first) }, or { kind =
 -- "reset", root, data_dir, before }: the settings backed up, then cleared
 -- (only if that backup was made).
--- Reports on "backup_out": { kind = "progress", done, total },
+-- Reports on "backup_out": { kind = "step", text } (what it's doing now),
+-- { kind = "progress", done, total },
 -- { kind = "done" }, or { kind = "failed", message }.
 require("love.data")
 require("love.timer")
@@ -21,13 +22,17 @@ local function progress(done, total)
     end
 end
 
+local function step(text) out:push({ kind = "step", text = text }) end
+
 local ok, err, skipped
 if job.kind == "reset" then
+    step("Backing up your settings first…")
     local files = Backup.collect(job.root, job.data_dir, false)
     Backup.mkdir_p(job.before.out:match("^(.*)/"))
     ok, err = Backup.write(job.before.out, files, job.before.manifest, job.root)
     if ok then
         Backup.prune(job.before.out:match("^(.*)/"), 3)
+        step("Clearing…")
         for _, f in ipairs(files) do os.remove(f.path) end
     else
         err = "the backup couldn't be made first, so nothing was cleared (" .. tostring(err) .. ")"
@@ -42,6 +47,7 @@ else
     -- (Not restored without it: it's the way back. Nor ever over, or pruning,
     -- the backup being restored.)
     if job.before then
+        step("Backing up your settings first…")
         Backup.mkdir_p(job.before.out:match("^(.*)/"))
         if job.before.out == job.zip then job.before.out = job.before.out:gsub("%.zip$", "-2.zip") end
         ok, err = Backup.write(job.before.out, Backup.collect(job.root, job.data_dir, false), job.before.manifest, job.root)
@@ -52,8 +58,14 @@ else
     if not ok then
         err = "a copy of your settings couldn't be made first, so nothing was restored (" .. tostring(err) .. ")"
     else
+        step("Restoring…")
         ok, err = Backup.restore(job.zip, job.root, job.data_dir, progress)
         skipped = ok and err or 0
     end
+end
+-- (Onto the card now, while it says so, rather than as the app closes.)
+if ok and job.kind ~= "backup" and not job.android then
+    step("Saving to the SD card…")
+    os.execute("sync")
 end
 if ok then out:push({ kind = "done", skipped = skipped }) else out:push({ kind = "failed", message = tostring(err) }) end

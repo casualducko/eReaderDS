@@ -10080,11 +10080,11 @@ function app.backup_restore(b)
     Store.frozen = true
     love.thread.getChannel("backup_out"):clear()
     local t = love.thread.newThread("backupworker.lua")
-    t:start({ kind = "restore", zip = b.path, root = root, data_dir = data_dir,
+    t:start({ kind = "restore", zip = b.path, root = root, data_dir = data_dir, android = require("android").active,
         before = { out = root .. "/Backups/eReaderDS-before-restore-" .. os.date("%Y-%m-%d-%H%M%S") .. ".zip",
             manifest = app.backup_manifest(false, root) } })
     app.bk = { kind = "restore", thread = t, done = 0, total = 0 }
-    app.toast("Restoring…", 3600)
+    app.toast("Backing up your settings first…", 3600)
 end
 
 -- Reset: everything eReaderDS has saved cleared (not your books, fonts or
@@ -10101,11 +10101,11 @@ function app.reset_ask()
             Store.frozen = true            -- (nothing of the app's written from here: see backup_restore)
             love.thread.getChannel("backup_out"):clear()
             local t = love.thread.newThread("backupworker.lua")
-            t:start({ kind = "reset", root = root, data_dir = data_dir,
+            t:start({ kind = "reset", root = root, data_dir = data_dir, android = require("android").active,
                 before = { out = root .. "/Backups/eReaderDS-before-reset-" .. os.date("%Y-%m-%d-%H%M%S") .. ".zip",
                     manifest = app.backup_manifest(false, root) } })
             app.bk = { kind = "reset", thread = t, done = 0, total = 0 }
-            app.toast("Resetting…", 3600)
+            app.toast("Backing up your settings first…", 3600)
         end })
 end
 
@@ -10115,7 +10115,9 @@ function app.backup_poll()
     while true do
         local msg = ch:pop()
         if not msg then break end
-        if msg.kind == "progress" then
+        if msg.kind == "step" then
+            app.toast(msg.text, 3600)
+        elseif msg.kind == "progress" then
             bk.done, bk.total = msg.done, msg.total
             local pct = bk.total > 0 and math.floor(bk.done / bk.total * 100) or 0
             app.toast((bk.kind == "restore" and "Restoring… " or "Backing up… ") .. pct .. "%", 3600)
