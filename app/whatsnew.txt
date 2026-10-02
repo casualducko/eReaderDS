@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.20.1
+Manga (BETA) is better at telling which way a comic reads: from its details, its language, manhwa and webtoons (left to right), manga publishers, Japanese names, or a folder called Manga.
+The first time a comic opens, a note says which way it's reading and where to change it.
+Back up: when the SD card hasn't room for an Everything backup, it says so before starting, and offers to delete your oldest Everything backups to make room.
+
 v1.20.0
 Manga support (BETA): read manga and comics (.cbz files) with a page on each screen, like an open book. Put them in the Ebook folder like any book.
 Manga reads right to left: turn with left, or tap the left half. It's set from the comic itself or its publisher's name; change it in Settings → Reading direction.

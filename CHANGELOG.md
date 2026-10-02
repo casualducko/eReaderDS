@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.20.1
+
+- **Manga (BETA): the right reading direction more often.** In order: your choice for that comic (Settings → Reading direction); its `ComicInfo.xml` (Manga: YesAndRightToLeft or No; its language: Japanese right to left, Korean or Chinese left to right); signs of a manhwa or webtoon in its names, genre or tags (left to right, even from a manga publisher); a manga publisher's name; Japanese writing in its names; a folder called **Manga** it's kept in; a plain "Manga: Yes". Otherwise left to right. The log says which, and why.
+- **The first time a comic opens**, a note says which way it's reading ("Reading RIGHT-to-LEFT") and where to change it.
+- **Back up: room checked first.** An Everything backup that won't fit on the SD card says so before starting, with how much it needs and how much is free; when deleting your oldest Everything backups would make room, it offers to (Delete or Cancel). Before, it ran until the card was full and then failed.
+
 ## v1.20.0
 
 Manga and comics on two screens, like an open book.
