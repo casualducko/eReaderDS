@@ -87,6 +87,7 @@ function M.info(z)
     return {
         manga = manga ~= "" and manga or nil,      -- (said at all: then it isn't guessed)
         title = tag("Title"), series = tag("Series"), number = tag("Number"), volume = tag("Volume"),
+        language = tag("LanguageISO"), genre = tag("Genre"), tags = tag("Tags"),
         writer = tag("Writer") or tag("Penciller"),
         -- "YesAndRightToLeft" is manga read right to left; plain "Yes" only
         -- says it's manga (often already turned to read left to right).
@@ -125,15 +126,39 @@ M.MANGA_PUBLISHERS = { "kodansha", "viz media", "viz signature", "yen press", "s
     "vertical comics", "vertical inc", "shueisha", "shogakukan", "denpa", "ghost ship", "j-novel", "one peace books",
     "kaiten books", "airship", "dark horse manga", "sublime" }
 
--- Read right to left, by its names (with no ComicInfo.xml to say).
-function M.guess_rtl(path, names)
-    local text = { (path:match("[^/]+$") or path):lower() }
+-- Korean and Chinese comics (manhwa, manhua, webtoons) read left to right,
+-- even from a manga publisher: words that say a comic is one.
+M.LEFT_TO_RIGHT = { "manhwa", "manhua", "webtoon", "ize press", "tappytoon", "lezhin", "toomics", "tapas" }
+
+-- Which way a comic reads: true for right to left (manga), and why. In
+-- order: ComicInfo.xml's Manga ("YesAndRightToLeft", or "No"), its language
+-- (Japanese; Korean or Chinese), signs of a manhwa or webtoon in its names,
+-- genre or folders, a manga publisher's name, Japanese writing in its
+-- names, a folder called Manga, a plain "Manga: Yes"; else left to right.
+function M.direction(path, names, info)
+    info = info or {}
+    local manga = info.manga
+    if manga == "yesandrighttoleft" then return true, "ComicInfo.xml" end
+    if manga == "no" then return false, "ComicInfo.xml" end
+    local lang = (info.language or ""):lower():match("^(%a%a)")
+    if lang == "ja" then return true, "Japanese" end
+    if lang == "ko" or lang == "zh" then return false, "Korean or Chinese" end
+    local text = { path:lower(), (info.genre or ""):lower(), (info.tags or ""):lower() }
     for i = 1, math.min(3, #names) do text[#text + 1] = names[i]:lower() end
     local all = table.concat(text, "\n")
-    for _, p in ipairs(M.MANGA_PUBLISHERS) do
-        if all:find(p, 1, true) then return true end
+    for _, w in ipairs(M.LEFT_TO_RIGHT) do
+        if all:find(w, 1, true) then return false, "manhwa or webtoon" end
     end
-    return false
+    for _, p in ipairs(M.MANGA_PUBLISHERS) do
+        if all:find(p, 1, true) then return true, "publisher" end
+    end
+    -- (Hiragana and katakana, in UTF-8: Japanese, not Chinese.)
+    if all:find("\227[\129-\131][\128-\191]") then return true, "Japanese names" end
+    for dir in path:lower():gmatch("([^/]+)/") do
+        if dir:find("%f[%a]manga%f[%A]") then return true, "a Manga folder" end
+    end
+    if manga == "yes" then return true, "ComicInfo.xml" end
+    return false, "nothing says otherwise"
 end
 
 -- Width and height from a picture file's header (PNG, JPEG, GIF, BMP), or nil.

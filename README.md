@@ -440,11 +440,15 @@ from its `ComicInfo.xml`, or else from its file name: "One-Punch Man v01
   across both screens, its halves meeting where the screens do.
 - **Manga reads right to left:** the first page of a pair is on the right,
   and you turn with **left** (or a swipe to the right, or a tap on the left
-  half). It's set from the comic's `ComicInfo.xml` when it says so, or else
-  from a manga publisher's name in its file names (Kodansha, VIZ Media, Yen
-  Press, Seven Seas and others); change it in **Settings → Reading
-  direction** while reading (kept for that comic). The first manga you open
-  has a note on how to turn its pages.
+  half). Which way a comic reads is worked out from, in order: its
+  `ComicInfo.xml` (Manga, or its language: Japanese right to left, Korean or
+  Chinese left to right); signs of a manhwa or webtoon in its names or genre
+  (left to right); a manga publisher's name in its file names (Kodansha, VIZ
+  Media, Yen Press, Seven Seas and others); Japanese writing in its names; a
+  folder called **Manga** it's kept in. Otherwise it's left to right. The
+  first time a comic opens, a note says which way it's reading; if that's
+  wrong, change it in **Settings → Reading direction** while reading (kept
+  for that comic).
 - **The magnifier,** for small print in speech bubbles: press **Y**, or hold
   a page. The page is on the touchscreen with a box on it, and what's in the
   box is enlarged on the other screen. Drag the box, or move it with the

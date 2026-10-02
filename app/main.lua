@@ -1329,20 +1329,21 @@ local function open_book(path)
     -- A comic opened the first time: which way it reads (manga: how to turn
     -- the pages), and the first comic ever, the magnifier.
     if b.comic then
-        -- (Each said once, ever: the first manga, the first comic.)
+        -- The first time each comic opens: which way it reads, and that it can
+        -- be changed (it's a guess when the comic doesn't say). The first
+        -- comic ever: the magnifier too.
         local tips = {}
-        if not S.manga_tip and app.comic_rtl() then
-            S.manga_tip = true
-            tips[#tips + 1] = "Manga reads right to left: turn with left, or tap the left half"
+        if Store.get_opened(path) == nil then        -- (it's saved after the first frame)
+            tips[#tips + 1] = app.comic_rtl() and "Reading right to left, as manga: turn with left"
+                or "Reading left to right"
+            tips[#tips + 1] = "If that's wrong, change it in Settings → Reading direction"
         end
         if not S.comic_tip then
             S.comic_tip = true
+            Store.save_settings(S)
             tips[#tips + 1] = "Y, or holding a page, shows the magnifier"
         end
-        if #tips > 0 then
-            Store.save_settings(S)
-            app.toast(table.concat(tips, "\n"))
-        end
+        if #tips > 0 then app.toast(table.concat(tips, "\n")) end
     end
     if b.comic and b.comic.later > 0 then
         app.toast(b.comic.later .. (b.comic.later == 1 and " page is a WebP picture" or " pages are WebP pictures")
@@ -3677,8 +3678,8 @@ function app.comic_pages()
         if d then return d[1], d[2] end
     end)
     for _, pg in ipairs(pages) do pg.items = {} end
-    print(string.format("[comic] %d pictures, %d pages, sizes read in %.2fs", #book.comic.names, #pages,
-        love.timer.getTime() - t0))
+    print(string.format("[comic] %d pictures, %d pages, sizes read in %.2fs; %s (%s)", #book.comic.names, #pages,
+        love.timer.getTime() - t0, book.comic.rtl and "right to left" or "left to right", tostring(book.comic.why)))
     return pages
 end
 
