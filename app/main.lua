@@ -1336,7 +1336,7 @@ local function open_book(path)
         if Store.get_opened(path) == nil then        -- (it's saved after the first frame)
             tips[#tips + 1] = app.comic_rtl() and "Reading right to left: turn with left"
                 or "Reading left to right"
-            tips[#tips + 1] = "If that's wrong, change it in Settings → Reading direction"
+            tips[#tips + 1] = "Change it in:\nSettings → Reading direction"
         end
         if not S.comic_tip then
             S.comic_tip = true
