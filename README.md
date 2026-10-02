@@ -385,7 +385,9 @@ it to another handheld or system:
   book, bookmarks, highlights, themes and logins (sync, Calibre, catalogs).
   Small.
 - **Back up → Everything, with Books:** all that, plus your books, fonts and
-  dictionaries (it shows the size, and asks first).
+  dictionaries (it shows the size, and asks first). If the SD card hasn't room
+  for it, it says so before starting, and offers to delete your oldest
+  Everything backups when that would make room (never without asking).
 - Backups are zips in **`Ebook/Backups`** (on ROCKNIX `roms/ebook/Backups`;
   on GammaOS `Ebook/Backups` in the device's storage), named by date:
   `eReaderDS-backup-2026-10-01-1215.zip`, or `…-settings.zip` for settings

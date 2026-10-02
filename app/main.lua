@@ -10551,11 +10551,64 @@ function app.backup_start(whole)
         app.bk = { kind = "backup", thread = t, out = out, done = 0, total = whole and app.backup_size() or 0 }
         app.toast("Backing up…", 3600)
     end
-    if not whole then go() return end
+    -- Room for it on the card? Said first, not after a long backup that
+    -- fills it; older Everything backups can make room (asked first).
+    local function start()
+        local need = (whole and app.backup_size() or 0) + 16 * 1024 * 1024
+        local free = app.free_bytes(root)
+        if not free or free >= need then go() return end
+        local old = {}
+        for _, b in ipairs(app.backup_list()) do
+            if not b.auto and b.info.kind == "everything" then
+                local f = io.open(b.path, "rb")
+                old[#old + 1] = { path = b.path, date = b.info.date or "", size = f and f:seek("end") or 0 }
+                if f then f:close() end
+            end
+        end
+        table.sort(old, function(a, b) return a.date < b.date end)       -- (the oldest go first)
+        local del, freed = {}, 0
+        for _, b in ipairs(old) do
+            if free + freed >= need then break end
+            del[#del + 1], freed = b.path, freed + b.size
+        end
+        local sizes = "It needs " .. app.size_words(need) .. "; the SD card has " .. app.size_words(free) .. " free."
+        if #del == 0 or free + freed < need then
+            app.toast("Not enough room for the backup\n" .. sizes, 6)
+            return
+        end
+        app.ask({ question = "Make room for the backup?", yes = "Delete", no = "Cancel",
+            detail = sizes .. "\nDelete " .. (#del == 1 and "your oldest Everything backup" or ("your " .. #del
+                .. " oldest Everything backups")) .. " (" .. app.size_words(freed) .. ")?",
+            on_yes = function()
+                for _, p in ipairs(del) do os.remove(p) end
+                go()
+            end })
+    end
+    if not whole then start() return end
     app.ask({ question = "Back up everything?", yes = "Back Up", no = "Cancel",
         detail = app.size_words(app.backup_size()) .. ", with your books, fonts and dictionaries.\n"
             .. "It's saved in " .. Store.books_folder() .. "/Backups.",
-        on_yes = go })
+        on_yes = start })
+end
+
+-- Free space on the card a folder is on, in bytes, from the system's df
+-- (nil if it can't be told: then nothing is checked).
+function app.free_bytes(dir)
+    local ok, out = pcall(function()
+        local p = io.popen('df -k "' .. dir .. '" 2>/dev/null')
+        if not p then return nil end
+        local text = p:read("*a")
+        p:close()
+        return text
+    end)
+    if not ok or not out then return nil end
+    -- The last line: size, used and available (in KB) after the filesystem's
+    -- name, which may be on a line of its own when it's long.
+    local last
+    for line in out:gmatch("[^\n]+") do last = line end
+    local nums = {}
+    for n in (last or ""):gmatch("%s(%d+)") do nums[#nums + 1] = tonumber(n) end
+    if #nums >= 3 then return nums[3] * 1024 end
 end
 
 function app.backup_manifest(whole, root)
