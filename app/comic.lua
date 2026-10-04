@@ -74,7 +74,8 @@ local function xml_text(s)
 end
 
 -- ComicInfo.xml (ComicRack's details, which most comic tools write):
--- { title, series, number, writer, rtl } (any may be missing), or {}.
+-- { title, series, number, writer, summary, publisher, year..., rtl } (any
+-- may be missing), or {}.
 function M.info(z)
     local name
     for n in pairs(z.entries) do
@@ -89,6 +90,8 @@ function M.info(z)
         title = tag("Title"), series = tag("Series"), number = tag("Number"), volume = tag("Volume"),
         language = tag("LanguageISO"), genre = tag("Genre"), tags = tag("Tags"),
         writer = tag("Writer") or tag("Penciller"),
+        summary = tag("Summary"), publisher = tag("Publisher"), imprint = tag("Imprint"),
+        year = tonumber(tag("Year") or ""), month = tonumber(tag("Month") or ""), day = tonumber(tag("Day") or ""),
         -- "YesAndRightToLeft" is manga read right to left; plain "Yes" only
         -- says it's manga (often already turned to read left to right).
         rtl = manga == "yesandrighttoleft" or nil,

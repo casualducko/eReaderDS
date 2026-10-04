@@ -752,6 +752,86 @@ function M.meta(path)
     return ok and res or nil
 end
 
+-- What a book says about itself, for its details page (Y in My Books):
+-- { description, publisher, date = { year, month, day }, language,
+-- subjects, isbn, pages (a comic's) }, any missing; {} for a .txt or a
+-- book that can't be read.
+local function plain(s)
+    -- (A description is often HTML, escaped or not: its paragraphs kept.)
+    s = decode(decode(s))
+    s = s:gsub("<!%[CDATA%[(.-)%]%]>", "%1"):gsub("<[Bb][Rr]%s*/?>", "\n")
+        :gsub("</[Pp]>", "\n\n"):gsub("</[Dd][Ii][Vv]>", "\n\n"):gsub("<[^>]+>", "")
+        :gsub("[ \t\r]+", " "):gsub(" ?\n ?", "\n"):gsub("\n\n\n+", "\n\n"):gsub("^%s+", ""):gsub("%s+$", "")
+    return s ~= "" and clean(s) or nil
+end
+
+local function date_of(s)
+    local y, m, d = (s or ""):match("^%s*(%d%d%d%d)%-?(%d?%d?)%-?(%d?%d?)")
+    y = tonumber(y)
+    if not y or y < 1000 then return nil end       -- (Calibre's "0101-01-01": not known)
+    return { year = y, month = tonumber(m), day = tonumber(d) }
+end
+
+function M.details(path)
+    local lower = path:lower()
+    if not (lower:match("%.epub$") or lower:match("%.cbz$")) then return {} end
+    local okz, z = pcall(Zip.open, path)
+    if not okz or not z then return {} end
+    local ok, res = pcall(function()
+        if lower:match("%.cbz$") then
+            local Comic = require("comic")
+            local info = Comic.info(z)
+            local names = Comic.list(z)
+            return { description = info.summary and plain(info.summary), publisher = clean(info.publisher or info.imprint),
+                date = info.year and info.year >= 1000 and { year = info.year, month = info.month, day = info.day } or nil,
+                language = info.language and info.language:lower(), subjects = info.genre and clean(info.genre),
+                pages = #names > 0 and #names or nil }
+        end
+        local container = z:read("META-INF/container.xml")
+        local opf_path = container and (container:match('full%-path%s*=%s*"([^"]+)"')
+            or container:match("full%-path%s*=%s*'([^']+)'"))
+        local opf = opf_path and z:read(opf_path)
+        if not opf then return {} end
+        local function text(v)
+            return v and clean((decode(v:gsub("<[^>]+>", "")):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", ""))) or nil
+        end
+        local t = {}
+        local desc = opf:match("<dc:description[^>]*>(.-)</dc:description>")
+        t.description = desc and plain(desc)
+        t.publisher = text(opf:match("<dc:publisher[^>]*>(.-)</dc:publisher>"))
+        -- The publication date: one marked so (EPUB 2's opf:event), else the
+        -- first that isn't marked as something else.
+        local first
+        for tag, v in opf:gmatch("(<dc:date[^>]*>)(.-)</dc:date>") do
+            local ev = attr(tag, "opf:event") or attr(tag, "event")
+            if ev == "publication" then first = v break end
+            if not ev and not first then first = v end
+        end
+        t.date = date_of(first)
+        t.language = (opf:match("<dc:language[^>]*>%s*(.-)%s*</dc:language>") or ""):lower()
+        if t.language == "" then t.language = nil end
+        local subjects = {}
+        for v in opf:gmatch("<dc:subject[^>]*>(.-)</dc:subject>") do
+            v = text(v)
+            if v and v ~= "" and #subjects < 6 then subjects[#subjects + 1] = v end
+        end
+        t.subjects = #subjects > 0 and table.concat(subjects, ", ") or nil
+        for tag, v in opf:gmatch("(<dc:identifier[^>]*>)(.-)</dc:identifier>") do
+            local scheme = (attr(tag, "opf:scheme") or attr(tag, "scheme") or ""):lower()
+            local n = (text(v) or ""):lower():gsub("^urn:isbn:", ""):gsub("^isbn:?%s*", "")
+            local digits = n:gsub("[%s%-]", "")
+            if (scheme == "isbn" or v:lower():find("isbn", 1, true) or digits:match("^97[89]")) and digits:match("^%d+[%dx]$")
+                    and (#digits == 10 or #digits == 13) then
+                t.isbn = digits:upper()
+                break
+            end
+        end
+        return t
+    end)
+    z:close()
+    return ok and res or {}
+end
+
 function M.open(path)
     local ext = (path:match("%.([^.]+)$") or ""):lower()
     if ext == "txt" then return open_txt(path) end

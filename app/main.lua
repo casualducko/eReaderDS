@@ -1858,6 +1858,7 @@ function app.library_options(it)
         hide(not S.lib_hide_finished)
     end }
     if it then
+        opts[#opts + 1] = { "Book Details", function() app.details_open(it) end }
         opts[#opts + 1] = { "Collections…", function() app.collections_for(it) end }
     end
     if #Store.collections() > 0 then
@@ -6831,7 +6832,19 @@ end
 
 -- A few choices on a card on the touchscreen: app.choose({ title, options =
 -- { { label, fn }, ... } }). Up/down and A, or tap one; B or a tap outside closes.
+-- More than fit (many collections) are shown a page at a time, the last
+-- row "More…" (start: the first of this page).
+app.CHOOSE_MAX = 10
 function app.choose(c)
+    if #c.options > app.CHOOSE_MAX then
+        local all, start = c.options, c.start or 1
+        local page = {}
+        for i = start, math.min(#all, start + app.CHOOSE_MAX - 2) do page[#page + 1] = all[i] end
+        local nxt = start + app.CHOOSE_MAX - 1
+        if nxt > #all then nxt = 1 end
+        page[#page + 1] = { "More…", function() app.choose({ title = c.title, options = all, start = nxt }) end }
+        c = { title = c.title, options = page }
+    end
     c.sel = 1
     app.choosing = c
     redraw()
@@ -7832,6 +7845,127 @@ function app.update_draw(side)
     app.hints(x, nil, (u.state == "downloading" and { "B", "cancel" }) or (u.state == "unpacking" and {})
         or (u.state == "available" and { "A", "update now", "Y", "skip this version", "B", "back" })
         or (button and { "A", button:lower(), "B", "back" }) or { "B", "back" })
+end
+
+---------------------------------------------------------------- book details
+
+-- A book's details (Y in My Books → Book Details): what it says about
+-- itself (description, publisher, date...), its file and where it is, on
+-- the touchscreen, its cover on the other screen as in My Books.
+app.MONTHS = { "January", "February", "March", "April", "May", "June", "July", "August", "September",
+    "October", "November", "December" }
+app.LANGUAGES = { en = "English", fr = "French", de = "German", es = "Spanish", it = "Italian", pt = "Portuguese",
+    nl = "Dutch", sv = "Swedish", da = "Danish", no = "Norwegian", nb = "Norwegian", fi = "Finnish", pl = "Polish",
+    ru = "Russian", uk = "Ukrainian", cs = "Czech", el = "Greek", la = "Latin", ja = "Japanese", zh = "Chinese",
+    ko = "Korean", ar = "Arabic", he = "Hebrew", tr = "Turkish", hu = "Hungarian", ro = "Romanian", eo = "Esperanto" }
+
+function app.details_open(it)
+    local info = Book.details(it.path)
+    local rows = {}
+    local function add(label, value) if value and value ~= "" then rows[#rows + 1] = { label, value } end end
+    add("Publisher", info.publisher)
+    local d = info.date
+    if d then
+        add("Published", (d.month and app.MONTHS[d.month] and ((d.day and d.day > 0 and (d.day .. " ") or "")
+            .. app.MONTHS[d.month] .. " ") or "") .. d.year)
+    end
+    if info.language then
+        local code = info.language:match("^(%a%a%a?)")
+        add("Language", code and app.LANGUAGES[code] or info.language)
+    end
+    add("Subjects", info.subjects)
+    add("ISBN", info.isbn)
+    add("Pages", info.pages and tostring(info.pages))
+    local f, size = io.open(it.path, "rb"), nil
+    if f then size = f:seek("end"); f:close() end
+    local ext = (it.path:match("%.([^./]+)$") or ""):upper()
+    add("File", (size and (shop.format_size(size) .. ", ") or "") .. ext)
+    add("Folder", it.path:match("^(.*)/") or it.path)
+    local in_cols = {}
+    for _, name in ipairs(Store.collections()) do
+        if (Store.collection_books(name) or {})[it.path] then in_cols[#in_cols + 1] = name end
+    end
+    add("Collections", table.concat(in_cols, ", "))
+    app.det = { it = it, rows = rows, description = info.description, page = 1, back = app.mode }
+    app.mode = "details"
+    redraw()
+end
+
+-- Laid out into pages: { { {font, text, x, y, dim}, ... }, ... }, the first
+-- under the heading.
+function app.details_pages(w)
+    local det, LW = app.det, 190
+    local pages, page, y = {}, {}, 60 + ui.title:getHeight() + 24
+    local bottom = PAGE_H - 110
+    local function new_page() pages[#pages + 1] = page; page, y = {}, 60 end
+    local lh = ui.font:getHeight()
+    for _, r in ipairs(det.rows) do
+        local _, lines = ui.font:getWrap(r[2], w - LW)
+        if y + lh > bottom then new_page() end
+        page[#page + 1] = { ui.small, r[1], 0, y + ui.font:getBaseline() - ui.small:getBaseline(), true }
+        for _, l in ipairs(lines) do
+            if y + lh > bottom then new_page() end
+            page[#page + 1] = { ui.font, l, LW, y }
+            y = y + lh
+        end
+        y = y + 10
+    end
+    if det.description then
+        y = y + 24
+        if y + ui.bold:getHeight() + lh > bottom then new_page() end
+        page[#page + 1] = { ui.bold, "About this book", 0, y }
+        y = y + ui.bold:getHeight() + 8
+        for para in (det.description .. "\n"):gmatch("(.-)\n") do
+            if para == "" then
+                y = y + 12
+            else
+                local _, lines = ui.font:getWrap(para, w)
+                for _, l in ipairs(lines) do
+                    if y + lh > bottom then new_page() end
+                    page[#page + 1] = { ui.font, l, 0, y }
+                    y = y + lh
+                end
+            end
+        end
+    elseif #det.rows <= 2 then
+        y = y + 24
+        page[#page + 1] = { ui.font, "The book doesn't say more about itself.", 0, y, true }
+    end
+    pages[#pages + 1] = page
+    return pages
+end
+
+function app.details_draw(side)
+    if side == "left" then draw_library("left") return end
+    local th = theme()
+    local m = MARGINS[2]
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    local det = app.det
+    det.pages = det.pages or app.details_pages(w)
+    det.page = math.max(1, math.min(#det.pages, det.page))
+    if det.page == 1 then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Book Details", x, 60)
+    end
+    for _, it in ipairs(det.pages[det.page]) do
+        love.graphics.setFont(it[1])
+        color(it[5] and th.dim or th.fg)
+        love.graphics.print(it[2], x + it[3], it[4])
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    app.hints(x, nil, #det.pages > 1 and { "‹ ›", "more", "B", "back" } or { "B", "back" })
+    if #det.pages > 1 then app.count(x, w, det.page, #det.pages) end
+end
+
+function app.details_action(a)
+    local det = app.det
+    if a == "right" or a == "next" or a == "down" or a == "confirm" then
+        det.page = math.min(#(det.pages or {}), det.page + 1)
+    elseif a == "left" or a == "prev" or a == "up" then det.page = math.max(1, det.page - 1)
+    elseif a == "back" or a == "menu" or a == "toc" then app.mode = det.back or "library"; app.det = nil end
+    redraw()
 end
 
 ---------------------------------------------------------------- what's new
@@ -8927,6 +9061,7 @@ local function render_canvases()
         end
     elseif app.mode == "update" then painter = app.update_draw
     elseif app.mode == "whatsnew" then painter = app.whatsnew_draw
+    elseif app.mode == "details" then painter = app.details_draw
     elseif app.mode == "find" then painter = app.find_draw
     elseif app.mode == "message" then painter = draw_message
     elseif app.mode == "splash" then painter = app.splash_draw
@@ -9402,6 +9537,8 @@ local function touch_event(kind, sx, sy)
                 app.turn_way((du < 0) ~= app.comic_rtl())          -- (manga: a swipe the other way is on)
             elseif app.mode == "whatsnew" and math.abs(du) > 60 then
                 app.whatsnew_action(du < 0 and "next" or "prev")
+            elseif app.mode == "details" and math.abs(du) > 60 then
+                app.details_action(du < 0 and "next" or "prev")
             elseif app.mode == "menu" and math.abs(du) > 60 then
                 app.menu_page(du < 0 and 1 or -1)           -- the next / previous settings page
             end
@@ -9833,6 +9970,7 @@ function handle_action(a)
     if mode == "theme_edit" then app.tedit_action(a) return end
     if mode == "update" then app.update_action(a) return end
     if mode == "whatsnew" then app.whatsnew_action(a) return end
+    if mode == "details" then app.details_action(a) return end
     if mode == "find" then app.find_action(a) return end
     if mode == "report" then app.report_action(a) return end
     if mode == "fontget" then app.fget_action(a) return end
@@ -10165,6 +10303,8 @@ function app.on_tap(side, u, v)
         app.update_tap(side, u, v)
     elseif mode == "whatsnew" then
         app.whatsnew_action("next")                 -- a tap turns to the next spread
+    elseif mode == "details" then
+        if side == "right" then app.details_action("next") end
     elseif mode == "find" then
         -- Tap a result to see it on the other screen, again to go there.
         local f, rows = app.find, list_rows(96)
