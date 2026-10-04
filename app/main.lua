@@ -1859,10 +1859,10 @@ function app.library_options(it)
     end }
     if it then
         opts[#opts + 1] = { "Book Details", function() app.details_open(it) end }
-        opts[#opts + 1] = { "Collections…", function() app.collections_for(it) end }
+        opts[#opts + 1] = { "Add to Collection…", function() app.collections_for(it) end }
     end
     if #Store.collections() > 0 then
-        opts[#opts + 1] = { "Show a Collection…", app.shelf_choose }
+        opts[#opts + 1] = { "Show Collection…", app.shelf_choose }
     end
     if S.lib_shelf ~= "" then
         opts[#opts + 1] = { "Rename “" .. S.lib_shelf .. "”", app.shelf_rename }
@@ -5760,7 +5760,7 @@ local function draw_library(side)
         love.graphics.setFont(ui.font)
         color(th.dim)
         love.graphics.printf("No books in this collection yet. Show All Books (tap the line under My Books), press "
-            .. app.key("Y") .. " on a book, choose Collections, and pick this one.", x, 180, w, "left")
+            .. app.key("Y") .. " on a book, choose Add to Collection, and pick this one.", x, 180, w, "left")
         return
     end
     if #library.items == 0 then

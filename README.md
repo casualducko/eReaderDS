@@ -284,9 +284,9 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   folder, and its collections: handy before opening something from a big
   library.
 - **Collections:** your own groups of books ("To read", "Favourites"...). In
-  My Books, **Y → Collections…** on a book puts it in one (or a new one) or
+  My Books, **Y → Add to Collection…** on a book puts it in one (or a new one) or
   takes it out; a book can be in several. Tap the line under My Books'
-  title (or **Y → Show a Collection…**) to show just one, or All Books; with
+  title (or **Y → Show Collection…**) to show just one, or All Books; with
   one showing, **Y** also renames or deletes it (its books stay).
 - **KOReader Sync:** carry your place between eReaderDS and KOReader or
   CrossPoint (a phone, Kobo, Kindle, Xteink X4 or X3...): one smart Sync
