@@ -2,6 +2,15 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.21.0
+Notes on highlights: hold a highlighted word (or press Select on it) and choose Note to type one. Notes show in the Bookmarks and Highlights list and in the highlights file for your computer.
+Each highlight can have its own colour: Yellow, Green, Blue, Pink or Subtle (choose Colour on it). Others follow the colour in Settings.
+Manga (BETA): the magnifier opens without a pause, even on big scans, and turning past the last page only goes on to the next volume of the same series.
+Safer saving: your reading places survive a sudden power-off, and backups and restores can't be cut short by a library refresh.
+Restoring a backup keeps the books you already have, and a copy of your settings is always kept to undo it.
+Lower memory use and less battery drain on long reading sessions.
+Many smaller fixes from a full review.
+
 v1.20.1
 Manga (BETA) is better at telling which way a comic reads: from its details, its language, manhwa and webtoons (left to right), manga publishers, Japanese names, or a folder called Manga.
 The first time a comic opens, a note says which way it's reading and where to change it.

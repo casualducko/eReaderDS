@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.21.0
+
+- **Notes on highlights.** Hold a highlighted word (or put the Y cursor on it and press Select) for **Note · Colour · Remove · Cancel**. A note is typed on the keyboard (empty removes it) and shows in the Bookmarks and Highlights list, in the highlight's preview, and under the highlight in `Ebook/Highlights/Title - Author.md`.
+- **A colour for each highlight:** Yellow, Green, Blue, Pink or Subtle, for that highlight alone; the others follow the colour in Settings → Reading & Device. Highlights that are joined keep their note and colour.
+- **Manga (BETA):** the magnifier is decoded on the background thread ("Loading…" for a moment), so a big scan never stalls the screens or reaches the graphics chip whole; holding a page then dragging moves its box. The next volume opens only within the same series, after saving this one's place. A, X and up/down turn a manga the right way. Publishers are recognised only as release groups write them, in brackets; a bare "v2" isn't taken for a volume; ComicVine's year in `Volume` is ignored.
+- **Safer saving.** Your places, the last book and the recently opened list keep a copy made after each flush to the card, read if a sudden power-off leaves the file empty. A library refresh no longer deletes files a backup, restore, Calibre or receiving is writing.
+- **Back up and restore.** The copy made before a restore or reset is never pruned straight away (a clock that's behind made it look oldest). Restoring keeps the books already on the card, puts every file in place before removing what the backup lacks, and closes eReaderDS if it can't finish. A backup over 3.9 GB is refused before any old backup is offered for deletion, and the one to delete is named; a backup never replaces another with the same name.
+- **Calibre:** its settings and login are written whole (a full card can't cut them short), and Calibre can only delete books it sent.
+- **Memory and battery:** a long book's parsed chapters are freed as you read on; fonts are released with their fallbacks; pictures on screen are never thrown away mid-draw; background threads that stop are noticed (no endless polling); quitting waits at most 2 seconds for the network; less CPU while you read.
+- **Fixes:** the note keyboard could crash on highlights with accented letters or curly quotes; the highlight preview and list show each highlight's colour; uploads cut off mid-way no longer leave hidden files behind; network replies held in memory are capped at 16 MB.
+
 ## v1.20.1
 
 - **Manga (BETA): the right reading direction more often.** In order: your choice for that comic (Settings → Reading direction); its `ComicInfo.xml` (Manga: YesAndRightToLeft or No; its language: Japanese right to left, Korean or Chinese left to right); signs of a manhwa or webtoon in its names, genre or tags (left to right, even from a manga publisher); a manga publisher's name; Japanese writing in its names; a folder called **Manga** it's kept in; a plain "Manga: Yes". Otherwise left to right. The log says which, and why.
