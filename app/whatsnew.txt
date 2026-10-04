@@ -2,6 +2,14 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.22.0
+Collections: make your own groups of books ("To read", "Favourites"...). In My Books, press Y on a book and choose Add to Collection. Tap the line under My Books (or Y → Jump to Collection) to see just one.
+Book Details: press Y on a book in My Books to see its description, publisher, publication date, file size and where it is on the SD card. Handy in a big library.
+Bookmarks and Highlights has a Notes filter, for the highlights you've written a note on.
+The keyboard for a highlight's note says Save, not Search.
+Long lists of choices show a page at a time, with More... at the end.
+Fix: Get Books knows the books you already have that are hidden as finished.
+
 v1.21.0
 Notes on highlights: hold a highlighted word (or press Select on it) and choose Note to type one. Notes show in the Bookmarks and Highlights list and in the highlights file for your computer.
 Each highlight can have its own colour: Yellow, Green, Blue, Pink or Subtle (choose Colour on it). Others follow the colour in Settings.

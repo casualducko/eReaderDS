@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.22.0
+
+- **Collections.** Your own groups of books in My Books; a book can be in several. **Y → Add to Collection…** on a book ticks the collections it's in (choose one to put it in or take it out) or makes a new one. The line under the My Books title (or **Y → Jump to Collection…**) shows All Books or one collection, with how many of its books are on the card; with one showing, **Y** renames or deletes it (its books stay). Kept in `collections.txt`, which backups include; a deleted book leaves its collections.
+- **Book Details.** **Y → Book Details** on a book in My Books: what it says about itself (the description, with its paragraphs; publisher; publication date; language; subjects; ISBN; a comic's page count, from `ComicInfo.xml`), its file's size and type, its folder and its collections. A long description continues on further pages (‹ ›, a swipe or a tap).
+- **Bookmarks and Highlights:** a **Notes** filter, the highlights with a note.
+- The note keyboard's button says **Save**, not Search.
+- Choice lists longer than fit on the screen (many collections) show 9 at a time, with **More…** for the next.
+- **Fixes:** Settings' My Books count is every book, not just the collection shown; Get Books knows the books you have in other collections or hidden as finished; a book received (or sent by Calibre) while a collection shows that hasn't it switches My Books to All Books; with finished books hidden, the count of hidden ones is the collection's; long collection names are shortened to fit.
+
 ## v1.21.0
 
 - **Notes on highlights.** Hold a highlighted word (or put the Y cursor on it and press Select) for **Note · Colour · Remove · Cancel**. A note is typed on the keyboard (empty removes it) and shows in the Bookmarks and Highlights list, in the highlight's preview, and under the highlight in `Ebook/Highlights/Title - Author.md`.
