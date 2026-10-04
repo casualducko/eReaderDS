@@ -1762,6 +1762,10 @@ local function scan_library()
             end
         end
     end
+    -- Every book, before any are left out below (Settings' count; Get Books
+    -- telling the ones you have).
+    library.all = {}
+    for i, it in ipairs(items) do library.all[i] = it end
     -- A collection chosen (the line under the title): only its books (first,
     -- so the finished ones hidden are counted from these).
     local shelf = S.lib_shelf ~= "" and Store.collection_books(S.lib_shelf)
@@ -1934,6 +1938,24 @@ function app.collections_for(it)
         end })
     end }
     app.choose({ title = "Collections for " .. it.title, options = opts })
+end
+
+-- A book selected in My Books (one just received): All Books shown if the
+-- collection shown hasn't it.
+function app.library_select(p)
+    if not p then return end
+    local function find()
+        for i, it in ipairs(library.items) do
+            if it.path == p then library.sel = i return true end
+        end
+    end
+    if not find() and S.lib_shelf ~= "" then
+        S.lib_shelf = ""
+        Store.save_settings(S)
+        scan_library()
+        library.top = 1
+        find()
+    end
 end
 
 -- My Books again after a change (a book taken out of the collection shown
@@ -2348,7 +2370,7 @@ function shop.have(it)
     -- Or a book with the same title and author (either may lack the author).
     local t = it.title:lower()
     local a = ((it.author or ""):match("^[^,&]+") or ""):lower():gsub("%s+$", "")
-    for _, b in ipairs(library.items) do
+    for _, b in ipairs(library.all or library.items) do
         local ba = (b.author or ""):lower()
         if b.path and b.title:lower() == t and (a == "" or ba == "" or ba == a) then
             it.have = b.path
@@ -3547,10 +3569,11 @@ end
 
 app.MENU_START = 2                  -- the row Settings opens on (after My Books)
 
--- "14 books" (finished ones hidden in My Books included), once it's been looked at.
+-- "14 books" (all of them: finished ones hidden, or another collection's,
+-- included), once it's been looked at.
 function app.book_count()
     if not library.seen then return nil end            -- (not read yet)
-    local n = #library.items + (library.hidden or 0)
+    local n = #(library.all or library.items)
     return n == 1 and "1 book" or (n .. " books")
 end
 
@@ -10637,9 +10660,7 @@ function app.recv_stop()
     if r.books > 0 then
         Store.flush()
         scan_library()
-        for i, it in ipairs(library.items) do                  -- the last one received
-            if it.path == r.last then library.sel = i end
-        end
+        app.library_select(r.last)                             -- the last one received
     end
     return r
 end
@@ -11170,9 +11191,7 @@ function app.cal_stop()
     if c.received + c.deleted > 0 then
         Store.flush()
         scan_library()
-        for i, it in ipairs(library.items) do
-            if it.path == c.last then library.sel = i end
-        end
+        app.library_select(c.last)
     end
     return c
 end
