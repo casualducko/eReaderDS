@@ -1862,7 +1862,7 @@ function app.library_options(it)
         opts[#opts + 1] = { "Add to Collection…", function() app.collections_for(it) end }
     end
     if #Store.collections() > 0 then
-        opts[#opts + 1] = { "Switch Collection…", app.shelf_choose }
+        opts[#opts + 1] = { "Jump to Collection…", app.shelf_choose }
     end
     if S.lib_shelf ~= "" then
         opts[#opts + 1] = { "Rename “" .. S.lib_shelf .. "”", app.shelf_rename }
@@ -1911,7 +1911,7 @@ function app.shelf_choose()
         end
         opts[#opts + 1] = { name .. "  (" .. n .. ")" .. (S.lib_shelf == name and "  ✓" or ""), function() app.shelf_show(name) end }
     end
-    app.choose({ title = "Switch Collection", options = opts })
+    app.choose({ title = "Jump to Collection", options = opts })
 end
 
 -- A book's collections: each with a ✓ when it's in it (choosing one puts it
