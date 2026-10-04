@@ -756,12 +756,17 @@ end
 -- { description, publisher, date = { year, month, day }, language,
 -- subjects, isbn, pages (a comic's) }, any missing; {} for a .txt or a
 -- book that can't be read.
+local function strip_tags(s)
+    return (s:gsub("<!%[CDATA%[(.-)%]%]>", "%1"):gsub("<[Bb][Rr]%s*/?>", "\n")
+        :gsub("</[Pp]>", "\n\n"):gsub("</[Dd][Ii][Vv]>", "\n\n"):gsub("</?%a[^<>]*>", ""):gsub("<!%-%-.-%-%->", ""))
+end
 local function plain(s)
-    -- (A description is often HTML, escaped or not: its paragraphs kept.)
-    s = decode(decode(s))
-    s = s:gsub("<!%[CDATA%[(.-)%]%]>", "%1"):gsub("<[Bb][Rr]%s*/?>", "\n")
-        :gsub("</[Pp]>", "\n\n"):gsub("</[Dd][Ii][Vv]>", "\n\n"):gsub("<[^>]+>", "")
-        :gsub("[ \t\r]+", " "):gsub(" ?\n ?", "\n"):gsub("\n\n\n+", "\n\n"):gsub("^%s+", ""):gsub("%s+$", "")
+    -- (A description is often HTML, as tags or escaped ("&lt;p&gt;"): its
+    -- paragraphs kept. Entities are decoded after the tags are gone, so a
+    -- "&lt;" in the text stays a "<" and isn't taken for a tag.)
+    if s:find("<%a") or s:find("</%a") then s = decode(strip_tags(s))
+    else s = decode(strip_tags(decode(s))) end
+    s = s:gsub("[ \t\r]+", " "):gsub(" ?\n ?", "\n"):gsub("\n\n\n+", "\n\n"):gsub("^%s+", ""):gsub("%s+$", "")
     return s ~= "" and clean(s) or nil
 end
 

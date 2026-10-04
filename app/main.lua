@@ -7858,6 +7858,11 @@ app.LANGUAGES = { en = "English", fr = "French", de = "German", es = "Spanish", 
     nl = "Dutch", sv = "Swedish", da = "Danish", no = "Norwegian", nb = "Norwegian", fi = "Finnish", pl = "Polish",
     ru = "Russian", uk = "Ukrainian", cs = "Czech", el = "Greek", la = "Latin", ja = "Japanese", zh = "Chinese",
     ko = "Korean", ar = "Arabic", he = "Hebrew", tr = "Turkish", hu = "Hungarian", ro = "Romanian", eo = "Esperanto" }
+-- (Some books give three letters: "eng".)
+app.LANGUAGES_3 = { eng = "en", fre = "fr", fra = "fr", ger = "de", deu = "de", spa = "es", ita = "it", por = "pt",
+    dut = "nl", nld = "nl", swe = "sv", dan = "da", nor = "no", fin = "fi", pol = "pl", rus = "ru", ukr = "uk",
+    cze = "cs", ces = "cs", gre = "el", ell = "el", lat = "la", jpn = "ja", chi = "zh", zho = "zh", kor = "ko",
+    ara = "ar", heb = "he", tur = "tr", hun = "hu", rum = "ro", ron = "ro", epo = "eo" }
 
 function app.details_open(it)
     local info = Book.details(it.path)
@@ -7871,6 +7876,7 @@ function app.details_open(it)
     end
     if info.language then
         local code = info.language:match("^(%a%a%a?)")
+        code = code and (app.LANGUAGES_3[code] or code)
         add("Language", code and app.LANGUAGES[code] or info.language)
     end
     add("Subjects", info.subjects)
@@ -7879,7 +7885,8 @@ function app.details_open(it)
     local f, size = io.open(it.path, "rb"), nil
     if f then size = f:seek("end"); f:close() end
     local ext = (it.path:match("%.([^./]+)$") or ""):upper()
-    add("File", (size and (shop.format_size(size) .. ", ") or "") .. ext)
+    local sz = size and shop.format_size(size)          -- (nil for an empty file)
+    add("File", (sz and (sz .. ", ") or "") .. ext)
     add("Folder", it.path:match("^(.*)/") or it.path)
     local in_cols = {}
     for _, name in ipairs(Store.collections()) do
