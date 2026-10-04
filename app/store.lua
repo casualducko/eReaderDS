@@ -33,6 +33,7 @@ local DEFAULTS = {
     skip_version = "", -- a version the reader chose to skip (not mentioned again)
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)
     lib_hide_finished = false, -- My Books leaves out the books marked finished
+    lib_shelf = "",      -- My Books shows only this collection ("": all books)
     idle_min = 10,     -- left alone this many minutes, the screens dim, then turn off (0 = never)
     -- KOReader sync (kosync.lua): the account (the key is the password's MD5,
     -- as KOReader keeps it), the server ("crosspoint", "koreader" or "custom":
@@ -651,6 +652,88 @@ function M.set_sync_seen(account, p, ts)
     write_atomic(path("sync-seen.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
 end
 
+-- collections.txt: your own groups of books (a book can be in several):
+-- name \t path per line, and name \t (nothing) for one with no books yet.
+local collections
+local function load_collections()
+    if collections then return collections end
+    collections = { order = {}, books = {} }
+    local f = M.open_good("collections.txt")
+    if f then
+        for line in lines(f) do
+            local name, p = line:match("^([^\t]+)\t(.*)$")
+            if name then
+                if not collections.books[name] then
+                    collections.books[name] = {}
+                    collections.order[#collections.order + 1] = name
+                end
+                if p ~= "" then collections.books[name][p] = true end
+            end
+        end
+        f:close()
+    end
+    return collections
+end
+
+local function write_collections()
+    local c, out = load_collections(), {}
+    for _, name in ipairs(c.order) do
+        local paths = {}
+        for p in pairs(c.books[name]) do paths[#paths + 1] = p end
+        table.sort(paths)
+        if #paths == 0 then out[#out + 1] = name .. "\t" end
+        for _, p in ipairs(paths) do out[#out + 1] = name .. "\t" .. p end
+    end
+    write_atomic(path("collections.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
+end
+
+-- The collections' names, A to Z.
+function M.collections()
+    local list = {}
+    for _, n in ipairs(load_collections().order) do list[#list + 1] = n end
+    table.sort(list, function(a, b) return a:lower() < b:lower() end)
+    return list
+end
+
+-- A collection's books (path -> true), or nil if there's no such collection.
+function M.collection_books(name) return load_collections().books[name] end
+
+-- A new (empty) collection; false if there's one with that name already.
+function M.add_collection(name)
+    local c = load_collections()
+    if c.books[name] then return false end
+    c.books[name] = {}
+    c.order[#c.order + 1] = name
+    write_collections()
+    return true
+end
+
+-- A book put in or taken out of a collection (which is made if need be).
+function M.set_in_collection(name, p, on)
+    local c = load_collections()
+    if not c.books[name] then c.books[name] = {}; c.order[#c.order + 1] = name end
+    c.books[name][p] = on or nil
+    write_collections()
+end
+
+function M.rename_collection(old, new)
+    local c = load_collections()
+    if not c.books[old] or c.books[new] then return false end
+    c.books[new], c.books[old] = c.books[old], nil
+    for i, n in ipairs(c.order) do if n == old then c.order[i] = new end end
+    write_collections()
+    return true
+end
+
+-- A collection removed (its books stay where they are).
+function M.delete_collection(name)
+    local c = load_collections()
+    if not c.books[name] then return end
+    c.books[name] = nil
+    for i, n in ipairs(c.order) do if n == name then table.remove(c.order, i) break end end
+    write_collections()
+end
+
 -- Forget a deleted book: its progress, bookmarks and "last opened".
 function M.forget(p)
     load_progress()[p] = nil
@@ -659,6 +742,11 @@ function M.forget(p)
     if load_highlights()[p] then M.set_highlights(p, {}) end
     if load_opened()[p] then load_opened()[p] = nil; write_opened() end
     if load_finished()[p] then M.set_finished(p, false) end
+    local changed = false
+    for _, books in pairs(load_collections().books) do
+        if books[p] then books[p] = nil; changed = true end
+    end
+    if changed then write_collections() end
     if M.get_last() == p then
         os.remove(path("last.txt"))
         last_written[path("last.txt")] = nil

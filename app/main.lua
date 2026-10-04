@@ -1769,6 +1769,14 @@ local function scan_library()
             if Store.get_finished(items[k].path) then table.remove(items, k); library.hidden = library.hidden + 1 end
         end
     end
+    -- A collection chosen (the line under the title): only its books.
+    local shelf = S.lib_shelf ~= "" and Store.collection_books(S.lib_shelf)
+    if S.lib_shelf ~= "" and not shelf then S.lib_shelf = "" end     -- (one since deleted)
+    if shelf then
+        for k = #items, 1, -1 do
+            if not shelf[items[k].path] then table.remove(items, k) end
+        end
+    end
     library.sort(items)
     library.pending = #pending > 0 and pending or nil
     library.seen = seen
@@ -1845,12 +1853,116 @@ function app.library_options(it)
         hide(not S.lib_hide_finished)
     end }
     if it then
+        opts[#opts + 1] = { "Collections…", function() app.collections_for(it) end }
+    end
+    if #Store.collections() > 0 then
+        opts[#opts + 1] = { "Show a Collection…", app.shelf_choose }
+    end
+    if S.lib_shelf ~= "" then
+        opts[#opts + 1] = { "Rename “" .. S.lib_shelf .. "”", app.shelf_rename }
+        opts[#opts + 1] = { "Delete “" .. S.lib_shelf .. "”", function()
+            local name = S.lib_shelf
+            app.ask({ question = "Delete the collection “" .. name .. "”?", detail = "Its books stay in My Books.",
+                yes = "Delete", on_yes = function()
+                    Store.delete_collection(name)
+                    app.shelf_show("")
+                    app.toast("Collection deleted")
+                end })
+        end }
+    end
+    if it then
         opts[#opts + 1] = { "Delete from the SD card", function()
             app.ask({ question = "Delete this book from the SD card?", detail = it.title,
                 yes = "Delete", on_yes = function() library.delete(it.path) end })
         end }
     end
     app.choose({ title = it and it.title or "My Books", options = opts })
+end
+
+---------------------------------------------------------------- collections
+
+-- Your own groups of books (Store: collections.txt). My Books shows all
+-- books or one collection (S.lib_shelf), chosen on the line under its title
+-- (or Y); a book is put in or taken out with Y → Collections.
+
+-- My Books showing a collection ("": all books), from the top.
+function app.shelf_show(name)
+    S.lib_shelf = name
+    Store.save_settings(S)
+    scan_library()
+    library.sel, library.top, library.picked = 1, 1, nil
+    redraw()
+end
+
+-- Which to show: All Books, or one of the collections (with how many books).
+function app.shelf_choose()
+    local opts = { { "All Books" .. (S.lib_shelf == "" and "  ✓" or ""), function() app.shelf_show("") end } }
+    for _, name in ipairs(Store.collections()) do
+        local n = 0
+        for _ in pairs(Store.collection_books(name) or {}) do n = n + 1 end
+        opts[#opts + 1] = { name .. "  (" .. n .. ")" .. (S.lib_shelf == name and "  ✓" or ""), function() app.shelf_show(name) end }
+    end
+    app.choose({ title = "Show", options = opts })
+end
+
+-- A book's collections: each with a ✓ when it's in it (choosing one puts it
+-- in or takes it out), and a new one.
+function app.collections_for(it)
+    local opts = {}
+    for _, name in ipairs(Store.collections()) do
+        local inside = (Store.collection_books(name) or {})[it.path]
+        opts[#opts + 1] = { name .. (inside and "  ✓" or ""), function()
+            Store.set_in_collection(name, it.path, not inside)
+            app.toast(inside and ("Taken out of “" .. name .. "”") or ("Put in “" .. name .. "”"))
+            if not inside then app.shelf_refresh(it) else app.shelf_refresh(nil) end
+        end }
+    end
+    opts[#opts + 1] = { "New Collection…", function()
+        app.kb_open({ title = "New collection", ok = "Create", max = 40, hint = it.title, submit = function(name)
+            name = name:gsub("[\t\r\n]", " ")
+            if (Store.collection_books(name)) then
+                app.toast("There's a collection called that already")
+                return
+            end
+            Store.set_in_collection(name, it.path, true)
+            app.toast("Put in “" .. name .. "”")
+            app.shelf_refresh(it)
+        end })
+    end }
+    app.choose({ title = "Collections for " .. it.title, options = opts })
+end
+
+-- My Books again after a change (a book taken out of the collection shown
+-- goes from the list), keeping it selected if it's still there.
+function app.shelf_refresh(it)
+    scan_library()
+    library.sel = math.max(1, math.min(library.sel, #library.items))
+    if it then
+        for i, b in ipairs(library.items) do if b.path == it.path then library.sel = i end end
+    end
+    redraw()
+end
+
+function app.shelf_rename()
+    local old = S.lib_shelf
+    app.kb_open({ title = "Rename “" .. old .. "”", text = old, ok = "Save", max = 40, submit = function(name)
+        name = name:gsub("[\t\r\n]", " ")
+        if name == old then return end
+        if not Store.rename_collection(old, name) then app.toast("There's a collection called that already") return end
+        S.lib_shelf = name
+        Store.save_settings(S)
+        redraw()
+    end })
+end
+
+-- The line under My Books' title (when there are collections): which is
+-- shown, to tap for another. x, y, w, h on the touchscreen's page, or nil.
+function app.shelf_line()
+    if S.lib_shelf == "" and #Store.collections() == 0 then return nil end
+    local x = MARGINS[2].inner
+    local y = 60 + ui.title:getHeight() + 10
+    local text = (S.lib_shelf ~= "" and S.lib_shelf or "All Books") .. "  ›"
+    return x, y, ui.font:getWidth(text), ui.font:getHeight(), text
 end
 
 -- Change the order, keeping the same book selected.
@@ -5482,7 +5594,9 @@ end
 -- { header, y } }, and how many books fit. The top book's group always has
 -- its header, even partway down a group.
 function app.library_layout(top)
-    local rows, y, n, last = {}, 160, 0, nil
+    -- (Lower when the collection line is under the title; the same bottom.)
+    local first = app.shelf_line() and 200 or 160
+    local rows, y, n, last = {}, first, 0, nil
     local bottom = 160 + library.list_rows() * 96
     for i = top, #library.items do
         local g, label = app.library_group(library.items[i])
@@ -5512,6 +5626,12 @@ local function draw_library(side)
         love.graphics.setFont(ui.title)
         color(th.fg)
         love.graphics.print("My Books", x, 60)
+        local sx, sy, _, _, stext = app.shelf_line()
+        if sx then
+            love.graphics.setFont(ui.font)
+            color(S.lib_shelf ~= "" and th.fg or th.dim)
+            love.graphics.print(stext, sx, sy)
+        end
         if #library.items > 0 then
             -- The sort order, changed with left/right, like a settings value.
             love.graphics.setFont(ui.font)
@@ -5602,6 +5722,16 @@ local function draw_library(side)
             .. " hidden. Press " .. app.key("Y") .. " to show " .. (library.hidden == 1 and "it" or "them") .. ".", x, 180, w, "left")
         return
     end
+    if #library.items == 0 and S.lib_shelf ~= "" then
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print(fit_text(ui.title, S.lib_shelf, w), x, 60)
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.printf("No books in this collection yet. Show All Books (tap the line under My Books), press "
+            .. app.key("Y") .. " on a book, choose Collections, and pick this one.", x, 180, w, "left")
+        return
+    end
     if #library.items == 0 then
         love.graphics.setFont(ui.title)
         color(th.fg)
@@ -5609,7 +5739,7 @@ local function draw_library(side)
         love.graphics.setFont(ui.font)
         color(th.dim)
         local folder, where = Store.books_folder()
-        love.graphics.printf("Copy .epub or .txt files into the " .. folder .. " folder"
+        love.graphics.printf("Copy .epub, .cbz or .txt files into the " .. folder .. " folder"
             .. (where and (" " .. where) or "") .. " (folders inside it are fine), or tap Get Books to download some or send them from a phone or computer.", x, 180, w, "left")
         love.graphics.setFont(ui.small)
         app.hints(x, nil, { "Anbernic button", "quit" })
@@ -9805,8 +9935,8 @@ function handle_action(a)
             elseif a == "toc" then
                 app.library_options(library.items[library.sel])
             end
-        elseif a == "toc" and (library.hidden or 0) > 0 then
-            app.library_options(nil)                    -- all hidden: "Show finished books"
+        elseif a == "toc" and ((library.hidden or 0) > 0 or S.lib_shelf ~= "") then
+            app.library_options(nil)                    -- all hidden ("Show finished books"), or an empty collection
         end
         if a == "bookmark" then shop.start() end
         if a == "menu" and not book and app.upd.state == "available" then app.update_open() end
@@ -9944,6 +10074,9 @@ function app.on_tap(side, u, v)
         end
         -- The order at the top right (Recent, Title...): the next one.
         if v < 140 and u > bx + bw + 20 and #library.items > 0 then library.cycle_sort(1); redraw(); return end
+        -- The line under the title (which collection): another.
+        local sx, sy, sw, sh = app.shelf_line()
+        if sx and u <= sx + sw + 30 and v >= sy - 10 and v <= sy + sh + 8 then app.shelf_choose(); return end
         -- The list: tap a book to see it on the top screen, again to open it.
         for _, r in ipairs((app.library_layout(library.top))) do
             if r.idx and v >= r.y and v < r.y + 96 then

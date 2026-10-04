@@ -154,7 +154,7 @@ to do the same.
 | D-pad or stick | Turn pages (right/down forward; in a manga, left forward) | Up/down move; left/right change a value, page through a list, or change the library's sort order |
 | A | Show the notes on these pages (in the magnifier: the other page) | Select |
 | B | Settings | Back |
-| Y | Look up (or highlight) a word; in a comic, the magnifier | In My Books: options (mark finished, hide finished books, delete); in Bookmarks and Highlights: delete; on Themes: options (copy, hide, or change one of yours) |
+| Y | Look up (or highlight) a word; in a comic, the magnifier | In My Books: options (mark finished, hide finished books, collections, delete); in Bookmarks and Highlights: delete; on Themes: options (copy, hide, or change one of yours) |
 | Select | Bookmark the page (again to remove) | Close; in the library: Get Books |
 | Start, X, ↩, or pressing the stick in | Settings | Open or close Settings (the stick selects) |
 | Menu (Anbernic button) | Quit | Quit |
@@ -278,6 +278,11 @@ last row. Tap **‹** or **›** to change a value, or use the D-pad.
   "Finished ✓". A book is marked finished when you reach its last page (or by
   hand: **Y** in My Books, which can also hide finished books, or delete a
   book).
+- **Collections:** your own groups of books ("To read", "Favourites"...). In
+  My Books, **Y → Collections…** on a book puts it in one (or a new one) or
+  takes it out; a book can be in several. Tap the line under My Books'
+  title (or **Y → Show a Collection…**) to show just one, or All Books; with
+  one showing, **Y** also renames or deletes it (its books stay).
 - **KOReader Sync:** carry your place between eReaderDS and KOReader or
   CrossPoint (a phone, Kobo, Kindle, Xteink X4 or X3...): one smart Sync
   button, or Send my place and Get my place; opening a book asks before
