@@ -1308,7 +1308,7 @@ end
 -- A note on highlight h, typed (empty: none).
 function app.hl_note(h)
     if not h then return end
-    app.kb_open({ title = h.note and "Edit the note" or "Add a note", text = h.note or "", allow_empty = true,
+    app.kb_open({ title = h.note and "Edit the note" or "Add a note", text = h.note or "", allow_empty = true, ok = "Save",
         max = math.max(500, #(h.note or "")),
         hint = "“" .. fit_text(ui.font, h.text or "", PAGE_W - 220) .. "”",
         submit = function(t)
