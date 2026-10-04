@@ -119,7 +119,7 @@ app.page_offs = {}
 local function clear_book_caches()
     for _, img in pairs(images) do if img then img:release() end end
     images, images_order, image_dims = {}, {}, {}
-    app.image_ink = {}
+    app.image_ink, app.image_frame = {}, {}
     clear_pages()
 end
 local pos = { ch = 1, off = 0 }  -- reading position (start of left page)
@@ -297,8 +297,26 @@ function app.image_from(filedata)
 end
 
 -- Decoded image for drawing (the ones least recently drawn are released).
+-- Over the count: the least recently drawn decoded image released, but
+-- never one drawn in this frame (a spread with more pictures than the count
+-- would otherwise decode them all again on every redraw): then over it is.
+app.image_frame, app.frame_no = {}, 0
+function app.image_evict()
+    while #images_order > app.images_keep() do
+        local k
+        for i, name in ipairs(images_order) do
+            if app.image_frame[name] ~= app.frame_no then k = i break end
+        end
+        if not k then return end
+        local old = table.remove(images_order, k)
+        if images[old] then images[old]:release() end
+        images[old], app.image_ink[old], app.image_frame[old] = nil, nil, nil
+    end
+end
+
 local function get_image(src)
     local img = images[src]
+    app.image_frame[src] = app.frame_no
     if img then
         -- Drawn again: the last to go.
         for i = #images_order, 1, -1 do
@@ -315,7 +333,10 @@ local function get_image(src)
         local data = book and book:read_resource(src)
         if data then
             local ok, res = pcall(function()
-                local id = love.image.newImageData(love.filesystem.newFileData(data, src))
+                local fd = love.filesystem.newFileData(data, src)
+                local okd, id = pcall(love.image.newImageData, fd)
+                fd:release()            -- (a copy of the file: not left for the GC)
+                if not okd then error(id, 0) end
                 if book.comic then return app.comic_fit(id) end
                 local okl, line = pcall(app.is_line_art, id)
                 app.image_ink[src] = okl and line or nil
@@ -330,11 +351,7 @@ local function get_image(src)
         -- (One that failed is only remembered, not kept in the count.)
         if img then
             images_order[#images_order + 1] = src
-            if #images_order > app.images_keep() then
-                local old = table.remove(images_order, 1)
-                if images[old] then images[old]:release() end
-                images[old], app.image_ink[old] = nil, nil
-            end
+            app.image_evict()
         end
     end
     return img or nil
@@ -424,7 +441,13 @@ local function pages_for(ch)
         while #pages_order > PAGES_KEEP do
             local k = 1
             if spread and pages_order[k] == spread.ch then k = 2 end
-            pages_cache[table.remove(pages_order, k)] = nil
+            local old = table.remove(pages_order, k)
+            pages_cache[old] = nil
+            -- Its parsed text too (read again from the book when needed), or a
+            -- long book read for hours keeps all of it. (Not a text file's or a
+            -- comic's: those aren't read from a file in the book.)
+            local c = book.zip and not book.comic and book.chapters[old]
+            if c and c.file and old ~= pos.ch then c.blocks, c.anchors = nil, nil end
         end
     end
     return p
@@ -514,7 +537,7 @@ local function next_spread()
     else
         -- Already on the last page: a comic goes on to the next volume.
         local nxt = book.comic and app.comic_next_path()
-        if nxt then app.open_book(nxt) return end
+        if nxt then save_progress(); app.open_book(nxt) return end
         app.check_finished()                   -- (a one-spread book)
         return
     end
@@ -791,7 +814,7 @@ function look.layout()
     local size = math.max(18, math.floor(S.font_size * 0.8))
     if not look.fonts or look.fonts_key ~= S.font .. size then
         -- (The set for the old font or size is released, not left to pile up.)
-        if look.fonts then for _, f in pairs(look.fonts) do pcall(f.release, f) end end
+        if look.fonts then Fonts.release(look.fonts) end
         look.fonts = Fonts.load(S.font, size)
         look.fonts_key = S.font .. size
     end
@@ -927,7 +950,8 @@ end
 -- A highlight is a run of words, saved as text offsets in a chapter (so it
 -- survives changes to the font or layout), like a bookmark. Made in look-up
 -- (Y): Select at the first word, move to the last, Select again. Select on a
--- highlighted word removes it. Listed with the bookmarks.
+-- highlighted word (or holding it) offers a note, its colour, or removing
+-- it. Listed with the bookmarks.
 
 -- The highlights on the visible chapter, and the one being chosen.
 function app.hl_ranges()
@@ -1125,9 +1149,9 @@ function app.look_bar_tap(side, u, v)
             elseif b[1] == "start" then
                 -- (then choose the rest, and Save)
                 if look.words[look.sel].off then look.hl_start = look.sel else app.toast("This can't be highlighted") end
-            elseif b[1] == "note" then app.hl_note(app.hl_at(look.words[look.sel]))
-            elseif b[1] == "colour" then app.hl_pick_colour(app.hl_at(look.words[look.sel]))
-            else app.hl_remove(app.hl_at(look.words[look.sel])) end      -- remove: the highlight this word is in
+            elseif b[1] == "note" then app.hl_note(app.hl_here(look.words[look.sel]))
+            elseif b[1] == "colour" then app.hl_pick_colour(app.hl_here(look.words[look.sel]))
+            else app.hl_remove(app.hl_here(look.words[look.sel])) end    -- remove: the highlight this word is in
             redraw()
             return true
         end
@@ -1203,7 +1227,9 @@ function app.hl_select()
     for _, h in ipairs(list) do
         if h.ch == spread.ch and h.s < span.e and h.e > span.s then
             -- (Its note and colour carry over into the new one.)
-            note = note and h.note and (note .. "\n" .. h.note) or note or h.note
+            -- (Notes joined on one line, as the keyboard edits them; not over its limit.)
+            note = note and h.note and (note .. " / " .. h.note) or note or h.note
+            if note and #note > 500 then note = note:sub(1, 500):gsub("[\128-\191]+$", ""):gsub("[\192-\255]$", "") end
             colour = colour or h.color
             if h.s < span.s then span.s, text, merged = h.s, h.text .. " … " .. text, true end
             if h.e > span.e then span.e, text, merged = h.e, text .. " … " .. h.text, true end
@@ -1234,63 +1260,75 @@ end
 
 -- A highlight's choices (Select on it, or holding it): a note, its colour,
 -- or removing it. i: its index in the book's highlights.
+-- (They take the highlight itself, not its place in the list: after a card
+-- or the keyboard, the list may be another, and the wrong one mustn't
+-- change. One no longer there is left alone.)
 function app.hl_options(i)
     local h = Store.get_highlights(book.path)[i]
     if not h then return end
     app.choose({ title = "This highlight", options = {
-        { h.note and "Edit the Note" or "Add a Note", function() app.hl_note(i) end },
-        { "Colour", function() app.hl_pick_colour(i) end },
-        { "Remove Highlight", function() app.hl_remove(i) end },
+        { h.note and "Edit the Note" or "Add a Note", function() app.hl_note(h) end },
+        { "Colour", function() app.hl_pick_colour(h) end },
+        { "Remove Highlight", function() app.hl_remove(h) end },
     } })
 end
 
--- Saved with a change made to highlight i (a copy of the list, which the
--- store sorts).
-function app.hl_change(i, fn)
-    local list = {}
-    for k, h in ipairs(Store.get_highlights(book.path)) do
-        if k == i then
+-- The highlight a word is in (the highlight itself), or nil.
+function app.hl_here(w)
+    local i = app.hl_at(w)
+    return i and Store.get_highlights(book.path)[i]
+end
+
+-- Saved with a change made to highlight h (a copy of the list, which the
+-- store sorts). False if h isn't in the book's list any more.
+function app.hl_change(h, fn)
+    local list, found = {}, false
+    for _, it in ipairs(Store.get_highlights(book.path)) do
+        if it == h then
             local c = {}
-            for key, v in pairs(h) do c[key] = v end
+            for key, v in pairs(it) do c[key] = v end
             fn(c)
             if not c.removed then list[#list + 1] = c end
+            found = true
         else
-            list[#list + 1] = h
+            list[#list + 1] = it
         end
     end
+    if not found then return false end
     Store.set_highlights(book.path, list)
     app.export_notes()
     redraw()
+    return true
 end
 
-function app.hl_remove(i)
-    if not i then return end
-    app.hl_change(i, function(h) h.removed = true end)
-    app.toast("Highlight removed")
+function app.hl_remove(h)
+    if h and app.hl_change(h, function(c) c.removed = true end) then app.toast("Highlight removed") end
 end
 
--- A note on highlight i, typed (empty: none).
-function app.hl_note(i)
-    local h = i and Store.get_highlights(book.path)[i]
+-- A note on highlight h, typed (empty: none).
+function app.hl_note(h)
     if not h then return end
-    app.kb_open({ title = h.note and "Edit the note" or "Add a note", text = h.note or "", allow_empty = true, max = 500,
-        hint = "“" .. (h.text or ""):sub(1, 60) .. ((#(h.text or "") > 60) and "…”" or "”"),
+    app.kb_open({ title = h.note and "Edit the note" or "Add a note", text = h.note or "", allow_empty = true,
+        max = math.max(500, #(h.note or "")),
+        hint = "“" .. fit_text(ui.font, h.text or "", PAGE_W - 220) .. "”",
         submit = function(t)
-            app.hl_change(i, function(c) c.note = t ~= "" and t or nil end)
-            app.toast(t ~= "" and "Note saved" or "Note removed")
+            local had = h.note
+            if app.hl_change(h, function(c) c.note = t ~= "" and t or nil end) and (t ~= "" or had) then
+                app.toast(t ~= "" and "Note saved" or "Note removed")
+            end
         end })
 end
 
--- Highlight i's own colour (the Settings one is the default).
-function app.hl_pick_colour(i)
-    local h = i and Store.get_highlights(book.path)[i]
+-- Highlight h's own colour. The Settings one is the default: picking it
+-- leaves the highlight following Settings.
+function app.hl_pick_colour(h)
     if not h then return end
     local opts = {}
     for _, c in ipairs({ { "yellow", "Yellow" }, { "green", "Green" }, { "blue", "Blue" }, { "pink", "Pink" },
             { "subtle", "Subtle" } }) do
         local mine = (h.color or S.hl_color) == c[1]
         opts[#opts + 1] = { c[2] .. (mine and "  ✓" or ""), function()
-            app.hl_change(i, function(x) x.color = c[1] end)
+            app.hl_change(h, function(x) x.color = c[1] ~= S.hl_color and c[1] or nil end)
         end }
     end
     app.choose({ title = "Highlight colour", options = opts })
@@ -1378,6 +1416,7 @@ local function open_book(path)
     book = b
     if app.zoom then app.zoom.img:release(); app.zoom = nil end      -- (the magnifier's picture: the old book's)
     app.page_failed = {}
+    app.page_drain()                          -- (the old comic's pages still queued: not wanted now)
     clear_book_caches()
     app.previews_clear()
     local pr = Store.get_progress(path)
@@ -1415,11 +1454,11 @@ local function open_book(path)
             Store.save_settings(S)
             tips[#tips + 1] = "Y, or holding a page, shows the magnifier"
         end
+        if b.comic.later > 0 then
+            tips[#tips + 1] = b.comic.later .. (b.comic.later == 1 and " page is a WebP picture" or " pages are WebP pictures")
+                .. ", which can't be shown yet"
+        end
         if #tips > 0 then app.toast(table.concat(tips, "\n")) end
-    end
-    if b.comic and b.comic.later > 0 then
-        app.toast(b.comic.later .. (b.comic.later == 1 and " page is a WebP picture" or " pages are WebP pictures")
-            .. ", which can't be shown yet", 5)
     end
 end
 
@@ -1497,7 +1536,7 @@ function app.export_notes(only_if_missing)
         local pct = math.floor((e.pct or 0) * 100 + 0.5) .. "%"
         if e.hl then
             out[#out + 1] = "- “" .. (e.text or "") .. "” (" .. pct .. ")"
-            if e.note then out[#out + 1] = "  - Note: " .. e.note:gsub("\n", "\n    ") end
+            if e.note then out[#out + 1] = "  - Note: " .. e.note:gsub("\n", "  \n    ") end
         else
             out[#out + 1] = "- Bookmark (" .. pct .. "): " .. ((e.text or "") ~= "" and (e.text .. "…") or "")
         end
@@ -1694,8 +1733,12 @@ local function scan_library()
             local name = path:match("([^/]+)$")
             local ext = (name:match("%.([^.]+)$") or ""):lower()
             if ext == "part" then
-                -- Left over from a download that was cut off.
-                if not shop.dl and not app.recv then os.remove(path) end
+                -- Left over from a download that was cut off. (Not while
+                -- something may be writing one: a download, receiving, Calibre,
+                -- a backup or a restore; and never a backup's own.)
+                if not shop.dl and not app.recv and not app.cal and not app.bk and not path:find("/Backups/", 1, true) then
+                    os.remove(path)
+                end
             elseif not seen[path] then
                 seen[path] = true
                 -- The file name ("Title - Author.epub") until the book's own
@@ -1880,6 +1923,14 @@ function app.cover_poll()
         end
         got = true
     end
+    -- (The thread stopped without replying, out of memory say: stop waiting,
+    -- or the screens' loop polls for ever.)
+    if app.covers_waiting > 0 and cover_thread and not cover_thread:isRunning() then
+        print("[library] cover thread stopped: " .. tostring(cover_thread:getError()))
+        cover_thread, app.covers_waiting = nil, 0
+        love.thread.getChannel("cover_jobs"):clear()
+        love.thread.getChannel("cover_out"):clear()
+    end
     if got then redraw() end
     return got
 end
@@ -1974,7 +2025,6 @@ end
 local function go_library()
     save_progress()
     app.sync_auto_push()
-    Store.flush()
     scan_library()
     for i, it in ipairs(library.items) do
         if book and it.path == book.path then library.sel = i end
@@ -3863,6 +3913,7 @@ app.pages_waiting, app.page_jobs = 0, {}
 app.page_failed = {}
 function app.comic_prefetch()
     if not (book and book.comic and spread) then return end
+    app.page_drain()                          -- (pages asked for before a jump: not before these)
     -- (This pair's first, then the next two: a page takes half a second.)
     for k = spread.pi, spread.pi + 5 do
         local pg = spread.pages[k]
@@ -3872,8 +3923,38 @@ end
 
 -- A page picture for the page thread to decode (and shrink), unless it's
 -- here, on its way, or couldn't be.
+-- The page jobs not started yet taken back (the magnifier's kept): counted
+-- off, so they can be asked for again.
+function app.page_drain()
+    local ch, keep = love.thread.getChannel("page_jobs"), {}
+    while true do
+        local job = ch:pop()
+        if not job then break end
+        if type(job) == "table" and job.tag == "zoom" then
+            keep[#keep + 1] = job
+        elseif type(job) == "table" then
+            app.page_jobs[app.page_key(job.path, job.name)] = nil
+            app.pages_waiting = math.max(0, app.pages_waiting - 1)
+        end
+    end
+    for _, job in ipairs(keep) do ch:push(job) end
+end
+
+function app.page_stop()
+    if not app.page_thread then return end
+    love.thread.getChannel("page_jobs"):clear()
+    love.thread.getChannel("page_jobs"):push("quit")
+    app.page_thread:wait()
+    app.page_thread, app.pages_waiting, app.page_jobs = nil, 0, {}
+    love.thread.getChannel("page_out"):clear()
+end
+
+-- (Jobs known by the comic and the picture: the next volume's pages often
+-- have the same names as this one's.)
+function app.page_key(path, src) return path .. "\0" .. src end
+
 function app.comic_request(src)
-    if images[src] ~= nil or app.page_jobs[src] or app.page_failed[src] then return end
+    if images[src] ~= nil or app.page_jobs[app.page_key(book.path, src)] or app.page_failed[src] then return end
     local data = book:read_resource(src)
     if not data then app.page_failed[src] = true return end
     if not app.page_thread then
@@ -3882,7 +3963,7 @@ function app.comic_request(src)
     end
     love.thread.getChannel("page_jobs"):push({ path = book.path, name = src, data = data,
         fit = { w = PAGE_W, h = PAGE_H, wide = true } })
-    app.page_jobs[src] = true
+    app.page_jobs[app.page_key(book.path, src)] = true
     app.pages_waiting = app.pages_waiting + 1
 end
 
@@ -3895,18 +3976,32 @@ function app.comic_poll()
         local msg = love.thread.getChannel("page_out"):pop()
         if not msg then break end
         app.pages_waiting = math.max(0, app.pages_waiting - 1)
-        app.page_jobs[msg.name] = nil
+        if msg.tag == "zoom" then
+            -- The magnifier's picture: for it if it's still waiting for this one.
+            local z = app.zoom
+            if msg.image and z and z.loading and book and book.path == msg.path and z.pg.src == msg.name then
+                app.zoom_ready(msg.image)
+            elseif msg.image then
+                msg.image:release()
+            elseif z and z.loading and z.pg.src == msg.name then
+                z.loading, z.failed = false, true
+            end
+            got = true
+            goto continue
+        end
+        app.page_jobs[app.page_key(msg.path, msg.name)] = nil
         if msg.image then
             if book and book.comic and book.path == msg.path and images[msg.name] == nil then
                 local ok, img = pcall(app.comic_fit, msg.image)
+                if not ok then
+                    print("[comic] " .. tostring(msg.name) .. ": " .. tostring(img))
+                    app.page_failed[msg.name] = true                  -- (not asked for again and again)
+                    pcall(msg.image.release, msg.image)
+                end
                 if ok then
                     images[msg.name] = img
                     images_order[#images_order + 1] = msg.name
-                    if #images_order > app.images_keep() then
-                        local old = table.remove(images_order, 1)
-                        if images[old] then images[old]:release() end
-                        images[old] = nil
-                    end
+                    app.image_evict()
                 end
             else
                 msg.image:release()
@@ -3915,6 +4010,17 @@ function app.comic_poll()
             print("[comic] " .. tostring(msg.name) .. ": " .. msg.error)
             if book and book.path == msg.path then app.page_failed[msg.name] = true end
         end
+        got = true
+        ::continue::
+    end
+    -- (The thread stopped without replying, out of memory say: nothing more
+    -- will come, so stop waiting, or the screens' loop polls for ever.)
+    if app.pages_waiting > 0 and app.page_thread and not app.page_thread:isRunning() then
+        print("[comic] page thread stopped: " .. tostring(app.page_thread:getError()))
+        app.page_thread, app.pages_waiting, app.page_jobs = nil, 0, {}
+        love.thread.getChannel("page_jobs"):clear()
+        love.thread.getChannel("page_out"):clear()
+        if app.zoom and app.zoom.loading then app.zoom.loading, app.zoom.failed = false, true end
         got = true
     end
     if got then redraw() end
@@ -3932,8 +4038,18 @@ function app.comic_next_path()
         if e:lower():match("%.cbz$") and not e:match("^%.") then list[#list + 1] = e end
     end
     table.sort(list, require("comic").natural_less)
+    -- (Only the same series: a folder of many series has another one next.)
+    local Comic = require("comic")
+    local function series(n)
+        local s, _, clean = Comic.from_name(n)
+        return (s or clean or ""):lower()
+    end
     for i, e in ipairs(list) do
-        if e == name then return list[i + 1] and (dir .. "/" .. list[i + 1]) or nil end
+        if e == name then
+            local nxt = list[i + 1]
+            if nxt and series(nxt) == series(name) and series(name) ~= "" then return dir .. "/" .. nxt end
+            return nil
+        end
     end
 end
 
@@ -3958,9 +4074,8 @@ function app.zoom_open(side, u, v)
         end
     end
     if not pg then return end
-    if not app.zoom_load(pg) then app.toast("This page can't be shown") return end
+    app.zoom_request(pg)
     local z = app.zoom
-    z.cx, z.cy = 0.5, 0.5
     if u then
         -- Where it was held, on the picture as the screen showed it.
         local small = get_image(pg.src)
@@ -3969,45 +4084,52 @@ function app.zoom_open(side, u, v)
             z.cx, z.cy = (u - x) / (rw * sc), (v - y) / (rh * sc)
         end
     end
-    app.zoom_clamp()
     app.zoom_back = app.mode
     app.mode = "zoom"
     redraw()
 end
 
--- The page's picture decoded bigger (app.ZOOM times the screen), for the
--- enlarged view. False if it can't be.
-function app.zoom_load(pg)
+-- The page's picture, decoded bigger (app.ZOOM times the screen) for the
+-- enlarged view, asked of the page thread: the full-size scan is decoded and
+-- shrunk there, never on the screens' thread or the GPU (a big one is tens of
+-- MB). Meanwhile "Loading…" (app.zoom.loading).
+function app.zoom_request(pg)
     if app.zoom and app.zoom.img then app.zoom.img:release() end
-    app.zoom = nil
+    local keep = app.zoom and app.zoom.pg == pg and app.zoom
+    app.zoom = { pg = pg, loading = true, cx = keep and keep.cx or 0.5, cy = keep and keep.cy or 0.5,
+        bw = 1, bh = 1 }
     local data = book:read_resource(pg.src)
-    if not data then return false end
-    local ok, img = pcall(function()
-        local id = love.image.newImageData(love.filesystem.newFileData(data, pg.src))
-        local w, h = id:getDimensions()
-        local wide = require("comic").wide(w, h)
-        -- (Not as sharp on Android, whose memory is short: the view is enlarged
-        -- as much, just from a smaller picture.)
-        local z = require("android").active and 1.6 or app.ZOOM
-        local mw, mh = PAGE_W * z * (wide and 2 or 1), PAGE_H * z
-        local okf, im = pcall(app.fit_image, id, mw, mh)
-        id:release()
-        if not okf then error(im, 0) end
-        return im
-    end)
-    if not ok then print("[comic] magnifier: " .. tostring(img)) return false end
+    if not data then app.zoom.failed = true return end
+    if not app.page_thread then
+        app.page_thread = love.thread.newThread("coverworker.lua")
+        app.page_thread:start("page_jobs", "page_out")
+    end
+    -- (Not as sharp on Android, whose memory is short: the view is enlarged
+    -- as much, just from a smaller picture.)
+    local z = require("android").active and 1.6 or app.ZOOM
+    love.thread.getChannel("page_jobs"):push({ path = book.path, name = pg.src, data = data, tag = "zoom",
+        fit = { w = PAGE_W * z, h = PAGE_H * z, wide = true } })
+    app.pages_waiting = app.pages_waiting + 1
+end
+
+-- Its picture is here (ImageData, already shrunk): the view and the box.
+function app.zoom_ready(id)
+    local z = app.zoom
+    local ok, img = pcall(love.graphics.newImage, id)
+    id:release()
+    if not ok then z.failed, z.loading = true, false return end
     local iw, ih = img:getDimensions()
-    local z = { pg = pg, img = img, rx = 0, rw = iw, rh = ih, cx = 0.5, cy = 0.5 }
-    if pg.half then
+    z.img, z.loading, z.rx, z.rw, z.rh = img, false, 0, iw, ih
+    if z.pg.half then
         z.rw = iw / 2
-        if (pg.half == 1) == app.comic_rtl() then z.rx = iw / 2 end
+        if (z.pg.half == 1) == app.comic_rtl() then z.rx = iw / 2 end
     end
     -- The box: the part of the page the other screen shows, as a share of it.
     local fit = math.min(PAGE_W / z.rw, PAGE_H / z.rh)
     z.bw = math.min(1, PAGE_W / (fit * app.ZOOM * z.rw))
     z.bh = math.min(1, PAGE_H / (fit * app.ZOOM * z.rh))
-    app.zoom = z
-    return true
+    app.zoom_clamp()
+    redraw()
 end
 
 function app.zoom_clamp()
@@ -4034,6 +4156,19 @@ end
 function app.zoom_draw(side)
     local z = app.zoom
     if not z then return end
+    if not z.img then
+        -- Still on its way (or it couldn't be made): the page as it was, and a word.
+        if side == app.touch_side() then app.comic_draw(z.pg, side) end
+        color(theme().dim)
+        love.graphics.setFont(ui.font)
+        love.graphics.printf(z.failed and "This page can't be enlarged" or "Loading…", 40, PAGE_H / 2 - 20, PAGE_W - 80, "center")
+        if side == app.touch_side() then
+            color(theme().bg, 0.9)
+            love.graphics.rectangle("fill", 0, PAGE_H - 92, PAGE_W, 92)
+            app.hints(48, nil, { "B", "close" })
+        end
+        return
+    end
     local th = theme()
     local k = app.dim_pictures(th) and 0.68 or 1
     local iw, ih = z.img:getDimensions()
@@ -4070,7 +4205,7 @@ end
 -- The box moved to a point on the touchscreen's page.
 function app.zoom_touch(u, v)
     local z = app.zoom
-    if not z then return end
+    if not (z and z.img) then return end
     local x, y, sc = app.zoom_page_place()
     z.cx, z.cy = (u - x) / (z.rw * sc), (v - y) / (z.rh * sc)
     app.zoom_clamp()
@@ -4080,6 +4215,10 @@ end
 function app.zoom_action(a)
     local z = app.zoom
     if not z then app.zoom_close() return end
+    if not z.img then                                  -- (on its way: only closing)
+        if a == "back" or a == "toc" or a == "menu" then app.zoom_close() end
+        return
+    end
     -- A press moves the box most of its own size, so nothing is skipped.
     if a == "left" or a == "prev" then z.cx = z.cx - z.bw * 0.6
     elseif a == "right" or a == "next" then z.cx = z.cx + z.bw * 0.6
@@ -4092,10 +4231,10 @@ function app.zoom_action(a)
             local c = spread.pages[k]
             if c and c.src and c ~= z.pg then other = c end
         end
-        if other and app.zoom_load(other) then app.zoom_clamp() end
+        if other then app.zoom_request(other) end
     elseif a == "back" or a == "toc" or a == "menu" then app.zoom_close() return
     end
-    if app.zoom then app.zoom_clamp() end
+    if app.zoom and app.zoom.img then app.zoom_clamp() end
     redraw()
 end
 
@@ -6261,9 +6400,9 @@ local function draw_bookmarks(side)
             -- A highlight: its words, marked like on the page; the chapter under them.
             local words = "“" .. fit_text(ui.font, e.text, rw - 110) .. "”"
             love.graphics.setFont(ui.font)
-            color(selected and th.bg or th.sel)
+            color(app.hl_colour(th, e.color))                   -- (in its own colour, as on the page)
             love.graphics.rectangle("fill", rx - 3, ty + 2, ui.font:getWidth(words) + 6, ui.font:getHeight() - 4, 4, 4)
-            color(th.fg)
+            color(app.hl_ink(th, e.color) or th.fg)
             love.graphics.print(words, rx, ty)
             love.graphics.setFont(ui.small)
             color(th.dim)
@@ -6414,11 +6553,12 @@ function app.bm_draw_left(entries, x, w)
     for k = 1, math.min(#lines, max) do
         local line = lines[k]
         if k == max and #lines > max then line = fit_text(ui.font, line .. " …", w - 8) end
+        local name = e.hl and not e.action and e.item.color or nil
         if e.hl then
-            color(app.hl_colour(th, not e.action and e.item.color or nil))
+            color(app.hl_colour(th, name))
             love.graphics.rectangle("fill", x - 3, y + 2, ui.font:getWidth(line) + 6, lh - 4, 4, 4)
         end
-        color(th.fg)
+        color(e.hl and app.hl_ink(th, name) or th.fg)
         love.graphics.print(line, x, y)
         y = y + lh
     end
@@ -7731,7 +7871,7 @@ function app.font_sample()
     local name = fp.list[fp.sel].name
     local cur = fp.sample
     if cur and cur.name == name and cur.size == fp.size then return cur.f end
-    if cur then for _, f in pairs(cur.f) do f:release() end end
+    if cur then Fonts.release(cur.f) end
     local f = Fonts.load(name, fp.size)
     fp.sample = { name = name, size = fp.size, f = f }
     return f
@@ -7739,7 +7879,7 @@ end
 
 function app.font_close(apply)
     local fp = app.font_pick
-    if fp.sample then for _, f in pairs(fp.sample.f) do f:release() end end
+    if fp.sample then Fonts.release(fp.sample.f) end
     if apply and fp.list[fp.sel] and fp.list[fp.sel].name ~= S.font then   -- (the same font: nothing to redo)
         S.font = fp.list[fp.sel].name
         build_fonts()
@@ -8570,6 +8710,7 @@ end
 
 local function render_canvases()
     local r0 = love.timer.getTime()
+    app.frame_no = app.frame_no + 1           -- (images drawn in this frame aren't released in it)
     local th = theme()
     local painter
     if app.mode == "reader" then
@@ -9483,9 +9624,9 @@ function handle_action(a)
     if mode == "zoom" then app.zoom_action(a) return end
     if mode == "reader" then
         if (a == "left" or a == "right") and app.comic_rtl() then app.turn_way(a == "left")    -- (manga: left is on)
-        elseif a == "next" or a == "right" or a == "down" then turn(1, next_spread)
+        elseif a == "next" or a == "right" or a == "down" then app.turn_way(true)
         elseif a == "up" and app.flipped() then look.open()   -- turned round: D-pad up does Y's job
-        elseif a == "prev" or a == "left" or a == "up" then turn(-1, prev_spread)
+        elseif a == "prev" or a == "left" or a == "up" then app.turn_way(false)
         elseif a == "bookmark" then toggle_bookmark()
         elseif a == "next_section" then jump_section(1)
         elseif a == "prev_section" then jump_section(-1)
@@ -10655,6 +10796,11 @@ function app.backup_start(whole)
     -- Room for it on the card? Said first, not after a long backup that
     -- fills it; older Everything backups can make room (asked first).
     local function start()
+        -- (Too big for a zip at all: said now, before old backups are offered up for it.)
+        if whole and app.backup_size() > 3.9 * 1024 ^ 3 then
+            app.toast("Too big for one backup\n" .. app.size_words(app.backup_size()) .. ": the most is 3.9 GB", 6)
+            return
+        end
         local need = (whole and app.backup_size() or 0) + 16 * 1024 * 1024
         local free = app.free_bytes(root)
         if not free or free >= need then go() return end
@@ -10662,15 +10808,17 @@ function app.backup_start(whole)
         for _, b in ipairs(app.backup_list()) do
             if not b.auto and b.info.kind == "everything" then
                 local f = io.open(b.path, "rb")
-                old[#old + 1] = { path = b.path, date = b.info.date or "", size = f and f:seek("end") or 0 }
+                old[#old + 1] = { path = b.path, date = b.info.date or "", size = f and f:seek("end") or 0,
+                    label = app.backup_label(b) }
                 if f then f:close() end
             end
         end
         table.sort(old, function(a, b) return a.date < b.date end)       -- (the oldest go first)
-        local del, freed = {}, 0
+        local del, freed, first = {}, 0, nil
         for _, b in ipairs(old) do
             if free + freed >= need then break end
             del[#del + 1], freed = b.path, freed + b.size
+            first = first or b
         end
         local sizes = "It needs " .. app.size_words(need) .. "; the SD card has " .. app.size_words(free) .. " free."
         if #del == 0 or free + freed < need then
@@ -10678,8 +10826,8 @@ function app.backup_start(whole)
             return
         end
         app.ask({ question = "Make room for the backup?", yes = "Delete", no = "Cancel",
-            detail = sizes .. "\nDelete " .. (#del == 1 and "your oldest Everything backup" or ("your " .. #del
-                .. " oldest Everything backups")) .. " (" .. app.size_words(freed) .. ")?",
+            detail = sizes .. "\nDelete " .. (#del == 1 and ("your Everything backup of " .. (first.label:match("^[^·]+") or ""):gsub("%s+$", ""))
+                or ("your " .. #del .. " oldest Everything backups")) .. " (" .. app.size_words(freed) .. ")?",
             on_yes = function()
                 for _, p in ipairs(del) do os.remove(p) end
                 go()
@@ -10744,7 +10892,7 @@ function app.backup_confirm(b)
     app.ask({ question = "Restore this backup?", yes = "Restore", no = "Cancel",
         -- (Three lines at most, the card's room.)
         detail = (b.info.kind == "everything"
-            and "Your settings, places, highlights and themes become the backup's, and its books are added."
+            and "Your settings, places, highlights and themes become the backup's; its books not here are added."
             or "Your settings, places, bookmarks, highlights and themes become the backup's.")
             .. "\neReaderDS closes when it's done.",
         on_yes = function() app.backup_restore(b) end })
@@ -10812,6 +10960,14 @@ function app.backup_poll()
             else
                 app.toast("Backed up\n" .. Store.books_folder() .. "/Backups/" .. bk.out:match("([^/]+)$"))
             end
+            redraw()
+        elseif msg.kind == "failed" and msg.partial then
+            -- Partly restored: the app's settings in memory are the old ones and
+            -- mustn't be saved over it. Stay frozen and close (the before-restore
+            -- copy puts things back).
+            app.bk = nil
+            app.toast("Couldn't finish restoring\n" .. msg.message .. "\neReaderDS is closing", 3600)
+            app.bk_quit_at = love.timer.getTime() + 5
             redraw()
         elseif msg.kind == "failed" then
             app.bk = nil
@@ -10894,13 +11050,30 @@ end
 function app.cal_setting(key, value)
     local file = Store.data_path("calibre.json")
     local f = io.open(file, "rb")
-    local ok, t = false, nil
-    if f then ok, t = pcall(require("json").decode, f:read("*a")); f:close() end
-    t = ok and type(t) == "table" and t or {}
-    if value == nil then return t[key] end
+    local ok, t, had = false, nil, false
+    if f then
+        local text = f:read("*a") or ""
+        f:close()
+        had = text:find("%S") ~= nil
+        ok, t = pcall(require("json").decode, text)
+    end
+    t = ok and type(t) == "table" and t or nil
+    if value == nil then return t and t[key] end
+    -- (A file that's there but can't be read isn't replaced by one with only
+    -- this setting: the login and the books Calibre sent would go.)
+    if not t and had then print("[calibre] calibre.json can't be read: not changed") return end
+    t = t or {}
     t[key] = value ~= "" and value or nil
+    -- Written whole, then put in place (a full card: the old one stays).
+    local text = require("json").encode(t)
     local w = io.open(file .. ".tmp", "wb")
-    if w then w:write(require("json").encode(t)); w:close(); os.rename(file .. ".tmp", file) end
+    if not w then return end
+    local wrote = w:write(text)
+    wrote = w:close() and wrote
+    local chk = wrote and io.open(file .. ".tmp", "rb")
+    wrote = chk and chk:seek("end") == #text
+    if chk then chk:close() end
+    if wrote then os.rename(file .. ".tmp", file) else os.remove(file .. ".tmp") end
 end
 
 -- Change the connection's settings: stop, change them, and connect again.
@@ -11312,10 +11485,14 @@ function love.quit()
         love.thread.getChannel("net_cancel"):push(true)
         love.thread.getChannel("net_jobs"):clear()
         love.thread.getChannel("net_jobs"):push({ kind = "quit" })
-        net.thread:wait()
+        -- (At most 2 seconds: one stuck looking up a server's name would hold
+        -- the quit up for as long as the resolver takes.)
+        local t = love.timer.getTime()
+        while net.thread:isRunning() and love.timer.getTime() - t < 2 do love.timer.sleep(0.02) end
     end
     local t2 = love.timer.getTime()
     app.cover_stop()
+    app.page_stop()
     app.pending_save()
     save_progress()
     Store.save_settings(S)
@@ -11356,6 +11533,15 @@ local function run_test_script()
             elseif a == "update" then app.update_open()
             elseif a == "crash" then error("a test crash")       -- the crash screen
             elseif a == "untoast" then overlay = nil            -- clear a message (for screenshots)
+            elseif a == "openbook" then                         -- open My Books' selected book now (no "Opening…" frame)
+                local it = library.items[library.sel]
+                if it then app.open_book(it.path) end
+            elseif a == "pages" then                            -- wait for a comic's pages and the magnifier (after a draw asks)
+                local t = love.timer.getTime()
+                while app.pages_waiting > 0 and love.timer.getTime() - t < 15 do
+                    app.comic_poll()
+                    love.timer.sleep(0.05)
+                end
             elseif a == "covers" then                           -- wait for covers being loaded (after a draw asks for them)
                 local t = love.timer.getTime()
                 while app.covers_waiting > 0 and love.timer.getTime() - t < 10 do
@@ -11514,6 +11700,7 @@ function love.run()
             and app.touch_clock() - gesture.t0 > 0.6 then
             gesture.held = true                -- press and hold
             gesture.hl_ok = app.on_hold(gesture.side, gesture.u0, gesture.v0)
+            if app.mode == "zoom" then gesture.mode = "zoom" end      -- (a comic held: the box follows the finger)
         end
         if shop.net_poll() then got = true end
         if app.update_poll() then got = true end
@@ -11572,16 +11759,17 @@ function love.run()
                 if S.sb_show and S.sb_clock ~= "off" and app.CLOCK_MODES[app.mode] then redraw() end
             end
         end
-        if app.anim or app.task or library.pending or app.covers_waiting > 0 or app.pages_waiting > 0 then
+        if app.anim or app.task or library.pending then
             love.timer.sleep(0.001)            -- animating or working: next frame
+        elseif app.covers_waiting > 0 or app.pages_waiting > 0 then
+            love.timer.sleep(0.01)             -- a picture decoding on its thread: look a hundred times a second
         elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or app.cal or app.bk or app.bk_quit_at
                 or (S.idle_min or 0) > 0 then
             -- Touch, the lid and the timers don't wake love.event.wait(), so poll at a gentle rate.
             if got then app.last_input = love.timer.getTime() end
             local nap = gesture and 0.008 or 0.025
-            -- Android: touches wait in the event queue, so after a few quiet
-            -- seconds look less often (less CPU while you read).
-            if app.frame_canvas and not gesture and love.timer.getTime() - (app.last_input or 0) > 5 then nap = 0.06 end
+            -- After a few quiet seconds look less often (less CPU while you read).
+            if not gesture and love.timer.getTime() - (app.last_input or 0) > 5 then nap = 0.06 end
             if not got and not app.dirty then love.timer.sleep(nap) end
         elseif not got then
             local r = handle(love.event.wait())

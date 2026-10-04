@@ -66,12 +66,18 @@ local function load_store()
         store.uuid = h:sub(1, 8) .. "-" .. h:sub(9, 12) .. "-" .. h:sub(13, 16) .. "-" .. h:sub(17, 20) .. "-" .. h:sub(21, 32)
     end
 end
+-- (Written whole, then put in place: a full card mustn't leave a cut-short
+-- file, which would lose the login and the list of books Calibre sent.)
 local function save_store()
+    local text = json.encode(store)
     local f = io.open(STORE .. ".tmp", "wb")
     if not f then return end
-    f:write(json.encode(store))
-    f:close()
-    os.rename(STORE .. ".tmp", STORE)
+    local ok = f:write(text)
+    ok = f:close() and ok
+    local chk = ok and io.open(STORE .. ".tmp", "rb")
+    ok = chk and chk:seek("end") == #text
+    if chk then chk:close() end
+    if ok then os.rename(STORE .. ".tmp", STORE) else os.remove(STORE .. ".tmp") end
 end
 
 -- What's kept of a book's metadata: enough for Calibre to recognise it (the
@@ -112,10 +118,11 @@ local function space()
     local p = io.popen('df -k "' .. args.books .. '" 2>/dev/null | tail -1')
     local line = p and p:read("*a") or ""
     if p then p:close() end
-    local cols = {}
-    for c in line:gmatch("%S+") do cols[#cols + 1] = c end
-    local total, free = tonumber(cols[2]), tonumber(cols[4])
-    return (total or 0) * 1024, (free or 0) * 1024
+    -- Size, used and available after the device's name (which busybox puts on
+    -- a line of its own when it's long: then the line starts with the numbers).
+    local nums = {}
+    for n in (" " .. line):gmatch("%s(%d+)") do nums[#nums + 1] = tonumber(n) end
+    return (nums[1] or 0) * 1024, (nums[3] or 0) * 1024
 end
 
 ---------------------------------------------------------------- finding Calibre
@@ -178,6 +185,7 @@ local function fill()
     local got = data or partial
     if got and #got > 0 then buf = buf .. got; return true end
     if err == "closed" then error("lost: Calibre closed the connection", 0) end
+    if err and err ~= "timeout" then error("lost: " .. tostring(err), 0) end     -- (a reset, say: not a quiet moment)
     return false
 end
 
@@ -187,7 +195,8 @@ local function receive()
         local b = buf:find("[", 1, true)
         if b then
             local len = tonumber(buf:sub(1, b - 1))
-            if not len then error("lost: Calibre sent something unexpected", 0) end
+            -- (Messages are small: a huge length isn't Calibre's.)
+            if not len or len > 64 * 1024 * 1024 then error("lost: Calibre sent something unexpected", 0) end
             while #buf - b + 1 < len do
                 if not fill() and stopping() then return nil end
             end
@@ -352,7 +361,8 @@ local function session(ip, port, name, timeout, address)
             for _, lp in ipairs(type(arg.lpaths) == "table" and arg.lpaths or {}) do
                 local m = store.books[lp]
                 local path = ROOT .. "/" .. clean(lp)
-                if os.remove(path) then
+                -- (Only a book Calibre itself sent here.)
+                if m and os.remove(path) then
                     out:push({ kind = "deleted", path = path, title = m and m.title or clean(lp):match("([^/]+)%.%w+$") })
                 end
                 store.books[lp] = nil

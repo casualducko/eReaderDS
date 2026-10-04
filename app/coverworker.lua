@@ -21,7 +21,10 @@ while true do
     if job == "quit" then break end
     local ok, id = pcall(function()
         local t0 = love.timer and love.timer.getTime()
-        local id = love.image.newImageData(love.filesystem.newFileData(job.data, job.name))
+        local fd = love.filesystem.newFileData(job.data, job.name)
+        local okd, id = pcall(love.image.newImageData, fd)
+        fd:release()                          -- (a copy of the file in native memory: not left for the GC)
+        if not okd then error(id, 0) end
         local t1 = love.timer and love.timer.getTime()
         -- Shrunk here (job.fit: { w, h, wide: a spread may be twice as wide }),
         -- so only the small copy goes back: the full picture can be 20 MB.
@@ -38,6 +41,6 @@ while true do
         return id
     end)
     job.data = nil
-    if ok then out:push({ path = job.path, name = job.name, image = id })
-    else out:push({ path = job.path, name = job.name, error = tostring(id) }) end
+    if ok then out:push({ path = job.path, name = job.name, tag = job.tag, image = id })
+    else out:push({ path = job.path, name = job.name, tag = job.tag, error = tostring(id) }) end
 end

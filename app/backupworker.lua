@@ -24,16 +24,16 @@ end
 
 local function step(text) out:push({ kind = "step", text = text }) end
 
-local ok, err, skipped
+local ok, err, skipped, partial
 if job.kind == "reset" then
     step("Backing up your settings first…")
     local files = Backup.collect(job.root, job.data_dir, false)
     Backup.mkdir_p(job.before.out:match("^(.*)/"))
     ok, err = Backup.write(job.before.out, files, job.before.manifest, job.root)
     if ok then
-        Backup.prune(job.before.out:match("^(.*)/"), 3)
+        Backup.prune(job.before.out:match("^(.*)/"), 3, { job.before.out })
         step("Clearing…")
-        for _, f in ipairs(files) do os.remove(f.path) end
+        for _, f in ipairs(files) do os.remove(f.path); os.remove(f.path .. ".bak") end    -- (their safety copies too)
     else
         err = "the backup couldn't be made first, so nothing was cleared (" .. tostring(err) .. ")"
     end
@@ -51,7 +51,7 @@ else
         Backup.mkdir_p(job.before.out:match("^(.*)/"))
         if job.before.out == job.zip then job.before.out = job.before.out:gsub("%.zip$", "-2.zip") end
         ok, err = Backup.write(job.before.out, Backup.collect(job.root, job.data_dir, false), job.before.manifest, job.root)
-        if ok then Backup.prune(job.before.out:match("^(.*)/"), 3, job.zip) end
+        if ok then Backup.prune(job.before.out:match("^(.*)/"), 3, { job.before.out, job.zip }) end
     else
         ok = true
     end
@@ -59,7 +59,7 @@ else
         err = "a copy of your settings couldn't be made first, so nothing was restored (" .. tostring(err) .. ")"
     else
         step("Restoring…")
-        ok, err = Backup.restore(job.zip, job.root, job.data_dir, progress, job.same_system)
+        ok, err, partial = Backup.restore(job.zip, job.root, job.data_dir, progress, job.same_system)
         skipped = ok and err or 0
     end
 end
@@ -68,4 +68,5 @@ if ok and job.kind ~= "backup" and not job.android then
     step("Saving to the SD card…")
     os.execute("sync")
 end
-if ok then out:push({ kind = "done", skipped = skipped }) else out:push({ kind = "failed", message = tostring(err) }) end
+if ok then out:push({ kind = "done", skipped = skipped })
+else out:push({ kind = "failed", message = tostring(err), partial = partial }) end

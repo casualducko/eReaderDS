@@ -349,6 +349,25 @@ end
 
 -- Returns fonts {r, i, b, bi, h} for a family at a size, falling back to the
 -- default family if anything fails to load.
+-- The fallback set made for each set M.load returns (kept aside: callers go
+-- through a set's fonts by name).
+M.fallbacks = setmetatable({}, { __mode = "k" })
+
+-- A set from M.load released now, its fallback set too: fonts hold glyph
+-- textures and native memory the Lua collector doesn't see.
+function M.release(set)
+    if not set then return end
+    local seen = {}
+    local function free(t)
+        for _, f in pairs(t or {}) do
+            if type(f) == "userdata" and not seen[f] then seen[f] = true; pcall(f.release, f) end
+        end
+    end
+    free(M.fallbacks[set])
+    M.fallbacks[set] = nil
+    free(set)
+end
+
 function M.load(name, size)
     local fam = M.find(name)
     local function load_family(f)
@@ -373,6 +392,7 @@ function M.load(name, size)
                 for k, f in pairs(res) do
                     if gres[k] then pcall(f.setFallbacks, f, gres[k]) end
                 end
+                M.fallbacks[res] = gres           -- (to be released with them: M.release)
             end
         end
         return res, fam.name

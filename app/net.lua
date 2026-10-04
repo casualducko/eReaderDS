@@ -522,8 +522,15 @@ function M.get(url, opts)
     local parts
     local sink = opts.sink
     if not sink then
+        -- (In memory: a page, a feed or a cover. Not past 16 MB: a wrong link
+        -- to something huge would use up a 1 GB handheld.)
         parts = {}
-        sink = function(d) parts[#parts + 1] = d end
+        local held = 0
+        sink = function(d)
+            held = held + #d
+            if held > 16 * 1024 * 1024 then error("too big (over 16 MB)", 0) end
+            parts[#parts + 1] = d
+        end
     end
     local tried_auth, retries = false, 0
     local start = M.parse_url(url)

@@ -112,11 +112,13 @@ local function write_atomic(file, text)
         if chk then chk:close() end
     end
     if not ok then os.remove(tmp); return false end
+    local synced = false
     if fsync_file then
         local base, now = file:match("([^/]+)$"), os.time()
         if not OFTEN[base] or now - (last_fsync[base] or 0) >= 30 then
             last_fsync[base] = now
             pcall(fsync_file, tmp)
+            synced = OFTEN[base]
         end
     end
     -- rename() replaces the old file in one step, so a power cut leaves either
@@ -130,7 +132,49 @@ local function write_atomic(file, text)
     -- Remember it only once it's really on the card, so a failed write is
     -- retried next time.
     if renamed then last_written[file] = text end
+    -- A file rewritten on nearly every page turn also keeps a copy made only
+    -- when it's just been flushed to the card: a power cut while it's
+    -- replaced can leave it empty (FAT), and the places in every book would
+    -- be gone (M.open_good reads the copy then).
+    if renamed and synced then
+        local b = io.open(file .. ".bak", "wb")
+        if b then
+            local okb = b:write(text)
+            if b:close() and okb then pcall(fsync_file, file .. ".bak") end
+        end
+    end
     return renamed
+end
+
+-- A data file to read: the file itself; when it's there but empty or all
+-- zeros (a power cut while it was replaced) its .bak copy; when it's gone,
+-- only the .tmp it was written to (a rename that failed after the old one was
+-- removed), never the .bak: a file that's gone was removed on purpose (a
+-- reset, say), and its old copy mustn't bring it back.
+function M.open_good(name)
+    local p = path(name)
+    local f = io.open(p, "rb")
+    local bad = false
+    if f then
+        local head = f:read(4096) or ""
+        bad = head == "" or head:match("^%z+$") ~= nil
+        f:seek("set", 0)
+        if not bad then return f end
+    end
+    for _, alt in ipairs(f and { p .. ".bak", p .. ".tmp" } or { p .. ".tmp" }) do
+        local g = io.open(alt, "rb")
+        if g then
+            local head = g:read(64) or ""
+            if head ~= "" and not head:match("^%z+$") then
+                g:seek("set", 0)
+                if f then f:close() end
+                print("[store] " .. name .. (bad and f and " was empty" or " was missing") .. ": read " .. alt:match("[^/]+$"))
+                return g
+            end
+            g:close()
+        end
+    end
+    return f
 end
 
 -- A file's lines without a Windows line ending (a file edited on a PC).
@@ -182,7 +226,7 @@ function M.data_dir() return (path(""):gsub("/$", "")) end
 -- line, "name <tab> text colour <tab> page colour", each "brightness:warmth:tint".
 function M.load_themes()
     local out = {}
-    local f = io.open(path("themes.txt"), "rb")
+    local f = M.open_good("themes.txt")
     if not f then return out end
     for line in lines(f) do
         local name, fg, bg = line:match("^([^\t]+)\t([%d,/:%-]+)\t([%d,/:%-]+)$")
@@ -288,7 +332,7 @@ local progress
 local function load_progress()
     if progress then return progress end
     progress = {}
-    local f = io.open(path("progress.txt"), "rb")
+    local f = M.open_good("progress.txt")
     if f then
         for line in lines(f) do
             local p, ch, off, pct = line:match("^(.-)\t(%d+)\t(%d+)\t([%d%.]+)$")
@@ -325,7 +369,7 @@ local bookmarks
 local function load_bookmarks()
     if bookmarks then return bookmarks end
     bookmarks = {}
-    local f = io.open(path("bookmarks.txt"), "rb")
+    local f = M.open_good("bookmarks.txt")
     if f then
         for line in lines(f) do
             local p, ch, off, pct, title, snippet = line:match("^(.-)\t(%d+)\t(%d+)\t([%d%.]+)\t(.-)\t(.*)$")
@@ -373,7 +417,7 @@ local highlights
 local function load_highlights()
     if highlights then return highlights end
     highlights = {}
-    local f = io.open(path("highlights.txt"), "rb")
+    local f = M.open_good("highlights.txt")
     if f then
         for line in lines(f) do
             local p, ch, s, e, pct, title, text, colour, note =
@@ -423,7 +467,7 @@ function M.set_highlights(p, list)
 end
 
 function M.get_last()
-    local f = io.open(path("last.txt"), "rb")
+    local f = M.open_good("last.txt")
     if not f then return nil end
     local p = f:read("*l")
     f:close()
@@ -438,7 +482,7 @@ local comics
 local function load_comics()
     if comics then return comics end
     comics = {}
-    local f = io.open(path("comics.txt"), "rb")
+    local f = M.open_good("comics.txt")
     if f then
         for line in lines(f) do
             local p, d = line:match("^(.-)\t(%a+)$")
@@ -465,7 +509,7 @@ local opened
 local function load_opened()
     if opened then return opened end
     opened = {}
-    local f = io.open(path("opened.txt"), "rb")
+    local f = M.open_good("opened.txt")
     if f then
         for line in lines(f) do
             local p, t = line:match("^(.-)\t(%d+)$")
@@ -503,7 +547,7 @@ local meta
 local function load_meta()
     if meta then return meta end
     meta = {}
-    local f = io.open(path("library.txt"), "rb")
+    local f = M.open_good("library.txt")
     if f then
         for line in lines(f) do
             local p, size, t, a, so, se, ix = line:match("^(.-)\t(%-?%d+)\t(.-)\t(.-)\t(.-)\t(.-)\t(.-)$")
@@ -547,7 +591,7 @@ local finished
 local function load_finished()
     if finished then return finished end
     finished = {}
-    local f = io.open(path("finished.txt"), "rb")
+    local f = M.open_good("finished.txt")
     if f then
         for line in lines(f) do
             local p, t = line:match("^(.-)\t(%d+)$")
@@ -577,7 +621,7 @@ local seen
 local function load_seen()
     if seen then return seen end
     seen = {}
-    local f = io.open(path("sync-seen.txt"), "rb")
+    local f = M.open_good("sync-seen.txt")
     if f then
         for line in lines(f) do
             local a, p, t = line:match("^(.-)\t(.-)\t(.+)$")

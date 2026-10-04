@@ -637,6 +637,7 @@ end
 local function comic_title(path, info)
     local Comic = require("comic")
     local vol = tonumber(info.volume or "")
+    if vol and vol >= 1900 then vol = nil end          -- (ComicVine's tools put the series' first year there)
     if info.series then
         if vol then return info.series .. ", Vol. " .. Comic.number_text(vol), info.series, vol end
         return info.series .. (info.number and (" " .. info.number) or ""), info.series, tonumber(info.number or "")

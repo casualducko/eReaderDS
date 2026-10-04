@@ -157,6 +157,7 @@ function M.write(out, files, manifest, root, progress)
     local central, offset, done, total = {}, 0, 0, 0
     for _, e in ipairs(files) do total = total + e.size end
     if total > 3.9 * 1024 ^ 3 then f:close(); os.remove(part); return nil, "it's too big for one backup (4 GB)" end
+    if #files >= 65535 then f:close(); os.remove(part); return nil, "it has too many files for one backup" end
     local tm, dt = dos_time(os.time())
     local ok_all = true
     local function put(s) if not f:write(s) then ok_all = false end end
@@ -236,7 +237,12 @@ function M.write(out, files, manifest, root, progress)
     put("PK\5\6" .. u16(0) .. u16(0) .. u16(#central) .. u16(#central) .. u32(#cds) .. u32(cd_start) .. u16(0))
     if not f:close() then ok_all = false end
     if not ok_all then os.remove(part); return nil, "couldn't write the backup (is the SD card full?)" end
-    os.remove(out)
+    -- (Never over another backup: one made in the same minute gets "-2".)
+    if size_of(out) then
+        local n = 2
+        while size_of((out:gsub("%.zip$", "-" .. n .. ".zip"))) do n = n + 1 end
+        out = out:gsub("%.zip$", "-" .. n .. ".zip")
+    end
     if not os.rename(part, out) then os.remove(part); return nil, "couldn't save the backup" end
     return true
 end
@@ -245,14 +251,22 @@ end
 -- ("eReaderDS-before-…zip") beyond the newest `keep` are deleted, so they
 -- don't pile up. Your own backups are never touched.
 -- (spare: the one being restored, which is never deleted.)
+-- spare: paths always kept (the copy just made, and the backup being
+-- restored), counted among the `keep`: by their names' dates alone, a copy
+-- just made with a clock that's behind would be the "oldest" and go at once.
 function M.prune(dir, keep, spare)
-    local found = {}
+    local spared = {}
+    for _, p in ipairs(type(spare) == "table" and spare or { spare }) do spared[p] = true end
+    local found, kept = {}, 0
     for _, e in ipairs(list(dir)) do
         local stamp = not e.dir and e.name:match("^eReaderDS%-before%-%a+%-(%d+%-%d+%-%d+%-%d+)%.zip$")
-        if stamp and dir .. "/" .. e.name ~= spare then found[#found + 1] = { name = e.name, stamp = stamp } end
+        if stamp then
+            if spared[dir .. "/" .. e.name] then kept = kept + 1
+            else found[#found + 1] = { name = e.name, stamp = stamp } end
+        end
     end
     table.sort(found, function(a, b) return a.stamp > b.stamp end)
-    for i = keep + 1, #found do os.remove(dir .. "/" .. found[i].name) end
+    for i = math.max(0, keep - kept) + 1, #found do os.remove(dir .. "/" .. found[i].name) end
 end
 
 ---------------------------------------------------------------- restoring
@@ -324,7 +338,9 @@ function M.restore(path, root, data_dir, progress, same_system)
     for name, e in pairs(zf.entries) do
         if name ~= M.MANIFEST and not name:match("/$") and not name:match("^%.") then
             local dest, start = root .. "/" .. name, done
-            if size_of(dest) ~= e.usize then
+            -- (A book already here is kept as it is, whatever its size: it may
+            -- be a newer copy, and "its books are added" is what was asked.)
+            if size_of(dest) == nil then
                 M.mkdir_p(dest:match("^(.*)/"))
                 local f = io.open(dest .. ".part", "wb")
                 local wrote = f ~= nil
@@ -406,17 +422,24 @@ function M.restore(path, root, data_dir, progress, same_system)
         from_backup[d.data_name] = true
     end
     zf:close()
+    -- Every file in place first, then the ones the backup lacks removed. (A
+    -- failure after the first rename leaves the data partly restored:
+    -- "partial", and the app must close rather than save its old settings.)
+    for k, n in ipairs(written) do
+        local p = data_dir .. "/" .. n
+        os.remove(p .. ".bak")                  -- (a safety copy of what's being replaced: not wanted back)
+        if not os.rename(p .. ".tmp", p) then
+            os.remove(p)
+            if not os.rename(p .. ".tmp", p) then
+                for j = k + 1, #written do os.remove(data_dir .. "/" .. written[j] .. ".tmp") end
+                return nil, "couldn't save " .. n, k > 1 and "partial" or nil
+            end
+        end
+    end
     for _, e in ipairs(list(data_dir)) do
         -- (Not logins the backup hasn't any of: the question doesn't say they go.)
         if not e.dir and data_file(e.name) and not from_backup[e.name] and not LOGINS[e.name] then
             os.remove(data_dir .. "/" .. e.name)
-        end
-    end
-    for _, n in ipairs(written) do
-        local p = data_dir .. "/" .. n
-        if not os.rename(p .. ".tmp", p) then
-            os.remove(p)
-            if not os.rename(p .. ".tmp", p) then return nil, "couldn't save " .. n end
         end
     end
     return true, skipped

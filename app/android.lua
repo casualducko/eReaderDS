@@ -25,7 +25,8 @@ function M.ls(dir)                              -- the names in a folder, sorted
         table.sort(t)
         return t
     end
-    local p = io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
+    -- (In single quotes, its own escaped: a name with " $ or ` in it.)
+    local p = io.popen("ls -1 '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
     if p then
         for n in p:lines() do t[#t + 1] = n end
         p:close()

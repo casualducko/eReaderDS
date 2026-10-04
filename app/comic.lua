@@ -105,7 +105,7 @@ function M.from_name(path)
         :gsub("%s+", " "):gsub("^%s+", ""):gsub("[%s%-]+$", "")
     if clean == "" then clean = base end
     for _, p in ipairs({ "^(.-)[%s%-,]+[Vv]olume%s*(%d+%.?%d*)$", "^(.-)[%s%-,]+[Vv]ol%.?%s*(%d+%.?%d*)$",
-            "^(.-)[%s%-,]+[Vv](%d+%.?%d*)$" }) do
+            "^(.-)[%s%-,]+[Vv](%d%d+%.?%d*)$" }) do      -- (a bare "v2" is a scan's version, not a volume)
         local s, n = clean:match(p)
         if s and s ~= "" and tonumber(n) then return s, tonumber(n), clean end
     end
@@ -149,8 +149,13 @@ function M.direction(path, names, info)
     for _, w in ipairs(M.LEFT_TO_RIGHT) do
         if all:find(w, 1, true) then return false, "manhwa or webtoon" end
     end
+    -- (A publisher as release groups write it, in brackets: "[Kodansha Comics]",
+    -- "(VIZ Media)"; not a word in a title or a folder's name.)
+    local tagged = {}
+    for t in all:gmatch("[%[%(]([^%]%)]*)[%]%)]") do tagged[#tagged + 1] = t end
+    tagged = table.concat(tagged, "\n")
     for _, p in ipairs(M.MANGA_PUBLISHERS) do
-        if all:find(p, 1, true) then return true, "publisher" end
+        if tagged:find(p, 1, true) then return true, "publisher" end
     end
     -- (Hiragana and katakana, in UTF-8: Japanese, not Chinese.)
     if all:find("\227[\129-\131][\128-\191]") then return true, "Japanese names" end

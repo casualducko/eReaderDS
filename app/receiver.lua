@@ -21,6 +21,18 @@ local ctl = love.thread.getChannel("recv_ctl")
 local out = love.thread.getChannel("recv_out")
 
 local MAX_SIZE = 300 * 1024 * 1024
+
+-- Left over from an upload cut off by a crash or the power going: hidden
+-- ".name.part" files the library never shows, cleared when receiving starts.
+for _, dir in ipairs({ dirs.books, dirs.fonts }) do
+    local p = dir and io.popen("ls -1a '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+    if p then
+        for n in p:lines() do
+            if n:match("^%..+%.part$") then os.remove(dir .. "/" .. n) end
+        end
+        p:close()
+    end
+end
 local STALL = 20            -- seconds without data before giving up on a connection
 local CHUNK = 64 * 1024
 
