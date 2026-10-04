@@ -573,7 +573,7 @@ passage over several lines joins up) in every theme, stay
 put when you change the font or text size, and are listed with your bookmarks
 in **Settings → Bookmarks and Highlights** (A goes there; Y deletes one after you
 confirm; left/right, or a tap on the label at the top, shows All, just
-Highlights or just Bookmarks).
+Highlights, just the highlights with Notes, or just Bookmarks).
 
 **Highlight color:** Yellow (the default), Green, Blue, Pink or Subtle, in
 Settings → Reading & Device (each highlight can have its own instead:

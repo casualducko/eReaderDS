@@ -6325,8 +6325,8 @@ end
 
 -- Bookmarks and highlights together, in reading order.
 -- What the page shows (left/right, like My Books' order): all, or just one kind.
-app.BM_FILTERS = { "all", "highlights", "bookmarks" }
-app.BM_FILTER_NAMES = { all = "All", highlights = "Highlights", bookmarks = "Bookmarks" }
+app.BM_FILTERS = { "all", "highlights", "notes", "bookmarks" }
+app.BM_FILTER_NAMES = { all = "All", highlights = "Highlights", notes = "Notes", bookmarks = "Bookmarks" }
 
 function app.bm_filter(d)
     local i = 1
@@ -6338,13 +6338,17 @@ end
 
 local function bookmark_entries()
     local f = bm.filter or "all"
-    local entries = f ~= "highlights" and { { action = true } } or {}
+    -- (Notes: the highlights that have one.)
+    local hl_only = f == "highlights" or f == "notes"
+    local entries = not hl_only and { { action = true } } or {}
     local all = {}
-    if f ~= "highlights" then
+    if not hl_only then
         for _, b in ipairs(Store.get_bookmarks(book.path)) do all[#all + 1] = { item = b, ch = b.ch, off = b.off } end
     end
     if f ~= "bookmarks" then
-        for _, h in ipairs(Store.get_highlights(book.path)) do all[#all + 1] = { item = h, ch = h.ch, off = h.s, hl = true } end
+        for _, h in ipairs(Store.get_highlights(book.path)) do
+            if f ~= "notes" or h.note then all[#all + 1] = { item = h, ch = h.ch, off = h.s, hl = true } end
+        end
     end
     table.sort(all, function(x, y) return x.ch < y.ch or (x.ch == y.ch and x.off < y.off) end)
     for _, e in ipairs(all) do entries[#entries + 1] = e end
@@ -6425,6 +6429,7 @@ local function draw_bookmarks(side)
         local how_h = "To highlight, press Y, then Select at the first word and again at the last."
         local f = bm.filter or "all"
         love.graphics.printf((f == "highlights" and ("No highlights yet. " .. how_h))
+            or (f == "notes" and "No notes yet. To add one, hold a highlighted word (or put the cursor on it and press Select), then choose Note.")
             or (f == "bookmarks" and ("No bookmarks yet. " .. how_b))
             or ("No bookmarks or highlights yet. " .. how_b .. " " .. how_h),
             x, 160 + (#entries > 0 and row_h or 0) + 20, w, "left")
