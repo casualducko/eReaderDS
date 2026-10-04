@@ -560,14 +560,15 @@ and tap **Save Highlight**. Or keep holding after the definition opens and
 **drag** over the words, then **Save Highlight**. When the word is near the
 foot of the page, the buttons move to the top. **Cancel** stops choosing (or
 closes the definition).
-Hold a highlighted word for **Remove Highlight**. (A word picked with the Y
+Hold a highlighted word for its buttons: **Note** (type a note on it;
+empty removes it), **Colour** (its own colour), **Remove**, **Cancel**. (A word picked with the Y
 cursor gets the same buttons on the touchscreen; move the cursor to the
 last word, then Save.)
 
 **With the buttons:** press **Y** for the word cursor, move to the first word, press **Select**, move
 to the last word (the highlight grows as you go, across both pages), and press
-**Select** again. **B** cancels. To remove one, put the cursor on it and press
-**Select**. Highlights show as one block of color behind the words (a
+**Select** again. **B** cancels. On a highlighted word, **Select** offers a
+note, its colour, or removing it. Highlights show as one block of color behind the words (a
 passage over several lines joins up) in every theme, stay
 put when you change the font or text size, and are listed with your bookmarks
 in **Settings → Bookmarks and Highlights** (A goes there; Y deletes one after you
@@ -575,14 +576,16 @@ confirm; left/right, or a tap on the label at the top, shows All, just
 Highlights or just Bookmarks).
 
 **Highlight color:** Yellow (the default), Green, Blue, Pink or Subtle, in
-Settings → Reading & Device; it's shaded to suit each theme, light or dark.
+Settings → Reading & Device (each highlight can have its own instead:
+**Colour** on it); it's shaded to suit each theme, light or dark.
 On a dark theme highlights are muted, so the light text on them stays easy
 to read; **Highlights on dark themes → Bright** makes them highlighter
 bright there too, with the highlighted words in dark ink.
 
 Your highlights and bookmarks are also saved as a file for each book, to read
 or copy on a computer (like a Kindle's "My Clippings"):
-`Ebook/Highlights/Title - Author.md`, in reading order under each chapter.
+`Ebook/Highlights/Title - Author.md`, in reading order under each chapter,
+with your notes under their highlights (the list shows them too).
 It's written again whenever they change, so add your own notes elsewhere.
 
 ## KOReader Sync

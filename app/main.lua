@@ -963,8 +963,10 @@ end
 -- lighter than a dark page, so the text on it reads the same. "Subtle":
 -- the theme's own selection colour.
 app.HL_HUES = { yellow = 100, green = 145, blue = 245, pink = 345 }
-function app.hl_colour(th)
-    local hue = app.HL_HUES[S.hl_color]
+-- (name: a highlight's own colour; else the Settings one.)
+function app.hl_colour(th, name)
+    name = name or S.hl_color
+    local hue = app.HL_HUES[name]
     if not hue then return th.sel end
     local L = app.rgb_lab(th.bg[1], th.bg[2], th.bg[3])[1]
     local dark = L < 50
@@ -973,7 +975,7 @@ function app.hl_colour(th)
     if dark and S.hl_bright then L, dark = 97, false end
     local l, c = dark and L + 17 or L - 8, dark and 0.055 or 0.085
     -- (Yellow is only highlighter-yellow when light and strong; darker, it's khaki.)
-    if S.hl_color == "yellow" and not dark then l, c = L - 2, 0.13 end
+    if name == "yellow" and not dark then l, c = L - 2, 0.13 end
     local h = math.rad(hue)
     local function axis(v) return math.max(-100, math.min(100, math.floor(v / app.TEDIT_CHROMA * 100 + 0.5))) end
     return app.lab_rgb({ math.max(0, math.min(100, l)), axis(c * math.sin(h)), axis(c * math.cos(h)) })
@@ -981,8 +983,8 @@ end
 
 -- The text colour of highlighted words: dark ink on bright highlights on a
 -- dark theme (light text on them would be hard to read), else nil.
-function app.hl_ink(th)
-    if S.hl_bright and app.HL_HUES[S.hl_color] and app.rgb_lab(th.bg[1], th.bg[2], th.bg[3])[1] < 50 then
+function app.hl_ink(th, name)
+    if S.hl_bright and app.HL_HUES[name or S.hl_color] and app.rgb_lab(th.bg[1], th.bg[2], th.bg[3])[1] < 50 then
         return { 0.1, 0.1, 0.1 }
     end
 end
@@ -997,12 +999,12 @@ end
 -- and a highlight that goes on to the next line meets it, filling the space
 -- between the lines, so a passage reads as one block.
 function app.hl_bands(page, ox, oy)
-    local marked, seq, n = {}, {}, 0
+    local marked, seq, n, range = {}, {}, 0, {}
     for _, it in ipairs(page.items) do
         if it.kind == "text" and it.off then
             n = n + 1
             for _, r in ipairs(app.hl_active) do
-                if it.off >= r.s and it.off < r.e then marked[#marked + 1] = it; seq[#marked] = n; break end
+                if it.off >= r.s and it.off < r.e then marked[#marked + 1] = it; seq[#marked] = n; range[#marked] = r; break end
             end
         end
     end
@@ -1034,8 +1036,11 @@ function app.hl_bands(page, ox, oy)
             a.bottom2, b.top2 = mid + 4, mid - 4
         end
     end
-    color(app.hl_colour(theme()))
+    local th, shade = theme(), {}
     for i, it in ipairs(marked) do
+        local name = range[i].color or S.hl_color
+        shade[name] = shade[name] or app.hl_colour(th, name)
+        color(shade[name])
         local x2 = it.x + it.font:getWidth(it.text)
         local nx = seq[i + 1] == seq[i] + 1 and marked[i + 1]   -- only the very next word, not one further on
         if nx and nx.x > it.x and line_of[i + 1] == line_of[i] then
@@ -1045,8 +1050,9 @@ function app.hl_bands(page, ox, oy)
         local top, bottom = l.top2 or l.top, l.bottom2 or l.bottom
         love.graphics.rectangle("fill", ox + it.x - 3, oy + top, x2 - it.x + 6, bottom - top, 4, 4)
     end
+    -- Each marked word's highlight (for its text colour: app.hl_ink).
     local set = {}
-    for _, it in ipairs(marked) do set[it] = true end
+    for i, it in ipairs(marked) do set[it] = range[i] end
     return set
 end
 
@@ -1060,7 +1066,8 @@ function app.look_buttons()
     if not w then return {} end
     local list
     if look.hl_start then list = { { "save", "Save Highlight" }, { "cancel", "Cancel" } }
-    elseif app.hl_at(w) then list = { { "remove", "Remove Highlight" }, { "close", "Cancel" } }
+    elseif app.hl_at(w) then
+        list = { { "note", "Note" }, { "colour", "Colour" }, { "remove", "Remove" }, { "close", "Cancel" } }
     else list = { { "start", "Start Highlight" }, { "close", "Cancel" } } end
     local gap, total = 24, -24
     for _, b in ipairs(list) do b.w = ui.font:getWidth(b[2]) + 72; total = total + b.w + gap end
@@ -1118,7 +1125,9 @@ function app.look_bar_tap(side, u, v)
             elseif b[1] == "start" then
                 -- (then choose the rest, and Save)
                 if look.words[look.sel].off then look.hl_start = look.sel else app.toast("This can't be highlighted") end
-            else app.hl_select() end                         -- remove: the highlight this word is in
+            elseif b[1] == "note" then app.hl_note(app.hl_at(look.words[look.sel]))
+            elseif b[1] == "colour" then app.hl_pick_colour(app.hl_at(look.words[look.sel]))
+            else app.hl_remove(app.hl_at(look.words[look.sel])) end      -- remove: the highlight this word is in
             redraw()
             return true
         end
@@ -1165,10 +1174,7 @@ function app.hl_select()
     if not look.hl_start then
         local i = app.hl_at(w)
         if i then
-            table.remove(list, i)
-            Store.set_highlights(book.path, list)
-            app.export_notes()
-            app.toast("Highlight removed")
+            app.hl_options(i)                -- a note, its colour, or removing it
         else
             look.hl_start = look.sel
         end
@@ -1193,9 +1199,12 @@ function app.hl_select()
     end
     local text = words_text(span.a, span.b)
     -- Overlapping highlights become one.
-    local keep, merged = {}, false
+    local keep, merged, note, colour = {}, false, nil, nil
     for _, h in ipairs(list) do
         if h.ch == spread.ch and h.s < span.e and h.e > span.s then
+            -- (Its note and colour carry over into the new one.)
+            note = note and h.note and (note .. "\n" .. h.note) or note or h.note
+            colour = colour or h.color
             if h.s < span.s then span.s, text, merged = h.s, h.text .. " … " .. text, true end
             if h.e > span.e then span.e, text, merged = h.e, text .. " … " .. h.text, true end
         else
@@ -1214,13 +1223,77 @@ function app.hl_select()
         end
     end
     keep[#keep + 1] = { ch = spread.ch, s = span.s, e = span.e, pct = book:fraction(spread.ch, span.s),
-        title = app.find_label({ ch = spread.ch, off = span.s }), text = text }
+        title = app.find_label({ ch = spread.ch, off = span.s }), text = text, note = note, color = colour }
     Store.set_highlights(book.path, keep)
     app.export_notes()
     app.mode = "reader"
     reading.since = love.timer.getTime()
     app.toast("Highlighted")
     redraw()
+end
+
+-- A highlight's choices (Select on it, or holding it): a note, its colour,
+-- or removing it. i: its index in the book's highlights.
+function app.hl_options(i)
+    local h = Store.get_highlights(book.path)[i]
+    if not h then return end
+    app.choose({ title = "This highlight", options = {
+        { h.note and "Edit the Note" or "Add a Note", function() app.hl_note(i) end },
+        { "Colour", function() app.hl_pick_colour(i) end },
+        { "Remove Highlight", function() app.hl_remove(i) end },
+    } })
+end
+
+-- Saved with a change made to highlight i (a copy of the list, which the
+-- store sorts).
+function app.hl_change(i, fn)
+    local list = {}
+    for k, h in ipairs(Store.get_highlights(book.path)) do
+        if k == i then
+            local c = {}
+            for key, v in pairs(h) do c[key] = v end
+            fn(c)
+            if not c.removed then list[#list + 1] = c end
+        else
+            list[#list + 1] = h
+        end
+    end
+    Store.set_highlights(book.path, list)
+    app.export_notes()
+    redraw()
+end
+
+function app.hl_remove(i)
+    if not i then return end
+    app.hl_change(i, function(h) h.removed = true end)
+    app.toast("Highlight removed")
+end
+
+-- A note on highlight i, typed (empty: none).
+function app.hl_note(i)
+    local h = i and Store.get_highlights(book.path)[i]
+    if not h then return end
+    app.kb_open({ title = h.note and "Edit the note" or "Add a note", text = h.note or "", allow_empty = true, max = 500,
+        hint = "“" .. (h.text or ""):sub(1, 60) .. ((#(h.text or "") > 60) and "…”" or "”"),
+        submit = function(t)
+            app.hl_change(i, function(c) c.note = t ~= "" and t or nil end)
+            app.toast(t ~= "" and "Note saved" or "Note removed")
+        end })
+end
+
+-- Highlight i's own colour (the Settings one is the default).
+function app.hl_pick_colour(i)
+    local h = i and Store.get_highlights(book.path)[i]
+    if not h then return end
+    local opts = {}
+    for _, c in ipairs({ { "yellow", "Yellow" }, { "green", "Green" }, { "blue", "Blue" }, { "pink", "Pink" },
+            { "subtle", "Subtle" } }) do
+        local mine = (h.color or S.hl_color) == c[1]
+        opts[#opts + 1] = { c[2] .. (mine and "  ✓" or ""), function()
+            app.hl_change(i, function(x) x.color = c[1] end)
+        end }
+    end
+    app.choose({ title = "Highlight colour", options = opts })
 end
 
 ---------------------------------------------------------------- bookmarks
@@ -1402,7 +1475,9 @@ function app.export_notes(only_if_missing)
         if f then f:close() return end
     end
     local all = {}
-    for _, h in ipairs(hls) do all[#all + 1] = { ch = h.ch, off = h.s, pct = h.pct, title = h.title, text = h.text, hl = true } end
+    for _, h in ipairs(hls) do
+        all[#all + 1] = { ch = h.ch, off = h.s, pct = h.pct, title = h.title, text = h.text, hl = true, note = h.note }
+    end
     for _, b in ipairs(bms) do all[#all + 1] = { ch = b.ch, off = b.off, pct = b.pct, title = b.title, text = b.snippet } end
     table.sort(all, function(x, y) return x.ch < y.ch or (x.ch == y.ch and x.off < y.off) end)
     local function n(k, one) return k .. " " .. one .. (k == 1 and "" or "s") end
@@ -1422,6 +1497,7 @@ function app.export_notes(only_if_missing)
         local pct = math.floor((e.pct or 0) * 100 + 0.5) .. "%"
         if e.hl then
             out[#out + 1] = "- “" .. (e.text or "") .. "” (" .. pct .. ")"
+            if e.note then out[#out + 1] = "  - Note: " .. e.note:gsub("\n", "\n    ") end
         else
             out[#out + 1] = "- Bookmark (" .. pct .. "): " .. ((e.text or "") ~= "" and (e.text .. "…") or "")
         end
@@ -3432,10 +3508,15 @@ local function draw_page(page, side, top)
     local oy = top or text_top()
     if not page then return end
     local marked = app.hl_active and #app.hl_active > 0 and app.hl_bands(page, ox, oy)
-    local ink = marked and app.hl_ink(th)
+    local inks = {}                                   -- (each highlight colour's ink, worked out once)
+    local function ink(r)
+        local name = r.color or S.hl_color
+        if inks[name] == nil then inks[name] = app.hl_ink(th, name) or false end
+        return inks[name] or nil
+    end
     for _, it in ipairs(page.items) do
         if it.kind == "text" then
-            color(ink and marked[it] and ink or th.fg)
+            color(marked and marked[it] and ink(marked[it]) or th.fg)
             love.graphics.setFont(it.font)
             love.graphics.print(it.text, ox + it.x, oy + it.y)
         elseif it.kind == "image" then
@@ -6186,7 +6267,7 @@ local function draw_bookmarks(side)
             love.graphics.print(words, rx, ty)
             love.graphics.setFont(ui.small)
             color(th.dim)
-            love.graphics.print(fit_text(ui.small, title, rw), rx, ty + 40)
+            love.graphics.print(fit_text(ui.small, e.note and ("Note: " .. e.note:gsub("\n", " ")) or title, rw), rx, ty + 40)
             return
         end
         love.graphics.setFont(ui.font)
@@ -6319,22 +6400,42 @@ function app.bm_draw_left(entries, x, w)
         end
         return
     end
-    -- The words: a highlight marked as on the page, as many lines as fit.
+    -- The words: a highlight marked as on the page (in its colour), as many
+    -- lines as fit, leaving room for its note.
     love.graphics.setFont(ui.font)
     local text = e.hl and ("“" .. (body or "") .. "”") or ((body or "") .. (body ~= "" and "…" or ""))
     local _, lines = ui.font:getWrap(text, w - 8)
     local lh = ui.font:getHeight()
-    local max = math.max(1, math.floor((PAGE_H - 130 - y) / lh))
+    local note = e.hl and not e.action and e.item.note
+    local note_lines = {}
+    if note then _, note_lines = ui.font:getWrap(note, w - 8) end
+    local room = note and (math.min(#note_lines, 5) * lh + ui.small:getHeight() + 24) or 0
+    local max = math.max(1, math.floor((PAGE_H - 130 - y - room) / lh))
     for k = 1, math.min(#lines, max) do
         local line = lines[k]
         if k == max and #lines > max then line = fit_text(ui.font, line .. " …", w - 8) end
         if e.hl then
-            color(th.sel)
+            color(app.hl_colour(th, not e.action and e.item.color or nil))
             love.graphics.rectangle("fill", x - 3, y + 2, ui.font:getWidth(line) + 6, lh - 4, 4, 4)
         end
         color(th.fg)
         love.graphics.print(line, x, y)
         y = y + lh
+    end
+    if note then
+        y = y + 16
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print("NOTE", x, y)
+        y = y + ui.small:getHeight() + 6
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        for k = 1, math.min(#note_lines, 5) do
+            local line = note_lines[k]
+            if k == 5 and #note_lines > 5 then line = fit_text(ui.font, line .. " …", w - 8) end
+            love.graphics.print(line, x, y)
+            y = y + lh
+        end
     end
 end
 

@@ -366,6 +366,9 @@ end
 
 -- highlights.txt: one line per highlight:
 -- path \t chapter \t start offset \t end offset \t fraction \t chapter title \t the words
+-- [\t colour \t note] (colour: "" for the Settings one; the note's line breaks
+-- as \n, its backslashes \\). Lines without the last two are from before
+-- there were colours and notes.
 local highlights
 local function load_highlights()
     if highlights then return highlights end
@@ -373,11 +376,20 @@ local function load_highlights()
     local f = io.open(path("highlights.txt"), "rb")
     if f then
         for line in lines(f) do
-            local p, ch, s, e, pct, title, text = line:match("^(.-)\t(%d+)\t(%d+)\t(%d+)\t([%d%.]+)\t(.-)\t(.*)$")
+            local p, ch, s, e, pct, title, text, colour, note =
+                line:match("^(.-)\t(%d+)\t(%d+)\t(%d+)\t([%d%.]+)\t([^\t]*)\t([^\t]*)\t(%a*)\t(.*)$")
+            if not p then
+                p, ch, s, e, pct, title, text = line:match("^(.-)\t(%d+)\t(%d+)\t(%d+)\t([%d%.]+)\t(.-)\t(.*)$")
+            end
             if p then
                 local list = highlights[p] or {}
+                if note and note ~= "" then
+                    note = note:gsub("\\(.)", function(c) return c == "n" and "\n" or c end)
+                else
+                    note = nil
+                end
                 list[#list + 1] = { ch = tonumber(ch), s = tonumber(s), e = tonumber(e), pct = tonumber(pct),
-                    title = title, text = text }
+                    title = title, text = text, color = (colour or "") ~= "" and colour or nil, note = note }
                 highlights[p] = list
             end
         end
@@ -402,8 +414,9 @@ function M.set_highlights(p, list)
     local function clean(t) return ((t or ""):gsub("[\t\r\n]", " ")) end
     for _, k in ipairs(keys) do
         for _, h in ipairs(all[k]) do
-            out[#out + 1] = string.format("%s\t%d\t%d\t%d\t%.4f\t%s\t%s", k, h.ch, h.s, h.e, frac(h.pct),
-                clean(h.title), clean(h.text))
+            local note = (h.note or ""):gsub("\\", "\\\\"):gsub("\r?\n", "\\n"):gsub("[\t\r]", " ")
+            out[#out + 1] = string.format("%s\t%d\t%d\t%d\t%.4f\t%s\t%s\t%s\t%s", k, h.ch, h.s, h.e, frac(h.pct),
+                clean(h.title), clean(h.text), h.color or "", note)
         end
     end
     write_atomic(path("highlights.txt"), table.concat(out, "\n") .. (#out > 0 and "\n" or ""))
