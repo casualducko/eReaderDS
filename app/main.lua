@@ -5965,7 +5965,7 @@ function look.draw_panel(side)
         look.page = math.max(1, math.min(look.page, #pages))
         draw_page(pages[look.page], side, top + 50)
     end
-    local hint = { "‹ ›", "word", "↕", "line", "Select", app.hl_at(look.words[look.sel]) and "unhighlight" or "highlight",
+    local hint = { "‹ ›", "word", "↕", "line", "Select", app.hl_at(look.words[look.sel]) and "note, colour…" or "highlight",
         "B", "close" }
     if pages and #pages > 1 then table.insert(hint, 1, "more " .. look.page .. "/" .. #pages); table.insert(hint, 1, "A") end
     app.hints(ox, PAGE_H - 26 - ui.small:getHeight(), hint)
