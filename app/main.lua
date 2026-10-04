@@ -1762,19 +1762,20 @@ local function scan_library()
             end
         end
     end
-    -- "Hide finished books" (Y in My Books): leave them out, counting them.
-    library.hidden = 0
-    if S.lib_hide_finished then
-        for k = #items, 1, -1 do
-            if Store.get_finished(items[k].path) then table.remove(items, k); library.hidden = library.hidden + 1 end
-        end
-    end
-    -- A collection chosen (the line under the title): only its books.
+    -- A collection chosen (the line under the title): only its books (first,
+    -- so the finished ones hidden are counted from these).
     local shelf = S.lib_shelf ~= "" and Store.collection_books(S.lib_shelf)
     if S.lib_shelf ~= "" and not shelf then S.lib_shelf = "" end     -- (one since deleted)
     if shelf then
         for k = #items, 1, -1 do
             if not shelf[items[k].path] then table.remove(items, k) end
+        end
+    end
+    -- "Hide finished books" (Y in My Books): leave them out, counting them.
+    library.hidden = 0
+    if S.lib_hide_finished then
+        for k = #items, 1, -1 do
+            if Store.get_finished(items[k].path) then table.remove(items, k); library.hidden = library.hidden + 1 end
         end
     end
     library.sort(items)
@@ -1862,7 +1863,7 @@ function app.library_options(it)
         opts[#opts + 1] = { "Rename “" .. S.lib_shelf .. "”", app.shelf_rename }
         opts[#opts + 1] = { "Delete “" .. S.lib_shelf .. "”", function()
             local name = S.lib_shelf
-            app.ask({ question = "Delete the collection “" .. name .. "”?", detail = "Its books stay in My Books.",
+            app.ask({ question = "Delete this collection?", detail = "“" .. name .. "”\nIts books stay in My Books.",
                 yes = "Delete", on_yes = function()
                     Store.delete_collection(name)
                     app.shelf_show("")
@@ -1898,8 +1899,11 @@ end
 function app.shelf_choose()
     local opts = { { "All Books" .. (S.lib_shelf == "" and "  ✓" or ""), function() app.shelf_show("") end } }
     for _, name in ipairs(Store.collections()) do
-        local n = 0
-        for _ in pairs(Store.collection_books(name) or {}) do n = n + 1 end
+        local n = 0          -- (the ones on the card: a book taken off by a computer stays listed)
+        for p in pairs(Store.collection_books(name) or {}) do
+            local f = io.open(p, "rb")
+            if f then f:close(); n = n + 1 end
+        end
         opts[#opts + 1] = { name .. "  (" .. n .. ")" .. (S.lib_shelf == name and "  ✓" or ""), function() app.shelf_show(name) end }
     end
     app.choose({ title = "Show", options = opts })
@@ -1961,7 +1965,8 @@ function app.shelf_line()
     if S.lib_shelf == "" and #Store.collections() == 0 then return nil end
     local x = MARGINS[2].inner
     local y = 60 + ui.title:getHeight() + 10
-    local text = (S.lib_shelf ~= "" and S.lib_shelf or "All Books") .. "  ›"
+    local w = PAGE_W - MARGINS[2].outer - x
+    local text = fit_text(ui.font, S.lib_shelf ~= "" and S.lib_shelf or "All Books", w - ui.font:getWidth("  ›")) .. "  ›"
     return x, y, ui.font:getWidth(text), ui.font:getHeight(), text
 end
 
@@ -5700,6 +5705,8 @@ local function draw_library(side)
                 or { "A", "open", "Y", "options", "‹ ›", "sort" })
         elseif hidden then
             app.hints(x, nil, { "Y", "show finished books" })
+        elseif S.lib_shelf ~= "" then
+            app.hints(x, nil, { "Y", "options" })
         end
         app.count(x, w, library.sel, #library.items, nil, hidden)
         return
@@ -6859,7 +6866,7 @@ function app.choose_draw()
         color(i == c.sel and th.bg or th.sel)
         love.graphics.rectangle("fill", rx, ry, rw, rh, 10, 10)
         color(th.fg)
-        love.graphics.printf(o[1], rx, centered_y(ui.font, UI_SIZE, ry, rh), rw, "center")
+        love.graphics.printf(fit_text(ui.font, o[1], rw - 20), rx, centered_y(ui.font, UI_SIZE, ry, rh), rw, "center")
     end
     app.hints(x, nil, { "A", "select", "B", "close" })
 end
@@ -10072,11 +10079,11 @@ function app.on_tap(side, u, v)
             shop.start()
             return
         end
-        -- The order at the top right (Recent, Title...): the next one.
-        if v < 140 and u > bx + bw + 20 and #library.items > 0 then library.cycle_sort(1); redraw(); return end
         -- The line under the title (which collection): another.
         local sx, sy, sw, sh = app.shelf_line()
         if sx and u <= sx + sw + 30 and v >= sy - 10 and v <= sy + sh + 8 then app.shelf_choose(); return end
+        -- The order at the top right (Recent, Title...): the next one.
+        if v < 140 and u > bx + bw + 20 and #library.items > 0 then library.cycle_sort(1); redraw(); return end
         -- The list: tap a book to see it on the top screen, again to open it.
         for _, r in ipairs((app.library_layout(library.top))) do
             if r.idx and v >= r.y and v < r.y + 96 then
