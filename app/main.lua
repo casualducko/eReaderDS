@@ -9090,18 +9090,23 @@ function app.splash_paint(side, alpha)
     love.graphics.setColor(app.SPLASH_BG[1], app.SPLASH_BG[2], app.SPLASH_BG[3], alpha)
     love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
     if side ~= "left" then return end
-    app.splash_img = app.splash_img or love.graphics.newImage("splash.png")
-    local iw, ih = app.splash_img:getDimensions()
-    local lw = PAGE_W * 0.55
-    local s = lw / iw
+    -- (false once it's been tried and isn't there: the name on its own then,
+    -- never an error that would stop the app on the opening screen.)
+    if app.splash_img == nil then
+        local ok, img = pcall(love.graphics.newImage, "splash.png")
+        app.splash_img = ok and img or false
+    end
     love.graphics.setFont(ui.big)
-    local gap = 44
-    local total = ih * s + gap + ui.big:getHeight()
-    local top = (PAGE_H - total) / 2
-    love.graphics.setColor(1, 1, 1, alpha)
-    love.graphics.draw(app.splash_img, (PAGE_W - lw) / 2, top, 0, s, s)
+    local gap = app.splash_img and 44 or 0
+    local lw = PAGE_W * 0.55
+    local logo_h = app.splash_img and lw * app.splash_img:getHeight() / app.splash_img:getWidth() or 0
+    local top = (PAGE_H - (logo_h + gap + ui.big:getHeight())) / 2
+    if app.splash_img then
+        love.graphics.setColor(1, 1, 1, alpha)
+        love.graphics.draw(app.splash_img, (PAGE_W - lw) / 2, top, 0, lw / app.splash_img:getWidth())
+    end
     love.graphics.setColor(app.SPLASH_INK[1], app.SPLASH_INK[2], app.SPLASH_INK[3], alpha)
-    love.graphics.printf("eReaderDS", 0, top + ih * s + gap, PAGE_W, "center")
+    love.graphics.printf("eReaderDS", 0, top + logo_h + gap, PAGE_W, "center")
 end
 
 

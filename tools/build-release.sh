@@ -20,7 +20,7 @@ trap 'rm -rf "$STAGE"' EXIT
 P="$STAGE/Ports/eReaderDS"
 mkdir -p "$P/app/fonts" "$P/app/hyph" "$P/app/dict" "$P/runtime/libs.aarch64" "$P/runtime/libs.rocknix" "$P/LICENSES"
 
-cp "$ROOT"/app/*.lua "$ROOT/app/whatsnew.txt" "$P/app/"
+cp "$ROOT"/app/*.lua "$ROOT/app/whatsnew.txt" "$ROOT/app/splash.png" "$P/app/"
 cp "$ROOT"/app/hyph/*.txt "$P/app/hyph/"
 cp "$ROOT"/app/dict/* "$P/app/dict/"
 cp "$ROOT"/app/dict/WordNet-LICENSE.txt "$P/LICENSES/"

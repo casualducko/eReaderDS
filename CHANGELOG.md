@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.23.2
+
+- **A new opening screen** (see below), now delivered correctly on stock and ROCKNIX: v1.23.1's zip left out `splash.png`, so the reader failed to open after updating there; the file is now included in the release, and the opening screen falls back to the name alone rather than stopping if the image is ever missing.
+
 ## v1.23.1
 
 - **A new opening screen.** The eReaderDS logo and name on the logo's deep navy, the same on stock, ROCKNIX and GammaOS, instead of a white flash while the app loads. On GammaOS the navy is also the window's background, so there's no white even in the moment before the app starts. Only the title font loads before the screen shows, so it appears sooner; the logo waits until the window has settled so it lands upright.

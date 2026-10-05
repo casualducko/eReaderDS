@@ -2,7 +2,7 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
-v1.23.1
+v1.23.2
 A new opening screen: the eReaderDS logo on a deep blue, the same on every device, instead of a white flash while the app loads. It also appears a little sooner now.
 
 v1.23.0
