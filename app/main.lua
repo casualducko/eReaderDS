@@ -3834,9 +3834,17 @@ local function draw_battery(x, y, b, measure)
     local fill = math.max(2, math.floor((bw - 6) * b.pct / 100))
     love.graphics.rectangle("fill", x + 3, by + 3, fill, bh - 6, 1, 1)
     if b.charging then
-        color(th.bg)
+        -- A charging bolt, in the ink colour so it shows at any level (in the
+        -- page colour it vanished over the empty part of the battery, which is
+        -- most of it when the charge is low). A thin page-colour outline keeps
+        -- it clear where it crosses the filled part.
         local cx, cy = x + bw / 2, by + bh / 2
-        love.graphics.polygon("fill", cx + 2, cy - 7, cx - 4, cy + 1, cx, cy + 1, cx - 2, cy + 7, cx + 4, cy - 1, cx, cy - 1)
+        local bolt = { cx + 2, cy - 7, cx - 4, cy + 1, cx, cy + 1, cx - 2, cy + 7, cx + 4, cy - 1, cx, cy - 1 }
+        color(th.bg)
+        love.graphics.setLineWidth(3)
+        love.graphics.polygon("line", bolt)
+        color(th.fg)
+        love.graphics.polygon("fill", bolt)
     end
     love.graphics.setFont(ui.small)
     color(th.dim)
