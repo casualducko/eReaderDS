@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.23.0
+
+- **Battery:** the charging bolt now shows whenever the device is plugged in, at any charge level (it was drawn in the page colour and vanished over the empty part of the battery below about 60%), and the icon follows plugging in and unplugging within a few seconds instead of only at the next page turn.
+- **Opening:** the screens show your theme's page colour as soon as the settings are read, instead of the window's white until the fonts loaded.
+- **Sync — return to your own place.** Send your place, page back, reopen the book, and it offers "Return to your synced place?" when the place you sent from this device is more than a few pages ahead. Before, only other devices' places were ever offered, so your furthest point could be lost on the next push.
+- **Sync — the right screen, the right answer.** A sync question raised while a book opens waits until you're reading with nothing else open (it could appear over the keyboard, Fonts or the theme editor, where a key meant for them answered it). Dismissing the card by tapping off it counts as Stay instead of silently turning sync off for the book. "Jump to %" marks the place as moved, so "Sync with KOReader" sends it rather than pulling you back.
+- **Overlay cards.** With a question or list card open, a swipe or pinch no longer turns the page or changes the text size underneath, and a tap (or a tappable toast) goes to the card, not the page behind it. The launch "Update to vX" row no longer steals the Settings highlight.
+- **Transfers.** Send Books checks the SD card has room before each upload (a full card is reported up front, not as a lost connection). Calibre gives up ~60s after the computer sleeps or Wi-Fi drops, and Back is noticed at once instead of blocking; a replaced book survives a failed save. A download cancel left in the queue no longer blocks the next one. Sync on quit goes through the network thread so a dead server can't freeze the screens.
+- **Book parsing.** A `.txt` with one paragraph per line (no blank lines) is no longer run into one wall of text and a single chapter; a UTF-8 `.txt` with a few stray bytes keeps its text instead of turning to mojibake; older EPUB2 `<a name>` anchors and OPF files with namespace prefixes (`<opf:item>`) are handled.
+
 ## v1.22.0
 
 - **Collections.** Your own groups of books in My Books; a book can be in several. **Y → Add to Collection…** on a book ticks the collections it's in (choose one to put it in or take it out) or makes a new one. The line under the My Books title (or **Y → Jump to Collection…**) shows All Books or one collection, with how many of its books are on the card; with one showing, **Y** renames or deletes it (its books stay). Kept in `collections.txt`, which backups include; a deleted book leaves its collections.

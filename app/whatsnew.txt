@@ -2,6 +2,17 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.23.0
+The battery shows a charging bolt whenever it's plugged in, at any level, and the icon follows plugging in and unplugging without waiting for a page turn.
+eReaderDS opens straight to your theme's page colour instead of flashing white for a moment.
+Return to your synced place: if you send your place, then page back and reopen the book, it offers to jump back to where you synced.
+Sync questions wait until you're reading instead of appearing over the keyboard or another screen, and tapping away from one keeps your place here.
+Jump to % now counts as your place for sync, so Sync with KOReader sends it instead of pulling you back.
+Send Books checks the SD card has room before copying, so a full card is caught up front.
+Calibre recovers if the computer sleeps or Wi-Fi drops mid-transfer, instead of waiting forever.
+Plain text (.txt) files with a paragraph on each line, or with a stray byte, read correctly now.
+Some older or unusually made EPUBs open and show their Contents when they didn't before.
+
 v1.22.0
 Collections: make your own groups of books ("To read", "Favourites"...). In My Books, press Y on a book and choose Add to Collection. Tap the line under My Books (or Y → Jump to Collection) to see just one.
 Book Details: press Y on a book in My Books to see its description, publisher, publication date, file size and where it is on the SD card. Handy in a big library.
