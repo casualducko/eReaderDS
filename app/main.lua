@@ -3057,7 +3057,7 @@ function app.sync_decide(b, how, docs, results)
                 app.untoast()
                 app.sync_ask(b, { question = "Go back to your synced place?",
                     detail = app.sync_distance(b, och, ooff, ofrac) .. "\nSent from here " .. ago(own_latest.r.timestamp),
-                    yes = "Go back", no = "Stay",
+                    yes = "Return", no = "Stay",
                     on_yes = function() app.sync_go_own(b, own_latest, och, ooff, ofrac) end,
                     on_no = function()
                         if book ~= b then return end
