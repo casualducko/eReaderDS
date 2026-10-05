@@ -26,6 +26,27 @@ local function find()
     return false
 end
 
+-- Re-read now (at most every 5 seconds); true when the level or charging
+-- state changed since last, so the status bar can be redrawn. Cheap: two
+-- small sysfs reads. The reader only redraws on events, so without this the
+-- bolt wouldn't change until the next page turn.
+local last_poll = -1
+function M.poll()
+    if dir == nil then dir = find() end
+    if not dir then return false end
+    local now = love.timer.getTime()
+    if last_poll >= 0 and now - last_poll < 5 then return false end
+    last_poll = now
+    local pct = tonumber(read(dir .. "/capacity"))
+    local status = (read(dir .. "/status") or ""):lower()
+    local new = pct and { pct = math.max(0, math.min(100, pct)),
+        charging = status == "charging" or status == "full" } or nil
+    local changed = (cache == nil) ~= (new == nil)
+        or (cache ~= nil and new ~= nil and (cache.pct ~= new.pct or cache.charging ~= new.charging))
+    cache, cached_at = new, now
+    return changed
+end
+
 -- { pct = 0..100, charging = bool } or nil when there's no battery.
 function M.get()
     if dir == nil then dir = find() end

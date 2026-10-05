@@ -12172,6 +12172,10 @@ function love.run()
             app.clock_second = second
             if app.frame_canvas and require("android").shot_pending() then redraw() end
             if app.frame_canvas then require("android").crash_check() end
+            -- The battery level or charging state changed (e.g. you plugged
+            -- in or unplugged): repaint so the icon and bolt follow.
+            if not lid.closed and S.sb_show and S.sb_battery and app.CLOCK_MODES[app.mode]
+                    and Battery.poll() then redraw() end
             local minute = os.date("%H%M")
             if minute ~= app.clock_minute then
                 app.clock_minute = minute
