@@ -363,7 +363,7 @@ local function parse_html(html, base, classes, show_notes)
                 elseif SKIP[name] then
                     if not selfclose then skipping = skipping + 1 end
                 else
-                    local id = attr(tag, "id")
+                    local id = attr(tag, "id") or (name == "a" and attr(tag, "name"))
                     if id then anchors[id] = off end
                     if name == "br" then
                         if skipping == 0 then
@@ -488,7 +488,7 @@ local function open_epub_zip(path, z)
     book.language = (opf:match("<dc:language[^>]*>%s*(.-)%s*</dc:language>") or ""):lower()
 
     local manifest, ncx, nav = {}, nil, nil
-    for item in opf:gmatch("<item%s[^>]*>") do
+    for item in opf:gmatch("<%w*:?item%s[^>]*>") do
         local id, href = attr(item, "id"), attr(item, "href")
         if id and href then
             local full = resolve(opf_path, href)
@@ -510,11 +510,11 @@ local function open_epub_zip(path, z)
         local m = cid and manifest[cid]
         if m and m.type:find("^image/") then book.cover = m.href end
     end
-    local spine_toc = opf:match("<spine[^>]-toc%s*=%s*\"([^\"]+)\"")
+    local spine_toc = opf:match("<%w*:?spine[^>]-toc%s*=%s*\"([^\"]+)\"")
     if spine_toc and manifest[spine_toc] then ncx = manifest[spine_toc].href end
 
     local total = 0
-    for ref in opf:gmatch("<itemref%s[^>]*>") do
+    for ref in opf:gmatch("<%w*:?itemref%s[^>]*>") do
         local idref = attr(ref, "idref")
         local m = idref and manifest[idref]
         if m then
@@ -579,10 +579,31 @@ local function txt_to_utf8(text)
     if not text:find("[\128-\255]") then return text end
     local ok, utf8 = pcall(require, "utf8")
     if ok and utf8.len(text) then return text end
-    return (text:gsub("[\128-\255]", function(c)
+    local function cp1252(c)
         local b = c:byte()
         return utf8char(CP1252[b] or b)
-    end))
+    end
+    -- UTF-8 with a few stray bytes (a file cut short, two joined): only
+    -- those are taken as Windows-1252, not every accent in the book.
+    if ok then
+        local high = select(2, text:gsub("[\128-\255]", ""))
+        local in_utf8 = 0
+        for seq in text:gmatch("[\194-\244][\128-\191]+") do in_utf8 = in_utf8 + #seq end
+        if in_utf8 >= high * 0.9 then
+            local out, i, bad = {}, 1, 0
+            while true do
+                local n, at = utf8.len(text, i)
+                if n then out[#out + 1] = text:sub(i) break end
+                bad = bad + 1
+                if bad > 1000 then out = nil break end
+                out[#out + 1] = text:sub(i, at - 1)
+                out[#out + 1] = cp1252(text:sub(at, at))
+                i = at + 1
+            end
+            if out then return table.concat(out) end
+        end
+    end
+    return (text:gsub("[\128-\255]", cp1252))
 end
 
 local function open_txt(path)
@@ -606,18 +627,29 @@ local function open_txt(path)
     -- Paragraphs are separated by blank lines (lines wrapped at ~70
     -- characters, as Project Gutenberg's are). A file whose lines are
     -- long has a paragraph on each line instead.
+    -- So does one with (almost) no blank lines between its lines.
     local lines, chars = 0, 0
     for l in text:gmatch("[^\n]+") do
         if l:find("%S") then lines, chars = lines + 1, chars + #l end
     end
-    local sep = (lines > 0 and chars / lines > 120) and "(.-)\n" or "(.-)\n%s*\n"
+    local blanks = select(2, text:gsub("\n[ \t]*\n", ""))
+    local per_line = lines > 0 and (chars / lines > 120 or (lines > 20 and blanks < lines / 20))
+    local sep = per_line and "(.-)\n" or "(.-)\n%s*\n"
     for para in (text .. "\n\n"):gmatch(sep) do
         local t = para:gsub("%s+", " "):gsub("^ ", "")
-        if t ~= "" then
+        -- (A huge paragraph in pieces, at spaces, so chapters stay small.)
+        while t ~= "" do
+            local piece = t
+            local cut = #t > 16384 and t:find(" ", 12288, true)
+            if cut then
+                piece, t = t:sub(1, cut - 1), t:sub(cut + 1)
+            else
+                t = ""
+            end
             blocks[#blocks + 1] = { kind = "text", off = off,
-                runs = { { text = t, i = false, b = false, off = off } } }
-            off = off + #t
-            size = size + #t
+                runs = { { text = piece, i = false, b = false, off = off } } }
+            off = off + #piece
+            size = size + #piece
             if size > 65536 then close_chapter() end
         end
     end
@@ -977,6 +1009,7 @@ function Book:find_id(file, frag)
     if not html then return nil end
     local esc = frag:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
     local at = html:find("[%s]id%s*=%s*[\"']" .. esc .. "[\"']")
+        or html:find("[%s]name%s*=%s*[\"']" .. esc .. "[\"']")      -- (older EPUB2 <a name=>)
     if not at then return nil end
     for i = at, 1, -1 do
         if html:byte(i) == 60 then return html, i end              -- "<"
