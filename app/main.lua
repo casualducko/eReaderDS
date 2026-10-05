@@ -2908,6 +2908,25 @@ function app.sync_go(b, r, rdoc, ch, off)
         math.floor(b:fraction(ch, off) * 100 + 0.5) .. "% · " .. ago(r.timestamp))
 end
 
+-- A question about a book's place, from an answer that came while it was
+-- opening: shown once you're reading it with nothing else open (it can't
+-- come up over the keyboard, Fonts or another card, where a key meant for
+-- them would answer it).
+function app.sync_ask(b, q, now)
+    if now then app.ask(q) return end           -- (asked for in Settings: answered there)
+    app.sync.waiting_ask = { b = b, q = q }
+    app.sync_ask_poll()
+end
+function app.sync_ask_poll()
+    local w = app.sync.waiting_ask
+    if not w then return false end
+    if book ~= w.b then app.sync.waiting_ask = nil return false end
+    if app.mode ~= "reader" or app.asking or app.choosing then return false end
+    app.sync.waiting_ask = nil
+    app.ask(w.q)
+    return true
+end
+
 function app.sync_decide(b, how, docs, results)
     local now = how == "now"
     if not app.sync_results_ok(results, now) then return end
@@ -2944,7 +2963,7 @@ function app.sync_decide(b, how, docs, results)
         if (moved or send) and not now and app.sync_auto() ~= "on" and other_newer then
             -- Ask when opening: offer to send, rather than sending on its own.
             app.untoast()
-            app.ask({ question = "Send your place to the sync server?",
+            app.sync_ask(b, { question = "Send your place to the sync server?",
                 -- (own: this device's own sends only, so it says "from here":
                 -- the server's name, such as CrossPoint, read like another device.)
                 detail = "You're at " .. where .. "\n"
@@ -3049,7 +3068,7 @@ function app.sync_decide(b, how, docs, results)
     app.sync.checked[b.path] = nil
     app.sync.asked[b.path] = true           -- (not asked again on its own this time)
     app.untoast()                           -- ("Syncing…")
-    app.ask({ question = device == "another device" and "Continue from another device?" or ("Continue from your " .. device .. "?"),
+    app.sync_ask(b, { question = device == "another device" and "Continue from another device?" or ("Continue from your " .. device .. "?"),
         detail = app.sync_distance(b, ch, off, frac) .. "\n" .. app.sync_saved_line(device, r),
         yes = "Jump", no = "Stay", on_yes = go,
         -- Stay: this device's place wins (and is sent when automatic sync
@@ -3062,7 +3081,7 @@ function app.sync_decide(b, how, docs, results)
                 app.sync.pushed[b.path] = nil
                 app.sync_push()
             end
-        end })
+        end }, now)
 end
 
 -- "Get my place from the server": the latest place another device saved
@@ -3187,21 +3206,27 @@ function app.sync_push(now, skip)
         if doc ~= skip then
             local job = app.KOSync.put_job(app.sync_url(), S.kosync_user, S.kosync_key, doc, xp, frac,
                 app.sync_device_id(), meta)
+            -- Waited for when the app may quit or sleep next (now), briefly, and
+            -- not at all when the server just failed: quitting mustn't hang on a
+            -- dead server. (On the network thread even then: looking up a
+            -- server's address can't be cut short, and would freeze the screens.)
+            if now and app.sync.failed and love.timer.getTime() - app.sync.failed < 600 then return end
+            if now then job.timeout = 4 end
+            local done = false
+            shop.net_job(job, function(msg)
+                done = true
+                print("[sync] push " .. xp .. ": " .. tostring(msg.status or msg.message))
+                -- (A server error, 5xx, counts as failing too.)
+                if msg.kind == "done" and (msg.status or 500) < 500 then sent(doc, msg.status, msg.body); app.sync.failed = nil
+                else app.sync.failed = love.timer.getTime() end
+            end)
             if now then
-                -- Waited for (the app may quit or sleep next), briefly, and not at
-                -- all when the server just failed: quitting mustn't hang on a dead server.
-                if app.sync.failed and love.timer.getTime() - app.sync.failed < 600 then return end
-                local ok, status, body = pcall(require("net").call, job.method, job.url,
-                    { headers = job.headers, body = job.body, timeout = 4 })
-                print("[sync] push " .. xp .. ": " .. tostring(status))
-                if ok and status < 500 then sent(doc, status, body) else app.sync.failed = love.timer.getTime() end
-            else
-                shop.net_job(job, function(msg)
-                    print("[sync] push " .. xp .. ": " .. tostring(msg.status or msg.message))
-                    -- (A server error, 5xx, counts as failing too.)
-                    if msg.kind == "done" and (msg.status or 500) < 500 then sent(doc, msg.status, msg.body); app.sync.failed = nil
-                    else app.sync.failed = love.timer.getTime() end
-                end)
+                local give_up = love.timer.getTime() + 4
+                while not done and love.timer.getTime() < give_up do
+                    shop.net_poll()
+                    love.timer.sleep(0.05)
+                end
+                if not done then app.sync.failed = love.timer.getTime() end
             end
         end
     end
@@ -6825,8 +6850,9 @@ function app.ask_tap(side, u, v)
         local bx, by, bw, bh = app.ask_button(which)
         return side == app.touch_side() and u >= bx - 12 and u <= bx + bw + 12 and v >= by - 12 and v <= by + bh + 12
     end
+    -- (A tap off the card closes it as B does: its "no".)
     if hit("yes") then q.on_yes()
-    elseif hit("no") and q.on_no then q.on_no() end
+    elseif q.on_no then q.on_no() end
     redraw()
 end
 
@@ -7554,7 +7580,19 @@ function app.update_check(by_hand)
             -- Skipped: nothing is said unless you check by hand.
             rel.skipped = rel.version == S.skip_version
             if rel.skipped and not by_hand then rel.state = "none"; rel.quiet = true end
+            -- (Settings open: its new Update row mustn't move the highlight
+            -- off the row it's on, so A does what it did a moment ago.)
+            local keep
+            if app.mode == "menu" then
+                local ok, before = pcall(menu_items)
+                keep = ok and (before[menu.sel] or {}).label
+            end
             app.upd = rel
+            local ok, after
+            if keep then ok, after = pcall(menu_items) end
+            if ok then
+                for i, it in ipairs(after) do if it.label == keep then menu.sel = i break end end
+            end
             -- Its notes in plain words (the release notes are the fallback).
             shop.net_job({ kind = "fetch", url = app.Updater.whatsnew_url(rel.version) }, function(m2)
                 if m2.kind ~= "error" and app.upd == rel then
@@ -9412,8 +9450,8 @@ local function touch_event(kind, sx, sy)
     -- percentage and a sample line) and applies it when the fingers lift.
     -- The size follows the square root of the pinch, so it changes gently.
     if kind == "pinch_start" then
-        gesture = app.mode == "reader" and not book.comic and { mode = "pinch", d0 = math.max(40, sx), size0 = S.font_size }
-            or { mode = "ignore" }
+        gesture = app.mode == "reader" and not book.comic and not app.asking and not app.choosing
+            and { mode = "pinch", d0 = math.max(40, sx), size0 = S.font_size } or { mode = "ignore" }
         return
     elseif kind == "pinch" then
         if gesture and gesture.mode == "pinch" then
@@ -9482,6 +9520,11 @@ local function touch_event(kind, sx, sy)
         local du, dv = u - gesture.u0, v - gesture.v0
         gesture.moved = math.max(gesture.moved, math.abs(du), math.abs(dv))
         gesture.u, gesture.v = u, v
+        -- A card (a question or a list) is up: a slide changes nothing under
+        -- it (it stays, to be answered; a tap off it still closes it).
+        if not gesture.mode and not gesture.held and (app.asking or app.choosing) and gesture.moved > 24 then
+            gesture.mode = "ignore"
+        end
         if gesture.held then
             -- A press-and-hold (look-up) doesn't turn into a swipe or slide;
             -- dragging on (past a wobble, and only from a word it opened)
@@ -9505,7 +9548,6 @@ local function touch_event(kind, sx, sy)
             local l, _, _, row_h = app.scroll_list()
             gesture.mode = "scroll"
             gesture.v0, gesture.top0, gesture.row_h = v, l.top or 1, row_h
-            app.asking, app.choosing = nil, nil
         elseif not gesture.mode and math.abs(dv) > 24 and math.abs(dv) > math.abs(du) * 1.5 then
             -- Mostly vertical slide: brightness. Work in sqrt space so the
             -- dim end gets finer control.
@@ -9995,10 +10037,7 @@ function handle_action(a)
         if step then
             jp.pct = math.max(0, math.min(100, jp.pct + step))
         elseif a == "confirm" then
-            if jp.pct ~= jp.here then
-                goto_pos(book:locate(jp.pct / 100))
-                save_progress()
-            end
+            if jp.pct ~= jp.here then app.jump_to(book:locate(jp.pct / 100)) end
             app.mode = "reader"
         elseif a == "back" or a == "menu" then
             app.mode = "menu"
@@ -10153,6 +10192,8 @@ function app.hint_tap(side, u, v)
 end
 
 function app.on_tap(side, u, v)
+    -- (A tappable toast over a card: the tap is the card's, and the toast just goes.)
+    if overlay and overlay.on_tap and (app.asking or app.choosing) then overlay = nil end
     -- (Look-up's buttons first: their tap area meets the hints'.)
     if app.mode == "lookup" and not app.asking and not app.choosing and (overlay == nil or not overlay.on_tap)
             and app.look_bar_tap(side, u, v) then return end
@@ -12027,6 +12068,7 @@ function love.run()
         if app.comic_poll() then got = true end
         if app.recv and app.recv_poll() then got = true end
         if app.cal and app.cal_poll() then got = true end
+        if app.sync.waiting_ask and app.sync_ask_poll() then got = true end
         if app.task and not lid.closed then app.task_step(); got = true end
         if library.pending and not lid.closed then app.library_meta_step(); got = true end
         app.add_busy(love.timer.getTime() - b2)
