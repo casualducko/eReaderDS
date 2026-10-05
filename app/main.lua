@@ -11697,6 +11697,14 @@ function love.load()
     if S.night_theme == "Green" and not mine("Green") then S.night_theme = "Mint" end
     Timezone.apply(S.tz)
     app.night_check()
+    -- The theme's page colour on the screens at once (until now the window
+    -- is blank, which shows white): the fonts and the opening screen take
+    -- another second.
+    pcall(function()
+        local bg = theme().bg
+        love.graphics.clear(bg[1], bg[2], bg[3])
+        love.graphics.present()
+    end)
     Touch.open("gt9xx-0")
     if not require("android").active then KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
         { ["gt9xx-0"] = true, ["Goodix Capacitive TouchScreen"] = true },  -- stock, ROCKNIX
