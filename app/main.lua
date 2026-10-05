@@ -2722,6 +2722,16 @@ function app.sync_distance(b, ch, off, frac)
         .. (here and (" (you're at " .. here .. "%)") or "")
 end
 
+-- How many pages a place (ch, off) is from the one on screen, when it's in
+-- the chapter being read (so pages can be counted), else nil.
+function app.sync_pages_ahead(b, ch, off)
+    local sp = spread
+    if not (b == book and sp and ch == sp.ch) then return nil end
+    local j = 1
+    for i, pg in ipairs(sp.pages) do if pg.off <= off then j = i end end
+    return j - sp.pi
+end
+
 function app.sync_device_id()
     if S.kosync_device == "" and not Store.frozen then      -- (frozen: it couldn't be saved)
         local t = {}
@@ -2927,6 +2937,20 @@ function app.sync_ask_poll()
     return true
 end
 
+-- Go back to this device's own place saved on the server (o: an "own"
+-- record), after opening the book behind it. The server already has this
+-- place, so nothing is sent.
+function app.sync_go_own(b, o, ch, off, frac)
+    if book ~= b then return end
+    app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
+    app.sync_set_seen(b.path, o.doc, o.r.timestamp)
+    app.jump_to(ch, off)
+    app.mode = "reader"
+    app.sync.moved[b.path] = nil
+    app.sync.pushed[b.path] = app.sync_place(b)         -- (already on the server)
+    app.sync_say("Back to your synced place", math.floor(frac * 100 + 0.5) .. "% · sent " .. ago(o.r.timestamp))
+end
+
 function app.sync_decide(b, how, docs, results)
     local now = how == "now"
     if not app.sync_results_ok(results, now) then return end
@@ -3018,6 +3042,33 @@ function app.sync_decide(b, how, docs, results)
     local saved_note = saved and ("sent " .. ago(own_ts)) or nil
     local pick = latest(new) or latest(old)
     if not pick then
+        -- Opening (not a by-hand sync) behind your own synced place by more
+        -- than a few pages: offer to go back to it. (Same device, so it's
+        -- never offered otherwise; your furthest place would be lost on the
+        -- next push.)
+        local own_latest = latest(own)
+        if not now and not moved and own_latest and not app.sync.asked[b.path] then
+            local och, ooff, ofrac = app.sync_target(b, own_latest.r)
+            local pages = och and app.sync_pages_ahead(b, och, ooff)
+            local far = (pages and pages > 3) or (och and pages == nil and (ofrac - frac_here) > 0.015)
+            if och and (ofrac - frac_here) > 0.001 and far then
+                app.sync.checked[b.path] = nil
+                app.sync.asked[b.path] = true
+                app.untoast()
+                app.sync_ask(b, { question = "Go back to your synced place?",
+                    detail = app.sync_distance(b, och, ooff, ofrac) .. "\nSent from here " .. ago(own_latest.r.timestamp),
+                    yes = "Go back", no = "Stay",
+                    on_yes = function() app.sync_go_own(b, own_latest, och, ooff, ofrac) end,
+                    on_no = function()
+                        if book ~= b then return end
+                        app.sync.checked[b.path], app.sync.asked[b.path] = true, nil
+                        app.sync_set_seen(b.path, own_latest.doc, own_latest.r.timestamp)
+                        -- (Staying here: your current place wins and is sent when auto sync is On.)
+                        if app.sync_auto() == "on" then app.sync.pushed[b.path] = nil; app.sync_push() end
+                    end })
+                return
+            end
+        end
         -- Nothing from another device: our own place(s), or nothing yet.
         print("[sync] pull: " .. (#own > 0 and "this device's place" or "nothing there yet") .. (stale and ", sending" or ""))
         return stands(stale, #own == 0 and "the first time for this book" or saved_note, saved_head)
