@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.23.1
+A new opening screen: the eReaderDS logo on a deep blue, the same on every device, instead of a white flash while the app loads. It also appears a little sooner now.
+
 v1.23.0
 The battery shows a charging bolt whenever it's plugged in, at any level, and the icon follows plugging in and unplugging without waiting for a page turn.
 eReaderDS opens straight to your theme's page colour instead of flashing white for a moment.

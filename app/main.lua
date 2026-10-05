@@ -9075,17 +9075,35 @@ function app.uptime()
 end
 
 -- While starting up: the name on the top screen.
-function app.splash_draw(side)
+-- The logo's navy (icon.png's background), for the opening screen and
+-- Android's window background (patch_manifest.py), so the launch is that
+-- navy whatever the theme, not a white flash.
+app.SPLASH_BG = { 40 / 255, 52 / 255, 78 / 255 }
+
+-- The opening screen: the logo (splash.png is the logo on navy) with the
+-- name under it, centred on navy, the same on both screens, so it doesn't
+-- depend on the theme.
+app.SPLASH_INK = { 240 / 255, 232 / 255, 208 / 255 }       -- the logo's cream
+-- Draw the opening screen (the logo and name on navy).
+function app.splash_draw(side) app.splash_paint(side, 1) end
+function app.splash_paint(side, alpha)
+    love.graphics.setColor(app.SPLASH_BG[1], app.SPLASH_BG[2], app.SPLASH_BG[3], alpha)
+    love.graphics.rectangle("fill", 0, 0, PAGE_W, PAGE_H)
     if side ~= "left" then return end
-    local th = theme()
+    app.splash_img = app.splash_img or love.graphics.newImage("splash.png")
+    local iw, ih = app.splash_img:getDimensions()
+    local lw = PAGE_W * 0.55
+    local s = lw / iw
     love.graphics.setFont(ui.big)
-    color(th.fg)
-    local y = PAGE_H / 2 - ui.big:getHeight()
-    love.graphics.printf("eReaderDS", 0, y, PAGE_W, "center")
-    love.graphics.setFont(ui.font)
-    color(th.dim)
-    love.graphics.printf("Opening…", 0, y + ui.big:getHeight() + 20, PAGE_W, "center")
+    local gap = 44
+    local total = ih * s + gap + ui.big:getHeight()
+    local top = (PAGE_H - total) / 2
+    love.graphics.setColor(1, 1, 1, alpha)
+    love.graphics.draw(app.splash_img, (PAGE_W - lw) / 2, top, 0, s, s)
+    love.graphics.setColor(app.SPLASH_INK[1], app.SPLASH_INK[2], app.SPLASH_INK[3], alpha)
+    love.graphics.printf("eReaderDS", 0, top + ih * s + gap, PAGE_W, "center")
 end
+
 
 local function draw_message(side)
     local th = theme()
@@ -11727,16 +11745,14 @@ function love.load()
     app.scale = love.graphics.getWidth() / 2048
     if require("android").active then
         app.scale = 1
-        -- The opening screen straight away (splash.png is the top screen's
-        -- half of it): Android and LÖVE have already kept the screens black
-        -- for a few seconds, and the setup and fonts below take another one.
+        -- The navy straight away (so the launch is navy, not black, during
+        -- the setup below). Not the logo yet: GammaOS's DualStack resizes and
+        -- rotates the window a moment after launch, and a logo drawn to the
+        -- framebuffer now would rotate with it. The logo comes from the
+        -- splash screen below, through the normal (rotation-aware) pipeline.
         pcall(function()
-            local img = love.graphics.newImage("splash.png")
-            local W, H = love.graphics.getDimensions()
-            love.graphics.clear(0.957, 0.925, 0.847)
-            love.graphics.draw(img, 0, 0, 0, W / 1024, (H > W and H / 2 or H) / 768)
+            love.graphics.clear(app.SPLASH_BG)
             love.graphics.present()
-            img:release()
         end)
         app.frame_canvas = love.graphics.newCanvas(2048, 768)
         app.redraw_until = love.timer.getTime() + 8           -- (see love.run: surfaces settling)
@@ -11797,14 +11813,16 @@ function love.load()
     if S.night_theme == "Green" and not mine("Green") then S.night_theme = "Mint" end
     Timezone.apply(S.tz)
     app.night_check()
-    -- The theme's page colour on the screens at once (until now the window
-    -- is blank, which shows white): the fonts and the opening screen take
-    -- another second.
-    pcall(function()
-        local bg = theme().bg
-        love.graphics.clear(bg[1], bg[2], bg[3])
-        love.graphics.present()
-    end)
+    -- The opening navy on the screens now, before the fonts load (otherwise
+    -- the window shows white until then). Android already drew its splash
+    -- above; here it covers the other platforms (the logo follows in the
+    -- splash screen once the fonts are ready, a moment later).
+    if not require("android").active then
+        pcall(function()
+            love.graphics.clear(app.SPLASH_BG)
+            love.graphics.present()
+        end)
+    end
     Touch.open("gt9xx-0")
     if not require("android").active then KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
         { ["gt9xx-0"] = true, ["Goodix Capacitive TouchScreen"] = true },  -- stock, ROCKNIX
@@ -11814,6 +11832,14 @@ function love.load()
     print(string.format("[startup] settings etc %.2fs, brightness %.2fs", tb - ts, love.timer.getTime() - tb))
     canvases[1] = love.graphics.newCanvas(PAGE_W, PAGE_H)
     canvases[2] = love.graphics.newCanvas(PAGE_W, PAGE_H)
+    -- The opening screen needs only the title font, so load it first and show
+    -- the screen before the rest of the fonts and the book (another second).
+    ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
+    app.mode = "splash"
+    love.draw()
+    love.graphics.present()
+    app.mode = "library"
+    print("[reader] opening screen shown (uptime " .. app.uptime() .. ")")
     ui.font = load_font("GentiumBookPlus-Regular.ttf", UI_SIZE)
     ui.small = load_font("GentiumBookPlus-Regular.ttf", SMALL_SIZE)
     ui.bold = load_font("GentiumBookPlus-Bold.ttf", UI_SIZE)
@@ -11821,17 +11847,9 @@ function love.load()
     ui.hint = load_font("GentiumBookPlus-Regular.ttf", app.HINT_SIZE)           -- what the buttons do
     ui.hint_bold = load_font("GentiumBookPlus-Bold.ttf", app.HINT_SIZE)
     ui.title = load_font("GentiumBookPlus-Bold.ttf", 44)
-    ui.big = load_font("GentiumBookPlus-Bold.ttf", 110)
     ui.menu = load_font("GentiumBookPlus-Regular.ttf", app.MENU_SIZE)       -- Settings rows
     ui.help = load_font("GentiumBookPlus-Regular.ttf", 34)                  -- the Help pages
     ui.menu_bold = load_font("GentiumBookPlus-Bold.ttf", app.MENU_SIZE)
-    -- Something on the screens straight away: loading the fonts and the
-    -- book takes a moment.
-    app.mode = "splash"
-    love.draw()
-    love.graphics.present()
-    app.mode = "library"
-    print("[reader] opening screen shown (uptime " .. app.uptime() .. ")")
     -- Horizontal gradient, opaque at x=0 fading to clear at x=1.
     shadow_mesh = love.graphics.newMesh({
         { 0, 0, 0, 0, 1, 1, 1, 1 }, { 1, 0, 1, 0, 1, 1, 1, 0 },

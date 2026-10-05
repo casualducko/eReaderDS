@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.23.1
+
+- **A new opening screen.** The eReaderDS logo and name on the logo's deep navy, the same on stock, ROCKNIX and GammaOS, instead of a white flash while the app loads. On GammaOS the navy is also the window's background, so there's no white even in the moment before the app starts. Only the title font loads before the screen shows, so it appears sooner; the logo waits until the window has settled so it lands upright.
+
 ## v1.23.0
 
 - **Battery:** the charging bolt now shows whenever the device is plugged in, at any charge level (it was drawn in the page colour and vanished over the empty part of the battery below about 60%), and the icon follows plugging in and unplugging within a few seconds instead of only at the next page turn.

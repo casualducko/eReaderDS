@@ -60,7 +60,23 @@ s = sub(r'(<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STO
 # (No microphone needed. Bluetooth stays: SDL uses it for Bluetooth controllers.)
 s = s.replace('    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n', "")
 
+# The window's background before the app draws its first frame. Android paints
+# it from the time the window opens until LÖVE's first present, and reads it
+# before any of our code runs. It's the logo's navy, matching the opening
+# splash (the logo on navy), so the launch is that navy rather than a white
+# flash, whatever the reader's theme.
+s = sub(r'android:theme="@android:style/Theme\.NoTitleBar\.Fullscreen"',
+        'android:theme="@style/EReaderDSLaunch"', s)
+
 open(path, "w", encoding="utf-8").write(s)
+
+# The launch theme and its colour (a style inheriting LÖVE's fullscreen one).
+open(root + "/res/values/ereaderds.xml", "w", encoding="utf-8").write(
+    '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+    '    <color name="ereaderds_launch">#283048</color>\n'
+    '    <style name="EReaderDSLaunch" parent="@android:style/Theme.NoTitleBar.Fullscreen">\n'
+    '        <item name="android:windowBackground">@color/ereaderds_launch</item>\n'
+    '    </style>\n</resources>\n')
 
 # LÖVE's switch for a game packed inside the app (assets/game.love); off,
 # it's the LÖVE player and shows "no game".
