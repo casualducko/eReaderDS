@@ -181,7 +181,19 @@ function next() {
   var job = queue.shift(), li = job.li, st = li.querySelector('.st'), bar = li.querySelector('.bar i'), x = new XMLHttpRequest();
   li.className = ''; bar.style.width = '0';
   st.textContent = 'Sending…';
-  x.open('POST', '/upload?name=' + encodeURIComponent(job.f.name));
+  // Room on the SD card first (a card that fills partway can only cut the
+  // upload off, which the browser reports as a lost connection).
+  var q = encodeURIComponent(job.f.name), room = new XMLHttpRequest();
+  room.open('GET', '/room?size=' + job.f.size + '&name=' + q); room.timeout = 10000;
+  room.onload = function () {
+    var r = {}; try { r = JSON.parse(room.responseText); } catch (e) {}
+    if (r.ok === false) { tally.bad++; finish(li, false, r.error, job); busy = false; next(); return; }
+    send();
+  };
+  room.onerror = room.ontimeout = send;          // (an older eReaderDS: just send)
+  room.send();
+  function send() {
+  x.open('POST', '/upload?name=' + q);
   x.upload.onprogress = function (e) {
     if (!e.lengthComputable) return;
     var p = Math.floor(e.loaded / e.total * 100);
@@ -200,6 +212,7 @@ function next() {
   };
   x.onerror = function () { tally.bad++; finish(li, false, "Couldn't reach eReaderDS. Is its Send Books screen still open?", job); busy = false; next(); };
   x.send(job.f);
+  }
 }
 document.getElementById('pick').onchange = function () { add(this.files); this.value = ''; };
 var drop = document.getElementById('drop');
@@ -299,6 +312,36 @@ local function whole_epub(path)
     return head == "PK\3\4" and tail:find("PK\5\6", 1, true) ~= nil
 end
 
+-- Free space where dir is, in bytes (from df), or nil if it can't be told.
+local function free_bytes(dir)
+    local p = io.popen("df -k '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+    if not p then return nil end
+    local out = p:read("*a") or ""
+    p:close()
+    -- (The last line: total, used, available, use%; a long device name may
+    -- have put the numbers on a line of their own.)
+    local last
+    for l in out:gmatch("[^\n]+") do last = l end
+    local avail = last and last:match("%d+%s+%d+%s+(%d+)%s+%d+%%")
+    return avail and tonumber(avail) * 1024
+end
+
+-- /room?size=&name=: whether a file that big fits (counting the copy it
+-- would replace, and a margin), as JSON.
+local function room(target)
+    local name = clean_name(target:match("[?&]name=([^&]*)"))
+    local size = tonumber(target:match("[?&]size=(%d+)") or "")
+    local ext = (name:match("%.([^.]+)$") or ""):lower()
+    local dir = (ext == "ttf" or ext == "otf") and dirs.fonts or dirs.books
+    local free = dir and size and free_bytes(dir)
+    if not free then return '{"ok":true}' end
+    local need = size - (file_size(dir .. "/" .. name) or 0) + 4 * 1024 * 1024
+    if need <= free then return '{"ok":true}' end
+    local function mb(n) return string.format("%.0f MB", math.max(1, n / 1048576)) end
+    return '{"ok":false,"error":' .. json_str("Not enough room on the SD card (it needs " .. mb(size)
+        .. ", and " .. mb(free) .. " is free)") .. "}"
+end
+
 local function upload(client, query, headers)
     local name = clean_name(query:match("[?&]name=([^&]*)"))
     local ext = (name:match("%.([^.]+)$") or ""):lower()
@@ -343,10 +386,10 @@ local function upload(client, query, headers)
     if not f:close() and not err then err = "The SD card is full" end
     if not err and ext == "epub" and not whole_epub(part) then err = "That isn't a whole EPUB file" end
     local replaced = exists(path)
-    if not err then
-        if not os.rename(part, path) and not (os.remove(path) and os.rename(part, path)) then
-            err = "Couldn't save it on the SD card"
-        elseif file_size(path) ~= total then err = "It didn't save properly (is the SD card full?)"; os.remove(path) end
+    -- (The size checked before it replaces anything: a failure keeps the old copy.)
+    if not err and file_size(part) ~= total then err = "It didn't save properly (is the SD card full?)" end
+    if not err and not os.rename(part, path) and not (os.remove(path) and os.rename(part, path)) then
+        err = "Couldn't save it on the SD card"
     end
     if err then
         os.remove(part)
@@ -390,6 +433,8 @@ local function handle(client)
     local p = target:match("^[^?]*")
     if method == "GET" and (p == "/" or p == "/index.html") then
         send(client, 200, "text/html; charset=utf-8", PAGE)
+    elseif method == "GET" and p == "/room" then
+        send(client, 200, "application/json", room(target))
     elseif method == "GET" and p == "/info" then
         send(client, 200, "application/json", '{"version":' .. json_str(dirs.version or "") .. ',"books":['
             .. table.concat(names(dirs.books, { epub = true, cbz = true, txt = true }), ",") .. '],"fonts":['

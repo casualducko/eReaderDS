@@ -151,7 +151,7 @@ local function discover()
         for _, port in ipairs(BROADCAST_PORTS) do u:sendto("hello", t, port) end
     end
     local deadline = love.timer.getTime() + 1.5
-    while love.timer.getTime() < deadline do
+    while love.timer.getTime() < deadline and ctl:peek() ~= "stop" do
         local data, from = u:receivefrom()
         if data then
             local name, ports = data:match("calibre wireless device client %(on (.-)%);(.*)")
@@ -210,14 +210,20 @@ local function receive()
     end
 end
 
+-- Seconds without a byte of a book before giving up on it (the computer
+-- slept, or Wi-Fi dropped, and no reset came).
+local STALL = 60
+
 -- A book's bytes, straight into a file; true when it's all there (every
 -- byte written, the size right, and an EPUB whole).
 local function receive_book(path, size, title)
     local part = path .. ".part"
     local f = io.open(part, "wb")
     local got, last, wrote = 0, 0, true
+    local heard = love.timer.getTime()          -- (the last bytes: a computer that slept sends no more)
     local function take(s)
         got = got + #s
+        heard = love.timer.getTime()
         if f and wrote and not f:write(s) then wrote = false end
         local now = love.timer.getTime()
         if now - last > 0.3 then last = now; out:push({ kind = "progress", got = got, size = size }) end
@@ -232,6 +238,10 @@ local function receive_book(path, size, title)
             if f then f:close() end
             os.remove(part)
             error("lost: Calibre closed the connection", 0)
+        elseif love.timer.getTime() - heard > STALL then
+            if f then f:close() end
+            os.remove(part)
+            error("lost: nothing from Calibre for " .. STALL .. " seconds", 0)
         end
         if stopping() then
             if f then f:close() end
@@ -256,19 +266,42 @@ local function receive_book(path, size, title)
         check:close()
     end
     if not ok then os.remove(part); return false, "couldn't save it (is the SD card full?)" end
-    os.remove(path)
-    if not os.rename(part, path) then os.remove(part); return false, "couldn't save it" end
+    -- rename() replaces an old copy in one step (removing it first only if
+    -- that isn't allowed), so a failure never leaves neither.
+    if not os.rename(part, path) and not (os.remove(path) and os.rename(part, path)) then
+        os.remove(part)
+        return false, "couldn't save it"
+    end
     return true
+end
+
+-- A connection to ip:port, or nil: not waited for in one go, so Back
+-- (stop) is noticed at once while a computer that's off doesn't answer.
+local function connect(ip, port, limit)
+    if not ip:match("^%d+%.%d+%.%d+%.%d+$") then ip = socket.dns.toip(ip) end
+    if not ip then return nil end
+    local s = socket.tcp()
+    s:settimeout(0)
+    local deadline = love.timer.getTime() + limit
+    while true do
+        local ok, err = s:connect(ip, port)
+        if ok or err == "already connected" then return s end
+        err = tostring(err)
+        if (err ~= "timeout" and not err:find("in progress")) or ctl:peek() == "stop"
+                or love.timer.getTime() > deadline then
+            s:close()
+            return nil
+        end
+        socket.select(nil, { s }, 0.25)
+    end
 end
 
 -- One connection, until it ends; returns why ("unreachable" if it couldn't
 -- connect at all).
 local function session(ip, port, name, timeout, address)
     buf = ""
-    sock = socket.tcp()
-    sock:settimeout(timeout or 5)
-    local ok = sock:connect(ip, port)
-    if not ok then sock:close(); sock = nil; return "unreachable" end
+    sock = connect(ip, port, timeout or 5)
+    if not sock then return "unreachable" end
     sock:settimeout(0.25)
     if address then store.last = address; save_store() end
     out:push({ kind = "connected", name = name or ip })

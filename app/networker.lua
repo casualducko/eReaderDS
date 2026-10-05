@@ -20,8 +20,14 @@ local cancel = love.thread.getChannel("net_cancel")
 -- Quitting pushes true: stop waiting on any server at once. Cancelling the
 -- running job (its id) does too, even while the server sends nothing.
 local running
+-- (Cancels for jobs already over are dropped here: one left at the head
+-- would hide a later cancel until the next job's data arrived.)
 Net.abort = function()
     local c = cancel:peek()
+    while type(c) == "number" and running ~= nil and c < running do
+        cancel:pop()
+        c = cancel:peek()
+    end
     return c == true or (running ~= nil and c == running)
 end
 
@@ -98,6 +104,9 @@ while true do
     running = job.id
     local ok, err = pcall(run, job)
     running = nil
+    -- This job's cancel (it may have stopped it before any data came) and
+    -- any older ones: done with.
+    while type(cancel:peek()) == "number" and cancel:peek() <= job.id do cancel:pop() end
     if not ok then
         out:push({ id = job.id, kind = "error", message = tostring(err):gsub("^[^:]*:%d+: ", "") })
     end
