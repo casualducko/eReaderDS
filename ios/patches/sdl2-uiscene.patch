@@ -1,0 +1,164 @@
+diff --git a/src/video/uikit/SDL_uikitappdelegate.h b/src/video/uikit/SDL_uikitappdelegate.h
+index 4a3895e..de17056 100644
+--- a/src/video/uikit/SDL_uikitappdelegate.h
++++ b/src/video/uikit/SDL_uikitappdelegate.h
+@@ -29,12 +29,26 @@
+ 
+ @end
+ 
++/* UIScene life cycle (required by apps built with the iOS 27 SDK, and what lets
++ * a window follow a folding or resizing display): the scene delegate named in
++ * the Info.plist's UIApplicationSceneManifest. */
++@interface SDLUIKitSceneDelegate : UIResponder<UIWindowSceneDelegate>
++@property (nonatomic, strong) UIWindow *window;
++@end
++
++/* YES when the Info.plist has a scene manifest. */
++BOOL SDL_UIKit_UsesScenes(void);
++/* The window scene to put a window in, waiting (running the run loop) for it
++ * to connect; nil when the app doesn't use scenes. */
++UIWindowScene *SDL_UIKit_WaitForWindowScene(void);
++
+ @interface SDLUIKitDelegate : NSObject<UIApplicationDelegate>
+ 
+ + (id)sharedAppDelegate;
+ + (NSString *)getAppDelegateClassName;
+ 
+ - (void)hideLaunchScreen;
++- (void)sendDropFileForURL:(NSURL *)url;
+ 
+ /* This property is marked as optional, and is only intended to be used when
+  * the app's UI is storyboard-based. SDL is not storyboard-based, however
+diff --git a/src/video/uikit/SDL_uikitappdelegate.m b/src/video/uikit/SDL_uikitappdelegate.m
+index b981439..5dc82ac 100644
+--- a/src/video/uikit/SDL_uikitappdelegate.m
++++ b/src/video/uikit/SDL_uikitappdelegate.m
+@@ -349,6 +349,63 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
+ 
+ @end
+ 
++static UIWindowScene *sdl_window_scene;
++
++BOOL SDL_UIKit_UsesScenes(void)
++{
++    return [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UIApplicationSceneManifest"] != nil;
++}
++
++UIWindowScene *SDL_UIKit_WaitForWindowScene(void)
++{
++    CFAbsoluteTime end = CFAbsoluteTimeGetCurrent() + 10.0;
++    if (!SDL_UIKit_UsesScenes()) {
++        return nil;
++    }
++    while (!sdl_window_scene && CFAbsoluteTimeGetCurrent() < end) {
++        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
++            if ([scene isKindOfClass:[UIWindowScene class]]) {
++                sdl_window_scene = (UIWindowScene *)scene;
++                break;
++            }
++        }
++        if (!sdl_window_scene) {
++            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
++        }
++    }
++    return sdl_window_scene;
++}
++
++@implementation SDLUIKitSceneDelegate
++
++@synthesize window;
++
++- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions
++{
++    if ([scene isKindOfClass:[UIWindowScene class]]) {
++        sdl_window_scene = (UIWindowScene *)scene;
++    }
++    for (UIOpenURLContext *context in connectionOptions.URLContexts) {
++        [[SDLUIKitDelegate sharedAppDelegate] sendDropFileForURL:context.URL];
++    }
++}
++
++- (void)sceneDidDisconnect:(UIScene *)scene
++{
++    if (scene == sdl_window_scene) {
++        sdl_window_scene = nil;
++    }
++}
++
++- (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts
++{
++    for (UIOpenURLContext *context in URLContexts) {
++        [[SDLUIKitDelegate sharedAppDelegate] sendDropFileForURL:context.URL];
++    }
++}
++
++@end
++
+ @implementation SDLUIKitDelegate {
+     UIWindow *launchWindow;
+ }
+@@ -447,7 +504,9 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
+         vc = [[SDLLaunchScreenController alloc] initWithNibName:screenname bundle:bundle];
+     }
+ 
+-    if (vc.view) {
++    /* (With scenes the launch screen belongs to the system, and a window of
++     * our own needs a scene that isn't there yet.) */
++    if (vc.view && !SDL_UIKit_UsesScenes()) {
+         launchWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+ 
+         /* We don't want the launch window immediately hidden when a real SDL
+@@ -499,6 +558,10 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
+ {
+     NSURL *fileURL = url.filePathURL;
+     if (fileURL != nil) {
++        /* A file opened in place (from Files, say) is outside the app's
++         * sandbox: it can only be read while the app holds access. (Kept
++         * until the app ends, which is as long as a dropped file is looked at.) */
++        [fileURL startAccessingSecurityScopedResource];
+         SDL_SendDropFile(NULL, fileURL.path.UTF8String);
+     } else {
+         SDL_SendDropFile(NULL, url.absoluteString.UTF8String);
+diff --git a/src/video/uikit/SDL_uikitvideo.m b/src/video/uikit/SDL_uikitvideo.m
+index 4e942a9..1ddae49 100644
+--- a/src/video/uikit/SDL_uikitvideo.m
++++ b/src/video/uikit/SDL_uikitvideo.m
+@@ -32,6 +32,7 @@
+ #include "../../events/SDL_events_c.h"
+ 
+ #include "SDL_uikitvideo.h"
++#include "SDL_uikitappdelegate.h"
+ #include "SDL_uikitevents.h"
+ #include "SDL_uikitmodes.h"
+ #include "SDL_uikitwindow.h"
+@@ -227,7 +228,7 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
+ 
+     /* The orientation flip doesn't make sense when the window is smaller
+      * than the screen (iPad Split View, for example). */
+-    if (fullscreen && (landscape != (frame.size.width > frame.size.height))) {
++    if (!SDL_UIKit_UsesScenes() && fullscreen && (landscape != (frame.size.width > frame.size.height))) {
+         float height = frame.size.width;
+         frame.size.width = frame.size.height;
+         frame.size.height = height;
+diff --git a/src/video/uikit/SDL_uikitwindow.m b/src/video/uikit/SDL_uikitwindow.m
+index 841b4d9..29278b6 100644
+--- a/src/video/uikit/SDL_uikitwindow.m
++++ b/src/video/uikit/SDL_uikitwindow.m
+@@ -207,7 +207,16 @@ int UIKit_CreateWindow(_THIS, SDL_Window *window)
+ 
+         /* ignore the size user requested, and make a fullscreen window */
+         /* !!! FIXME: can we have a smaller view? */
+-        uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
++        {
++            UIWindowScene *scene = SDL_UIKit_WaitForWindowScene();
++            if (scene) {
++                /* In the scene, at the scene's size: it follows the display
++                 * (folding, resizing). */
++                uiwindow = [[SDL_uikitwindow alloc] initWithWindowScene:scene];
++            } else {
++                uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
++            }
++        }
+ 
+         /* put the window on an external display if appropriate. */
+         if (data.uiscreen != [UIScreen mainScreen]) {

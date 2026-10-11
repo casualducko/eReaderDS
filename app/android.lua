@@ -1,6 +1,11 @@
 -- Running on Android: GammaOS on the RG DS Plus (and other dual-screen
 -- Android handhelds that stack both screens into one tall window).
 --
+-- Also iOS (the iPhone Duo and other iPhones/iPads): like Android there's no
+-- shell, buttons or evdev, and the app draws its 2048x768 frame into a canvas
+-- and shows it in whatever window the system gives (see "iOS" below). `active`
+-- is true for both; `android` and `ios` say which.
+--
 -- GammaOS's "DualStack" gives an app on its list one window across both
 -- screens, the top one above the bottom one (1024x1536). eReaderDS draws its
 -- usual 2048x768 frame (the two screens side by side, as on Linux) into a
@@ -9,9 +14,19 @@
 -- setting any app may change: no root needed).
 local M = {}
 
-M.active = love.system.getOS() == "Android"
+M.android = love.system.getOS() == "Android"
+M.ios = love.system.getOS() == "iOS"
+M.active = M.android or M.ios
 M.PACKAGE = "com.casualducko.ereaderds"
 M.ROOT = "/storage/emulated/0"                  -- what Android apps see as /sdcard
+if M.ios then
+    io.stdout:setvbuf("line")               -- (so a log read while it runs is current)
+    -- The app's Documents folder: what Files shows under "On My iPhone".
+    -- (LÖVE's save folder is <home>/Library/Application Support/LOVE/<id>.)
+    local save = love.filesystem.getSaveDirectory()
+    local home = save:match("^(.*)/Library/Application Support/") or save
+    M.ROOT = home .. "/Documents"
+end
 M.BOOKS = M.ROOT .. "/Ebook"
 M.DATA = M.BOOKS .. "/.ereaderds"
 M.CA_FILE = M.DATA .. "/cacerts.pem"            -- (net.lua looks for it at this path)
@@ -56,7 +71,9 @@ for _, decl in ipairs({
     "int mkdir(const char *path, unsigned int mode);",
     "int access(const char *path, int mode);",
     "typedef struct rgds_DIR rgds_DIR;",
-    "struct rgds_dirent { uint64_t d_ino; int64_t d_off; unsigned short d_reclen; unsigned char d_type; char d_name[256]; };",
+    love.system.getOS() == "iOS"
+        and "struct rgds_dirent { uint64_t d_ino; uint64_t d_seekoff; uint16_t d_reclen; uint16_t d_namlen; uint8_t d_type; char d_name[1024]; };"
+        or "struct rgds_dirent { uint64_t d_ino; int64_t d_off; unsigned short d_reclen; unsigned char d_type; char d_name[256]; };",
     "rgds_DIR *opendir(const char *name);",
     "struct rgds_dirent *readdir(rgds_DIR *dir);",
     "int closedir(rgds_DIR *dir);",
@@ -226,9 +243,11 @@ end
 -- closes). value 0..1, or -1 for the system's own; false if it couldn't be done.
 local BRIGHT = { "com/casualducko/ereaderds/Bright", "set", "(Landroid/app/Activity;F)V" }
 function M.window_brightness_ok()
+    if M.ios then return false end
     return jni_method(BRIGHT[1], BRIGHT[2], BRIGHT[3]) ~= nil
 end
 function M.window_brightness(value)
+    if M.ios then return false end
     return jni_call(BRIGHT[1], BRIGHT[2], BRIGHT[3], value)
 end
 
@@ -239,6 +258,7 @@ end
 -- and a message. When it's done Android stops the app.
 M.INSTALL_STATUS = M.DATA .. "/.update.status"
 function M.install_update(apk)
+    if M.ios then return false end          -- (updates come through TestFlight / the App Store)
     os.remove(M.INSTALL_STATUS)
     return jni_call("com/casualducko/ereaderds/Install", "start",
         "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)V", apk, M.INSTALL_STATUS)
@@ -256,12 +276,86 @@ end
 
 -- Both screens: the window is taller than it's wide.
 function M.stacked()
+    if M.ios then return true end           -- (a window of any shape shows both screens)
     local w, h = love.graphics.getDimensions()
     return h > w
 end
 
+---------------------------------------------------------------------- iOS
+-- The app draws each screen as a landscape 1024x768 with the portrait page
+-- turned a quarter (the handheld is held on its side, like a book: the top
+-- screen is the left page). A phone or the iPhone Duo is held upright, so each
+-- screen is shown turned back: two portrait pages, the book's page and the
+-- menu/touch page, side by side when the window is wide (the Duo open) or one
+-- above the other when it's tall, whichever comes out larger, inside the safe
+-- area (clear of the notch, the home indicator and the rounded corners).
+--   M.lay = { mode = "book" | "column", x, y (top left), s (scale) }
+-- and the two pages' corners: M.lay.page, M.lay.menu = { x, y } (each 768s x 1024s).
+-- The window's safe area insets (points), asked of UIKit through the
+-- Objective-C runtime: LÖVE's own love.window.getSafeArea is wrong under scenes.
+local objc
+local function safe_insets()
+    if objc == nil then
+        objc = false
+        local ok = pcall(ffi.cdef, [[
+            typedef void *rgds_id;
+            typedef void *rgds_SEL;
+            typedef struct { double top, left, bottom, right; } rgds_insets;
+            rgds_id objc_getClass(const char *name);
+            rgds_SEL sel_registerName(const char *name);
+            rgds_id objc_msgSend_id(rgds_id self, rgds_SEL op) __asm__("objc_msgSend");
+            rgds_insets objc_msgSend_insets(rgds_id self, rgds_SEL op) __asm__("objc_msgSend");
+        ]])
+        if ok then objc = { sel = function(n) return C.sel_registerName(n) end } end
+    end
+    if not objc then return 0, 0, 0, 0 end
+    local ok, t, l, b, r = pcall(function()
+        local sel = objc.sel
+        local app = C.objc_msgSend_id(C.objc_getClass("UIApplication"), sel("sharedApplication"))
+        local scene = C.objc_msgSend_id(C.objc_msgSend_id(app, sel("connectedScenes")), sel("anyObject"))
+        local win = C.objc_msgSend_id(C.objc_msgSend_id(scene, sel("windows")), sel("firstObject"))
+        if win == nil then return 0, 0, 0, 0 end
+        local i = C.objc_msgSend_insets(win, sel("safeAreaInsets"))
+        return i.top, i.left, i.bottom, i.right
+    end)
+    if not ok then return 0, 0, 0, 0 end
+    return t, l, b, r
+end
+
+local function ios_layout()
+    local W, H = love.graphics.getDimensions()
+    local top, left, bottom, right = safe_insets()
+    local x, y, w, h = left, top, W - left - right, H - top - bottom
+    if w <= 0 or h <= 0 then x, y, w, h = 0, 0, W, H end
+    local book = math.min(w / 1536, h / 1024)
+    local column = math.min(w / 768, h / 2048)
+    local lay = M.lay or {}
+    if book >= column then
+        local s = book
+        local x0, y0 = x + (w - 1536 * s) / 2, y + (h - 1024 * s) / 2
+        lay.mode, lay.s = "book", s
+        lay.page = { x = x0, y = y0 }
+        lay.menu = { x = x0 + 768 * s, y = y0 }
+    else
+        local s = column
+        local x0, y0 = x + (w - 768 * s) / 2, y + (h - 2048 * s) / 2
+        lay.mode, lay.s = "column", s
+        lay.page = { x = x0, y = y0 }
+        lay.menu = { x = x0, y = y0 + 1024 * s }
+    end
+    M.lay = lay
+    if M.lay_log ~= W .. "x" .. H .. ":" .. x .. "," .. y .. "," .. w .. "," .. h then
+        M.lay_log = W .. "x" .. H .. ":" .. x .. "," .. y .. "," .. w .. "," .. h
+        print(string.format("[ios] window %dx%d (pixels %dx%d, scale %.2f), safe area %d,%d %dx%d -> %s %.3f",
+            W, H, love.graphics.getPixelWidth(), love.graphics.getPixelHeight(), love.graphics.getDPIScale(),
+            x, y, w, h, lay.mode, lay.s))
+    end
+    return lay
+end
+
 -- Can we write to the books folder? (Needs Android's all-files access.)
 function M.storage_ok()
+    if M.ios then M.mkdir_p(M.DATA) return true end     -- (the app's own sandbox)
     -- (Asking is enough when the folder is there, and quick: opening or making
     -- a file in shared storage costs Android much more.)
     local W_OK = 2
@@ -281,6 +375,7 @@ end
 -- is changed if eReaderDS has a profile already (the reader's own).
 -- Returns whether there's one now, and whether it was just added.
 function M.gamepad_profile()
+    if M.ios then return true, false end
     local g = "persist.gammaos.gamepad.pa"
     local n = tonumber(M.getprop(g .. "_count")) or 0
     for i = 0, n - 1 do
@@ -295,6 +390,7 @@ end
 -- GammaOS's front end sometimes comes back from an app with its icons gone;
 -- asking it to refresh its apps list (a new value each time) redraws them.
 function M.refresh_front_end()
+    if M.ios then return end
     M.setprop("sys.gammaos.nano.apps_refresh_req", tostring(os.time()))
 end
 
@@ -326,6 +422,7 @@ end
 -- One-time setup: all-files access, and the DualStack list. Returns a
 -- heading and a message when something's left for the reader to do, else nil.
 function M.setup()
+    if M.ios then M.mkdir_p(M.DATA) return nil end
     -- An update installed since the last launch: its download isn't needed.
     for _, f in ipairs({ M.DATA .. "/.update.apk", M.INSTALL_STATUS }) do
         if C.access(f, 0) == 0 then os.remove(f) end
@@ -404,6 +501,7 @@ end
 -- lookup by hashed name doesn't match Android's naming). Made once a day at
 -- most, since the system's list only changes with an update.
 function M.ca_bundle()
+    if M.ios then return end                -- (cacert.pem comes with the app: see net.lua)
     local stamp = M.CA_FILE .. ".day"
     local today = os.date("%Y%m%d")
     local f = io.open(stamp, "rb")
@@ -439,6 +537,21 @@ end
 -- otherwise go straight to the real screen.
 local set_canvas = love.graphics.setCanvas
 local target
+-- iOS draws to the screen's own pixels (a 3x display: 3x the points), and
+-- LÖVE would make every canvas that big too. The app's canvases are sized in
+-- its own units (the 2048x768 frame, pages), so they stay one pixel per unit.
+if M.ios then
+    local new_canvas = love.graphics.newCanvas
+    function love.graphics.newCanvas(w, h, a, b)
+        if type(a) == "table" and b == nil then
+            if a.dpiscale == nil then a.dpiscale = 1 end
+            return new_canvas(w, h, a)
+        elseif a == nil then
+            return new_canvas(w, h, { dpiscale = 1 })
+        end
+        return new_canvas(w, h, a, b)
+    end
+end
 function love.graphics.setCanvas(c, ...)
     if c == nil and target then return set_canvas(target) end
     return set_canvas(c, ...)
@@ -481,6 +594,19 @@ end
 -- the top screen's half.
 local quads
 function M.present(canvas)
+    if M.ios then
+        local lay = ios_layout()
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.clear(0, 0, 0)
+        quads = quads or {
+            love.graphics.newQuad(0, 0, 1024, 768, 2048, 768),
+            love.graphics.newQuad(1024, 0, 1024, 768, 2048, 768),
+        }
+        -- (A screen's top right corner goes to its page's top left: a quarter turn back.)
+        love.graphics.draw(canvas, quads[1], lay.page.x, lay.page.y, -math.pi / 2, lay.s, lay.s, 1024, 0)
+        love.graphics.draw(canvas, quads[2], lay.menu.x, lay.menu.y, -math.pi / 2, lay.s, lay.s, 1024, 0)
+        return
+    end
     local W, H = love.graphics.getDimensions()
     quads = quads or {
         love.graphics.newQuad(0, 0, 1024, 768, 2048, 768),
@@ -506,6 +632,12 @@ end
 -- coordinates, or nil when it isn't on the bottom screen (the top screen has
 -- no touch, but a desktop-style window might).
 function M.bottom_xy(x, y)
+    if M.ios then
+        local lay = M.lay or ios_layout()
+        local lx, ly = (x - lay.menu.x) / lay.s, (y - lay.menu.y) / lay.s
+        if lx < 0 or lx >= 768 or ly < 0 or ly >= 1024 then return nil end
+        return 1024 - ly, lx                -- (the quarter turn undone)
+    end
     local W, H = love.graphics.getDimensions()
     if not M.stacked() then
         if not M.was_stacked then return nil end

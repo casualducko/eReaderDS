@@ -74,6 +74,16 @@ local CA_FILES = {
     "/storage/emulated/0/Ebook/.ereaderds/cacerts.pem",
 }
 
+-- The app's own folder when it's an iOS app (game.love sits in it, with
+-- Frameworks/ and cacert.pem beside it); nil elsewhere.
+function M.bundle_dir()
+    local ok, dir = pcall(function() return love.filesystem.getSourceBaseDirectory() end)
+    if ok and dir and dir:match("%.app$") then
+        local f = io.open(dir .. "/cacert.pem", "rb")
+        if f then f:close() return dir end
+    end
+end
+
 local function load_ssl()
     if ssl ~= nil then return ssl end
     pcall(ffi.cdef, [[
@@ -105,9 +115,14 @@ local function load_ssl()
         void ERR_error_string_n(unsigned long e, char *buf, size_t len);
     ]])
     -- macOS's own libssl aborts the process when loaded, so use Homebrew's there.
+    -- iOS comes with none: its app carries OpenSSL's two libraries (ios/build.sh).
     local names = ffi.os == "OSX"
         and { "/opt/homebrew/opt/openssl@3/lib/libssl.3.dylib", "/usr/local/opt/openssl@3/lib/libssl.3.dylib" }
         or { "libssl.so.3", "ssl" }
+    local bundle = M.bundle_dir()
+    if bundle and io.open(bundle .. "/Frameworks/libssl.3.dylib", "rb") then
+        names = { bundle .. "/Frameworks/libssl.3.dylib" }
+    end
     for _, name in ipairs(names) do
         local ok, lib = pcall(ffi.load, name)
         if ok and pcall(function() return lib.TLS_client_method end) then
@@ -133,7 +148,10 @@ local function ssl_context(verify)
     end
     if verify then
         ssl.SSL_CTX_set_default_verify_paths(ctx)
-        for _, f in ipairs(CA_FILES) do
+        local files = CA_FILES
+        local bundle = M.bundle_dir()
+        if bundle then files = { bundle .. "/cacert.pem" } end
+        for _, f in ipairs(files) do
             local h = io.open(f, "rb")
             if h then h:close(); ssl.SSL_CTX_load_verify_locations(ctx, f, nil); break end
         end

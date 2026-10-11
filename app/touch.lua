@@ -15,10 +15,10 @@ function M.open() return false end
 function M.poll() return false end
 function M.close() end
 
--- Android (GammaOS): no evdev for apps, but LÖVE gets the touches itself.
+-- Android (GammaOS) and iOS: no evdev for apps, but LÖVE gets the touches itself.
 -- They're turned into the same events, on the same terms: the first finger
 -- down is the one followed, and two fingers make a pinch until all lift.
-if love and love.system and love.system.getOS() == "Android" then
+if love and love.system and (love.system.getOS() == "Android" or love.system.getOS() == "iOS") then
     local Android = require("android")
     local fingers, first = {}, nil           -- id -> { x, y } (bottom screen only)
     local queue = {}

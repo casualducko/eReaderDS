@@ -3573,21 +3573,25 @@ end
 -- Help & About: help, what's new, updates and credits.
 function app.about_items()
     local u = app.upd
+    local rows = {
+        { label = "Help", act = function() app.mode = "help" end },
+        { label = "What's New", act = app.whatsnew_open },
+    }
+    -- (iOS gets its updates from TestFlight or the App Store.)
+    if not require("android").ios then
+        rows[#rows + 1] = { label = "Check for Updates",
+            value = app.update_status(), act = app.update_check_open }
+        rows[#rows + 1] = { label = "Update notices", value = S.update_notices and "On" or "Off", adjust = function()
+            S.update_notices = not S.update_notices
+        end }
+    end
+    rows[#rows + 1] = { label = "Report a Problem", act = app.report_open }
+    rows[#rows + 1] = { label = "About & Credits", act = function() app.mode = "about" end }
     return join(
         u.state == "available" and section(nil, {
             { label = "Update to v" .. u.version, act = app.update_open },
         }) or {},
-        section(u.state == "available" and "" or nil, {
-            { label = "Help", act = function() app.mode = "help" end },
-            { label = "What's New", act = app.whatsnew_open },
-            { label = "Check for Updates",
-              value = app.update_status(), act = app.update_check_open },
-            { label = "Update notices", value = S.update_notices and "On" or "Off", adjust = function()
-                S.update_notices = not S.update_notices
-            end },
-            { label = "Report a Problem", act = app.report_open },
-            { label = "About & Credits", act = function() app.mode = "about" end },
-        }),
+        section(u.state == "available" and "" or nil, rows),
         section("", { { label = "Back", act = close_sub } })
     )
 end
@@ -5857,7 +5861,7 @@ local function draw_library(side)
         love.graphics.printf("Copy .epub, .cbz or .txt files into the " .. folder .. " folder"
             .. (where and (" " .. where) or "") .. " (folders inside it are fine), or tap Get Books to download some or send them from a phone or computer.", x, 180, w, "left")
         love.graphics.setFont(ui.small)
-        app.hints(x, nil, { "Anbernic button", "quit" })
+        if not require("android").ios then app.hints(x, nil, { "Anbernic button", "quit" }) end
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
         return
     end
@@ -7610,6 +7614,7 @@ function app.update_error(msg)
 end
 
 function app.update_check(by_hand)
+    if require("android").ios then return end
     local u = app.upd
     if u.state == "checking" then u.by_hand = u.by_hand or by_hand return end   -- asked while the launch check runs
     if u.state == "downloading" or u.state == "unpacking" or u.state == "ready" or u.state == "installing"
@@ -10034,7 +10039,11 @@ function handle_action(a)
     if a == "bookmark" and mode ~= "reader" and mode ~= "library" and mode ~= "lookup" then a = "menu" end
     -- Pressing the stick in opens Settings while reading, and selects elsewhere.
     if a == "stick" then a = mode == "reader" and "menu" or "confirm" end
-    if a == "quit" then love.event.quit() return end
+    if a == "quit" then
+        -- (iOS apps aren't closed from inside: LÖVE would just start it again.)
+        if not require("android").ios then love.event.quit() end
+        return
+    end
     if app.asking and app.ask_action(a) then return end
     if app.choosing and app.choose_action(a) then return end
 
@@ -10613,6 +10622,7 @@ function app.crash_clean(text)
 end
 
 function app.system_name()
+    if require("android").ios then return "iOS" end
     if require("android").active then return "GammaOS (Android)" end
     local f = io.open("/etc/os-release", "rb")
     local s = f and f:read("*a") or ""
@@ -11746,6 +11756,40 @@ function app.cal_buttons()
     return math.floor((PAGE_W - w) / 2), by - 84, w, h
 end
 
+-- A book sent to the app (iOS: "Open in eReaderDS", Share, dragged in from
+-- Files): copied into the books folder, then My Books looks again.
+function love.filedropped(file)
+    local path = file:getFilename() or ""
+    local name = path:match("([^/]+)$") or path
+    local base, ext = name:match("^(.*)%.([^.]+)$")
+    ext = (ext or ""):lower()
+    if not base or (ext ~= "epub" and ext ~= "cbz" and ext ~= "txt") then
+        app.toast("eReaderDS can't read " .. name, 4)
+        return
+    end
+    local dir = Store.book_dirs()[1]
+    if not dir or not file:open("r") then app.toast("Couldn't open " .. name, 4) return end
+    local data = file:read()
+    file:close()
+    if not data or #data == 0 then app.toast("Couldn't read " .. name, 4) return end
+    require("android").mkdir(dir)
+    local dest, n = dir .. "/" .. name, 1
+    while io.open(dest, "rb") do                -- (never over a book already there)
+        n = n + 1
+        dest = dir .. "/" .. base .. " (" .. n .. ")." .. ext
+    end
+    local w = io.open(dest .. ".part", "wb")
+    if not w then app.toast("Couldn't save " .. name, 4) return end
+    w:write(data); w:close()
+    os.rename(dest .. ".part", dest)
+    -- (Only the copy iOS puts in the app's own Inbox: a file opened in place,
+    -- from Files or iCloud, is the reader's original and stays.)
+    if path:find("/Documents/Inbox/", 1, true) then pcall(os.remove, path) end
+    scan_library()
+    app.toast("Added " .. base, 3)
+    redraw()
+end
+
 function love.load()
     app.scale = love.graphics.getWidth() / 2048
     if require("android").active then
@@ -11944,7 +11988,7 @@ function love.quit()
     -- Android: everything is saved; LÖVE's own shutdown then took about five
     -- seconds before GammaOS's menu came back. End here instead (GammaOS
     -- stops apps this way itself when you go home).
-    if app.frame_canvas then
+    if app.frame_canvas and not require("android").ios then
         require("android").refresh_front_end()
         os.exit(0)
     end
@@ -12095,6 +12139,7 @@ function love.run()
             if name == "quit" then
                 if not love.quit() then return a or 0 end
             elseif name == "visible" or name == "focus" or name == "resize" or name == "displayrotated" then
+                if require("android").ios then print("[ios] " .. name, tostring(a), tostring(b)) end
                 redraw()
                 -- Android recreates the window's surfaces around these (and
                 -- GammaOS's DualStack reshapes it) without always saying when

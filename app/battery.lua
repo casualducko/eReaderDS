@@ -14,7 +14,16 @@ local function read(path)
     return v
 end
 
+-- iOS: LÖVE asks the system (there's no sysfs).
+local IOS = love and love.system and love.system.getOS() == "iOS"
+local function ios_read()
+    local state, pct = love.system.getPowerInfo()
+    if not pct then return nil end
+    return { pct = math.max(0, math.min(100, pct)), charging = state == "charging" or state == "charged" }
+end
+
 local function find()
+    if IOS then return "ios" end
     for _, name in ipairs(require("android").ls(ROOT)) do
         local d = ROOT .. "/" .. name
         if (read(d .. "/type") or ""):lower() == "battery" and read(d .. "/capacity") then
@@ -37,10 +46,10 @@ function M.poll()
     local now = love.timer.getTime()
     if last_poll >= 0 and now - last_poll < 5 then return false end
     last_poll = now
-    local pct = tonumber(read(dir .. "/capacity"))
-    local status = (read(dir .. "/status") or ""):lower()
-    local new = pct and { pct = math.max(0, math.min(100, pct)),
-        charging = status == "charging" or status == "full" } or nil
+    local pct = not IOS and tonumber(read(dir .. "/capacity"))
+    local status = not IOS and (read(dir .. "/status") or ""):lower()
+    local new = IOS and ios_read() or (pct and { pct = math.max(0, math.min(100, pct)),
+        charging = status == "charging" or status == "full" } or nil)
     local changed = (cache == nil) ~= (new == nil)
         or (cache ~= nil and new ~= nil and (cache.pct ~= new.pct or cache.charging ~= new.charging))
     cache, cached_at = new, now
@@ -53,10 +62,10 @@ function M.get()
     if not dir then return nil end
     local now = love.timer.getTime()          -- (not the clock, which can be set back)
     if not cache or now - cached_at >= 30 then
-        local pct = tonumber(read(dir .. "/capacity"))
-        local status = (read(dir .. "/status") or ""):lower()
-        cache = pct and { pct = math.max(0, math.min(100, pct)),
-            charging = status == "charging" or status == "full" } or nil
+        local pct = not IOS and tonumber(read(dir .. "/capacity"))
+        local status = not IOS and (read(dir .. "/status") or ""):lower()
+        cache = IOS and ios_read() or (pct and { pct = math.max(0, math.min(100, pct)),
+            charging = status == "charging" or status == "full" } or nil)
         cached_at = now
     end
     return cache

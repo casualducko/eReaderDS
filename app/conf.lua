@@ -13,7 +13,11 @@ function love.conf(t)
     -- DualStack's tall 1024x1536 surface, SDL waits for a rotation that never
     -- comes and the app freezes. Resizable lets it accept any shape.
     if love._os == "Android" then t.window.resizable = true end
-    t.window.highdpi = false
+    -- iOS: the screen's own pixels (the frame is scaled up from a canvas, so
+    -- without this it comes out soft), and a window that follows the display
+    -- as it folds, unfolds or turns.
+    t.window.highdpi = love._os == "iOS"
+    if love._os == "iOS" then t.window.resizable = true end
     t.window.vsync = 1
     t.window.display = tonumber(os.getenv("READER_DISPLAY")) or 1
     t.modules.audio = false
