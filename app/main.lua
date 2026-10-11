@@ -11801,24 +11801,47 @@ function love.filedropped(file)
     end
     local dir = Store.book_dirs()[1]
     if not dir or not file:open("r") then app.toast("Couldn't open " .. name, 4) return end
-    local data = file:read()
-    file:close()
-    if not data or #data == 0 then app.toast("Couldn't read " .. name, 4) return end
+    local size = file:getSize()
+    if not size or size == 0 then file:close() app.toast("Couldn't read " .. name, 4) return end
     require("android").mkdir(dir)
+    local function size_of(p)
+        local f = io.open(p, "rb")
+        local n = f and f:seek("end")
+        if f then f:close() end
+        return n
+    end
     local dest, n = dir .. "/" .. name, 1
-    while io.open(dest, "rb") do                -- (never over a book already there)
+    local same
+    while size_of(dest) do                      -- (never over a book already there)
+        if size_of(dest) == size then same = true break end     -- (this very book, opened again)
         n = n + 1
         dest = dir .. "/" .. base .. " (" .. n .. ")." .. ext
     end
-    local w = io.open(dest .. ".part", "wb")
-    if not w then app.toast("Couldn't save " .. name, 4) return end
-    w:write(data); w:close()
-    os.rename(dest .. ".part", dest)
+    if not same then
+        local w = io.open(dest .. ".part", "wb")
+        if not w then file:close() app.toast("Couldn't save " .. name, 4) return end
+        -- (In pieces: a comic can be hundreds of megabytes, more than the app may hold.)
+        local ok = true
+        while true do
+            local chunk = file:read(1024 * 1024)
+            if not chunk or #chunk == 0 then break end
+            if not w:write(chunk) then ok = false break end
+        end
+        w:close()
+        if not ok or size_of(dest .. ".part") ~= size then
+            file:close()
+            os.remove(dest .. ".part")
+            app.toast("Couldn't save " .. name .. " (is the phone full?)", 4)
+            return
+        end
+        os.rename(dest .. ".part", dest)
+    end
+    file:close()
     -- (Only the copy iOS puts in the app's own Inbox: a file opened in place,
     -- from Files or iCloud, is the reader's original and stays.)
     if path:find("/Documents/Inbox/", 1, true) then pcall(os.remove, path) end
     scan_library()
-    app.toast("Added " .. base, 3)
+    app.toast(same and (base .. " is already in My Books") or ("Added " .. base), 3)
     redraw()
 end
 

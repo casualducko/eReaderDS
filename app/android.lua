@@ -294,6 +294,8 @@ local function objc_get()
             typedef void *rgds_id;
             typedef void *rgds_SEL;
             typedef struct { double top, left, bottom, right; } rgds_insets;
+            void *objc_autoreleasePoolPush(void);
+            void objc_autoreleasePoolPop(void *pool);
             rgds_id objc_getClass(const char *name);
             rgds_SEL sel_registerName(const char *name);
             rgds_id objc_msgSend_id(rgds_id self, rgds_SEL op) __asm__("objc_msgSend");
@@ -306,12 +308,21 @@ local function objc_get()
     return objc or nil
 end
 
+-- UIKit hands back autoreleased objects (the scenes, their windows) that
+-- LÖVE's loop never drains: each call that asks for them runs in its own pool.
+local function pooled(fn)
+    local pool = C.objc_autoreleasePoolPush()
+    local r = { pcall(fn) }
+    C.objc_autoreleasePoolPop(pool)
+    return unpack(r, 1, 6)
+end
+
 -- The window's safe area insets (points), asked of UIKit: LÖVE's own
 -- love.window.getSafeArea is wrong under scenes.
 local function safe_insets()
     local o = objc_get()
     if not o then return 0, 0, 0, 0 end
-    local ok, t, l, b, r = pcall(function()
+    local ok, t, l, b, r = pooled(function()
         local sel = o.sel
         local app = C.objc_msgSend_id(C.objc_getClass("UIApplication"), sel("sharedApplication"))
         local scene = C.objc_msgSend_id(C.objc_msgSend_id(app, sel("connectedScenes")), sel("anyObject"))
@@ -329,7 +340,7 @@ end
 function M.ios_brightness(value)
     local o = objc_get()
     if not o then return nil end
-    local ok, v = pcall(function()
+    local ok, v = pooled(function()
         local screen = C.objc_msgSend_id(C.objc_getClass("UIScreen"), o.sel("mainScreen"))
         if value then C.objc_msgSend_setdbl(screen, o.sel("setBrightness:"), value) return value end
         return C.objc_msgSend_dbl(screen, o.sel("brightness"))

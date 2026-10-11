@@ -1,8 +1,8 @@
 diff --git a/src/video/uikit/SDL_uikitappdelegate.h b/src/video/uikit/SDL_uikitappdelegate.h
-index 4a3895e..de17056 100644
+index 4a3895e..721b35b 100644
 --- a/src/video/uikit/SDL_uikitappdelegate.h
 +++ b/src/video/uikit/SDL_uikitappdelegate.h
-@@ -29,12 +29,26 @@
+@@ -29,12 +29,28 @@
  
  @end
  
@@ -18,6 +18,8 @@ index 4a3895e..de17056 100644
 +/* The window scene to put a window in, waiting (running the run loop) for it
 + * to connect; nil when the app doesn't use scenes. */
 +UIWindowScene *SDL_UIKit_WaitForWindowScene(void);
++/* Send the files that arrived before the window existed. */
++void SDL_UIKit_FlushPendingDrops(void);
 +
  @interface SDLUIKitDelegate : NSObject<UIApplicationDelegate>
  
@@ -30,10 +32,18 @@ index 4a3895e..de17056 100644
  /* This property is marked as optional, and is only intended to be used when
   * the app's UI is storyboard-based. SDL is not storyboard-based, however
 diff --git a/src/video/uikit/SDL_uikitappdelegate.m b/src/video/uikit/SDL_uikitappdelegate.m
-index b981439..5dc82ac 100644
+index b981439..fdafeda 100644
 --- a/src/video/uikit/SDL_uikitappdelegate.m
 +++ b/src/video/uikit/SDL_uikitappdelegate.m
-@@ -349,6 +349,63 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
+@@ -23,6 +23,7 @@
+ #ifdef SDL_VIDEO_DRIVER_UIKIT
+ 
+ #include "../SDL_sysvideo.h"
++#include "SDL.h"
+ #include "SDL_hints.h"
+ #include "SDL_system.h"
+ #include "SDL_main.h"
+@@ -349,6 +350,63 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
  
  @end
  
@@ -97,7 +107,7 @@ index b981439..5dc82ac 100644
  @implementation SDLUIKitDelegate {
      UIWindow *launchWindow;
  }
-@@ -447,7 +504,9 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
+@@ -447,7 +505,9 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
          vc = [[SDLLaunchScreenController alloc] initWithNibName:screenname bundle:bundle];
      }
  
@@ -108,8 +118,33 @@ index b981439..5dc82ac 100644
          launchWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
  
          /* We don't want the launch window immediately hidden when a real SDL
-@@ -499,6 +558,10 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
+@@ -495,10 +555,35 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
+     /* Do nothing. */
+ }
+ 
++static NSMutableArray<NSURL *> *sdl_pending_drops;
++
++/* A file the system hands over while the app starts (opened from Files, say)
++ * arrives before SDL's event queue is running, and would be lost: kept until the
++ * window is made. */
++void SDL_UIKit_FlushPendingDrops(void)
++{
++    NSArray<NSURL *> *urls = sdl_pending_drops;
++    sdl_pending_drops = nil;
++    for (NSURL *url in urls) {
++        [[SDLUIKitDelegate sharedAppDelegate] sendDropFileForURL:url];
++    }
++}
++
+ - (void)sendDropFileForURL:(NSURL *)url
  {
++    if (!SDL_WasInit(SDL_INIT_VIDEO)) {
++        if (!sdl_pending_drops) {
++            sdl_pending_drops = [[NSMutableArray alloc] init];
++        }
++        [sdl_pending_drops addObject:url];
++        return;
++    }
      NSURL *fileURL = url.filePathURL;
      if (fileURL != nil) {
 +        /* A file opened in place (from Files, say) is outside the app's
@@ -156,10 +191,10 @@ index b8c8355..b708b51 100644
      return hidden;
  }
 diff --git a/src/video/uikit/SDL_uikitwindow.m b/src/video/uikit/SDL_uikitwindow.m
-index 841b4d9..29278b6 100644
+index 841b4d9..2344851 100644
 --- a/src/video/uikit/SDL_uikitwindow.m
 +++ b/src/video/uikit/SDL_uikitwindow.m
-@@ -207,7 +207,16 @@ int UIKit_CreateWindow(_THIS, SDL_Window *window)
+@@ -207,7 +207,17 @@ int UIKit_CreateWindow(_THIS, SDL_Window *window)
  
          /* ignore the size user requested, and make a fullscreen window */
          /* !!! FIXME: can we have a smaller view? */
@@ -173,6 +208,7 @@ index 841b4d9..29278b6 100644
 +            } else {
 +                uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
 +            }
++            SDL_UIKit_FlushPendingDrops();
 +        }
  
          /* put the window on an external display if appropriate. */

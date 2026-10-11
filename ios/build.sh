@@ -38,11 +38,17 @@ echo "== eReaderDS v$version for iOS ($mode)"
 # --- sources
 [ -d "$cache/love" ] || git clone -q --depth 1 --branch "$LOVE_TAG" https://github.com/love2d/love.git "$cache/love"
 [ -d "$cache/deps" ] || git clone -q --depth 1 --branch "$DEPS_BRANCH" https://github.com/love2d/love-apple-dependencies.git "$cache/deps"
+# (A changed patch: the SDL2 built from the old one is thrown away.)
+patch_sum=$(shasum "$here/patches/sdl2-uiscene.patch" | cut -d' ' -f1)
+if [ "$(cat "$cache/sdl2.patch-sum" 2>/dev/null)" != "$patch_sum" ]; then
+    rm -rf "$cache/sdl2" "$cache"/sdl-*.done
+    echo "$patch_sum" > "$cache/sdl2.patch-sum"
+fi
 if [ ! -d "$cache/sdl2" ]; then
     git init -q "$cache/sdl2"
     git -C "$cache/sdl2" fetch -q --depth 1 https://github.com/libsdl-org/SDL.git "$SDL_COMMIT"
     git -C "$cache/sdl2" checkout -q FETCH_HEAD
-    git -C "$cache/sdl2" apply "$here/patches/sdl2-uiscene.patch"
+    git -C "$cache/sdl2" apply "$here/patches/sdl2-uiscene.patch" || { rm -rf "$cache/sdl2"; echo "the SDL2 patch didn't apply"; exit 1; }
 fi
 xc="$cache/love/platform/xcode"
 [ -d "$xc/ios/libraries" ] || cp -R "$cache/deps/iOS/libraries" "$xc/ios/libraries"
@@ -140,6 +146,7 @@ plutil -replace LSSupportsOpeningDocumentsInPlace -bool true "$plist"
 plutil -replace UISupportedInterfaceOrientations -json '["UIInterfaceOrientationPortrait","UIInterfaceOrientationLandscapeLeft","UIInterfaceOrientationLandscapeRight","UIInterfaceOrientationPortraitUpsideDown"]' "$plist"
 plutil -replace UISupportedInterfaceOrientations~ipad -json '["UIInterfaceOrientationPortrait","UIInterfaceOrientationLandscapeLeft","UIInterfaceOrientationLandscapeRight","UIInterfaceOrientationPortraitUpsideDown"]' "$plist"
 plutil -replace UIStatusBarHidden -bool true "$plist"
+plutil -replace UIApplicationSupportsIndirectInputEvents -bool true "$plist"     # (a mouse or trackpad on an iPad)
 # Books can be opened in the app (Files, Mail, Share): epub, cbz, txt.
 plutil -replace UTExportedTypeDeclarations -json '[{"UTTypeIdentifier":"com.casualducko.ereaderds.cbz","UTTypeDescription":"Comic Book Archive","UTTypeConformsTo":["com.pkware.zip-archive"],"UTTypeTagSpecification":{"public.filename-extension":["cbz"],"public.mime-type":["application/vnd.comicbook+zip"]}}]' "$plist"
 plutil -replace CFBundleDocumentTypes -json '[{"CFBundleTypeName":"E-book","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["org.idpf.epub-container","com.casualducko.ereaderds.cbz","public.plain-text"]}]' "$plist"
