@@ -11,7 +11,8 @@ local devices
 -- Android (GammaOS): apps can read the backlight but not set it (that takes
 -- root). They can set their own window's brightness, though, which GammaOS
 -- applies to both screens while eReaderDS is showing; android.lua does that.
-local ANDROID = love and love.system and love.system.getOS() == "Android"
+-- (iOS the same way, through UIScreen's own brightness.)
+local ANDROID = love and love.system and (love.system.getOS() == "Android" or love.system.getOS() == "iOS")
 local android_pct                               -- what it was last set to
 
 local function write(path, value)
@@ -55,6 +56,10 @@ end
 -- Current brightness in percent (of the first backlight).
 function M.get()
     if ANDROID and android_pct then return android_pct end
+    if ANDROID and require("android").ios then
+        local v = require("android").ios_brightness()
+        return v and math.floor(v * 100 + 0.5) or nil
+    end
     local d = (devices or scan())[1]
     if not d then return nil end
     local v = read_num(d.dir .. "/brightness")

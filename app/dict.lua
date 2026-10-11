@@ -194,23 +194,31 @@ M.list = nil
 function M.scan(dirs)
     local list = {}
     local seen = {}
+    local sysfs = require("sysfs")
     for _, dir in ipairs(dirs) do
-        local p = io.popen('find -L "' .. dir .. '" -maxdepth 3 -name "*.ifo" 2>/dev/null | sort')
-        if p then
-            for path in p:lines() do
-                if not seen[path] then
-                    seen[path] = true
-                    local d = load_dict(path)
-                    -- The same dictionary copied twice (e.g. a folder inside
-                    -- a folder) only counts once.
-                    local key = d and (d.name .. "|" .. (d.words or "") .. "|" .. (d.idxsize or ""))
-                    if d and not seen[key] then
-                        seen[key] = true
-                        list[#list + 1] = d
-                    end
+        -- (iOS has no shell: the folders are walked directly.)
+        local paths = {}
+        if sysfs.ios then
+            paths = sysfs.find(dir, 3, function(name) return name:match("%.ifo$") ~= nil end)
+        else
+            local p = io.popen('find -L "' .. dir .. '" -maxdepth 3 -name "*.ifo" 2>/dev/null | sort')
+            if p then
+                for path in p:lines() do paths[#paths + 1] = path end
+                p:close()
+            end
+        end
+        for _, path in ipairs(paths) do
+            if not seen[path] then
+                seen[path] = true
+                local d = load_dict(path)
+                -- The same dictionary copied twice (e.g. a folder inside
+                -- a folder) only counts once.
+                local key = d and (d.name .. "|" .. (d.words or "") .. "|" .. (d.idxsize or ""))
+                if d and not seen[key] then
+                    seen[key] = true
+                    list[#list + 1] = d
                 end
             end
-            p:close()
         end
     end
     M.list = list

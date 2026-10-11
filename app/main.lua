@@ -3570,6 +3570,33 @@ function app.night_items()
     return join(section(nil, rows), section("", { { label = "Back", act = close_sub } }))
 end
 
+-- The Device section of Settings. (The grip, the lid and the screen-off timer
+-- are for the handhelds: a phone has its own, in iOS's Settings.)
+function app.device_rows()
+    local rows = {}
+    if not require("android").ios then
+        -- The grip: buttons under the right hand (the usual), or turned
+        -- round with them under the left (everything turns 180°).
+        rows[#rows + 1] = { label = "Hold it with buttons", value = app.flipped() and "On the left" or "On the right", adjust = function()
+            S.orient = app.flipped() and "left" or "right"
+            app.toast(app.flipped() and "Turned round: buttons on the left" or "Buttons on the right", 2)
+        end }
+        rows[#rows + 1] = { label = "Screens off after", value = S.idle_min > 0 and (S.idle_min .. " min") or "Never", adjust = function(d)
+            S.idle_min = cycle(app.IDLE_CHOICES, S.idle_min, d)
+        end }
+        rows[#rows + 1] = { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
+            S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
+        end }
+    end
+    -- The clock's zone: the status bar and the night theme's hours.
+    rows[#rows + 1] = { label = "Time zone", value = S.tz, adjust = function(d)
+        S.tz = cycle(Timezone.NAMES, S.tz, d)
+        Timezone.apply(S.tz)
+        app.night_check()
+    end }
+    return rows
+end
+
 -- Help & About: help, what's new, updates and credits.
 function app.about_items()
     local u = app.upd
@@ -3624,26 +3651,7 @@ local function more_items()
                 S.dict = cycle(names, look.only() or "all", d)
             end },
         }),
-        section("Device", {
-            -- The grip: buttons under the right hand (the usual), or turned
-            -- round with them under the left (everything turns 180°).
-            { label = "Hold it with buttons", value = app.flipped() and "On the left" or "On the right", adjust = function()
-                S.orient = app.flipped() and "left" or "right"
-                app.toast(app.flipped() and "Turned round: buttons on the left" or "Buttons on the right", 2)
-            end },
-            { label = "Screens off after", value = S.idle_min > 0 and (S.idle_min .. " min") or "Never", adjust = function(d)
-                S.idle_min = cycle(app.IDLE_CHOICES, S.idle_min, d)
-            end },
-            { label = "Closing the lid", value = S.lid == "sleep" and "Sleep" or "Screen off", adjust = function()
-                S.lid = S.lid == "sleep" and "screen" or "sleep"; S.lid_failed = nil
-            end },
-            -- The clock's zone: the status bar and the night theme's hours.
-            { label = "Time zone", value = S.tz, adjust = function(d)
-                S.tz = cycle(Timezone.NAMES, S.tz, d)
-                Timezone.apply(S.tz)
-                app.night_check()
-            end },
-        }),
+        section("Device", app.device_rows()),
         section("", { { label = "Back", act = close_sub } })
     )
 end
@@ -8431,12 +8439,25 @@ app.FONTPACK = "https://raw.githubusercontent.com/casualducko/eReaderDS/main/fon
 app.FGET_ROW_H = 84
 app.fget = { sel = 1, top = 1 }
 
+-- Hidden files in a folder (".name.zip", ".name.part": downloads and uploads
+-- cut short) matching any of the patterns, removed. Without a shell.
+function app.remove_leftovers(dir, ...)
+    local pats = { ... }
+    for _, name in ipairs(require("sysfs").ls(dir, true)) do
+        if name:sub(1, 1) == "." then
+            for _, pat in ipairs(pats) do
+                if name:find(pat) then os.remove(dir .. "/" .. name) break end
+            end
+        end
+    end
+end
+
 function app.fget_open()
     local g = app.fget
     g.sel, g.top = 1, 1
     -- A download cut short (the app quit) leaves a hidden zip: tidy it away.
     local dir = not g.busy and Fonts.user_dir()
-    if dir then os.execute('rm -f "' .. dir .. '"/.*.zip "' .. dir .. '"/.*.zip.part 2>/dev/null') end
+    if dir then app.remove_leftovers(dir, "%.zip$", "%.zip%.part$") end
     app.mode = "fontget"
     if not g.list and not g.loading then app.fget_load() end
     redraw()
@@ -9868,6 +9889,8 @@ function love.draw()
     if app.frame_canvas then
         require("android").finish()
         require("android").shot_check(app.frame_canvas)
+        -- (iOS: the margins around the pages, and under the home indicator, in the page's colour.)
+        require("android").margin = app.mode == "splash" and app.SPLASH_BG or theme().bg
         require("android").present(app.frame_canvas)
     end
 end
@@ -10883,8 +10906,8 @@ function app.recv_ip()
         return a
     end)
     if ok and ip and ip ~= "0.0.0.0" and not ip:match("^127%.") then return ip end
-    local p = io.popen("ip -4 -o addr show 2>/dev/null")
-    if p then
+    local okp, p = pcall(io.popen, "ip -4 -o addr show 2>/dev/null")    -- (not on iOS)
+    if okp and p then
         for line in p:lines() do
             local a = line:match("inet (%d+%.%d+%.%d+%.%d+)")
             if a and not a:match("^127%.") then p:close(); return a end
@@ -10904,7 +10927,7 @@ function app.recv_open()
     local books, fonts = Store.download_dir(), Fonts.user_dir()
     -- Uploads cut off by the app closing leave hidden .part files: tidy them.
     for _, d in ipairs({ books, fonts }) do
-        if d then os.execute('rm -f "' .. d .. '"/.*.part 2>/dev/null') end
+        if d then app.remove_leftovers(d, "%.part$") end
     end
     r.thread = love.thread.newThread("receiver.lua")
     r.thread:start({ books = books, fonts = fonts, version = VERSION })
@@ -11289,6 +11312,8 @@ end
 -- Free space on the card a folder is on, in bytes, from the system's df
 -- (nil if it can't be told: then nothing is checked).
 function app.free_bytes(dir)
+    local sysfs = require("sysfs")
+    if sysfs.ios then return (sysfs.free_bytes(dir)) end         -- (no df on iOS)
     local ok, out = pcall(function()
         local p = io.popen('df -k "' .. dir .. '" 2>/dev/null')
         if not p then return nil end
@@ -11804,6 +11829,12 @@ function love.load()
             love.graphics.present()
         end)
         app.frame_canvas = love.graphics.newCanvas(2048, 768)
+        -- iOS: the phone's auto-lock applies (LÖVE keeps the screen awake otherwise).
+        if require("android").ios then
+            love.window.setDisplaySleepEnabled(true)
+            -- (No system keyboard: the app has its own. SDL may have started text input.)
+            if love.keyboard.hasTextInput() then love.keyboard.setTextInput(false) end
+        end
         app.redraw_until = love.timer.getTime() + 8           -- (see love.run: surfaces settling)
         print(string.format("[android] window %dx%d, pixels %dx%d, dpi scale %.2f",
             love.graphics.getWidth(), love.graphics.getHeight(), love.graphics.getPixelWidth(),

@@ -46,6 +46,9 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
 
     local function touch(id, x, y, down)
         local bx, by = Android.bottom_xy(x, y)
+        if os.getenv("READER_DEBUG") then
+            print(string.format("[debug] touch %s %.0f,%.0f -> %s,%s", down and "down" or "up", x, y, tostring(bx), tostring(by)))
+        end
         if down then
             if not bx then return end
             if not fingers[id] and next(fingers) == nil then first = id end

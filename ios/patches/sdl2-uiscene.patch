@@ -140,6 +140,21 @@ index 4e942a9..1ddae49 100644
          float height = frame.size.width;
          frame.size.width = frame.size.height;
          frame.size.height = height;
+diff --git a/src/video/uikit/SDL_uikitviewcontroller.m b/src/video/uikit/SDL_uikitviewcontroller.m
+index b8c8355..b708b51 100644
+--- a/src/video/uikit/SDL_uikitviewcontroller.m
++++ b/src/video/uikit/SDL_uikitviewcontroller.m
+@@ -249,6 +249,10 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
+     BOOL hidden = NO;
+     if (self.homeIndicatorHidden == 1) {
+         hidden = YES;
++    } else if (self.homeIndicatorHidden < 0 && (window->flags & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_BORDERLESS)) != 0) {
++        /* Not asked either way: a borderless window (a reader, a game) lets
++         * the indicator fade out while it's not being touched. */
++        hidden = YES;
+     }
+     return hidden;
+ }
 diff --git a/src/video/uikit/SDL_uikitwindow.m b/src/video/uikit/SDL_uikitwindow.m
 index 841b4d9..29278b6 100644
 --- a/src/video/uikit/SDL_uikitwindow.m

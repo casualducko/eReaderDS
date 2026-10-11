@@ -796,6 +796,9 @@ problem (on ROCKNIX `roms/ports/eReaderDS/log.txt`; GammaOS has no log file).
 
 See [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
+An iOS port (made for the iPhone Duo, running on any iPhone or iPad) lives in
+[ios/](ios/README.md). It has been tried in the simulator only so far.
+
 ## License
 
 eReaderDS is open source under the [MIT License](LICENSE). The fonts,

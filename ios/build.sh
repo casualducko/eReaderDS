@@ -4,7 +4,7 @@
 #
 #   ios/build.sh              -> ios/cache/out/eReaderDS.app (for the Simulator)
 #   ios/build.sh device       -> ios/cache/out-device/eReaderDS.app (for a device;
-#                                signed with your team: IOS_TEAM=ABCDE12345)
+#                                unsigned unless IOS_SIGN is set: see "Signing" below)
 #
 # Needs: Xcode 27.1 or later (the iOS 27.1 SDK; the iPhone Duo simulator comes
 # with it), the Metal toolchain (xcodebuild -downloadComponent MetalToolchain),
@@ -62,9 +62,7 @@ fi
 
 # --- LÖVE
 if [ ! -f "$cache/love-$sdk.done" ] || [ "$cache/sdl-$sdk.done" -nt "$cache/love-$sdk.done" ]; then
-    extra=()
-    if [ $mode = device ]; then extra=(DEVELOPMENT_TEAM="${IOS_TEAM:?set IOS_TEAM to your Apple team id}" -allowProvisioningUpdates)
-    else extra=(CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""); fi
+    extra=(CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="")
     xcodebuild -project "$xc/love.xcodeproj" -scheme love-ios -configuration Release -sdk $sdk -arch arm64 \
         IPHONEOS_DEPLOYMENT_TARGET=$TARGET "${extra[@]}" -derivedDataPath "$cache/love-build-$sdk" build \
         > "$cache/love-$sdk.log" 2>&1 || { grep -E "error:" "$cache/love-$sdk.log" | head; exit 1; }
@@ -99,6 +97,23 @@ cp -R "$built" "$app"
 rm -f "$app/game.love"
 (cd "$repo/app" && find . -type f ! -name '.*' ! -path './data/*' ! -path '*/.*' | zip -q -X -@ "$app/game.love")
 
+# The icon (the Android one, 512 px, enlarged: put a 1024 px ios/icon-1024.png here for the App Store)
+# and the opening navy as the launch screen, in place of LÖVE's.
+icons="$cache/AppIcon.xcassets"
+rm -rf "$icons" && mkdir -p "$icons/AppIcon.appiconset"
+if [ -f "$here/icon-1024.png" ]; then cp "$here/icon-1024.png" "$icons/AppIcon.appiconset/icon.png"
+else sips -z 1024 1024 "$repo/android/icon.png" --out "$icons/AppIcon.appiconset/icon.png" >/dev/null; fi
+cat > "$icons/AppIcon.appiconset/Contents.json" <<'JSON'
+{ "images": [ { "filename": "icon.png", "idiom": "universal", "platform": "ios", "size": "1024x1024" } ],
+  "info": { "author": "xcode", "version": 1 } }
+JSON
+rm -f "$app"/Assets.car "$app"/iOS\ AppIcon* "$app/Launch Screen.nib"
+xcrun actool --output-format human-readable-text --notices --warnings --platform $sdk \
+    --minimum-deployment-target $TARGET --app-icon AppIcon --output-partial-info-plist "$cache/icon-partial.plist" \
+    --target-device iphone --target-device ipad --compile "$app" "$icons" >/dev/null
+xcrun ibtool --compile "$app/LaunchScreen.storyboardc" "$here/LaunchScreen.storyboard" \
+    --minimum-deployment-target $TARGET --target-device iphone --target-device ipad >/dev/null
+
 mkdir -p "$app/Frameworks"
 cp "$ossl"/libssl.3.dylib "$ossl"/libcrypto.3.dylib "$app/Frameworks/"
 # The certificates HTTPS trusts (Mozilla's list, from curl.se): iOS gives apps no PEM file.
@@ -112,6 +127,9 @@ set_key CFBundleName string eReaderDS
 set_key CFBundleDisplayName string eReaderDS
 set_key CFBundleShortVersionString string "$version"
 set_key CFBundleVersion string "$code"
+plutil -replace CFBundleIcons -json '{"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60"],"CFBundleIconName":"AppIcon"}}' "$plist"
+plutil -replace CFBundleIcons~ipad -json '{"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60","AppIcon76x76"],"CFBundleIconName":"AppIcon"}}' "$plist"
+plutil -replace UILaunchStoryboardName -string LaunchScreen "$plist"
 plutil -remove CFBundleDocumentTypes "$plist" 2>/dev/null || true
 plutil -remove UTExportedTypeDeclarations "$plist" 2>/dev/null || true
 # UIScene (see the top), the Files app showing the Documents folder (books go
@@ -130,7 +148,19 @@ plutil -replace CFBundleDocumentTypes -json '[{"CFBundleTypeName":"E-book","CFBu
 plutil -replace NSLocalNetworkUsageDescription -string "eReaderDS connects to Calibre or a web browser on your network to receive books." "$plist"
 plutil -replace ITSAppUsesNonExemptEncryption -bool false "$plist"     # (HTTPS only, through the system's standard)
 
-if [ $mode = device ]; then
-    codesign --force --sign - --timestamp=none "$app" >/dev/null 2>&1 || true
+# Signing. The Simulator takes it unsigned. A device needs the app signed with
+# your team's certificate and a provisioning profile that lists the device:
+#   IOS_SIGN="Apple Development: Your Name (TEAMID)" IOS_PROFILE=path/to.mobileprovision ios/build.sh device
+# (or open Xcode's Devices window and drag the unsigned app in once it has a
+# profile; see ios/README.md). Nothing is signed when IOS_SIGN isn't set.
+if [ $mode = device ] && [ -n "${IOS_SIGN:-}" ]; then
+    [ -n "${IOS_PROFILE:-}" ] && cp "$IOS_PROFILE" "$app/embedded.mobileprovision"
+    ents="$cache/entitlements.plist"
+    if [ -n "${IOS_PROFILE:-}" ]; then
+        security cms -D -i "$IOS_PROFILE" > "$cache/profile.plist"
+        /usr/libexec/PlistBuddy -x -c "Print :Entitlements" "$cache/profile.plist" > "$ents"
+    else printf '<?xml version="1.0"?><plist version="1.0"><dict/></plist>' > "$ents"; fi
+    for f in "$app"/Frameworks/*.dylib; do codesign --force --sign "$IOS_SIGN" "$f"; done
+    codesign --force --sign "$IOS_SIGN" --entitlements "$ents" "$app"
 fi
 echo "== $app ($(du -sh "$app" | cut -f1))"

@@ -24,13 +24,20 @@ local MAX_SIZE = 300 * 1024 * 1024
 
 -- Left over from an upload cut off by a crash or the power going: hidden
 -- ".name.part" files the library never shows, cleared when receiving starts.
+local sysfs = require("sysfs")                    -- (no shell on iOS)
 for _, dir in ipairs({ dirs.books, dirs.fonts }) do
-    local p = dir and io.popen("ls -1a '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-    if p then
-        for n in p:lines() do
+    if dir and sysfs.ios then
+        for _, n in ipairs(sysfs.ls(dir, true)) do
             if n:match("^%..+%.part$") then os.remove(dir .. "/" .. n) end
         end
-        p:close()
+    else
+        local p = dir and io.popen("ls -1a '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+        if p then
+            for n in p:lines() do
+                if n:match("^%..+%.part$") then os.remove(dir .. "/" .. n) end
+            end
+            p:close()
+        end
     end
 end
 local STALL = 20            -- seconds without data before giving up on a connection
@@ -287,6 +294,13 @@ end
 -- The books and fonts already there (so the page can say a file will replace one).
 local function names(dir, exts)
     local list = {}
+    if dir and sysfs.ios then
+        for _, n in ipairs(sysfs.ls(dir)) do
+            local ext = (n:match("%.([^.]+)$") or ""):lower()
+            if exts[ext] then list[#list + 1] = json_str(n) end
+        end
+        return list
+    end
     local p = dir and io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
     if not p then return list end
     for n in p:lines() do
@@ -314,6 +328,7 @@ end
 
 -- Free space where dir is, in bytes (from df), or nil if it can't be told.
 local function free_bytes(dir)
+    if sysfs.ios then return (sysfs.free_bytes(dir)) end
     local p = io.popen("df -k '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
     if not p then return nil end
     local out = p:read("*a") or ""

@@ -26,6 +26,7 @@ if M.ios then
     local save = love.filesystem.getSaveDirectory()
     local home = save:match("^(.*)/Library/Application Support/") or save
     M.ROOT = home .. "/Documents"
+    M.CACHE = home .. "/Library/Caches"     -- (not backed up; what's copied out of the app goes here)
 end
 M.BOOKS = M.ROOT .. "/Ebook"
 M.DATA = M.BOOKS .. "/.ereaderds"
@@ -243,11 +244,11 @@ end
 -- closes). value 0..1, or -1 for the system's own; false if it couldn't be done.
 local BRIGHT = { "com/casualducko/ereaderds/Bright", "set", "(Landroid/app/Activity;F)V" }
 function M.window_brightness_ok()
-    if M.ios then return false end
+    if M.ios then return M.ios_brightness() ~= nil end
     return jni_method(BRIGHT[1], BRIGHT[2], BRIGHT[3]) ~= nil
 end
 function M.window_brightness(value)
-    if M.ios then return false end
+    if M.ios then return M.ios_brightness(math.max(0, math.min(1, value))) ~= nil end
     return jni_call(BRIGHT[1], BRIGHT[2], BRIGHT[3], value)
 end
 
@@ -282,19 +283,11 @@ function M.stacked()
 end
 
 ---------------------------------------------------------------------- iOS
--- The app draws each screen as a landscape 1024x768 with the portrait page
--- turned a quarter (the handheld is held on its side, like a book: the top
--- screen is the left page). A phone or the iPhone Duo is held upright, so each
--- screen is shown turned back: two portrait pages, the book's page and the
--- menu/touch page, side by side when the window is wide (the Duo open) or one
--- above the other when it's tall, whichever comes out larger, inside the safe
--- area (clear of the notch, the home indicator and the rounded corners).
---   M.lay = { mode = "book" | "column", x, y (top left), s (scale) }
--- and the two pages' corners: M.lay.page, M.lay.menu = { x, y } (each 768s x 1024s).
--- The window's safe area insets (points), asked of UIKit through the
--- Objective-C runtime: LÖVE's own love.window.getSafeArea is wrong under scenes.
+-- Talking to UIKit through the Objective-C runtime (a few calls: the safe
+-- area, the screen's brightness), declared once. Calls with a floating point
+-- argument or result get their own declaration of objc_msgSend.
 local objc
-local function safe_insets()
+local function objc_get()
     if objc == nil then
         objc = false
         local ok = pcall(ffi.cdef, [[
@@ -305,12 +298,21 @@ local function safe_insets()
             rgds_SEL sel_registerName(const char *name);
             rgds_id objc_msgSend_id(rgds_id self, rgds_SEL op) __asm__("objc_msgSend");
             rgds_insets objc_msgSend_insets(rgds_id self, rgds_SEL op) __asm__("objc_msgSend");
+            double objc_msgSend_dbl(rgds_id self, rgds_SEL op) __asm__("objc_msgSend");
+            void objc_msgSend_setdbl(rgds_id self, rgds_SEL op, double v) __asm__("objc_msgSend");
         ]])
         if ok then objc = { sel = function(n) return C.sel_registerName(n) end } end
     end
-    if not objc then return 0, 0, 0, 0 end
+    return objc or nil
+end
+
+-- The window's safe area insets (points), asked of UIKit: LÖVE's own
+-- love.window.getSafeArea is wrong under scenes.
+local function safe_insets()
+    local o = objc_get()
+    if not o then return 0, 0, 0, 0 end
     local ok, t, l, b, r = pcall(function()
-        local sel = objc.sel
+        local sel = o.sel
         local app = C.objc_msgSend_id(C.objc_getClass("UIApplication"), sel("sharedApplication"))
         local scene = C.objc_msgSend_id(C.objc_msgSend_id(app, sel("connectedScenes")), sel("anyObject"))
         local win = C.objc_msgSend_id(C.objc_msgSend_id(scene, sel("windows")), sel("firstObject"))
@@ -322,9 +324,39 @@ local function safe_insets()
     return t, l, b, r
 end
 
+-- The screen's brightness, 0..1 (the system's own: it stays when the app
+-- closes, as in iOS's Control Center). nil if it can't be read.
+function M.ios_brightness(value)
+    local o = objc_get()
+    if not o then return nil end
+    local ok, v = pcall(function()
+        local screen = C.objc_msgSend_id(C.objc_getClass("UIScreen"), o.sel("mainScreen"))
+        if value then C.objc_msgSend_setdbl(screen, o.sel("setBrightness:"), value) return value end
+        return C.objc_msgSend_dbl(screen, o.sel("brightness"))
+    end)
+    return ok and v or nil
+end
+
+-- The app draws each screen as a landscape 1024x768 with the portrait page
+-- turned a quarter (the handheld is held on its side, like a book: the top
+-- screen is the left page). A phone or the iPhone Duo is held upright, so each
+-- screen is shown turned back: two portrait pages, the book's page and the
+-- menu/touch page, side by side when the window is wide (the Duo open) or one
+-- above the other when it's tall, whichever comes out larger, inside the safe
+-- area (clear of the notch, the home indicator and the rounded corners).
+--   M.lay = { mode = "book" | "column", x, y (top left), s (scale) }
+-- and the two pages' corners: M.lay.page, M.lay.menu = { x, y } (each 768s x 1024s).
 local function ios_layout()
     local W, H = love.graphics.getDimensions()
-    local top, left, bottom, right = safe_insets()
+    -- (The insets only change with the window or a pose: asked at most every half second.)
+    local now = love.timer.getTime()
+    local ins = M.insets
+    if not ins or ins.W ~= W or ins.H ~= H or now - ins.at > 0.5 then
+        local top, left, bottom, right = safe_insets()
+        ins = { W = W, H = H, at = now, top = top, left = left, bottom = bottom, right = right }
+        M.insets = ins
+    end
+    local top, left, bottom, right = ins.top, ins.left, ins.bottom, ins.right
     local x, y, w, h = left, top, W - left - right, H - top - bottom
     if w <= 0 or h <= 0 then x, y, w, h = 0, 0, W, H end
     local book = math.min(w / 1536, h / 1024)
@@ -467,7 +499,7 @@ end
 -- to the data folder so ordinary file reads can use it. Copied again when a
 -- file's size changes (a new version).
 function M.bundled(dir)
-    local dest = M.DATA .. "/bundled/" .. dir
+    local dest = (M.CACHE or M.DATA) .. "/bundled/" .. dir
     M.mkdir_p(dest)
     local items, copied, kept = love.filesystem.getDirectoryItems(dir), 0, 0
     for _, name in ipairs(items) do
@@ -597,7 +629,8 @@ function M.present(canvas)
     if M.ios then
         local lay = ios_layout()
         love.graphics.setColor(1, 1, 1)
-        love.graphics.clear(0, 0, 0)
+        local m = M.margin or { 0, 0, 0 }
+        love.graphics.clear(m[1], m[2], m[3])
         quads = quads or {
             love.graphics.newQuad(0, 0, 1024, 768, 2048, 768),
             love.graphics.newQuad(1024, 0, 1024, 768, 2048, 768),
