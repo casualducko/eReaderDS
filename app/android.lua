@@ -352,10 +352,10 @@ end
 -- turned a quarter (the handheld is held on its side, like a book: the top
 -- screen is the left page). A phone or the iPhone Duo is held upright, so each
 -- screen is shown turned back: two portrait pages, the book's page and the
--- menu/touch page, side by side when the window is wide (the Duo open) or one
--- above the other when it's tall, whichever comes out larger, inside the safe
--- area (clear of the notch, the home indicator and the rounded corners).
---   M.lay = { mode = "book" | "column", x, y (top left), s (scale) }
+-- menu/touch page, side by side when the window is wide (the Duo open), inside
+-- the safe area (clear of the notch, the home indicator and the rounded
+-- corners). When it's tall (the Duo closed) only a note asks to open it.
+--   M.lay = { mode = "book" | "closed", s (scale) }
 -- and the two pages' corners: M.lay.page, M.lay.menu = { x, y } (each 768s x 1024s).
 local function ios_layout()
     local W, H = love.graphics.getDimensions()
@@ -371,21 +371,19 @@ local function ios_layout()
     local x, y, w, h = left, top, W - left - right, H - top - bottom
     if w <= 0 or h <= 0 then x, y, w, h = 0, 0, W, H end
     local book = math.min(w / 1536, h / 1024)
-    local column = math.min(w / 768, h / 2048)
     local lay = M.lay or {}
-    if book >= column then
+    -- A tall window (the Duo folded shut, a phone held upright) is too narrow for
+    -- two pages: a dual screen reader is read open, so it only asks for that.
+    if w < h then
+        lay.mode, lay.s = "closed", book
+    else
         local s = book
         local x0, y0 = x + (w - 1536 * s) / 2, y + (h - 1024 * s) / 2
         lay.mode, lay.s = "book", s
         lay.page = { x = x0, y = y0 }
         lay.menu = { x = x0 + 768 * s, y = y0 }
-    else
-        local s = column
-        local x0, y0 = x + (w - 768 * s) / 2, y + (h - 2048 * s) / 2
-        lay.mode, lay.s = "column", s
-        lay.page = { x = x0, y = y0 }
-        lay.menu = { x = x0, y = y0 + 1024 * s }
     end
+    lay.x, lay.y, lay.w, lay.h = x, y, w, h
     M.lay = lay
     if M.lay_log ~= W .. "x" .. H .. ":" .. x .. "," .. y .. "," .. w .. "," .. h then
         M.lay_log = W .. "x" .. H .. ":" .. x .. "," .. y .. "," .. w .. "," .. h
@@ -635,13 +633,29 @@ end
 -- Show the 2048x768 frame: its left half (the top screen's) above its right
 -- half (the bottom screen's). On one screen only (no DualStack yet), just
 -- the top screen's half.
-local quads
+local quads, ios_note_fonts
 function M.present(canvas)
     if M.ios then
         local lay = ios_layout()
         love.graphics.setColor(1, 1, 1)
         local m = M.margin or { 0, 0, 0 }
         love.graphics.clear(m[1], m[2], m[3])
+        if lay.mode == "closed" then
+            -- (Words in the page's own colour scheme: dark text on a light page and the other way round.)
+            local lum = 0.3 * m[1] + 0.6 * m[2] + 0.1 * m[3]
+            local ink = lum > 0.5 and 0.2 or 0.9
+            ios_note_fonts = ios_note_fonts or { love.graphics.newFont(34), love.graphics.newFont(22) }
+            local W, H = love.graphics.getDimensions()
+            local pad = 24
+            love.graphics.setColor(ink, ink, ink)
+            love.graphics.setFont(ios_note_fonts[1])
+            love.graphics.printf("Open your iPhone Duo\nto read", pad, H / 2 - 70, W - 2 * pad, "center")
+            love.graphics.setFont(ios_note_fonts[2])
+            love.graphics.setColor(ink, ink, ink, 0.7)
+            love.graphics.printf("eReaderDS is a two-page reader, made for the open Duo.", pad, H / 2 + 30, W - 2 * pad, "center")
+            love.graphics.setColor(1, 1, 1)
+            return
+        end
         quads = quads or {
             love.graphics.newQuad(0, 0, 1024, 768, 2048, 768),
             love.graphics.newQuad(1024, 0, 1024, 768, 2048, 768),
@@ -678,6 +692,7 @@ end
 function M.bottom_xy(x, y)
     if M.ios then
         local lay = M.lay or ios_layout()
+        if lay.mode == "closed" then return nil end
         local lx, ly = (x - lay.menu.x) / lay.s, (y - lay.menu.y) / lay.s
         if lx < 0 or lx >= 768 or ly < 0 or ly >= 1024 then return nil end
         return 1024 - ly, lx                -- (the quarter turn undone)

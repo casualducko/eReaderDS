@@ -27,10 +27,10 @@ the Duo's poses and the rotate button).
 
 - **Screens.** The app draws its usual 2048x768 frame (two screens, each with a
   portrait page turned on its side, as the handheld is held like a book). Here each
-  screen is turned back upright and shown as two portrait pages: **side by side**
-  when the window is wide (the Duo open), **one above the other** when it's tall
-  (a phone, the Duo closed). Whichever is larger wins, inside the safe area; the
-  margins are the page's colour. The window follows folding and rotation
+  screen is turned back upright and shown as two portrait pages **side by side**
+  when the window is wide (the Duo open), inside the safe area; the margins are the
+  page's colour. When it's tall (the Duo closed, a phone held upright) nothing of
+  the reader is shown, only a note asking to open the Duo: it's a dual screen reader. The window follows folding and rotation
   (`app/android.lua`, "iOS").
 - **Touch only.** The left page shows the book; the right page is the touchscreen
   (taps, swipes, pinch for text size, swipe up from the bottom for Settings). The
