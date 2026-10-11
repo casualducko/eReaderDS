@@ -3570,6 +3570,19 @@ function app.night_items()
     return join(section(nil, rows), section("", { { label = "Back", act = close_sub } }))
 end
 
+-- Help & About, and Quit (not on iOS: an app there isn't closed from inside,
+-- the system does that; LÖVE would only start it again).
+function app.help_quit_rows()
+    local rows = {
+        -- (Help is inside: page 2 holds 12 rows at full size.)
+        { label = "Help & About", value = app.upd.state ~= "available" and "›" or nil,
+          value_bold = app.upd.state == "available" and "Update" or nil,
+          act = function() open_sub("about") end },
+    }
+    if not require("android").ios then rows[#rows + 1] = { label = "Quit", act = function() love.event.quit() end } end
+    return rows
+end
+
 -- The Device section of Settings. (The grip, the lid and the screen-off timer
 -- are for the handhelds: a phone has its own, in iOS's Settings.)
 function app.device_rows()
@@ -3768,13 +3781,7 @@ local function menu_items()
             { label = "Back Up & Restore", value = "›", act = function() app.bk_size = nil; open_sub("backup") end },
             { label = "KOReader Sync", value = app.sync_on() and "On" or "Off", opens = true, act = function() open_sub("sync") end },
         })),
-        app.menu_on_page(2, section("", {
-            -- (Help is inside: page 2 holds 12 rows at full size.)
-            { label = "Help & About", value = app.upd.state ~= "available" and "›" or nil,
-              value_bold = app.upd.state == "available" and "Update" or nil,
-              act = function() open_sub("about") end },
-            { label = "Quit", act = function() love.event.quit() end },
-        }))
+        app.menu_on_page(2, section("", app.help_quit_rows()))
     )
 end
 

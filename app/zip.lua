@@ -14,7 +14,7 @@ end
 -- size is in its first bytes); without it the whole entry is read.
 local ffi = require("ffi")
 local Z
-for _, lib in ipairs({ "z", "libz.so.1", "libz.so" }) do
+for _, lib in ipairs({ "z", "libz.so.1", "libz.so", "/usr/lib/libz.1.dylib" }) do
     local ok, l = pcall(ffi.load, lib)
     if ok then Z = l break end
 end

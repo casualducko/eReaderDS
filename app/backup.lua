@@ -24,7 +24,10 @@ M.TOKEN = "{BOOKS}"
 for _, decl in ipairs({
     "int mkdir(const char *path, unsigned int mode);",
     "typedef struct bk_DIR bk_DIR;",
-    "struct bk_dirent { uint64_t d_ino; int64_t d_off; unsigned short d_reclen; unsigned char d_type; char d_name[256]; };",
+    -- (Darwin's folder entry, on iOS, is laid out differently from Linux's and Android's.)
+    ffi.os == "OSX"
+        and "struct bk_dirent { uint64_t d_ino; uint64_t d_seekoff; uint16_t d_reclen; uint16_t d_namlen; uint8_t d_type; char d_name[1024]; };"
+        or "struct bk_dirent { uint64_t d_ino; int64_t d_off; unsigned short d_reclen; unsigned char d_type; char d_name[256]; };",
     "bk_DIR *opendir(const char *name);",
     "struct bk_dirent *readdir(bk_DIR *dir);",
     "int closedir(bk_DIR *dir);",
@@ -112,7 +115,7 @@ end
 ---------------------------------------------------------------- CRC32
 
 local z
-for _, lib in ipairs({ "z", "libz.so.1", "libz.so" }) do
+for _, lib in ipairs({ "z", "libz.so.1", "libz.so", "/usr/lib/libz.1.dylib" }) do
     local ok, l = pcall(ffi.load, lib)
     if ok then z = l break end
 end
