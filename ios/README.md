@@ -3,6 +3,8 @@
 The same app as on the handhelds (the Lua in `app/`), in LÖVE 11.5's iOS app. It's
 made for the iPhone Duo, and runs on any iPhone or iPad (iOS 15 or later).
 
+See `NOTES.md` for everything learned about this port.
+
 Status: built and tested in the iPhone Duo **simulator** (Xcode 27.1). It hasn't
 been on a real device yet (the Duo isn't out).
 
