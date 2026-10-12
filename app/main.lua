@@ -120,6 +120,7 @@ local function clear_book_caches()
     for _, img in pairs(images) do if img then img:release() end end
     images, images_order, image_dims = {}, {}, {}
     app.image_ink, app.image_frame = {}, {}
+    if app.cover_img then app.cover_img:release(); app.cover_img, app.cover_for = nil, nil end     -- (the closed book's)
     clear_pages()
 end
 local pos = { ch = 1, off = 0 }  -- reading position (start of left page)
@@ -8263,7 +8264,10 @@ function app.whatsnew_action(a)
     local wn = app.wn
     if a == "right" or a == "next" or a == "down" or a == "confirm" then wn.spread = wn.spread + 1
     elseif a == "left" or a == "prev" or a == "up" then wn.spread = math.max(1, wn.spread - 1)
-    elseif a == "back" or a == "menu" then app.mode = app.whatsnew_back or (book and "menu" or "library") end
+    elseif a == "back" or a == "menu" then
+        app.mode = app.whatsnew_back or (book and "menu" or "library")
+        app.wn = nil                                  -- (every page of text laid out: not kept)
+    end
     redraw()
 end
 
@@ -8304,6 +8308,7 @@ app.FONT_SAMPLE = {
 }
 
 function app.font_open()
+    if app.font_pick and app.font_pick.sample then Fonts.release(app.font_pick.sample.f) end     -- (left some other way)
     local fp = { sel = 1, top = 1, size = app.FONT_SAMPLE_SIZE }
     app.font_pick = fp
     app.font_set_filter(app.font_filter_last or "all", fonts.name)
