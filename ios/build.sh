@@ -79,8 +79,15 @@ built="$(ls -d "$cache"/love-build-$sdk/Build/Products/Release-*/love.app)"
 # --- OpenSSL, as two dylibs that go in the app (net.lua loads them)
 ossl="$cache/openssl-$sdk"
 if [ ! -f "$ossl/libssl.3.dylib" ]; then
-    [ -f "$cache/openssl-$OPENSSL.tar.gz" ] || curl -fsSL -o "$cache/openssl-$OPENSSL.tar.gz" \
-        "https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL/openssl-$OPENSSL.tar.gz"
+    # (Pinned: this is OpenSSL's own published SHA-256 for 3.0.22; change both together.)
+    want=67ebca7e50d17383028045486653492195b83db95f8558709701bb47b5c1ef81
+    tgz="$cache/openssl-$OPENSSL.tar.gz"
+    if [ -f "$tgz" ] && [ "$(shasum -a 256 "$tgz" | cut -d' ' -f1)" != "$want" ]; then rm -f "$tgz"; fi
+    if [ ! -f "$tgz" ]; then
+        curl -fsSL -o "$tgz.part" "https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL/openssl-$OPENSSL.tar.gz"
+        [ "$(shasum -a 256 "$tgz.part" | cut -d' ' -f1)" = "$want" ] || { rm -f "$tgz.part"; echo "OpenSSL $OPENSSL isn't the file expected"; exit 1; }
+        mv "$tgz.part" "$tgz"
+    fi
     rm -rf "$cache/ossl-build-$sdk" && mkdir -p "$cache/ossl-build-$sdk" "$ossl"
     tar xzf "$cache/openssl-$OPENSSL.tar.gz" -C "$cache/ossl-build-$sdk" --strip-components 1
     if [ $sdk = iphonesimulator ]; then cfg=iossimulator-xcrun; flags="-arch arm64 -mios-simulator-version-min=$TARGET"
@@ -123,7 +130,13 @@ xcrun ibtool --compile "$app/LaunchScreen.storyboardc" "$here/LaunchScreen.story
 mkdir -p "$app/Frameworks"
 cp "$ossl"/libssl.3.dylib "$ossl"/libcrypto.3.dylib "$app/Frameworks/"
 # The certificates HTTPS trusts (Mozilla's list, from curl.se): iOS gives apps no PEM file.
-[ -f "$cache/cacert.pem" ] || curl -fsSL -o "$cache/cacert.pem" https://curl.se/ca/cacert.pem
+# (Fetched aside and checked as a certificate list before it's kept; a partial download isn't cached.
+# Not pinned: Mozilla's list changes, and a stale one stops HTTPS working.)
+if [ ! -f "$cache/cacert.pem" ] || [ -n "$(find "$cache/cacert.pem" -mtime +60 2>/dev/null)" ]; then
+    curl -fsSL -o "$cache/cacert.pem.part" https://curl.se/ca/cacert.pem &&
+        grep -q "BEGIN CERTIFICATE" "$cache/cacert.pem.part" && mv "$cache/cacert.pem.part" "$cache/cacert.pem" ||
+        { rm -f "$cache/cacert.pem.part"; [ -f "$cache/cacert.pem" ] || { echo "couldn't fetch the certificate list"; exit 1; }; }
+fi
 cp "$cache/cacert.pem" "$app/cacert.pem"
 
 plist="$app/Info.plist"

@@ -466,8 +466,10 @@ local function host_port(address)
     return address:match("^([^:]+)"), tonumber(address:match(":(%d+)$")) or 9090
 end
 
+-- (Seeded before the first random number, the uuid load_store may make: a new
+-- thread starts with the same sequence every time.)
+math.randomseed(os.time() + math.floor(os.clock() * 1e6) + (tonumber(tostring({}):match("0x(%x+)"), 16) or 0) % 1e6)
 load_store()
-math.randomseed(os.time())
 while true do
     if stopping() then break end
     out:push({ kind = "searching" })

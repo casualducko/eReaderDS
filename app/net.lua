@@ -372,6 +372,10 @@ local function auth_header(auth, opts, path)
     local p = auth.params
     auth.nc = (auth.nc or 0) + 1
     local nc = string.format("%08x", auth.nc)
+    if not M.seeded then      -- (a new thread starts with the same sequence every time)
+        M.seeded = true
+        math.randomseed(os.time() + math.floor(os.clock() * 1e6) + (tonumber(tostring({}):match("0x(%x+)"), 16) or 0) % 1e6)
+    end
     local cnonce = hex_md5(tostring(os.time()) .. tostring(math.random())):sub(1, 16)
     local ha1 = hex_md5(opts.user .. ":" .. (p.realm or "") .. ":" .. (opts.password or ""))
     local ha2 = hex_md5("GET:" .. path)

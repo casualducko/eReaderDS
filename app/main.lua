@@ -8513,7 +8513,7 @@ function app.fget_open()
     g.sel, g.top = 1, 1
     -- A download cut short (the app quit) leaves a hidden zip: tidy it away.
     local dir = not g.busy and Fonts.user_dir()
-    if dir then app.remove_leftovers(dir, "%.zip$", "%.zip%.part$") end
+    if dir then app.remove_leftovers(dir, "%.zip$", "%.part$") end
     app.mode = "fontget"
     if not g.list and not g.loading then app.fget_load() end
     redraw()

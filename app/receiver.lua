@@ -249,6 +249,10 @@ local function send(client, code, ctype, body, cache)
 end
 
 local function json_str(s)
+    -- (A file name that isn't UTF-8 would make the page's JSON unreadable: its
+    -- odd bytes are shown as ?.)
+    local ok, u = pcall(require, "utf8")
+    if ok and u.len and not u.len(s) then s = s:gsub("[\128-\255]", "?") end
     return '"' .. s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end) .. '"'
 end
 
