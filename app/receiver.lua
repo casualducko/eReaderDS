@@ -301,7 +301,7 @@ local function names(dir, exts)
         end
         return list
     end
-    local p = dir and io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
+    local p = dir and io.popen('ls -1 ' .. require("shq")(dir) .. ' 2>/dev/null')
     if not p then return list end
     for n in p:lines() do
         local ext = (n:match("%.([^.]+)$") or ""):lower()

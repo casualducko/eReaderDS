@@ -120,7 +120,7 @@ local function space()
         local avail, total = sysfs.free_bytes(args.books)
         return total or 0, avail or 0           -- (the same order as below: size, then available)
     end
-    local p = io.popen('df -k "' .. args.books .. '" 2>/dev/null | tail -1')
+    local p = io.popen('df -k ' .. require("shq")(args.books) .. ' 2>/dev/null | tail -1')
     local line = p and p:read("*a") or ""
     if p then p:close() end
     -- Size, used and available after the device's name (which busybox puts on

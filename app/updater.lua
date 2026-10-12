@@ -97,7 +97,7 @@ function M.whatsnew_since(text, current)
     return out
 end
 
-local function mkdir(p) os.execute('mkdir -p "' .. p .. '"') end
+local function mkdir(p) os.execute('mkdir -p ' .. require("shq")(p)) end
 
 -- Flush everything to the SD card on a thread, yielding meanwhile (the
 -- screen stays live: on a slow card this takes a while).
@@ -159,7 +159,7 @@ function M.unpack(zip_path, dest, version)
     if next(need) then z:close(); error("the download is missing parts of the app", 0) end
     local vfile = z:read("Ports/eReaderDS/app/version.lua") or ""
     if vfile:match('"(.-)"') ~= version then z:close(); error("the download is a different version", 0) end
-    os.execute('rm -rf "' .. dest .. '"')
+    os.execute('rm -rf ' .. require("shq")(dest))
     mkdir(dest)
     local made, in_zip = {}, {}
     for i, name in ipairs(names) do
@@ -183,7 +183,7 @@ function M.unpack(zip_path, dest, version)
     z:close()
     -- Files of the old app/ folder that aren't in the new version.
     local gone = {}
-    local ls = io.popen('cd "' .. app_dir .. '" && find app -type f 2>/dev/null')
+    local ls = io.popen('cd ' .. require("shq")(app_dir) .. ' && find app -type f 2>/dev/null')
     if ls then
         for line in ls:lines() do
             if not in_zip[app_dir .. "/" .. line] then gone[#gone + 1] = line end

@@ -50,11 +50,11 @@ function M.ls(dir)                              -- the names in a folder, sorted
     return t
 end
 function M.mkdir(dir)
-    if M.active then M.mkdir_p(dir) else os.execute('mkdir -p "' .. dir .. '"') end
+    if M.active then M.mkdir_p(dir) else os.execute('mkdir -p ' .. require("shq")(dir)) end
 end
 function M.is_dir(dir)
     if M.active then return M.dir_exists(dir) end
-    local r = os.execute('[ -d "' .. dir .. '" ]')
+    local r = os.execute('[ -d ' .. require("shq")(dir) .. ' ]')
     return r == 0 or r == true
 end
 

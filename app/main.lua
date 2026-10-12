@@ -1725,9 +1725,9 @@ function app.find_books(dir)
         return out
     end
     local match = '-maxdepth 6 -type f \\( -iname "*.epub" -o -iname "*.cbz" -o -iname "*.txt" -o -iname "*.part" \\)'
-    local found = run('find "' .. dir .. '" ' .. match .. ' -exec stat -c "%s|%n" {} + 2>/dev/null')
+    local found = run('find ' .. require("shq")(dir) .. ' ' .. match .. ' -exec stat -c "%s|%n" {} + 2>/dev/null')
     -- No stat that way (not the device's busybox): without the sizes.
-    if #found == 0 then found = run('find "' .. dir .. '" ' .. match .. ' 2>/dev/null') end
+    if #found == 0 then found = run('find ' .. require("shq")(dir) .. ' ' .. match .. ' 2>/dev/null') end
     return found
 end
 
@@ -3275,8 +3275,8 @@ function app.sync_push(now, skip)
             shop.net_job(job, function(msg)
                 done = true
                 print("[sync] push " .. xp .. ": " .. tostring(msg.status or msg.message))
-                -- (A server error, 5xx, counts as failing too.)
-                if msg.kind == "done" and (msg.status or 500) < 500 then sent(doc, msg.status, msg.body); app.sync.failed = nil
+                -- (Only a 2xx is a success: a refusal, 401 for a wrong password, is no better than a dead server.)
+                if msg.kind == "done" and (msg.status or 500) < 300 then sent(doc, msg.status, msg.body); app.sync.failed = nil
                 else app.sync.failed = love.timer.getTime() end
             end)
             if now then
@@ -7801,7 +7801,7 @@ function app.update_start()
                 os.remove(zip)
                 if ok then u.state = "ready"
                 else
-                    os.execute('rm -rf "' .. dir .. '/.delta"')
+                    os.execute('rm -rf ' .. require("shq")(dir .. "/.delta"))
                     u.state, u.message = "error", tostring(err)
                 end
             end)
@@ -11350,7 +11350,7 @@ function app.free_bytes(dir)
     local sysfs = require("sysfs")
     if sysfs.ios then return (sysfs.free_bytes(dir)) end         -- (no df on iOS)
     local ok, out = pcall(function()
-        local p = io.popen('df -k "' .. dir .. '" 2>/dev/null')
+        local p = io.popen('df -k ' .. require("shq")(dir) .. ' 2>/dev/null')
         if not p then return nil end
         local text = p:read("*a")
         p:close()

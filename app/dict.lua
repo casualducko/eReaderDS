@@ -202,7 +202,7 @@ function M.scan(dirs)
         if sysfs.ios then
             paths = sysfs.find(dir, 3, function(name) return name:match("%.ifo$") ~= nil end)
         else
-            local p = io.popen('find -L "' .. dir .. '" -maxdepth 3 -name "*.ifo" 2>/dev/null | sort')
+            local p = io.popen('find -L ' .. require("shq")(dir) .. ' -maxdepth 3 -name "*.ifo" 2>/dev/null | sort')
             if p then
                 for path in p:lines() do paths[#paths + 1] = path end
                 p:close()
