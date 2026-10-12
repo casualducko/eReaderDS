@@ -4813,7 +4813,6 @@ function app.theme_set_filter(filter, keep)
 end
 
 function app.theme_open()
-    app.themes.list, app.themes.sel = THEMES, 1
     local cur = app.theme_current()
     local mine = false
     for _, t in ipairs(THEMES) do if t.custom and t.name == cur then mine = true end end
@@ -5887,8 +5886,6 @@ local function draw_library(side)
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
         return
     end
-    love.graphics.setFont(ui.small)
-    color(th.dim)
     love.graphics.setFont(ui.small)
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
@@ -9716,7 +9713,7 @@ local function touch_event(kind, sx, sy)
         elseif gesture.held or gesture.mode == "hl" then
             -- Already handled while the finger was down (and any drag).
             if app.mode == "lookup" and (gesture.hl_ok or gesture.mode == "hl") then app.hl_drag_end() end
-        elseif gesture.moved < 30 and app.touch_clock() - gesture.t0 < 0.5 and app.on_tap then
+        elseif gesture.moved < 30 and gesture.mode ~= "ignore" and app.touch_clock() - gesture.t0 < 0.5 and app.on_tap then
             app.on_tap(gesture.side, gesture.u0, gesture.v0)
         end
         gesture = nil
@@ -9827,6 +9824,7 @@ local function draw_overlay()
         color(th.dim, 0.45)
         love.graphics.setLineWidth(2)
         love.graphics.rectangle("line", x, y, w, h, 22, 22)
+        love.graphics.setLineWidth(1)
         color(th.fg)
         if first then
             love.graphics.setFont(ui.bold)
@@ -10177,7 +10175,6 @@ function handle_action(a)
     if mode == "bookmarks" then
         local entries = bookmark_entries()
         local n = #entries
-        local rows = list_rows(96)
         if a == "up" then bm.sel = math.max(1, bm.sel - 1)
         elseif a == "down" then bm.sel = math.max(1, math.min(n, bm.sel + 1))
         elseif a == "left" or a == "prev" or a == "right" or a == "next" then
