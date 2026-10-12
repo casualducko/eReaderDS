@@ -4139,6 +4139,15 @@ function app.comic_place(pg, side, img)
     return rx, rw, ih, x, (PAGE_H - dh) / 2, sc
 end
 
+-- One quad, pointed at a part of a picture just for the draw that follows it
+-- (drawing is immediate), instead of a new one each time a page is drawn.
+function app.view_quad(x, y, w, h, iw, ih)
+    local q = app.view_q
+    if q then q:setViewport(x, y, w, h, iw, ih)
+    else q = love.graphics.newQuad(x, y, w, h, iw, ih); app.view_q = q end
+    return q
+end
+
 function app.comic_draw(pg, side)
     if not pg or pg.blank then return end
     local img = get_image(pg.src)
@@ -4152,9 +4161,7 @@ function app.comic_draw(pg, side)
     local rx, rw, rh, x, y, sc = app.comic_place(pg, side, img)
     local k = app.dim_pictures(theme()) and 0.68 or 1          -- (a dark theme: dimmed, as other pictures)
     love.graphics.setColor(k, k, k)
-    local q = love.graphics.newQuad(rx, 0, rw, rh, img:getDimensions())
-    love.graphics.draw(img, q, x, y, 0, sc, sc)
-    q:release()
+    love.graphics.draw(img, app.view_quad(rx, 0, rw, rh, img:getDimensions()), x, y, 0, sc, sc)
 end
 
 -- The reader's painter for a comic: a page on each screen, and the
@@ -4458,9 +4465,7 @@ function app.zoom_draw(side)
         -- The whole page, the box on it, and what the buttons do.
         local x, y, sc = app.zoom_page_place()
         love.graphics.setColor(k, k, k)
-        local q = love.graphics.newQuad(z.rx, 0, z.rw, z.rh, iw, ih)
-        love.graphics.draw(z.img, q, x, y, 0, sc, sc)
-        q:release()
+        love.graphics.draw(z.img, app.view_quad(z.rx, 0, z.rw, z.rh, iw, ih), x, y, 0, sc, sc)
         local bx, by = x + (z.cx - z.bw / 2) * z.rw * sc, y + (z.cy - z.bh / 2) * z.rh * sc
         local bw, bh = z.bw * z.rw * sc, z.bh * z.rh * sc
         love.graphics.setLineWidth(6)
@@ -4478,9 +4483,7 @@ function app.zoom_draw(side)
         local sx, sy = z.rx + (z.cx - z.bw / 2) * z.rw, (z.cy - z.bh / 2) * z.rh
         local sc = math.min(PAGE_W / sw, PAGE_H / sh)
         love.graphics.setColor(k, k, k)
-        local q = love.graphics.newQuad(sx, sy, sw, sh, iw, ih)
-        love.graphics.draw(z.img, q, (PAGE_W - sw * sc) / 2, (PAGE_H - sh * sc) / 2, 0, sc, sc)
-        q:release()
+        love.graphics.draw(z.img, app.view_quad(sx, sy, sw, sh, iw, ih), (PAGE_W - sw * sc) / 2, (PAGE_H - sh * sc) / 2, 0, sc, sc)
     end
 end
 
@@ -9387,10 +9390,13 @@ end
 -- Draw the page that is turning. s = cos(angle): 1 flat, 0 edge-on.
 -- The spine end is drawn slightly shorter than the outer edge so the page
 -- appears to tilt toward the viewer as it lifts.
+-- (The same vertex tables every frame of the flip, filled in again: setVertices
+-- copies them, so nothing new is made 60 times a second.)
+local turn_verts = {}
 local function blit_turning(canvas, side, s, shade)
     if s <= 0.001 then return end
     local lift = 0.10 * math.sqrt(math.max(0, 1 - s * s))   -- sin(angle)
-    local verts = {}
+    local verts = turn_verts
     for c = 0, TURN_COLS do
         local u = c / TURN_COLS                     -- 0 at spine, 1 at outer edge
         local x = u * PAGE_W * s
@@ -9399,8 +9405,11 @@ local function blit_turning(canvas, side, s, shade)
         local h = 1 - lift * (1 - u)
         local y0 = PAGE_H * (1 - h) / 2
         local k = 1 - 0.25 * lift * (1 - u) * 4      -- a little darker toward the fold
-        verts[#verts + 1] = { x, y0, tu, 0, k, k, k, 1 }
-        verts[#verts + 1] = { x, y0 + PAGE_H * h, tu, 1, k, k, k, 1 }
+        local i = c * 2 + 1
+        local a, b = verts[i], verts[i + 1]
+        if not a then a, b = {}, {}; verts[i], verts[i + 1] = a, b end
+        a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8] = x, y0, tu, 0, k, k, k, 1
+        b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8] = x, y0 + PAGE_H * h, tu, 1, k, k, k, 1
     end
     turn_mesh:setVertices(verts)
     turn_mesh:setTexture(canvas)
@@ -11570,6 +11579,7 @@ end
 -- Settings kept with the connection's own record (calibre.json): Calibre's
 -- address (when it can't be found by itself) and its password.
 function app.cal_setting(key, value)
+    if value ~= nil then app.cal_servers_cache = nil end         -- (the saved list may change)
     local file = Store.data_path("calibre.json")
     local f = io.open(file, "rb")
     local ok, t, had = false, nil, false
@@ -11613,14 +11623,22 @@ function app.cal_edit(fn)
 end
 
 -- The saved Calibre computers: { { name, address }, ... }.
+-- (Read from the file once, not on every redraw of the Calibre screen; the
+-- list handed out is a copy, for callers that change it.)
 function app.cal_servers()
-    local list = {}
-    for _, sv in ipairs(type(app.cal_setting("servers")) == "table" and app.cal_setting("servers") or {}) do
-        if type(sv) == "table" and sv.address then list[#list + 1] = { name = sv.name, address = sv.address } end
+    if not app.cal_servers_cache then
+        local list = {}
+        local saved = app.cal_setting("servers")
+        for _, sv in ipairs(type(saved) == "table" and saved or {}) do
+            if type(sv) == "table" and sv.address then list[#list + 1] = { name = sv.name, address = sv.address } end
+        end
+        local old = app.cal_setting("address")
+        if type(old) == "string" and old ~= "" then table.insert(list, 1, { name = old:match("^[^:]+"), address = old }) end
+        app.cal_servers_cache = list
     end
-    local old = app.cal_setting("address")
-    if type(old) == "string" and old ~= "" then table.insert(list, 1, { name = old:match("^[^:]+"), address = old }) end
-    return list
+    local copy = {}
+    for i, sv in ipairs(app.cal_servers_cache) do copy[i] = { name = sv.name, address = sv.address } end
+    return copy
 end
 
 -- The address, then a name for it.
