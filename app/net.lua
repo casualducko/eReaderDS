@@ -335,6 +335,7 @@ local function reader(conn)
                 buf = buf:sub(i + 1)
                 return line
             end
+            if #buf > 65536 then error("the server sent something that isn't a web page") end     -- (a line with no end)
             local d = conn.recv(4096)
             if not d then error("the connection closed early") end
             buf = buf .. d
@@ -371,6 +372,10 @@ local function auth_header(auth, opts, path)
     local p = auth.params
     auth.nc = (auth.nc or 0) + 1
     local nc = string.format("%08x", auth.nc)
+    if not M.seeded then      -- (a new thread starts with the same sequence every time)
+        M.seeded = true
+        math.randomseed(os.time() + math.floor(os.clock() * 1e6) + (tonumber(tostring({}):match("0x(%x+)"), 16) or 0) % 1e6)
+    end
     local cnonce = hex_md5(tostring(os.time()) .. tostring(math.random())):sub(1, 16)
     local ha1 = hex_md5(opts.user .. ":" .. (p.realm or "") .. ":" .. (opts.password or ""))
     local ha2 = hex_md5("GET:" .. path)
@@ -444,9 +449,12 @@ local function request(url, opts, auth, sink, first_byte)
             first = nil
             if not status then error("the server sent something that isn't a web page") end
             local headers = {}
+            local count = 0
             while true do
                 local line = r.line()
                 if line == "" then break end
+                count = count + 1
+                if count > 200 then error("the server sent something that isn't a web page") end
                 local k, v = line:match("^([^:]+):%s*(.-)%s*$")
                 if k then
                     k = k:lower()

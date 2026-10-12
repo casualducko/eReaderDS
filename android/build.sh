@@ -35,12 +35,24 @@ if [ -z "${JAVA_HOME:-}" ] && [ -d /opt/homebrew/opt/openjdk@17 ]; then
     export PATH="$JAVA_HOME/bin:$PATH"
 fi
 
+# Downloads are pinned: fetch <file> <url> <sha256> keeps nothing that doesn't
+# match (pinned from the first download, 2026-10-12; update them with the file).
+fetch() {
+    local file="$1" url="$2" want="$3"
+    if [ -f "$file" ] && [ "$(shasum -a 256 "$file" | cut -d' ' -f1)" != "$want" ]; then rm -f "$file"; fi
+    if [ ! -f "$file" ]; then
+        curl -fL -o "$file.part" "$url"
+        [ "$(shasum -a 256 "$file.part" | cut -d' ' -f1)" = "$want" ] || { rm -f "$file.part"; echo "$(basename "$file") isn't the file expected"; exit 1; }
+        mv "$file.part" "$file"
+    fi
+}
+
 love_apk="$cache/love-11.5-android.apk"
-[ -f "$love_apk" ] || curl -fL -o "$love_apk" \
-    https://github.com/love2d/love/releases/download/11.5/love-11.5-android.apk
+fetch "$love_apk" https://github.com/love2d/love/releases/download/11.5/love-11.5-android.apk \
+    10a804f84da2cbe1b9c65736bcae0572accc1c7ded46b132c2de73d7e35b1f00
 openssl_aar="$cache/openssl-1.1.1q-beta-1.aar"
-[ -f "$openssl_aar" ] || curl -fL -o "$openssl_aar" \
-    https://dl.google.com/android/maven2/com/android/ndk/thirdparty/openssl/1.1.1q-beta-1/openssl-1.1.1q-beta-1.aar
+fetch "$openssl_aar" https://dl.google.com/android/maven2/com/android/ndk/thirdparty/openssl/1.1.1q-beta-1/openssl-1.1.1q-beta-1.aar \
+    a5b05c4b362d35c022238ef9b2e4e2196248adea3bac9dd683845ee75a3a8d66
 
 echo "== eReaderDS v$version for Android"
 rm -rf "$work"

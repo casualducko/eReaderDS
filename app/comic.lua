@@ -191,8 +191,10 @@ function M.header_dims(d)
                 local m = d:byte(i + 1)
                 if m >= 0xC0 and m <= 0xCF and m ~= 0xC4 and m ~= 0xC8 and m ~= 0xCC then
                     return be16(i + 7), be16(i + 5)
-                elseif m == 0xD8 or m == 0x01 or (m >= 0xD0 and m <= 0xD7) or m == 0xFF then
+                elseif m == 0xD8 or m == 0x01 or (m >= 0xD0 and m <= 0xD7) then
                     i = i + 2
+                elseif m == 0xFF then
+                    i = i + 1                  -- (a fill byte: the marker follows)
                 else
                     i = i + 2 + be16(i + 2)
                 end

@@ -120,7 +120,7 @@ local function space()
         local avail, total = sysfs.free_bytes(args.books)
         return total or 0, avail or 0           -- (the same order as below: size, then available)
     end
-    local p = io.popen('df -k "' .. args.books .. '" 2>/dev/null | tail -1')
+    local p = io.popen('df -k ' .. require("shq")(args.books) .. ' 2>/dev/null | tail -1')
     local line = p and p:read("*a") or ""
     if p then p:close() end
     -- Size, used and available after the device's name (which busybox puts on
@@ -211,6 +211,7 @@ local function receive()
             if not ok or type(msg) ~= "table" then error("lost: Calibre sent something unexpected", 0) end
             return msg[1], msg[2] or {}
         end
+        if #buf > 64 then error("lost: Calibre sent something unexpected", 0) end     -- (a length, then "[": no more)
         if not fill() and stopping() then return nil end
     end
 end
@@ -379,6 +380,16 @@ local function session(ip, port, name, timeout, address)
             local m = type(arg.metadata) == "table" and arg.metadata or {}
             local title = m.title or lpath:match("([^/]+)$") or "Book"
             local size = tonumber(arg.length) or 0
+            -- Only what was offered (epub, txt), no bigger than a book can be or
+            -- than there is room for: a computer pretending to be Calibre can't
+            -- fill the card or drop other files into the books folder. (Its
+            -- bytes would follow, so the connection is dropped, not answered.)
+            local ext = lpath:lower():match("%.(%w+)$")
+            local _, room = space()
+            if (ext ~= "epub" and ext ~= "txt") or size < 1 or size > 300 * 1024 * 1024
+                    or (room > 0 and size > room) then
+                error("lost: Calibre sent a book that can't be taken (" .. tostring(ext) .. ", " .. size .. " bytes)", 0)
+            end
             out:push({ kind = "start", title = title, this = (tonumber(arg.thisBook) or 0) + 1,
                 total = tonumber(arg.totalBooks) or 1, size = size })
             local path = ROOT .. "/" .. lpath
@@ -455,8 +466,10 @@ local function host_port(address)
     return address:match("^([^:]+)"), tonumber(address:match(":(%d+)$")) or 9090
 end
 
+-- (Seeded before the first random number, the uuid load_store may make: a new
+-- thread starts with the same sequence every time.)
+math.randomseed(os.time() + math.floor(os.clock() * 1e6) + (tonumber(tostring({}):match("0x(%x+)"), 16) or 0) % 1e6)
 load_store()
-math.randomseed(os.time())
 while true do
     if stopping() then break end
     out:push({ kind = "searching" })

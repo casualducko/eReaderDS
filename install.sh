@@ -32,6 +32,7 @@ if [ "${1:-}" = "--ssh" ]; then
     if ! $SSH test -f /mnt/mmc/Ports/eReaderDS/runtime/love.aarch64; then
         mkdir -p "$P/runtime"
         cp -R "$HERE/runtime/love.aarch64" "$HERE/runtime/libs.aarch64" "$P/runtime/"
+        [ -d "$HERE/runtime/libs.rocknix" ] && cp -R "$HERE/runtime/libs.rocknix" "$P/runtime/"
     fi
     COPYFILE_DISABLE=1 tar -C "$STAGE" -czf - Ports | $SSH '
         set -e
@@ -99,6 +100,7 @@ fi
 if [ -n "$SRC" ]; then
     cp "$SRC/love.aarch64" "$D/runtime/"
     cp "$SRC"/libs.aarch64/* "$D/runtime/libs.aarch64/"
+    if [ -d "$HERE/runtime/libs.rocknix" ]; then mkdir -p "$D/runtime/libs.rocknix"; cp "$HERE"/runtime/libs.rocknix/* "$D/runtime/libs.rocknix/"; fi
 elif [ ! -f "$D/runtime/love.aarch64" ]; then
     echo "No LÖVE 11.5 runtime found. Set LOVE_RUNTIME to a folder containing"
     echo "love.aarch64 and libs.aarch64/."

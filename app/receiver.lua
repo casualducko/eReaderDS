@@ -249,6 +249,10 @@ local function send(client, code, ctype, body, cache)
 end
 
 local function json_str(s)
+    -- (A file name that isn't UTF-8 would make the page's JSON unreadable: its
+    -- odd bytes are shown as ?.)
+    local ok, u = pcall(require, "utf8")
+    if ok and u.len and not u.len(s) then s = s:gsub("[\128-\255]", "?") end
     return '"' .. s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end) .. '"'
 end
 
@@ -301,7 +305,7 @@ local function names(dir, exts)
         end
         return list
     end
-    local p = dir and io.popen('ls -1 "' .. dir .. '" 2>/dev/null')
+    local p = dir and io.popen('ls -1 ' .. require("shq")(dir) .. ' 2>/dev/null')
     if not p then return list end
     for n in p:lines() do
         local ext = (n:match("%.([^.]+)$") or ""):lower()
@@ -459,6 +463,12 @@ local function handle(client)
         if data then send(client, 200, "font/ttf", data, "max-age=86400")
         else send(client, 404, "text/plain", "Not found") end
     elseif method == "POST" and p == "/upload" then
+        -- A page from some other site can't send books here: a browser says
+        -- where a cross-site request came from, and it isn't this address.
+        local origin = headers["origin"]
+        if origin and origin:match("^%a+://([^/]+)") ~= headers["host"] then
+            return reply(client, 403, false, { error = "Open the address shown on the reader's screen" })
+        end
         if (headers["transfer-encoding"] or ""):lower():find("chunked") then
             return reply(client, 411, false, { error = "The browser didn't say how big it is" })
         end

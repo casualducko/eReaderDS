@@ -120,6 +120,7 @@ local function clear_book_caches()
     for _, img in pairs(images) do if img then img:release() end end
     images, images_order, image_dims = {}, {}, {}
     app.image_ink, app.image_frame = {}, {}
+    if app.cover_img then app.cover_img:release(); app.cover_img, app.cover_for = nil, nil end     -- (the closed book's)
     clear_pages()
 end
 local pos = { ch = 1, off = 0 }  -- reading position (start of left page)
@@ -270,18 +271,23 @@ function app.fit_image(id, mw, mh)
     -- (Mipmaps, for smooth scaling, where the driver allows them for any size.)
     local okm, full = pcall(love.graphics.newImage, id, { mipmaps = true })
     if okm then full:setMipmapFilter("linear") else full = love.graphics.newImage(id) end
-    local c = love.graphics.newCanvas(math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
+    local okc, c = pcall(love.graphics.newCanvas, math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
+    if not okc then full:release(); error(c, 0) end
     love.graphics.push("all")
-    love.graphics.setCanvas(c)
-    love.graphics.origin()
-    love.graphics.clear(0, 0, 0, 0)
-    love.graphics.setBlendMode("replace", "premultiplied")
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(full, 0, 0, 0, s, s)
-    love.graphics.pop()
+    local ok, err = pcall(function()
+        love.graphics.setCanvas(c)
+        love.graphics.origin()
+        love.graphics.clear(0, 0, 0, 0)
+        love.graphics.setBlendMode("replace", "premultiplied")
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.draw(full, 0, 0, 0, s, s)
+    end)
+    love.graphics.pop()                      -- (always, or the drawing state stays changed)
     full:release()
-    local small = c:newImageData()
+    if not ok then c:release(); error(err, 0) end
+    local oks, small = pcall(c.newImageData, c)
     c:release()
+    if not oks then error(small, 0) end
     local image = love.graphics.newImage(small)
     small:release()
     return image
@@ -337,7 +343,6 @@ local function get_image(src)
                 local okd, id = pcall(love.image.newImageData, fd)
                 fd:release()            -- (a copy of the file: not left for the GC)
                 if not okd then error(id, 0) end
-                if book.comic then return app.comic_fit(id) end
                 local okl, line = pcall(app.is_line_art, id)
                 app.image_ink[src] = okl and line or nil
                 local okf, image = pcall(app.fit_image, id)
@@ -374,8 +379,10 @@ local function header_dims(d)
                 local m = d:byte(i + 1)
                 if m >= 0xC0 and m <= 0xCF and m ~= 0xC4 and m ~= 0xC8 and m ~= 0xCC then
                     return be16(i + 7), be16(i + 5)
-                elseif m == 0xD8 or m == 0x01 or (m >= 0xD0 and m <= 0xD7) or m == 0xFF then
+                elseif m == 0xD8 or m == 0x01 or (m >= 0xD0 and m <= 0xD7) then
                     i = i + 2
+                elseif m == 0xFF then
+                    i = i + 1                  -- (a fill byte: the marker follows)
                 else
                     i = i + 2 + be16(i + 2)
                 end
@@ -586,6 +593,7 @@ end
 
 local function jump_section(dir)
     if #book.toc == 0 then
+        reading_pause()
         if dir > 0 and pos.ch < #book.chapters then set_spread(pos.ch + 1, 1)
         elseif dir < 0 then set_spread(math.max(1, spread.pi > 1 and pos.ch or pos.ch - 1), 1) end
         save_progress()
@@ -796,7 +804,7 @@ function look.find()
         table.insert(tries, 2, prv.text .. w.text)
     end
     -- Hyphenated compounds with no entry of their own: their parts.
-    for part in look.dict.clean(w.text):gmatch("[^%-\226]+") do
+    for part in look.dict.clean(w.text):gsub("\226\128[\147\148]", "-"):gmatch("[^%-]+") do
         if part:find("%a") then tries[#tries + 1] = part end
     end
     look.results, look.word = {}, look.dict.clean(w.text)
@@ -1414,7 +1422,7 @@ local function open_book(path)
     -- Find results belong to one book; drop them (and the old book they hold).
     if app.find and app.find.book ~= b then app.find_stop(); app.find, app.find_mark = nil, nil end
     book = b
-    if app.zoom then app.zoom.img:release(); app.zoom = nil end      -- (the magnifier's picture: the old book's)
+    if app.zoom then if app.zoom.img then app.zoom.img:release() end; app.zoom = nil end      -- (the magnifier's picture: the old book's)
     app.page_failed = {}
     app.page_drain()                          -- (the old comic's pages still queued: not wanted now)
     clear_book_caches()
@@ -1471,6 +1479,7 @@ app.open_book = open_book           -- (for code above it: a comic's next volume
 function app.notes_path(b)
     local name = (b.title ~= "" and b.title or "Book") .. ((b.author or "") ~= "" and (" - " .. b.author) or "")
     name = name:gsub('[%c<>:"/\\|%?%*]', ""):gsub("%s+", " "):gsub("^[%s%.]+", ""):gsub("[%s%.]+$", "")
+    if name == "" then name = "Book" end
     local short = ""
     for ch in name:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
         if #short + #ch > 120 then break end
@@ -1717,9 +1726,9 @@ function app.find_books(dir)
         return out
     end
     local match = '-maxdepth 6 -type f \\( -iname "*.epub" -o -iname "*.cbz" -o -iname "*.txt" -o -iname "*.part" \\)'
-    local found = run('find "' .. dir .. '" ' .. match .. ' -exec stat -c "%s|%n" {} + 2>/dev/null')
+    local found = run('find ' .. require("shq")(dir) .. ' ' .. match .. ' -exec stat -c "%s|%n" {} + 2>/dev/null')
     -- No stat that way (not the device's busybox): without the sizes.
-    if #found == 0 then found = run('find "' .. dir .. '" ' .. match .. ' 2>/dev/null') end
+    if #found == 0 then found = run('find ' .. require("shq")(dir) .. ' ' .. match .. ' 2>/dev/null') end
     return found
 end
 
@@ -2650,8 +2659,9 @@ end
 app.KOSync = require("kosync")
 app.sync = { checked = {}, pushed = {}, docs = {}, asked = {}, moved = {}, last_push = 0, last_try = 0 }
 
-function app.sync_on() return S.kosync_user ~= "" and S.kosync_key ~= "" end
 function app.sync_url() return app.KOSync.server(S.kosync_server, S.kosync_custom) end
+-- (Not to a server over plain http out on the internet: the key would go in the clear.)
+function app.sync_on() return S.kosync_user ~= "" and S.kosync_key ~= "" and not app.KOSync.insecure(app.sync_url()) end
 
 -- The server's timestamp for a book's place that we've dealt with already
 -- (saved, per account and server, so a restart doesn't forget it).
@@ -3267,8 +3277,8 @@ function app.sync_push(now, skip)
             shop.net_job(job, function(msg)
                 done = true
                 print("[sync] push " .. xp .. ": " .. tostring(msg.status or msg.message))
-                -- (A server error, 5xx, counts as failing too.)
-                if msg.kind == "done" and (msg.status or 500) < 500 then sent(doc, msg.status, msg.body); app.sync.failed = nil
+                -- (Only a 2xx is a success: a refusal, 401 for a wrong password, is no better than a dead server.)
+                if msg.kind == "done" and (msg.status or 500) < 300 then sent(doc, msg.status, msg.body); app.sync.failed = nil
                 else app.sync.failed = love.timer.getTime() end
             end)
             if now then
@@ -3390,6 +3400,14 @@ end
 
 -- Type an address (a new server, or a change to yours); done(address).
 function app.server_address(title, ok, done)
+    local entered = done
+    done = function(addr)
+        if app.KOSync.insecure(addr) then
+            app.toast("A server on the internet needs https://. (http:// is for your home network.)", 6)
+            return
+        end
+        entered(addr)
+    end
     app.kb_open({ title = title, text = S.kosync_custom, ok = ok, url = true,
         hint = "The address of a KOReader sync server, such as https://sync.example.com or "
             .. "http://192.168.1.20:7200 (Kavita, Komga, Calibre-Web, BookLore and others can be one).",
@@ -3404,9 +3422,8 @@ end
 -- Add your own: its address, then a name; then it's the one used.
 function app.server_add()
     app.server_address("Your Own Sync Server", "Next", function(addr)
-        S.kosync_custom, S.kosync_custom_name = addr, ""
         app.server_name("", function(name)
-            S.kosync_custom_name = name
+            S.kosync_custom, S.kosync_custom_name = addr, name     -- (only once both are given)
             app.sync_set_server("custom")
             app.server_close()
         end)
@@ -3458,6 +3475,10 @@ end
 
 function app.sync_auth(user, key)
     if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
+    if app.KOSync.insecure(app.sync_url()) then
+        app.toast("This server is plain http:// on the internet. Change it to https://.", 6)
+        return
+    end
     app.toast("Logging in to " .. app.sync_server_name() .. "…", 20)
     shop.net_job(app.KOSync.auth_job(app.sync_url(), user, key), function(msg)
         if msg.kind ~= "done" then
@@ -4118,6 +4139,15 @@ function app.comic_place(pg, side, img)
     return rx, rw, ih, x, (PAGE_H - dh) / 2, sc
 end
 
+-- One quad, pointed at a part of a picture just for the draw that follows it
+-- (drawing is immediate), instead of a new one each time a page is drawn.
+function app.view_quad(x, y, w, h, iw, ih)
+    local q = app.view_q
+    if q then q:setViewport(x, y, w, h, iw, ih)
+    else q = love.graphics.newQuad(x, y, w, h, iw, ih); app.view_q = q end
+    return q
+end
+
 function app.comic_draw(pg, side)
     if not pg or pg.blank then return end
     local img = get_image(pg.src)
@@ -4131,9 +4161,7 @@ function app.comic_draw(pg, side)
     local rx, rw, rh, x, y, sc = app.comic_place(pg, side, img)
     local k = app.dim_pictures(theme()) and 0.68 or 1          -- (a dark theme: dimmed, as other pictures)
     love.graphics.setColor(k, k, k)
-    local q = love.graphics.newQuad(rx, 0, rw, rh, img:getDimensions())
-    love.graphics.draw(img, q, x, y, 0, sc, sc)
-    q:release()
+    love.graphics.draw(img, app.view_quad(rx, 0, rw, rh, img:getDimensions()), x, y, 0, sc, sc)
 end
 
 -- The reader's painter for a comic: a page on each screen, and the
@@ -4155,6 +4183,15 @@ end
 -- thread's work, on its own channels), so a page turn needn't wait.
 app.pages_waiting, app.page_jobs = 0, {}
 app.page_failed = {}
+-- The jobs the page thread has been given and not answered, oldest first: the
+-- first is the one it was on if it dies (see comic_poll).
+app.page_inflight = {}
+function app.page_track(path, name, zoom) app.page_inflight[#app.page_inflight + 1] = { path = path, name = name, zoom = zoom } end
+function app.page_untrack(path, name, zoom)
+    for i, e in ipairs(app.page_inflight) do
+        if e.path == path and e.name == name and e.zoom == zoom then table.remove(app.page_inflight, i) return end
+    end
+end
 function app.comic_prefetch()
     if not (book and book.comic and spread) then return end
     app.page_drain()                          -- (pages asked for before a jump: not before these)
@@ -4178,6 +4215,7 @@ function app.page_drain()
             keep[#keep + 1] = job
         elseif type(job) == "table" then
             app.page_jobs[app.page_key(job.path, job.name)] = nil
+            app.page_untrack(job.path, job.name, false)
             app.pages_waiting = math.max(0, app.pages_waiting - 1)
         end
     end
@@ -4189,7 +4227,7 @@ function app.page_stop()
     love.thread.getChannel("page_jobs"):clear()
     love.thread.getChannel("page_jobs"):push("quit")
     app.page_thread:wait()
-    app.page_thread, app.pages_waiting, app.page_jobs = nil, 0, {}
+    app.page_thread, app.pages_waiting, app.page_jobs, app.page_inflight = nil, 0, {}, {}
     love.thread.getChannel("page_out"):clear()
 end
 
@@ -4208,6 +4246,7 @@ function app.comic_request(src)
     love.thread.getChannel("page_jobs"):push({ path = book.path, name = src, data = data,
         fit = { w = PAGE_W, h = PAGE_H, wide = true } })
     app.page_jobs[app.page_key(book.path, src)] = true
+    app.page_track(book.path, src, false)
     app.pages_waiting = app.pages_waiting + 1
 end
 
@@ -4220,6 +4259,7 @@ function app.comic_poll()
         local msg = love.thread.getChannel("page_out"):pop()
         if not msg then break end
         app.pages_waiting = math.max(0, app.pages_waiting - 1)
+        app.page_untrack(msg.path, msg.name, msg.tag == "zoom")
         if msg.tag == "zoom" then
             -- The magnifier's picture: for it if it's still waiting for this one.
             local z = app.zoom
@@ -4261,7 +4301,11 @@ function app.comic_poll()
     -- will come, so stop waiting, or the screens' loop polls for ever.)
     if app.pages_waiting > 0 and app.page_thread and not app.page_thread:isRunning() then
         print("[comic] page thread stopped: " .. tostring(app.page_thread:getError()))
-        app.page_thread, app.pages_waiting, app.page_jobs = nil, 0, {}
+        -- (The oldest unanswered job is the one it was on: a page that kills it
+        -- is marked, or it would be sent again, and kill the next thread too.)
+        local culprit = app.page_inflight[1]
+        if culprit and not culprit.zoom then app.page_failed[culprit.name] = true end
+        app.page_thread, app.pages_waiting, app.page_jobs, app.page_inflight = nil, 0, {}, {}
         love.thread.getChannel("page_jobs"):clear()
         love.thread.getChannel("page_out"):clear()
         if app.zoom and app.zoom.loading then app.zoom.loading, app.zoom.failed = false, true end
@@ -4353,6 +4397,7 @@ function app.zoom_request(pg)
     local z = require("android").active and 1.6 or app.ZOOM
     love.thread.getChannel("page_jobs"):push({ path = book.path, name = pg.src, data = data, tag = "zoom",
         fit = { w = PAGE_W * z, h = PAGE_H * z, wide = true } })
+    app.page_track(book.path, pg.src, true)
     app.pages_waiting = app.pages_waiting + 1
 end
 
@@ -4420,9 +4465,7 @@ function app.zoom_draw(side)
         -- The whole page, the box on it, and what the buttons do.
         local x, y, sc = app.zoom_page_place()
         love.graphics.setColor(k, k, k)
-        local q = love.graphics.newQuad(z.rx, 0, z.rw, z.rh, iw, ih)
-        love.graphics.draw(z.img, q, x, y, 0, sc, sc)
-        q:release()
+        love.graphics.draw(z.img, app.view_quad(z.rx, 0, z.rw, z.rh, iw, ih), x, y, 0, sc, sc)
         local bx, by = x + (z.cx - z.bw / 2) * z.rw * sc, y + (z.cy - z.bh / 2) * z.rh * sc
         local bw, bh = z.bw * z.rw * sc, z.bh * z.rh * sc
         love.graphics.setLineWidth(6)
@@ -4433,16 +4476,14 @@ function app.zoom_draw(side)
         love.graphics.rectangle("line", bx, by, bw, bh, 6, 6)
         color(th.bg, 0.9)
         love.graphics.rectangle("fill", 0, PAGE_H - 92, PAGE_W, 92)
-        app.hints(48, nil, { "‹ ›", "move", "A", "other page", "B", "close" })
+        app.hints(48, nil, { "‹ ›", "move, at the edge turn", "A", "other page", "B", "close" })
     else
         -- The box's part, as big as the screen.
         local sw, sh = z.bw * z.rw, z.bh * z.rh
         local sx, sy = z.rx + (z.cx - z.bw / 2) * z.rw, (z.cy - z.bh / 2) * z.rh
         local sc = math.min(PAGE_W / sw, PAGE_H / sh)
         love.graphics.setColor(k, k, k)
-        local q = love.graphics.newQuad(sx, sy, sw, sh, iw, ih)
-        love.graphics.draw(z.img, q, (PAGE_W - sw * sc) / 2, (PAGE_H - sh * sc) / 2, 0, sc, sc)
-        q:release()
+        love.graphics.draw(z.img, app.view_quad(sx, sy, sw, sh, iw, ih), (PAGE_W - sw * sc) / 2, (PAGE_H - sh * sc) / 2, 0, sc, sc)
     end
 end
 
@@ -4462,6 +4503,14 @@ function app.zoom_action(a)
     if not z.img then                                  -- (on its way: only closing)
         if a == "back" or a == "toc" or a == "menu" then app.zoom_close() end
         return
+    end
+    -- Already at the page's edge in that direction: on to the next (or the
+    -- previous) page, still enlarged.
+    if book and book.comic then
+        local left, right = a == "left" or a == "prev", a == "right" or a == "next"
+        local rtl = app.comic_rtl()
+        if right and z.cx >= 1 - z.bw / 2 - 1e-4 then app.zoom_turn(not rtl) return end
+        if left and z.cx <= z.bw / 2 + 1e-4 then app.zoom_turn(rtl) return end
     end
     -- A press moves the box most of its own size, so nothing is skipped.
     if a == "left" or a == "prev" then z.cx = z.cx - z.bw * 0.6
@@ -4806,7 +4855,6 @@ function app.theme_set_filter(filter, keep)
 end
 
 function app.theme_open()
-    app.themes.list, app.themes.sel = THEMES, 1
     local cur = app.theme_current()
     local mine = false
     for _, t in ipairs(THEMES) do if t.custom and t.name == cur then mine = true end end
@@ -5880,8 +5928,6 @@ local function draw_library(side)
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
         return
     end
-    love.graphics.setFont(ui.small)
-    color(th.dim)
     love.graphics.setFont(ui.small)
     color(th.dim)
     love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
@@ -7752,30 +7798,60 @@ function app.update_start()
                 u.state, u.message = "error", "The download was incomplete. Try again."
                 return
             end
-            if apk then u.state = "ready"; u.apk = apk; return end
-            u.state, u.frac, u.saving = "unpacking", 0, nil
-            -- Unpack a file at a time between frames (the screen stays live).
-            app.find_stop()                                -- the update comes first
-            app.task_kind = "update"
-            app.task = coroutine.create(function()
-                local ok, err = pcall(function()
-                    local co = coroutine.create(app.Updater.unpack)
-                    local args = { zip, dir .. "/.delta", u.version }
-                    while true do
-                        local ok2, frac, phase = coroutine.resume(co, unpack(args))
-                        args = {}
-                        if not ok2 then error(frac, 0) end
-                        if coroutine.status(co) == "dead" then break end
-                        u.frac, u.saving = frac, phase == "saving"
-                        coroutine.yield()
+            -- It must be the file GitHub has for this release, not something swapped on the way.
+            local same, why = app.Updater.verify(zip, u.sha256)
+            if not same then
+                os.remove(zip)
+                u.state, u.message = "error", "The download doesn't match the release (" .. tostring(why) .. "). Try again."
+                return
+            end
+            local function proceed()
+                if apk then u.state = "ready"; u.apk = apk; return end
+                u.state, u.frac, u.saving = "unpacking", 0, nil
+                -- Unpack a file at a time between frames (the screen stays live).
+                app.find_stop()                                -- the update comes first
+                app.task_kind = "update"
+                app.task = coroutine.create(function()
+                    local ok, err = pcall(function()
+                        local co = coroutine.create(app.Updater.unpack)
+                        local args = { zip, dir .. "/.delta", u.version }
+                        while true do
+                            local ok2, frac, phase = coroutine.resume(co, unpack(args))
+                            args = {}
+                            if not ok2 then error(frac, 0) end
+                            if coroutine.status(co) == "dead" then break end
+                            u.frac, u.saving = frac, phase == "saving"
+                            coroutine.yield()
+                        end
+                    end)
+                    os.remove(zip)
+                    if ok then u.state = "ready"
+                    else
+                        os.execute('rm -rf ' .. require("shq")(dir .. "/.delta"))
+                        u.state, u.message = "error", tostring(err)
                     end
                 end)
+            end
+            -- The signature: the release must have been signed with the key in
+            -- the app (tools/sign-release.sh). Not for a test release (the
+            -- .update-test file or READER_FAKE_UPDATE_URL: unsigned on purpose).
+            local testing = os.getenv("READER_FAKE_UPDATE_URL") or os.getenv("READER_ALLOW_UNSIGNED")
+            local tf = io.open(Store.data_path(".update-test"), "rb")
+            if tf then tf:close(); testing = true end
+            if testing then proceed() return end
+            local function refuse(why)
                 os.remove(zip)
-                if ok then u.state = "ready"
-                else
-                    os.execute('rm -rf "' .. dir .. '/.delta"')
-                    u.state, u.message = "error", tostring(err)
-                end
+                u.state, u.message = "error", why
+            end
+            local have = app.Updater.sha256_file(zip)
+            if not have then refuse("The download couldn't be read back. Try again.") return end
+            if not u.sig_url then refuse("This release isn't signed, so it wasn't installed.") return end
+            u.state, u.frac, u.saving = "unpacking", 0, nil          -- (checking: the bar waits)
+            u.job = shop.net_job({ kind = "fetch", url = u.sig_url }, function(m2)
+                if m2.kind == "error" then refuse("Couldn't get the signature: " .. app.update_error(m2.message)) return end
+                local ok, why = app.Updater.check_signature(u.version, u.asset or "", have, m2.body)
+                if not ok then refuse("This download isn't signed by eReaderDS (" .. tostring(why) .. "), so it wasn't installed.") return end
+                proceed()
             end)
         else
             os.remove(zip)
@@ -8222,7 +8298,10 @@ function app.whatsnew_action(a)
     local wn = app.wn
     if a == "right" or a == "next" or a == "down" or a == "confirm" then wn.spread = wn.spread + 1
     elseif a == "left" or a == "prev" or a == "up" then wn.spread = math.max(1, wn.spread - 1)
-    elseif a == "back" or a == "menu" then app.mode = app.whatsnew_back or (book and "menu" or "library") end
+    elseif a == "back" or a == "menu" then
+        app.mode = app.whatsnew_back or (book and "menu" or "library")
+        app.wn = nil                                  -- (every page of text laid out: not kept)
+    end
     redraw()
 end
 
@@ -8263,6 +8342,7 @@ app.FONT_SAMPLE = {
 }
 
 function app.font_open()
+    if app.font_pick and app.font_pick.sample then Fonts.release(app.font_pick.sample.f) end     -- (left some other way)
     local fp = { sel = 1, top = 1, size = app.FONT_SAMPLE_SIZE }
     app.font_pick = fp
     app.font_set_filter(app.font_filter_last or "all", fonts.name)
@@ -8464,7 +8544,7 @@ function app.fget_open()
     g.sel, g.top = 1, 1
     -- A download cut short (the app quit) leaves a hidden zip: tidy it away.
     local dir = not g.busy and Fonts.user_dir()
-    if dir then app.remove_leftovers(dir, "%.zip$", "%.zip%.part$") end
+    if dir then app.remove_leftovers(dir, "%.zip$", "%.part$") end
     app.mode = "fontget"
     if not g.list and not g.loading then app.fget_load() end
     redraw()
@@ -9102,7 +9182,7 @@ end
 -- Seconds since the device started, for timing the start in the log.
 function app.uptime()
     local f = io.open("/proc/uptime", "rb")
-    local t = f and f:read("*l"):match("^%S+")
+    local t = f and (f:read("*l") or ""):match("^%S+")
     if f then f:close() end
     return t or "?"
 end
@@ -9341,10 +9421,13 @@ end
 -- Draw the page that is turning. s = cos(angle): 1 flat, 0 edge-on.
 -- The spine end is drawn slightly shorter than the outer edge so the page
 -- appears to tilt toward the viewer as it lifts.
+-- (The same vertex tables every frame of the flip, filled in again: setVertices
+-- copies them, so nothing new is made 60 times a second.)
+local turn_verts = {}
 local function blit_turning(canvas, side, s, shade)
     if s <= 0.001 then return end
     local lift = 0.10 * math.sqrt(math.max(0, 1 - s * s))   -- sin(angle)
-    local verts = {}
+    local verts = turn_verts
     for c = 0, TURN_COLS do
         local u = c / TURN_COLS                     -- 0 at spine, 1 at outer edge
         local x = u * PAGE_W * s
@@ -9353,8 +9436,11 @@ local function blit_turning(canvas, side, s, shade)
         local h = 1 - lift * (1 - u)
         local y0 = PAGE_H * (1 - h) / 2
         local k = 1 - 0.25 * lift * (1 - u) * 4      -- a little darker toward the fold
-        verts[#verts + 1] = { x, y0, tu, 0, k, k, k, 1 }
-        verts[#verts + 1] = { x, y0 + PAGE_H * h, tu, 1, k, k, k, 1 }
+        local i = c * 2 + 1
+        local a, b = verts[i], verts[i + 1]
+        if not a then a, b = {}, {}; verts[i], verts[i + 1] = a, b end
+        a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8] = x, y0, tu, 0, k, k, k, 1
+        b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8] = x, y0 + PAGE_H * h, tu, 1, k, k, k, 1
     end
     turn_mesh:setVertices(verts)
     turn_mesh:setTexture(canvas)
@@ -9508,6 +9594,33 @@ end
 function app.turn_way(fwd)
     local rtl = app.comic_rtl()
     if fwd then turn(rtl and -1 or 1, next_spread) else turn(rtl and 1 or -1, prev_spread) end
+end
+
+-- The magnifier's next (fwd) or previous page: the book turns on without the
+-- flip, and the first (or last) picture of the new pair is enlarged, with the
+-- box starting where reading starts (the top, at the side the page is read
+-- from). Not past the ends of the book: that would open the next volume.
+function app.zoom_turn(fwd)
+    local z = app.zoom
+    if not (z and z.img and book and book.comic and spread) then return end
+    if fwd and spread.pi + 2 > #spread.pages and spread.ch >= #book.chapters then return end
+    if not fwd and spread.pi - 2 < 1 and spread.ch <= 1 then return end
+    local before = book
+    if fwd then next_spread() else prev_spread() end
+    if book ~= before or app.mode ~= "zoom" then return end
+    local pg
+    for k = spread.pi, spread.pi + 1 do
+        local c = spread.pages[k]
+        if c and c.src and (fwd and not pg or not fwd) then pg = c end
+    end
+    if not pg then redraw() return end
+    app.zoom_request(pg)
+    local rtl = app.comic_rtl()
+    -- (Reading starts at the top left, or the top right for a comic read right
+    -- to left; coming back, at the other end.)
+    app.zoom.cx = ((fwd ~= rtl) and 0 or 1)
+    app.zoom.cy = fwd and 0 or 1
+    redraw()
 end
 
 ---------------------------------------------------------------- touch brightness
@@ -9709,7 +9822,7 @@ local function touch_event(kind, sx, sy)
         elseif gesture.held or gesture.mode == "hl" then
             -- Already handled while the finger was down (and any drag).
             if app.mode == "lookup" and (gesture.hl_ok or gesture.mode == "hl") then app.hl_drag_end() end
-        elseif gesture.moved < 30 and app.touch_clock() - gesture.t0 < 0.5 and app.on_tap then
+        elseif gesture.moved < 30 and gesture.mode ~= "ignore" and app.touch_clock() - gesture.t0 < 0.5 and app.on_tap then
             app.on_tap(gesture.side, gesture.u0, gesture.v0)
         end
         gesture = nil
@@ -9820,6 +9933,7 @@ local function draw_overlay()
         color(th.dim, 0.45)
         love.graphics.setLineWidth(2)
         love.graphics.rectangle("line", x, y, w, h, 22, 22)
+        love.graphics.setLineWidth(1)
         color(th.fg)
         if first then
             love.graphics.setFont(ui.bold)
@@ -10170,7 +10284,6 @@ function handle_action(a)
     if mode == "bookmarks" then
         local entries = bookmark_entries()
         local n = #entries
-        local rows = list_rows(96)
         if a == "up" then bm.sel = math.max(1, bm.sel - 1)
         elseif a == "down" then bm.sel = math.max(1, math.min(n, bm.sel + 1))
         elseif a == "left" or a == "prev" or a == "right" or a == "next" then
@@ -11214,7 +11327,7 @@ end
 function app.backup_label(b)
     local y, mo, d, hm = (b.info.date or ""):match("^(%d+)%-(%d+)%-(%d+) (%d+:%d+)$")
     local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
-    local when = y and (tonumber(d) .. " " .. MONTHS[tonumber(mo)] .. " " .. hm) or b.name
+    local when = y and MONTHS[tonumber(mo)] and (tonumber(d) .. " " .. MONTHS[tonumber(mo)] .. " " .. hm) or b.name
     local kind = b.info.kind == "everything" and "Everything" or "Settings"
     -- (Made on another system: which, as its times are by that one's clock.)
     local SHORT = { ["stock firmware"] = "Stock", ROCKNIX = "ROCKNIX", ["GammaOS (Android)"] = "GammaOS", computer = "Computer" }
@@ -11312,7 +11425,8 @@ function app.backup_start(whole)
     if not whole then start() return end
     app.ask({ question = "Back up everything?", yes = "Back Up", no = "Cancel",
         detail = app.size_words(app.backup_size()) .. ", with your books, fonts and dictionaries.\n"
-            .. "It's saved in " .. Store.books_folder() .. "/Backups.",
+            .. "It's saved in " .. Store.books_folder() .. "/Backups.\n"
+            .. "It holds your saved logins too (sync, catalogs, Calibre): keep it private.",
         on_yes = start })
 end
 
@@ -11322,7 +11436,7 @@ function app.free_bytes(dir)
     local sysfs = require("sysfs")
     if sysfs.ios then return (sysfs.free_bytes(dir)) end         -- (no df on iOS)
     local ok, out = pcall(function()
-        local p = io.popen('df -k "' .. dir .. '" 2>/dev/null')
+        local p = io.popen('df -k ' .. require("shq")(dir) .. ' 2>/dev/null')
         if not p then return nil end
         local text = p:read("*a")
         p:close()
@@ -11524,6 +11638,7 @@ end
 -- Settings kept with the connection's own record (calibre.json): Calibre's
 -- address (when it can't be found by itself) and its password.
 function app.cal_setting(key, value)
+    if value ~= nil then app.cal_servers_cache = nil end         -- (the saved list may change)
     local file = Store.data_path("calibre.json")
     local f = io.open(file, "rb")
     local ok, t, had = false, nil, false
@@ -11567,14 +11682,22 @@ function app.cal_edit(fn)
 end
 
 -- The saved Calibre computers: { { name, address }, ... }.
+-- (Read from the file once, not on every redraw of the Calibre screen; the
+-- list handed out is a copy, for callers that change it.)
 function app.cal_servers()
-    local list = {}
-    for _, sv in ipairs(type(app.cal_setting("servers")) == "table" and app.cal_setting("servers") or {}) do
-        if type(sv) == "table" and sv.address then list[#list + 1] = { name = sv.name, address = sv.address } end
+    if not app.cal_servers_cache then
+        local list = {}
+        local saved = app.cal_setting("servers")
+        for _, sv in ipairs(type(saved) == "table" and saved or {}) do
+            if type(sv) == "table" and sv.address then list[#list + 1] = { name = sv.name, address = sv.address } end
+        end
+        local old = app.cal_setting("address")
+        if type(old) == "string" and old ~= "" then table.insert(list, 1, { name = old:match("^[^:]+"), address = old }) end
+        app.cal_servers_cache = list
     end
-    local old = app.cal_setting("address")
-    if type(old) == "string" and old ~= "" then table.insert(list, 1, { name = old:match("^[^:]+"), address = old }) end
-    return list
+    local copy = {}
+    for i, sv in ipairs(app.cal_servers_cache) do copy[i] = { name = sv.name, address = sv.address } end
+    return copy
 end
 
 -- The address, then a name for it.

@@ -57,6 +57,24 @@ function M.server(s, custom)
     return (s:gsub("/+$", ""))
 end
 
+-- Plain http to a server that isn't on the home network: the account key (the
+-- password's MD5, as good as the password) would cross the internet in the
+-- clear. Home servers (192.168.x.x, 10.x, name.local, ...) over http are fine.
+function M.insecure(address)
+    local url = M.server(address == nil and "" or address)
+    if not url:match("^http://") then return false end
+    local host = (url:match("^http://([^/:]+)") or ""):lower()
+    if host == "localhost" or not host:find(".", 1, true) then return false end
+    if host:match("%.local$") or host:match("%.lan$") or host:match("%.home%.arpa$") then return false end
+    local a, b = host:match("^(%d+)%.(%d+)%.%d+%.%d+$")
+    if a then
+        a, b = tonumber(a), tonumber(b)
+        return not (a == 10 or a == 127 or (a == 192 and b == 168) or (a == 172 and b >= 16 and b <= 31)
+            or (a == 169 and b == 254))
+    end
+    return true
+end
+
 function M.headers(user, key)
     return { Accept = "application/vnd.koreader.v1+json", ["x-auth-user"] = user, ["x-auth-key"] = key }
 end

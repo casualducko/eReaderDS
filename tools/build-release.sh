@@ -15,6 +15,11 @@ VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$ROOT/app/version.lua")
 [ -n "$VERSION" ] || { echo "could not read app/version.lua"; exit 1; }
 [ -f "$ROOT/runtime/love.aarch64" ] || { echo "runtime/love.aarch64 missing"; exit 1; }
 
+# A syntax error would only show on the device, so stop here.
+if command -v luajit >/dev/null; then
+    for f in "$ROOT"/app/*.lua; do luajit -bl "$f" >/dev/null || { echo "syntax error in $f"; exit 1; }; done
+fi
+
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 P="$STAGE/Ports/eReaderDS"

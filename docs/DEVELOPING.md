@@ -87,6 +87,22 @@ leaves settings and progress (`Ebook/.ereaderds`) alone.
    android/build.sh && gh release upload v0.2.0 dist/eReaderDS-v0.2.0-android.apk
    ```
 
+5. Sign the release. The app only installs an update that carries a signature
+   from the update-signing key, which stays on your computer, so a release
+   published through GitHub alone can't be installed:
+   ```sh
+   tools/sign-release.sh v0.2.0
+   ```
+   It signs the zip and the APK (run it again after adding the APK) and
+   uploads `eReaderDS-v0.2.0.zip.sig` and `eReaderDS-v0.2.0-android.apk.sig`.
+   **Do this for every release**: a release without its `.sig` is refused by
+   the app ("This release isn't signed"). The key is
+   `~/.android/ereaderds-update-signing.pem` (copy in the key backup folder);
+   its public half is `PUBLIC_KEYS` in `app/updater.lua`. To change keys, ship
+   a release with both public keys listed, sign with the old key, and drop the
+   old one a release later. A test release can skip signing with an
+   `.ereaderds/.update-test` file or `READER_ALLOW_UNSIGNED=1`.
+
 To build the zip locally: `tools/build-release.sh` (writes to `dist/`).
 
 The zip contains only `Ports/…`, laid out like the SD card. It never includes
