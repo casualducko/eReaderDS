@@ -2658,8 +2658,9 @@ end
 app.KOSync = require("kosync")
 app.sync = { checked = {}, pushed = {}, docs = {}, asked = {}, moved = {}, last_push = 0, last_try = 0 }
 
-function app.sync_on() return S.kosync_user ~= "" and S.kosync_key ~= "" end
 function app.sync_url() return app.KOSync.server(S.kosync_server, S.kosync_custom) end
+-- (Not to a server over plain http out on the internet: the key would go in the clear.)
+function app.sync_on() return S.kosync_user ~= "" and S.kosync_key ~= "" and not app.KOSync.insecure(app.sync_url()) end
 
 -- The server's timestamp for a book's place that we've dealt with already
 -- (saved, per account and server, so a restart doesn't forget it).
@@ -3398,6 +3399,14 @@ end
 
 -- Type an address (a new server, or a change to yours); done(address).
 function app.server_address(title, ok, done)
+    local entered = done
+    done = function(addr)
+        if app.KOSync.insecure(addr) then
+            app.toast("A server on the internet needs https://. (http:// is for your home network.)", 6)
+            return
+        end
+        entered(addr)
+    end
     app.kb_open({ title = title, text = S.kosync_custom, ok = ok, url = true,
         hint = "The address of a KOReader sync server, such as https://sync.example.com or "
             .. "http://192.168.1.20:7200 (Kavita, Komga, Calibre-Web, BookLore and others can be one).",
@@ -3465,6 +3474,10 @@ end
 
 function app.sync_auth(user, key)
     if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
+    if app.KOSync.insecure(app.sync_url()) then
+        app.toast("This server is plain http:// on the internet. Change it to https://.", 6)
+        return
+    end
     app.toast("Logging in to " .. app.sync_server_name() .. "…", 20)
     shop.net_job(app.KOSync.auth_job(app.sync_url(), user, key), function(msg)
         if msg.kind ~= "done" then
