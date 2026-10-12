@@ -211,6 +211,7 @@ local function receive()
             if not ok or type(msg) ~= "table" then error("lost: Calibre sent something unexpected", 0) end
             return msg[1], msg[2] or {}
         end
+        if #buf > 64 then error("lost: Calibre sent something unexpected", 0) end     -- (a length, then "[": no more)
         if not fill() and stopping() then return nil end
     end
 end

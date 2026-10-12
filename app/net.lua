@@ -335,6 +335,7 @@ local function reader(conn)
                 buf = buf:sub(i + 1)
                 return line
             end
+            if #buf > 65536 then error("the server sent something that isn't a web page") end     -- (a line with no end)
             local d = conn.recv(4096)
             if not d then error("the connection closed early") end
             buf = buf .. d
@@ -444,9 +445,12 @@ local function request(url, opts, auth, sink, first_byte)
             first = nil
             if not status then error("the server sent something that isn't a web page") end
             local headers = {}
+            local count = 0
             while true do
                 local line = r.line()
                 if line == "" then break end
+                count = count + 1
+                if count > 200 then error("the server sent something that isn't a web page") end
                 local k, v = line:match("^([^:]+):%s*(.-)%s*$")
                 if k then
                     k = k:lower()

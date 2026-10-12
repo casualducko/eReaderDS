@@ -160,7 +160,7 @@ function M.write(out, files, manifest, root, progress)
     local central, offset, done, total = {}, 0, 0, 0
     for _, e in ipairs(files) do total = total + e.size end
     if total > 3.9 * 1024 ^ 3 then f:close(); os.remove(part); return nil, "it's too big for one backup (4 GB)" end
-    if #files >= 65535 then f:close(); os.remove(part); return nil, "it has too many files for one backup" end
+    if #files >= 65534 then f:close(); os.remove(part); return nil, "it has too many files for one backup" end
     local tm, dt = dos_time(os.time())
     local ok_all = true
     local function put(s) if not f:write(s) then ok_all = false end end

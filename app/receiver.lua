@@ -459,6 +459,12 @@ local function handle(client)
         if data then send(client, 200, "font/ttf", data, "max-age=86400")
         else send(client, 404, "text/plain", "Not found") end
     elseif method == "POST" and p == "/upload" then
+        -- A page from some other site can't send books here: a browser says
+        -- where a cross-site request came from, and it isn't this address.
+        local origin = headers["origin"]
+        if origin and origin:match("^%a+://([^/]+)") ~= headers["host"] then
+            return reply(client, 403, false, { error = "Open the address shown on the reader's screen" })
+        end
         if (headers["transfer-encoding"] or ""):lower():find("chunked") then
             return reply(client, 411, false, { error = "The browser didn't say how big it is" })
         end
