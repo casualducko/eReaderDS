@@ -138,10 +138,18 @@ local function write_atomic(file, text)
     -- replaced can leave it empty (FAT), and the places in every book would
     -- be gone (M.open_good reads the copy then).
     if renamed and synced then
-        local b = io.open(file .. ".bak", "wb")
+        -- (Written aside and renamed over the old copy, so the copy itself
+        -- is never half-written: it's the one thing read when the file is bad.)
+        local bt = file .. ".bak.tmp"
+        local b = io.open(bt, "wb")
         if b then
             local okb = b:write(text)
-            if b:close() and okb then pcall(fsync_file, file .. ".bak") end
+            if b:close() and okb then
+                pcall(fsync_file, bt)
+                if not os.rename(bt, file .. ".bak") then os.remove(bt) end
+            else
+                os.remove(bt)
+            end
         end
     end
     return renamed
