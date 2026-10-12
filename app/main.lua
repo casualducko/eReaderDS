@@ -4476,7 +4476,7 @@ function app.zoom_draw(side)
         love.graphics.rectangle("line", bx, by, bw, bh, 6, 6)
         color(th.bg, 0.9)
         love.graphics.rectangle("fill", 0, PAGE_H - 92, PAGE_W, 92)
-        app.hints(48, nil, { "‹ ›", "move", "A", "other page", "B", "close" })
+        app.hints(48, nil, { "‹ ›", "move, at the edge turn", "A", "other page", "B", "close" })
     else
         -- The box's part, as big as the screen.
         local sw, sh = z.bw * z.rw, z.bh * z.rh
@@ -4503,6 +4503,14 @@ function app.zoom_action(a)
     if not z.img then                                  -- (on its way: only closing)
         if a == "back" or a == "toc" or a == "menu" then app.zoom_close() end
         return
+    end
+    -- Already at the page's edge in that direction: on to the next (or the
+    -- previous) page, still enlarged.
+    if book and book.comic then
+        local left, right = a == "left" or a == "prev", a == "right" or a == "next"
+        local rtl = app.comic_rtl()
+        if right and z.cx >= 1 - z.bw / 2 - 1e-4 then app.zoom_turn(not rtl) return end
+        if left and z.cx <= z.bw / 2 + 1e-4 then app.zoom_turn(rtl) return end
     end
     -- A press moves the box most of its own size, so nothing is skipped.
     if a == "left" or a == "prev" then z.cx = z.cx - z.bw * 0.6
@@ -9586,6 +9594,33 @@ end
 function app.turn_way(fwd)
     local rtl = app.comic_rtl()
     if fwd then turn(rtl and -1 or 1, next_spread) else turn(rtl and 1 or -1, prev_spread) end
+end
+
+-- The magnifier's next (fwd) or previous page: the book turns on without the
+-- flip, and the first (or last) picture of the new pair is enlarged, with the
+-- box starting where reading starts (the top, at the side the page is read
+-- from). Not past the ends of the book: that would open the next volume.
+function app.zoom_turn(fwd)
+    local z = app.zoom
+    if not (z and z.img and book and book.comic and spread) then return end
+    if fwd and spread.pi + 2 > #spread.pages and spread.ch >= #book.chapters then return end
+    if not fwd and spread.pi - 2 < 1 and spread.ch <= 1 then return end
+    local before = book
+    if fwd then next_spread() else prev_spread() end
+    if book ~= before or app.mode ~= "zoom" then return end
+    local pg
+    for k = spread.pi, spread.pi + 1 do
+        local c = spread.pages[k]
+        if c and c.src and (fwd and not pg or not fwd) then pg = c end
+    end
+    if not pg then redraw() return end
+    app.zoom_request(pg)
+    local rtl = app.comic_rtl()
+    -- (Reading starts at the top left, or the top right for a comic read right
+    -- to left; coming back, at the other end.)
+    app.zoom.cx = ((fwd ~= rtl) and 0 or 1)
+    app.zoom.cy = fwd and 0 or 1
+    redraw()
 end
 
 ---------------------------------------------------------------- touch brightness
