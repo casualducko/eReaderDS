@@ -270,18 +270,23 @@ function app.fit_image(id, mw, mh)
     -- (Mipmaps, for smooth scaling, where the driver allows them for any size.)
     local okm, full = pcall(love.graphics.newImage, id, { mipmaps = true })
     if okm then full:setMipmapFilter("linear") else full = love.graphics.newImage(id) end
-    local c = love.graphics.newCanvas(math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
+    local okc, c = pcall(love.graphics.newCanvas, math.max(1, math.ceil(w * s)), math.max(1, math.ceil(h * s)))
+    if not okc then full:release(); error(c, 0) end
     love.graphics.push("all")
-    love.graphics.setCanvas(c)
-    love.graphics.origin()
-    love.graphics.clear(0, 0, 0, 0)
-    love.graphics.setBlendMode("replace", "premultiplied")
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(full, 0, 0, 0, s, s)
-    love.graphics.pop()
+    local ok, err = pcall(function()
+        love.graphics.setCanvas(c)
+        love.graphics.origin()
+        love.graphics.clear(0, 0, 0, 0)
+        love.graphics.setBlendMode("replace", "premultiplied")
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.draw(full, 0, 0, 0, s, s)
+    end)
+    love.graphics.pop()                      -- (always, or the drawing state stays changed)
     full:release()
-    local small = c:newImageData()
+    if not ok then c:release(); error(err, 0) end
+    local oks, small = pcall(c.newImageData, c)
     c:release()
+    if not oks then error(small, 0) end
     local image = love.graphics.newImage(small)
     small:release()
     return image
@@ -337,7 +342,6 @@ local function get_image(src)
                 local okd, id = pcall(love.image.newImageData, fd)
                 fd:release()            -- (a copy of the file: not left for the GC)
                 if not okd then error(id, 0) end
-                if book.comic then return app.comic_fit(id) end
                 local okl, line = pcall(app.is_line_art, id)
                 app.image_ink[src] = okl and line or nil
                 local okf, image = pcall(app.fit_image, id)
@@ -374,8 +378,10 @@ local function header_dims(d)
                 local m = d:byte(i + 1)
                 if m >= 0xC0 and m <= 0xCF and m ~= 0xC4 and m ~= 0xC8 and m ~= 0xCC then
                     return be16(i + 7), be16(i + 5)
-                elseif m == 0xD8 or m == 0x01 or (m >= 0xD0 and m <= 0xD7) or m == 0xFF then
+                elseif m == 0xD8 or m == 0x01 or (m >= 0xD0 and m <= 0xD7) then
                     i = i + 2
+                elseif m == 0xFF then
+                    i = i + 1                  -- (a fill byte: the marker follows)
                 else
                     i = i + 2 + be16(i + 2)
                 end
@@ -586,6 +592,7 @@ end
 
 local function jump_section(dir)
     if #book.toc == 0 then
+        reading_pause()
         if dir > 0 and pos.ch < #book.chapters then set_spread(pos.ch + 1, 1)
         elseif dir < 0 then set_spread(math.max(1, spread.pi > 1 and pos.ch or pos.ch - 1), 1) end
         save_progress()
@@ -796,7 +803,7 @@ function look.find()
         table.insert(tries, 2, prv.text .. w.text)
     end
     -- Hyphenated compounds with no entry of their own: their parts.
-    for part in look.dict.clean(w.text):gmatch("[^%-\226]+") do
+    for part in look.dict.clean(w.text):gsub("\226\128[\147\148]", "-"):gmatch("[^%-]+") do
         if part:find("%a") then tries[#tries + 1] = part end
     end
     look.results, look.word = {}, look.dict.clean(w.text)
@@ -1414,7 +1421,7 @@ local function open_book(path)
     -- Find results belong to one book; drop them (and the old book they hold).
     if app.find and app.find.book ~= b then app.find_stop(); app.find, app.find_mark = nil, nil end
     book = b
-    if app.zoom then app.zoom.img:release(); app.zoom = nil end      -- (the magnifier's picture: the old book's)
+    if app.zoom then if app.zoom.img then app.zoom.img:release() end; app.zoom = nil end      -- (the magnifier's picture: the old book's)
     app.page_failed = {}
     app.page_drain()                          -- (the old comic's pages still queued: not wanted now)
     clear_book_caches()
@@ -1471,6 +1478,7 @@ app.open_book = open_book           -- (for code above it: a comic's next volume
 function app.notes_path(b)
     local name = (b.title ~= "" and b.title or "Book") .. ((b.author or "") ~= "" and (" - " .. b.author) or "")
     name = name:gsub('[%c<>:"/\\|%?%*]', ""):gsub("%s+", " "):gsub("^[%s%.]+", ""):gsub("[%s%.]+$", "")
+    if name == "" then name = "Book" end
     local short = ""
     for ch in name:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
         if #short + #ch > 120 then break end
@@ -3404,9 +3412,8 @@ end
 -- Add your own: its address, then a name; then it's the one used.
 function app.server_add()
     app.server_address("Your Own Sync Server", "Next", function(addr)
-        S.kosync_custom, S.kosync_custom_name = addr, ""
         app.server_name("", function(name)
-            S.kosync_custom_name = name
+            S.kosync_custom, S.kosync_custom_name = addr, name     -- (only once both are given)
             app.sync_set_server("custom")
             app.server_close()
         end)
@@ -9102,7 +9109,7 @@ end
 -- Seconds since the device started, for timing the start in the log.
 function app.uptime()
     local f = io.open("/proc/uptime", "rb")
-    local t = f and f:read("*l"):match("^%S+")
+    local t = f and (f:read("*l") or ""):match("^%S+")
     if f then f:close() end
     return t or "?"
 end
@@ -11214,7 +11221,7 @@ end
 function app.backup_label(b)
     local y, mo, d, hm = (b.info.date or ""):match("^(%d+)%-(%d+)%-(%d+) (%d+:%d+)$")
     local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
-    local when = y and (tonumber(d) .. " " .. MONTHS[tonumber(mo)] .. " " .. hm) or b.name
+    local when = y and MONTHS[tonumber(mo)] and (tonumber(d) .. " " .. MONTHS[tonumber(mo)] .. " " .. hm) or b.name
     local kind = b.info.kind == "everything" and "Everything" or "Settings"
     -- (Made on another system: which, as its times are by that one's clock.)
     local SHORT = { ["stock firmware"] = "Stock", ROCKNIX = "ROCKNIX", ["GammaOS (Android)"] = "GammaOS", computer = "Computer" }
