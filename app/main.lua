@@ -8962,28 +8962,31 @@ function app.find_start(query, resume)
         for i = f.next or 1, n do
             local c = book.chapters[i]
             local loaded = c.blocks ~= nil
-            book:chapter(i)
-            for _, t in ipairs(book.toc) do
-                if t.chapter == i then toc_pos(t) end
-            end
-            for _, b in ipairs(c.blocks or {}) do
-                if b.kind == "text" then
-                    local parts = {}
-                    for _, r in ipairs(b.runs) do if r.text then parts[#parts + 1] = r.text end end
-                    local text = table.concat(parts)
-                    local low = text:lower()
-                    local at = 1
-                    while #f.results < app.FIND_MAX do
-                        local s0, s1 = low:find(needle, at, true)
-                        if not s0 then break end
-                        f.results[#f.results + 1] = { ch = i, off = b.off + s0 - 1,
-                            text = text, s0 = s0, s1 = s1 }
-                        at = s1 + 1
+            local okc, errc = pcall(function()
+                book:chapter(i)
+                for _, t in ipairs(book.toc) do
+                    if t.chapter == i then toc_pos(t) end
+                end
+                for _, b in ipairs(c.blocks or {}) do
+                    if b.kind == "text" then
+                        local parts = {}
+                        for _, r in ipairs(b.runs) do if r.text then parts[#parts + 1] = r.text end end
+                        local text = table.concat(parts)
+                        local low = text:lower()
+                        local at = 1
+                        while #f.results < app.FIND_MAX do
+                            local s0, s1 = low:find(needle, at, true)
+                            if not s0 then break end
+                            f.results[#f.results + 1] = { ch = i, off = b.off + s0 - 1,
+                                text = text, s0 = s0, s1 = s1 }
+                            at = s1 + 1
+                        end
                     end
                 end
-            end
+            end)
             -- Free what only the search needed (the open chapter stays).
             if not loaded and i ~= pos.ch then c.blocks, c.anchors = nil, nil end
+            if not okc then error(errc, 0) end     -- (after the chapter is let go: the search stops, the memory doesn't stay)
             f.pct, f.next = i / n, i + 1
             if #f.results >= app.FIND_MAX then f.capped = true; break end
             if love.timer.getTime() - t0 > 0.03 then

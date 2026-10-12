@@ -213,7 +213,7 @@ stopped() {
 }
 trap stopped TERM INT HUP
 
-cd "$APP_DIR/app" || exit 1
+cd "$APP_DIR/app" || { restore; exit 1; }       # (the device put back as it was)
 if [ -n "$ROCKNIX" ] && command -v swaymsg >/dev/null; then
     # sway puts windows on one screen and keeps the bottom one off in the
     # menu: turn it on and stretch the window over both (restore() turns it
