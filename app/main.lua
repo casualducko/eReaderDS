@@ -7756,6 +7756,13 @@ function app.update_start()
                 u.state, u.message = "error", "The download was incomplete. Try again."
                 return
             end
+            -- It must be the file GitHub has for this release, not something swapped on the way.
+            local same, why = app.Updater.verify(zip, u.sha256)
+            if not same then
+                os.remove(zip)
+                u.state, u.message = "error", "The download doesn't match the release (" .. tostring(why) .. "). Try again."
+                return
+            end
             if apk then u.state = "ready"; u.apk = apk; return end
             u.state, u.frac, u.saving = "unpacking", 0, nil
             -- Unpack a file at a time between frames (the screen stays live).

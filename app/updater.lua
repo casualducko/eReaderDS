@@ -51,12 +51,27 @@ function M.parse(body, current)
         if v and M.newer(v, current) and (not best or M.newer(v, best.version)) then
             for _, a in ipairs(r.assets or {}) do
                 if tostring(a.name or ""):match(M.ASSET) and a.browser_download_url then
-                    best = { version = v, url = a.browser_download_url, size = a.size, notes = plain(r.body) }
+                    best = { version = v, url = a.browser_download_url, size = a.size, notes = plain(r.body),
+                        sha256 = tostring(a.digest or ""):match("^sha256:(%x+)$") }
                 end
             end
         end
     end
     return best
+end
+
+-- Whether a downloaded file is the release asset GitHub recorded (its SHA-256,
+-- from the release list). true when it is, or when no digest was given (older
+-- releases); false, "mismatch" when it isn't.
+function M.verify(path, sha256)
+    if not sha256 or #sha256 ~= 64 then return true end
+    local f = io.open(path, "rb")
+    if not f then return false, "missing" end
+    local data = f:read("*a")
+    f:close()
+    if not data then return false, "unreadable" end
+    local got = love.data.encode("string", "hex", love.data.hash("sha256", data))
+    return got == sha256:lower() or false, "mismatch"
 end
 
 -- The plain-words notes (whatsnew.txt) for a release, to show before updating.
