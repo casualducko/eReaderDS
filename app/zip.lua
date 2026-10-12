@@ -56,6 +56,8 @@ local function inflate(data)
     error("no inflate available")
 end
 
+M.MAX_ENTRY = 192 * 1024 * 1024
+
 function M.open(path)
     local f, err = io.open(path, "rb")
     if not f then return nil, err end
@@ -101,6 +103,8 @@ function M:read(name)
     if not e then return nil, "missing " .. name end
     local f = self.file
     if not f then return nil, "closed" end
+    -- (A deflate bomb: a few KB that inflate to gigabytes. Nothing real is this big.)
+    if e.usize and e.usize > M.MAX_ENTRY then return nil, "entry too large" end
     f:seek("set", e.offset)
     local hdr = f:read(30)
     if not hdr or #hdr < 30 or hdr:sub(1, 4) ~= "PK\3\4" then return nil, "bad local header" end

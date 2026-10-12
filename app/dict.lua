@@ -171,6 +171,7 @@ local function entry_text(d, i)
     else
         off, size = u32(d.idx.data, after), u32(d.idx.data, after + 4)
     end
+    if size > 1048576 then return "" end          -- (no entry is this long: a damaged index)
     local raw
     if d.dz then raw = dz_read(d.dz, off, size)
     elseif d.plain then raw = d.plain:sub(off + 1, off + size)

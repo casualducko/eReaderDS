@@ -18,7 +18,7 @@ local function clean(s) return s and require("layout").sanitize(s) end
 
 local function utf8char(cp)
     -- NUL, UTF-16 halves and beyond Unicode can't be drawn: U+FFFD instead.
-    if cp == 0 or (cp >= 0xD800 and cp <= 0xDFFF) or cp >= 0x110000 then return "\239\191\189" end
+    if not (cp >= 1) or (cp >= 0xD800 and cp <= 0xDFFF) or cp >= 0x110000 then return "\239\191\189" end
     if cp < 0x80 then return string.char(cp) end
     if cp < 0x800 then
         return string.char(0xC0 + math.floor(cp / 0x40), 0x80 + cp % 0x40)
@@ -1096,6 +1096,7 @@ end
 -- Release the open book file (EPUBs keep it open to read chapters on demand).
 function Book:close()
     if self.zip then self.zip:close() end
+    self.html_cache = nil
 end
 
 return M
