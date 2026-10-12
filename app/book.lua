@@ -118,28 +118,78 @@ local function style_props(body)
     return p
 end
 
-local function parse_css(css, into)
-    css = css:gsub("/%*.-%*/", "")
-    -- Leave out @media blocks (for other readers and screens: "@media
-    -- amzn-kf8 { .kindle-only {...} }"); their braces nest.
-    local out, pos = {}, 1
+-- (Everything here walks the text with plain finds that only move forward: a
+-- hostile style sheet, with thousands of unclosed comments or braces, mustn't
+-- take quadratic time in the library scan or on opening the book.)
+local function strip_comments(css)
+    local out, at = {}, 1
     while true do
-        local s, e = css:find("@media[^{;]*{", pos)
+        local s = css:find("/*", at, true)
         if not s then break end
-        out[#out + 1] = css:sub(pos, s - 1)
-        local depth, i = 1, e + 1
-        while depth > 0 and i <= #css do
-            local c = css:find("[{}]", i)
-            if not c then i = #css + 1; break end
-            depth = depth + (css:sub(c, c) == "{" and 1 or -1)
-            i = c + 1
-        end
-        pos = i
+        local e = css:find("*/", s + 2, true)
+        if not e then break end             -- unclosed: the text stays, as it did
+        out[#out + 1] = css:sub(at, s - 1)
+        at = e + 2
     end
+    if at == 1 then return css end
+    out[#out + 1] = css:sub(at)
+    return table.concat(out)
+end
+
+-- Leave out @media blocks (for other readers and screens: "@media
+-- amzn-kf8 { .kindle-only {...} }"); their braces nest.
+local function strip_media(css)
+    local out, pos, cut = {}, 1, false
+    local brace, semi = 0, 0                -- (the next "{" and ";" at or after the search point)
+    while true do
+        local s = css:find("@media", pos, true)
+        if not s then break end
+        if brace < s then brace = css:find("{", s, true) or math.huge end
+        if semi < s then semi = css:find(";", s, true) or math.huge end
+        if brace == math.huge then break end
+        if semi < brace then
+            pos = s + 1                     -- "@media" ended by a ";": not a block
+        else
+            out[#out + 1] = css:sub(pos, s - 1)
+            cut = true
+            local depth, i = 1, brace + 1
+            while depth > 0 and i <= #css do
+                local c = css:find("[{}]", i)
+                if not c then i = #css + 1; break end
+                depth = depth + (css:sub(c, c) == "{" and 1 or -1)
+                i = c + 1
+            end
+            pos = i
+        end
+    end
+    if not cut then return css end
     out[#out + 1] = css:sub(pos)
-    css = table.concat(out)
-    for sel, body in css:gmatch("([^{}]+){([^}]*)}") do
-        local props = style_props(body)
+    return table.concat(out)
+end
+
+local function parse_css(css, into)
+    css = strip_media(strip_comments(css))
+    -- "selector { body }" rules.
+    local at = 1
+    local cb = 0                            -- the first "}" at or after `at`
+    while true do
+        local ob = css:find("{", at, true)
+        if not ob then break end
+        if cb < at then cb = css:find("}", at, true) or math.huge end
+        -- (A stray "}" before the selector ends what came before it.)
+        while cb < ob do
+            at = cb + 1
+            cb = css:find("}", at, true) or math.huge
+        end
+        if cb == math.huge then break end
+        local sel = css:sub(at, ob - 1)
+        local props = {}
+        if sel == "" then
+            at = ob + 1                     -- a "{" with no selector: skipped, what follows is read as usual
+        else
+            props = style_props(css:sub(ob + 1, cb - 1))
+            at = cb + 1
+        end
         if next(props) then
             for one in sel:gmatch("[^,]+") do
                 -- only simple ".cls" / "tag.cls" selectors (last compound part)
@@ -496,7 +546,7 @@ local function open_epub_zip(path, z)
             manifest[id] = { href = full, type = mt }
             if mt == "text/css" then
                 local css = z:read(full)
-                if css then parse_css(css, book.classes) end
+                if css and #css < 4 * 1048576 then parse_css(css, book.classes) end      -- (no style sheet is bigger)
             end
             local props = attr(item, "properties") or ""
             if props:find("nav") then nav = full end
@@ -712,6 +762,39 @@ local function open_cbz(path)
     return nil, ok and why or book
 end
 
+-- The <meta> elements of a package file: { { tag, text }, ... }, the
+-- self-closing ones first, then those with content (an unclosed one has none).
+-- One pass over the text: a package file with thousands of unclosed <meta>
+-- tags mustn't make each one search the rest of the file.
+local function meta_elements(opf)
+    local selfc, open = {}, {}
+    local closers, ci = {}, 1                    -- where each </meta> is, in order
+    for c in opf:gmatch("()</meta>") do closers[#closers + 1] = c end
+    local at = 1
+    while true do
+        local s = opf:find("<meta%s", at)
+        if not s then break end
+        local e = opf:find(">", s, true)
+        if not e then break end
+        local tag = opf:sub(s, e)
+        at = e + 1
+        if opf:sub(e - 1, e - 1) == "/" then
+            selfc[#selfc + 1] = { tag = tag }
+        else
+            while closers[ci] and closers[ci] < e do ci = ci + 1 end
+            local nxt = opf:find("<meta%s", e + 1)
+            local c = closers[ci]
+            if c and (not nxt or c < nxt) then
+                open[#open + 1] = { tag = tag, content = opf:sub(e + 1, c - 1) }
+                at = c + 7
+            else
+                selfc[#selfc + 1] = { tag = tag }       -- (not closed, <meta name=".." content="..">: its attributes only)
+            end
+        end
+    end
+    return selfc, open
+end
+
 -- Title, author, the author's sort name ("Suarez, Daniel") and the series
 -- (name and number) from an EPUB's package file, without opening the rest of
 -- the book: for the library list. nil if it can't be read.
@@ -731,7 +814,7 @@ function M.meta(path)
         local opf_path = container and (container:match('full%-path%s*=%s*"([^"]+)"')
             or container:match("full%-path%s*=%s*'([^']+)'"))
         local opf = opf_path and z:read(opf_path)
-        if not opf then return nil end
+        if not opf or #opf > 16 * 1048576 then return nil end        -- (no package file is bigger)
         local function text(v)
             return v and clean((decode(v:gsub("<[^>]+>", "")):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", ""))) or nil
         end
@@ -744,7 +827,8 @@ function M.meta(path)
             t.sort = attr(tag, "opf:file-as") or attr(tag, "file-as")
             local id = attr(tag, "id")
             if not t.sort and id then
-                for m, v in opf:gmatch("(<meta%s[^>]*[^/]>)(.-)</meta>") do   -- (not a self-closing <meta/>)
+                for _, el in ipairs(select(2, meta_elements(opf))) do
+                    local m, v = el.tag, el.content
                     if attr(m, "refines") == "#" .. id and attr(m, "property") == "file-as" then t.sort = text(v) end
                 end
             end
@@ -753,8 +837,9 @@ function M.meta(path)
         -- EPUB 3's belongs-to-collection when it's marked a series (Standard
         -- Ebooks uses collections for curated sets too, which aren't).
         local metas = {}
-        for m in opf:gmatch("<meta%s[^>]*/>") do metas[#metas + 1] = { tag = m } end
-        for m, v in opf:gmatch("(<meta%s[^>]*[^/]>)(.-)</meta>") do metas[#metas + 1] = { tag = m, text = text(v) } end
+        local selfc, open = meta_elements(opf)
+        for _, el in ipairs(selfc) do metas[#metas + 1] = { tag = el.tag } end
+        for _, el in ipairs(open) do metas[#metas + 1] = { tag = el.tag, text = text(el.content) } end
         for _, m in ipairs(metas) do
             local name = attr(m.tag, "name")
             if name == "calibre:series" then t.series = text(attr(m.tag, "content"))
