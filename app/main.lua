@@ -5655,6 +5655,7 @@ function app.tedit_draw(side)
     end
     -- The sliders: rounded tracks showing the colours they lead to.
     local hsl = e[e.which]
+    app.tedit_now = app.lab_rgb(hsl)                          -- (the handles' colour: the same for all three)
     for k, s in ipairs(app.TEDIT_SLIDERS) do
         local ty, tht = L.slider(k)
         local on = e.row == R.slider + k - 1
@@ -5668,24 +5669,36 @@ function app.tedit_draw(side)
         color(th.fg)
         love.graphics.print(s[1], x, name_y)
         local rad = tht / 2
-        local function col_at(f)
-            -- Brightness shows the colour itself, dark to light. Warmth and
-            -- Tint show which way they go (blue to yellow, green to pink) at
-            -- a middle brightness, so they read even for black or white.
-            local c = k == 1 and { hsl[1], hsl[2], hsl[3] } or { 68, 0, 0 }
-            c[k] = s[2] + f * (s[3] - s[2])
-            return app.lab_rgb(c)
-        end
         local steps = 96
+        -- The track's colours, worked out only when they change: Brightness
+        -- shows the colour itself, dark to light (so it changes with Warmth and
+        -- Tint); Warmth and Tint show which way they go (blue to yellow, green
+        -- to pink) at a middle brightness, so they read even for black or white,
+        -- and never change. (Dragging a slider redraws on every move.)
+        local grads = app.tedit_grads or {}
+        app.tedit_grads = grads
+        local key = app.TEDIT_CHROMA .. (k == 1 and (":" .. hsl[2] .. ":" .. hsl[3]) or "")
+        local g = grads[k]
+        if not (g and g.key == key) then
+            g = { key = key }
+            local c = { 0, 0, 0 }
+            for i = 0, steps + 1 do                     -- the steps, then the two round ends
+                local f = i < steps and (i + 0.5) / steps or (i - steps)
+                if k == 1 then c[1], c[2], c[3] = hsl[1], hsl[2], hsl[3] else c[1], c[2], c[3] = 68, 0, 0 end
+                c[k] = s[2] + f * (s[3] - s[2])
+                local rgb = app.lab_rgb(c)
+                g[#g + 1], g[#g + 2], g[#g + 3] = rgb[1], rgb[2], rgb[3]
+            end
+            grads[k] = g
+        end
         local inner = w - 2 * rad
         for i = 0, steps - 1 do
-            local rgb = col_at((i + 0.5) / steps)
-            love.graphics.setColor(rgb[1], rgb[2], rgb[3])
+            love.graphics.setColor(g[i * 3 + 1], g[i * 3 + 2], g[i * 3 + 3])
             love.graphics.rectangle("fill", x + rad + i * inner / steps, ty, inner / steps + 1, tht)
         end
-        for _, f in ipairs({ 0, 1 }) do                       -- round ends
-            local rgb = col_at(f)
-            love.graphics.setColor(rgb[1], rgb[2], rgb[3])
+        for f = 0, 1 do                                       -- round ends
+            local at = (steps + f) * 3
+            love.graphics.setColor(g[at + 1], g[at + 2], g[at + 3])
             love.graphics.circle("fill", x + rad + f * inner, ty + rad, rad)
         end
         if s[2] < 0 then
@@ -5698,7 +5711,7 @@ function app.tedit_draw(side)
         love.graphics.printf(s[5], x, words_y, w, "right")
         -- The handle: a disc in the colour now, ringed in the page's ink.
         local hx = x + rad + (hsl[k] - s[2]) / (s[3] - s[2]) * inner
-        local now = app.lab_rgb(hsl)
+        local now = app.tedit_now
         love.graphics.setColor(now[1], now[2], now[3])
         love.graphics.circle("fill", hx, ty + rad, rad + 6)
         color(th.bg)
@@ -6761,26 +6774,38 @@ end
 -- the theme's colours. (cx, cy) is the middle of the spine; s the scale.
 function app.draw_book_art(cx, cy, s)
     local th = theme()
-    local function curve(...)
-        local pts = {}
-        local c = love.math.newBezierCurve(...)
-        for _, v in ipairs(c:render(4)) do pts[#pts + 1] = v end
-        return pts
+    -- The pages' outlines (curves, then cut into triangles) only change with the
+    -- place and size, so they're worked out once and kept.
+    local art = app.book_art
+    if not (art and art.cx == cx and art.cy == cy and art.s == s) then
+        art = { cx = cx, cy = cy, s = s }
+        local function curve(...)
+            local pts = {}
+            local c = love.math.newBezierCurve(...)
+            for _, v in ipairs(c:render(4)) do pts[#pts + 1] = v end
+            c:release()
+            return pts
+        end
+        for _, d in ipairs({ -1, 1 }) do
+            -- A page: its top and bottom edges bow away from the spine.
+            local top = curve(cx, cy - 46 * s, cx + d * 50 * s, cy - 72 * s, cx + d * 118 * s, cy - 60 * s)
+            local bottom = curve(cx + d * 118 * s, cy + 58 * s, cx + d * 50 * s, cy + 46 * s, cx, cy + 70 * s)
+            local shape = {}
+            for _, v in ipairs(top) do shape[#shape + 1] = v end
+            for _, v in ipairs(bottom) do shape[#shape + 1] = v end
+            local ok, tris = pcall(love.math.triangulate, shape)
+            art[#art + 1] = { d = d, shape = shape, tris = ok and tris or {} }
+        end
+        app.book_art = art
     end
     love.graphics.setLineWidth(3 * s)
     love.graphics.setLineJoin("bevel")
-    for _, d in ipairs({ -1, 1 }) do
-        -- A page: its top and bottom edges bow away from the spine.
-        local top = curve(cx, cy - 46 * s, cx + d * 50 * s, cy - 72 * s, cx + d * 118 * s, cy - 60 * s)
-        local bottom = curve(cx + d * 118 * s, cy + 58 * s, cx + d * 50 * s, cy + 46 * s, cx, cy + 70 * s)
-        local shape = {}
-        for _, v in ipairs(top) do shape[#shape + 1] = v end
-        for _, v in ipairs(bottom) do shape[#shape + 1] = v end
-        local ok, tris = pcall(love.math.triangulate, shape)
+    for _, page in ipairs(art) do
+        local d = page.d
         color(th.sel)
-        if ok then for _, t in ipairs(tris) do love.graphics.polygon("fill", t) end end
+        for _, t in ipairs(page.tris) do love.graphics.polygon("fill", t) end
         color(th.dim)
-        love.graphics.polygon("line", shape)
+        love.graphics.polygon("line", page.shape)
         -- Lines of text.
         color(th.dim, 0.45)
         for k = 0, 4 do
