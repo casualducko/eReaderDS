@@ -11367,7 +11367,8 @@ function app.backup_start(whole)
     if not whole then start() return end
     app.ask({ question = "Back up everything?", yes = "Back Up", no = "Cancel",
         detail = app.size_words(app.backup_size()) .. ", with your books, fonts and dictionaries.\n"
-            .. "It's saved in " .. Store.books_folder() .. "/Backups.",
+            .. "It's saved in " .. Store.books_folder() .. "/Backups.\n"
+            .. "It holds your saved logins too (sync, catalogs, Calibre): keep it private.",
         on_yes = start })
 end
 
