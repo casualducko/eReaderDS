@@ -10,6 +10,13 @@ local M = {}
 
 M.RELEASES = "https://api.github.com/repos/casualducko/eReaderDS/releases?per_page=5"
 
+-- Releases are signed by hand, with a key that never leaves the maintainer's
+-- computer (tools/sign-release.sh), so a bad release published through GitHub
+-- alone isn't installed. The signature is a small file beside the download,
+-- "<file>.sig" (128 hex digits), over the file's name, version and SHA-256.
+-- A list, so a new key can be added before the old one is retired.
+M.PUBLIC_KEYS = { "e983cf246c7a29a86908600c32375ca794956221851db385b8f6b2edcbc7d9da" }
+
 -- The folder the app runs from (Ports/eReaderDS or roms/ports/eReaderDS).
 function M.app_dir()
     return (love.filesystem.getSource():gsub("/app/?$", ""))
@@ -51,8 +58,13 @@ function M.parse(body, current)
         if v and M.newer(v, current) and (not best or M.newer(v, best.version)) then
             for _, a in ipairs(r.assets or {}) do
                 if tostring(a.name or ""):match(M.ASSET) and a.browser_download_url then
+                    -- (Its signature file, if the release has one.)
+                    local sig
+                    for _, b in ipairs(r.assets) do
+                        if b.name == a.name .. ".sig" and b.browser_download_url then sig = b.browser_download_url end
+                    end
                     best = { version = v, url = a.browser_download_url, size = a.size, notes = plain(r.body),
-                        sha256 = tostring(a.digest or ""):match("^sha256:(%x+)$") }
+                        sha256 = tostring(a.digest or ""):match("^sha256:(%x+)$"), asset = a.name, sig_url = sig }
                 end
             end
         end
@@ -60,18 +72,45 @@ function M.parse(body, current)
     return best
 end
 
--- Whether a downloaded file is the release asset GitHub recorded (its SHA-256,
--- from the release list). true when it is, or when no digest was given (older
--- releases); false, "mismatch" when it isn't.
-function M.verify(path, sha256)
-    if not sha256 or #sha256 ~= 64 then return true end
+-- A file's SHA-256 as hex (nil if it can't be read).
+function M.sha256_file(path)
     local f = io.open(path, "rb")
-    if not f then return false, "missing" end
+    if not f then return nil end
     local data = f:read("*a")
     f:close()
-    if not data then return false, "unreadable" end
-    local got = love.data.encode("string", "hex", love.data.hash("sha256", data))
-    return got == sha256:lower() or false, "mismatch"
+    if not data then return nil end
+    return (love.data.encode("string", "hex", love.data.hash("sha256", data)))
+end
+
+-- Whether a downloaded file is the release asset GitHub recorded (its SHA-256,
+-- from the release list). true when it is, or when no digest was given (older
+-- releases); false, "mismatch" when it isn't. `have`: the file's SHA-256, if
+-- already worked out.
+function M.verify(path, sha256, have)
+    if not sha256 or #sha256 ~= 64 then return true end
+    have = have or M.sha256_file(path)
+    if not have then return false, "unreadable" end
+    return have == sha256:lower() or false, "mismatch"
+end
+
+local function unhex(h) return (h:gsub("%x%x", function(x) return string.char(tonumber(x, 16)) end)) end
+
+-- What is signed: this text, which names the file, the version and the exact bytes.
+function M.signed_text(version, asset, sha256)
+    return "eReaderDS-release-v1\n" .. version .. "\n" .. asset .. "\n" .. sha256:lower() .. "\n"
+end
+
+-- Whether sig_text (the contents of the .sig file) is a signature of this file
+-- by one of the app's keys: true, or false and why.
+function M.check_signature(version, asset, sha256, sig_text)
+    local hex = tostring(sig_text or ""):match("^%s*(%x+)%s*$")
+    if not hex or #hex ~= 128 then return false, "the signature file can't be read" end
+    local sig, text = unhex(hex), M.signed_text(version, asset, sha256)
+    for _, key in ipairs(M.PUBLIC_KEYS) do
+        local ok, good = pcall(require("ed25519").verify, sig, text, unhex(key))
+        if ok and good then return true end
+    end
+    return false, "the signature isn't one of ours"
 end
 
 -- The plain-words notes (whatsnew.txt) for a release, to show before updating.

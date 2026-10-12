@@ -7797,30 +7797,53 @@ function app.update_start()
                 u.state, u.message = "error", "The download doesn't match the release (" .. tostring(why) .. "). Try again."
                 return
             end
-            if apk then u.state = "ready"; u.apk = apk; return end
-            u.state, u.frac, u.saving = "unpacking", 0, nil
-            -- Unpack a file at a time between frames (the screen stays live).
-            app.find_stop()                                -- the update comes first
-            app.task_kind = "update"
-            app.task = coroutine.create(function()
-                local ok, err = pcall(function()
-                    local co = coroutine.create(app.Updater.unpack)
-                    local args = { zip, dir .. "/.delta", u.version }
-                    while true do
-                        local ok2, frac, phase = coroutine.resume(co, unpack(args))
-                        args = {}
-                        if not ok2 then error(frac, 0) end
-                        if coroutine.status(co) == "dead" then break end
-                        u.frac, u.saving = frac, phase == "saving"
-                        coroutine.yield()
+            local function proceed()
+                if apk then u.state = "ready"; u.apk = apk; return end
+                u.state, u.frac, u.saving = "unpacking", 0, nil
+                -- Unpack a file at a time between frames (the screen stays live).
+                app.find_stop()                                -- the update comes first
+                app.task_kind = "update"
+                app.task = coroutine.create(function()
+                    local ok, err = pcall(function()
+                        local co = coroutine.create(app.Updater.unpack)
+                        local args = { zip, dir .. "/.delta", u.version }
+                        while true do
+                            local ok2, frac, phase = coroutine.resume(co, unpack(args))
+                            args = {}
+                            if not ok2 then error(frac, 0) end
+                            if coroutine.status(co) == "dead" then break end
+                            u.frac, u.saving = frac, phase == "saving"
+                            coroutine.yield()
+                        end
+                    end)
+                    os.remove(zip)
+                    if ok then u.state = "ready"
+                    else
+                        os.execute('rm -rf ' .. require("shq")(dir .. "/.delta"))
+                        u.state, u.message = "error", tostring(err)
                     end
                 end)
+            end
+            -- The signature: the release must have been signed with the key in
+            -- the app (tools/sign-release.sh). Not for a test release (the
+            -- .update-test file or READER_FAKE_UPDATE_URL: unsigned on purpose).
+            local testing = os.getenv("READER_FAKE_UPDATE_URL") or os.getenv("READER_ALLOW_UNSIGNED")
+            local tf = io.open(Store.data_path(".update-test"), "rb")
+            if tf then tf:close(); testing = true end
+            if testing then proceed() return end
+            local function refuse(why)
                 os.remove(zip)
-                if ok then u.state = "ready"
-                else
-                    os.execute('rm -rf ' .. require("shq")(dir .. "/.delta"))
-                    u.state, u.message = "error", tostring(err)
-                end
+                u.state, u.message = "error", why
+            end
+            local have = app.Updater.sha256_file(zip)
+            if not have then refuse("The download couldn't be read back. Try again.") return end
+            if not u.sig_url then refuse("This release isn't signed, so it wasn't installed.") return end
+            u.state, u.frac, u.saving = "unpacking", 0, nil          -- (checking: the bar waits)
+            u.job = shop.net_job({ kind = "fetch", url = u.sig_url }, function(m2)
+                if m2.kind == "error" then refuse("Couldn't get the signature: " .. app.update_error(m2.message)) return end
+                local ok, why = app.Updater.check_signature(u.version, u.asset or "", have, m2.body)
+                if not ok then refuse("This download isn't signed by eReaderDS (" .. tostring(why) .. "), so it wasn't installed.") return end
+                proceed()
             end)
         else
             os.remove(zip)

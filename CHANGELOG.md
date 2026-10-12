@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Updates are checked before they're installed.** The app now installs an update only if it carries a signature from the eReaderDS signing key (and, as before, is the file GitHub lists for the release). A release that is missing its signature, or has a changed or forged one, is refused with a message instead of being installed.
+
 ## v1.23.2
 
 - **A new opening screen** (see below), now delivered correctly on stock and ROCKNIX: v1.23.1's zip left out `splash.png`, so the reader failed to open after updating there; the file is now included in the release, and the opening screen falls back to the name alone rather than stopping if the image is ever missing.
