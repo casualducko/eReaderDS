@@ -4162,6 +4162,15 @@ end
 -- thread's work, on its own channels), so a page turn needn't wait.
 app.pages_waiting, app.page_jobs = 0, {}
 app.page_failed = {}
+-- The jobs the page thread has been given and not answered, oldest first: the
+-- first is the one it was on if it dies (see comic_poll).
+app.page_inflight = {}
+function app.page_track(path, name, zoom) app.page_inflight[#app.page_inflight + 1] = { path = path, name = name, zoom = zoom } end
+function app.page_untrack(path, name, zoom)
+    for i, e in ipairs(app.page_inflight) do
+        if e.path == path and e.name == name and e.zoom == zoom then table.remove(app.page_inflight, i) return end
+    end
+end
 function app.comic_prefetch()
     if not (book and book.comic and spread) then return end
     app.page_drain()                          -- (pages asked for before a jump: not before these)
@@ -4185,6 +4194,7 @@ function app.page_drain()
             keep[#keep + 1] = job
         elseif type(job) == "table" then
             app.page_jobs[app.page_key(job.path, job.name)] = nil
+            app.page_untrack(job.path, job.name, false)
             app.pages_waiting = math.max(0, app.pages_waiting - 1)
         end
     end
@@ -4196,7 +4206,7 @@ function app.page_stop()
     love.thread.getChannel("page_jobs"):clear()
     love.thread.getChannel("page_jobs"):push("quit")
     app.page_thread:wait()
-    app.page_thread, app.pages_waiting, app.page_jobs = nil, 0, {}
+    app.page_thread, app.pages_waiting, app.page_jobs, app.page_inflight = nil, 0, {}, {}
     love.thread.getChannel("page_out"):clear()
 end
 
@@ -4215,6 +4225,7 @@ function app.comic_request(src)
     love.thread.getChannel("page_jobs"):push({ path = book.path, name = src, data = data,
         fit = { w = PAGE_W, h = PAGE_H, wide = true } })
     app.page_jobs[app.page_key(book.path, src)] = true
+    app.page_track(book.path, src, false)
     app.pages_waiting = app.pages_waiting + 1
 end
 
@@ -4227,6 +4238,7 @@ function app.comic_poll()
         local msg = love.thread.getChannel("page_out"):pop()
         if not msg then break end
         app.pages_waiting = math.max(0, app.pages_waiting - 1)
+        app.page_untrack(msg.path, msg.name, msg.tag == "zoom")
         if msg.tag == "zoom" then
             -- The magnifier's picture: for it if it's still waiting for this one.
             local z = app.zoom
@@ -4268,7 +4280,11 @@ function app.comic_poll()
     -- will come, so stop waiting, or the screens' loop polls for ever.)
     if app.pages_waiting > 0 and app.page_thread and not app.page_thread:isRunning() then
         print("[comic] page thread stopped: " .. tostring(app.page_thread:getError()))
-        app.page_thread, app.pages_waiting, app.page_jobs = nil, 0, {}
+        -- (The oldest unanswered job is the one it was on: a page that kills it
+        -- is marked, or it would be sent again, and kill the next thread too.)
+        local culprit = app.page_inflight[1]
+        if culprit and not culprit.zoom then app.page_failed[culprit.name] = true end
+        app.page_thread, app.pages_waiting, app.page_jobs, app.page_inflight = nil, 0, {}, {}
         love.thread.getChannel("page_jobs"):clear()
         love.thread.getChannel("page_out"):clear()
         if app.zoom and app.zoom.loading then app.zoom.loading, app.zoom.failed = false, true end
@@ -4360,6 +4376,7 @@ function app.zoom_request(pg)
     local z = require("android").active and 1.6 or app.ZOOM
     love.thread.getChannel("page_jobs"):push({ path = book.path, name = pg.src, data = data, tag = "zoom",
         fit = { w = PAGE_W * z, h = PAGE_H * z, wide = true } })
+    app.page_track(book.path, pg.src, true)
     app.pages_waiting = app.pages_waiting + 1
 end
 
