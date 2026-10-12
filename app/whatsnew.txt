@@ -2,6 +2,20 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.24.0
+Magnifier turns pages: in a comic, push left or right at the edge of the page and the next (or previous) page opens, still enlarged. You no longer have to close the magnifier to turn.
+Updates are double-checked before they're installed, and a download that doesn't match is stopped with a message.
+Sending books over Wi-Fi only takes books sent from the page the reader shows. Sync servers out on the internet need https://, and a wrong sync password no longer makes closing a book wait for the server.
+Calibre only takes books it was offered (EPUB and text), and checks there is room first.
+Back Up & Restore tells you a full backup includes your saved logins, so you keep it private.
+Smoother page flips and comics, and less memory held after you leave a screen.
+Fix: opening another book while the magnifier was still loading could crash.
+Fix: if a comic page can't be decoded, it says "This page can't be shown" instead of trying again forever.
+Fix: letters like š, œ and ž were missing from some older books.
+Fix: a book with a badly made style sheet or package file can no longer hang the library when it starts.
+Fix: a comic with a damaged picture header no longer loses its page sizes, and the dictionary finds words joined by dashes.
+Fix: a file with an unusual name no longer breaks the Wi-Fi sending page.
+
 v1.23.2
 A new opening screen: the eReaderDS logo on a deep blue, the same on every device, instead of a white flash while the app loads. It also appears a little sooner now.
 

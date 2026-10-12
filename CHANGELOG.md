@@ -1,8 +1,19 @@
 # Changelog
 
-## Unreleased
+## v1.24.0
 
-- **Updates are checked before they're installed.** The app now installs an update only if it carries a signature from the eReaderDS signing key (and, as before, is the file GitHub lists for the release). A release that is missing its signature, or has a changed or forged one, is refused with a message instead of being installed.
+- **The magnifier turns pages.** In a comic, left or right at the page's edge (the box already as far as it goes) turns to the next or previous page and enlarges it, the box starting at the top where reading starts (the right side for manga). It stops at the first and last page rather than opening the next volume. The hint line says so.
+- **Updates are checked before they're installed.** After the download, the app checks its SHA-256 against the one GitHub lists for the release, and its Ed25519 signature (the `.sig` file beside it, made by `tools/sign-release.sh` with a key kept off GitHub) against the key built into the app (`app/ed25519.lua`, `PUBLIC_KEYS` in `app/updater.lua`). A release with no or a wrong signature is refused with a message. Test releases can skip the signature with `.ereaderds/.update-test`, `READER_FAKE_UPDATE_URL` or `READER_ALLOW_UNSIGNED=1`. **Every release from here on must be signed** (docs/DEVELOPING.md).
+- **Safer sending over Wi-Fi.** The page that receives books rejects a request that a browser says came from another site, and a file name that isn't UTF-8 no longer breaks the page's list.
+- **Sync.** Only a 2xx reply counts as a successful push (a wrong password, 401, was treated as healthy, so closing a book waited for the server every time). A custom server over plain `http://` is refused unless it is on the home network (192.168.x.x, 10.x, name.local and so on); adding your own server saves it only once both the address and name are given.
+- **Calibre.** A book must be EPUB or text, between 1 byte and 300 MB, and fit the free space, or the connection is dropped. Messages and HTTP headers have size limits.
+- **Back Up & Restore.** The Everything backup's confirmation says it holds saved logins. The backup's file-count limit is checked one entry earlier, so the manifest can't push a zip past its limit.
+- **A comic page that stops the page thread** is marked as failed ("This page can't be shown") instead of being sent again over and over.
+- **Hostile or damaged books.** Package `<meta>` tags and style sheets are scanned in one pass (a crafted EPUB could hang the library scan), style sheets over 4 MB and package files over 16 MB are skipped, zip entries over 192 MB and dictionary entries over 1 MB are refused, and an `&#nan;` entity no longer throws in the HTML parser.
+- **Text.** The ten Windows-1252 characters š œ ž Š Œ Ž Ÿ ƒ ˆ ˜ were being deleted from books in that encoding; they're kept. Words joined by en or em dashes are looked up part by part, not split at every curly quote.
+- **Fixes.** Opening a book while the magnifier was still loading no longer crashes. A GPU error shrinking a picture no longer leaves the drawing state changed. JPEG sizes are read correctly after a 0xFF fill byte. A book whose title is all stripped characters no longer exports to a hidden `.md` file. The backup list survives a hand-edited date. A toast no longer leaves lines drawn thicker.
+- **Smoother and lighter.** Page flips and comic pages make less garbage per frame, the Calibre screen no longer re-reads its saved computers on every redraw, and the What's New text, a leftover font sample and the closed book's cover are released.
+- **Shell commands** (update, library scan, free space, dictionary scan, folder listing) quote their paths. Release builds check that every Lua file compiles; the Android and iOS builds check their downloads against pinned SHA-256 values; `install.sh` copies `runtime/libs.rocknix`; random numbers are seeded in the Calibre and network threads; the `.bak` copy of often-saved files is written aside and renamed.
 
 ## v1.23.2
 
