@@ -65,6 +65,49 @@ function M.load_catalogs(file)
     return out, opts
 end
 
+-- What was typed as an address, as a web address: spaces dropped, http://
+-- if it has no scheme (a home server, as in "192.168.1.20:8080").
+function M.normalize_address(text)
+    local u = (text or ""):gsub("%s", "")
+    if u == "" then return nil end
+    if not u:match("^%a[%w+.-]*://") then u = "http://" .. u end
+    local p = Net.parse_url(u)
+    return p and p.host ~= "" and u or nil
+end
+
+-- Addresses to try for what was typed: itself, and for a bare server
+-- (no path) Calibre's and Calibre-Web's /opds.
+function M.candidates(url)
+    local list = { url }
+    local u = Net.parse_url(url)
+    if u and (u.path == "/") then
+        list[#list + 1] = url:gsub("/+$", "") .. "/opds"
+    end
+    return list
+end
+
+-- Add a catalog to the end of opds.txt (made with its examples if it isn't
+-- there yet). Returns true, or false and why not.
+function M.add_catalog(file, c)
+    local f = io.open(file, "rb")
+    local old = f and f:read("*a")
+    if f then f:close() end
+    local text = old or SAMPLE
+    if text ~= "" and not text:find("\n$") then text = text .. "\n" end
+    local block = { "", "name = " .. c.name:gsub("[\r\n]", " "), "url = " .. c.url }
+    if c.user and c.user ~= "" then
+        block[#block + 1] = "user = " .. c.user
+        block[#block + 1] = "password = " .. (c.password or "")
+    end
+    if c.verify == false then block[#block + 1] = "verify = no" end
+    local w, err = io.open(file, "wb")
+    if not w then return false, err end
+    local ok = w:write(text, table.concat(block, "\n"), "\n")
+    w:close()
+    if not ok then return false, "couldn't write to the SD card" end
+    return true
+end
+
 -- Free catalogs offered without any setup.
 M.BUILT_IN = {
     -- www directly: m.gutenberg.org only redirects there, and is often slow

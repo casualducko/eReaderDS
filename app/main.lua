@@ -1732,6 +1732,16 @@ function app.find_books(dir)
     return found
 end
 
+-- Yours from opds.txt, then the free built-in ones.
+function app.load_catalogs()
+    local ok, catalogs, opts = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
+    if not ok then print("[opds] " .. tostring(catalogs)); catalogs, opts = {}, {} end
+    for _, c in ipairs(Opds.BUILT_IN) do
+        if opts[c.key] ~= false then catalogs[#catalogs + 1] = c end      -- "gutenberg = off" etc.
+    end
+    library.catalogs = catalogs
+end
+
 local function scan_library()
     local items = {}
     local seen = {}
@@ -1797,12 +1807,7 @@ local function scan_library()
     if not library.pending then Store.save_meta(seen) end
     -- Online catalogs from opds.txt, for "Get Books" (Select, or the button
     -- on the right page).
-    local ok, catalogs, opts = pcall(Opds.load_catalogs, Store.data_path("opds.txt"))
-    if not ok then print("[opds] " .. tostring(catalogs)); catalogs, opts = {}, {} end
-    for _, c in ipairs(Opds.BUILT_IN) do
-        if opts[c.key] ~= false then catalogs[#catalogs + 1] = c end      -- "gutenberg = off" etc.
-    end
-    library.catalogs = catalogs
+    app.load_catalogs()
     library.items = items
     library.sel = math.max(1, math.min(library.sel, #items))
 end
@@ -2320,7 +2325,7 @@ end
 -- "Get Books" from the library: a list of catalogs (yours from opds.txt,
 -- then the free built-in ones), and how to add your own.
 function shop.start()
-    app.asking = nil
+    app.asking, shop.adding = nil, nil
     if not shop.online(true) then
         app.toast("Not connected to Wi-Fi")
         return
@@ -2341,10 +2346,11 @@ function shop.start()
             formats = {}, catalog = c }
     end
     entries[#entries + 1] = { title = "Add a Catalog", author = "Calibre, Calibre-Web or any OPDS server",
-        formats = {}, info = true, summary = "Get books from your own library over Wi-Fi. Edit "
+        formats = {}, add = true, summary = "Get books from your own library over Wi-Fi. Type its address, "
+            .. "such as 192.168.1.20:8080 for Calibre; it's checked before it's saved, and asks for a "
+            .. "user name and password if it needs one.\n\nTo remove one, delete its lines in "
             .. Store.books_folder() .. "/.ereaderds/opds.txt"
-            .. (select(2, Store.books_folder()) and (" " .. select(2, Store.books_folder())) or "") .. " (it has examples), for example:\n\n"
-            .. "name = Calibre\nurl = http://192.168.1.20:8080/opds\nuser = me\npassword = secret" }
+            .. (select(2, Store.books_folder()) and (" " .. select(2, Store.books_folder())) or "") .. "." }
     shop.stack = { { title = "Get Books", entries = entries, sel = 1, top = 1 } }
     app.mode = "shop"
     redraw()
@@ -2363,6 +2369,7 @@ function shop.hints(pg, it)
     end
     if it.search then return { "A", "search", "B", "back" } end
     if it.receive or it.calibre then return { "A", "start", "B", "back" } end
+    if it.add then return { "A", "add", "B", "back" } end
     if it.href or it.catalog then return { "A", "open", "B", "back" } end
     return { "B", "back" }
 end
@@ -2483,6 +2490,8 @@ function shop.confirm()
     elseif it.catalog then
         shop.catalog = it.catalog
         shop.push_page(it.catalog.name, it.catalog.url, true)
+    elseif it.add then
+        shop.add_start()
     elseif it.receive then
         app.recv_open()
     elseif it.calibre then
@@ -2494,6 +2503,97 @@ function shop.confirm()
     elseif it.href then
         shop.push_page(it.title, it.href)
     end
+end
+
+-- Add a catalog from the device: its address, checked (the address as typed,
+-- then /opds on it), a user name and password if it asks, and a name. Nothing
+-- is saved until it has answered with a catalog.
+function shop.add_start(text)
+    app.kb_open({ title = "Catalog Address", text = text or "", url = true, ok = "Next",
+        hint = "Your server's address, such as 192.168.1.20:8080 (Calibre's content server). "
+            .. "Calibre and Calibre-Web's /opds is tried for you.",
+        submit = function(t)
+            local url = Opds.normalize_address(t)
+            if not url then app.toast("That isn't a web address"); return end
+            for _, c in ipairs(library.catalogs or {}) do
+                if c.url == url or c.url == url:gsub("/+$", "") .. "/opds" then
+                    app.toast("“" .. c.name .. "” is already in the list")
+                    return
+                end
+            end
+            shop.add_check({ typed = t, cands = Opds.candidates(url), i = 1, verify = true })
+        end })
+end
+
+-- Is the card still on the list (not left, not typing)? The check's answer
+-- is only shown then.
+function shop.add_here(st)
+    return shop.adding == st and app.mode == "shop" and #shop.stack == 1
+end
+
+function shop.add_fail(st, why)
+    app.untoast()
+    app.ask({ question = "Couldn't add it", detail = why .. " (" .. st.typed .. ")", yes = "Edit address", no = "Cancel",
+        on_yes = function() shop.add_start(st.typed) end })
+end
+
+function shop.add_credentials(st, why)
+    app.untoast()
+    app.kb_open({ title = "User Name", text = st.user or "", ok = "Next",
+        hint = why .. " Its user name:",
+        submit = function(user)
+            app.kb_open({ title = "Password for " .. user, secret = true, ok = "Check", allow_empty = true,
+                hint = "The password for " .. user .. ".",
+                submit = function(pw)
+                    st.user, st.password = user, pw
+                    shop.add_check(st)
+                end })
+        end })
+end
+
+function shop.add_check(st)
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
+    shop.adding = st
+    local url = st.cands[st.i]
+    app.toast("Checking " .. url:gsub("^%a+://", "") .. "…", 30)
+    shop.net_job({ kind = "feed", url = url, user = st.user, password = st.password, verify = st.verify }, function(msg)
+        if not shop.add_here(st) then return end
+        if msg.kind ~= "error" then
+            local feed = msg.feed
+            local name = feed.title ~= "" and #feed.title <= 40 and feed.title or Opds.parse_url(url).host
+            app.untoast()
+            app.kb_open({ title = "Name this Catalog", text = name, ok = "Save",
+                hint = "It works. What to call it in Get Books.",
+                submit = function(n)
+                    n = n:match("^%s*(.-)%s*$")
+                    local c = { name = n ~= "" and n or name, url = url, user = st.user, password = st.password,
+                        verify = st.verify }
+                    local ok, err = Opds.add_catalog(Store.data_path("opds.txt"), c)
+                    if not ok then app.toast("Couldn't save: " .. tostring(err)); return end
+                    app.load_catalogs()
+                    shop.start()
+                    local pg = shop.stack[1]
+                    for k, e in ipairs(pg.entries) do
+                        if e.catalog and e.catalog.url == url then pg.sel = k end
+                    end
+                    app.toast("Added " .. c.name)
+                end })
+            return
+        end
+        local m = tostring(msg.message)
+        if m:find("needs a user name") or m:find("didn't accept") then
+            shop.add_credentials(st, st.user and "That user name or password wasn't accepted." or "It asks for a login.")
+        elseif m:find("certificate") and st.verify then
+            app.untoast()
+            app.ask({ question = "Trust this server?", detail = "Its certificate can't be verified, as with a "
+                .. "server of your own at home. Add it anyway?", yes = "Add it", no = "Cancel",
+                on_yes = function() st.verify = false; shop.add_check(st) end })
+        else
+            st.err = st.err or m
+            if st.i < #st.cands then st.i = st.i + 1; shop.add_check(st)
+            else shop.add_fail(st, st.err) end
+        end
+    end)
 end
 
 -- Search the catalog: its search address, or the one in its OpenSearch
