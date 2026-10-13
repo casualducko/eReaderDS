@@ -14,6 +14,9 @@ if [ "${1:-}" = "--ssh" ]; then
     [ -n "$HOST" ] || { echo "Usage: ./install.sh --ssh <device-ip>  (or put the IP in .device)"; exit 1; }
     [ -n "${2:-}" ] && echo "$HOST" > "$HERE/.device"
     SSH="ssh -o BatchMode=yes -o ConnectTimeout=8 root@$HOST"
+    # Stock firmware: /mnt/mmc with Ports and Ebook. ROCKNIX: /storage/roms with ports and ebook.
+    if $SSH test -d /mnt/mmc; then BASE=/mnt/mmc; PORTS=Ports; EBOOK=Ebook
+    else BASE=/storage/roms; PORTS=ports; EBOOK=ebook; fi
     VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$HERE/app/version.lua")
     STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
     P="$STAGE/Ports/eReaderDS"
@@ -29,20 +32,22 @@ if [ "${1:-}" = "--ssh" ]; then
     cp "$HERE/port/art/eReaderDS.png" "$P/icon.png"
     sed "s/@VERSION@/$VERSION/g" "$HERE/port/README.txt" > "$P/README.txt"
     # The engine only goes over the first time.
-    if ! $SSH test -f /mnt/mmc/Ports/eReaderDS/runtime/love.aarch64; then
+    if ! $SSH test -f $BASE/$PORTS/eReaderDS/runtime/love.aarch64; then
         mkdir -p "$P/runtime"
         cp -R "$HERE/runtime/love.aarch64" "$HERE/runtime/libs.aarch64" "$P/runtime/"
         [ -d "$HERE/runtime/libs.rocknix" ] && cp -R "$HERE/runtime/libs.rocknix" "$P/runtime/"
     fi
-    COPYFILE_DISABLE=1 tar -C "$STAGE" -czf - Ports | $SSH '
+    if [ "$PORTS" != Ports ]; then mv "$STAGE/Ports" "$STAGE/stage.tmp" && mv "$STAGE/stage.tmp" "$STAGE/$PORTS"; fi
+    COPYFILE_DISABLE=1 tar -C "$STAGE" -czf - "$PORTS" | $SSH "
         set -e
-        cd /mnt/mmc
-        rm -rf Ports/eReaderDS/app
+        cd $BASE
+        mkdir -p $PORTS
+        rm -rf $PORTS/eReaderDS/app
         tar -xzf -
-        chmod +x Ports/eReaderDS.sh Ports/eReaderDS/launch.sh
-        [ -f Ports/eReaderDS/runtime/love.aarch64 ] && chmod +x Ports/eReaderDS/runtime/love.aarch64
-        mkdir -p Ebook/Fonts Ebook/Dictionaries
-        sync'
+        chmod +x $PORTS/eReaderDS.sh $PORTS/eReaderDS/launch.sh
+        [ -f $PORTS/eReaderDS/runtime/love.aarch64 ] && chmod +x $PORTS/eReaderDS/runtime/love.aarch64
+        mkdir -p $EBOOK/Fonts $EBOOK/Dictionaries
+        sync"
     echo "Installed eReaderDS v$VERSION on $HOST over SSH."
     echo "If eReaderDS is open on the device, quit and reopen it to load the new version."
     exit 0
