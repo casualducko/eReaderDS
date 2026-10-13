@@ -6148,11 +6148,11 @@ function shop.draw(side)
                 if e.book then
                     mark = (shop.dl and shop.dl.item == e) and "…"
                         or (e.have or shop.have(e)) and "✓" or nil
-                elseif e.href or e.catalog or e.receive or e.calibre or e.search then
+                elseif e.href or e.catalog or e.receive or e.calibre or e.search or e.add then
                     mark = "›"
                 end
                 love.graphics.setFont(ui.font)
-                color((e.book or e.href or e.catalog or e.receive or e.calibre or e.search) and th.fg or th.dim)
+                color((e.book or e.href or e.catalog or e.receive or e.calibre or e.search or e.add) and th.fg or th.dim)
                 love.graphics.print(fit_text(ui.font, e.title, rw - 60), rx, ty)
                 if mark then love.graphics.printf(mark, rx, ty, rw, "right") end
                 if sub ~= "" then
@@ -6243,7 +6243,7 @@ function shop.draw(side)
     if it.summary ~= "" and it.summary ~= it.title then
         love.graphics.setFont(ui.small)
         color(th.fg)
-        shop.print_clipped(ui.small, it.summary, x, y + 16, w, foot_y - y - 40, (it.book or it.info) and "left" or "center")
+        shop.print_clipped(ui.small, it.summary, x, y + 16, w, foot_y - y - 40, (it.book or it.add) and "left" or "center")
     end
 end
 
