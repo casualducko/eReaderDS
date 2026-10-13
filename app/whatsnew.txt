@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.25.0
+Add a catalog right on the device: in Get Books, choose Add a Catalog, type your server's address (like 192.168.1.20:8080) and it's checked before it's saved. It asks for a user name and password if the server needs one, and for a name at the end. No more editing a file.
+
 v1.24.0
 Magnifier turns pages: in a comic, push left or right at the edge of the page and the next (or previous) page opens, still enlarged. You no longer have to close the magnifier to turn.
 Updates are double-checked before they're installed, and a download that doesn't match is stopped with a message.

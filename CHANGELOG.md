@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.25.0
+
+- **Add a catalog from the device.** Get Books → Add a Catalog asks for an address (`http://` is added if there is no scheme; a bare server also gets `/opds` tried, for Calibre and Calibre-Web), fetches it as an OPDS feed, and saves it to `opds.txt` only when that works. A 401 asks for a user name and password and checks again; a certificate error offers to trust the server (`verify = no`); the name is pre-filled from the feed's title. An address already in the list is refused. Catalog loading moved to `app.load_catalogs()`.
+- **`install.sh --ssh`** installs on ROCKNIX (`/storage/roms/ports`) and into a ROCKNIXDS Store copy (`/storage/.config/rocknixds/ereaderds/eReaderDS`) as well as the stock firmware.
+
 ## v1.24.0
 
 - **The magnifier turns pages.** In a comic, left or right at the page's edge (the box already as far as it goes) turns to the next or previous page and enlarges it, the box starting at the top where reading starts (the right side for manga). It stops at the first and last page rather than opening the next volume. The hint line says so.
