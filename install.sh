@@ -15,7 +15,9 @@ if [ "${1:-}" = "--ssh" ]; then
     [ -n "${2:-}" ] && echo "$HOST" > "$HERE/.device"
     SSH="ssh -o BatchMode=yes -o ConnectTimeout=8 root@$HOST"
     # Stock firmware: /mnt/mmc with Ports and Ebook. ROCKNIX: /storage/roms with ports and ebook.
-    if $SSH test -d /mnt/mmc; then BASE=/mnt/mmc; PORTS=Ports; EBOOK=Ebook
+    STORE=/storage/.config/rocknixds/ereaderds/eReaderDS     # installed by the ROCKNIXDS Store
+    if $SSH test -d $STORE/app; then BASE=; PORTS=; EBOOK=
+    elif $SSH test -d /mnt/mmc; then BASE=/mnt/mmc; PORTS=Ports; EBOOK=Ebook
     else BASE=/storage/roms; PORTS=ports; EBOOK=ebook; fi
     VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$HERE/app/version.lua")
     STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
@@ -31,6 +33,11 @@ if [ "${1:-}" = "--ssh" ]; then
     cp "$HERE/port/art/eReaderDS.png" "$STAGE/Ports/Imgs/eReaderDS.png"
     cp "$HERE/port/art/eReaderDS.png" "$P/icon.png"
     sed "s/@VERSION@/$VERSION/g" "$HERE/port/README.txt" > "$P/README.txt"
+    if [ -z "$BASE" ]; then
+        tar -C "$P" -czf - app | $SSH "set -e; cd $STORE; rm -rf app; tar -xzf -; sync"
+        echo "Installed eReaderDS v$VERSION on $HOST (ROCKNIXDS Store copy) over SSH."
+        exit 0
+    fi
     # The engine only goes over the first time.
     if ! $SSH test -f $BASE/$PORTS/eReaderDS/runtime/love.aarch64; then
         mkdir -p "$P/runtime"
