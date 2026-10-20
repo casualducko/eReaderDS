@@ -708,7 +708,7 @@ end
 -- Show the 2048x768 frame: its left half (the top screen's) above its right
 -- half (the bottom screen's). On one screen only (no DualStack yet), just
 -- the top screen's half.
-local quads, ios_note_fonts
+local quads, closed_art
 function M.present(canvas)
     if M.phone then
         local lay = phone_layout()
@@ -716,22 +716,47 @@ function M.present(canvas)
         local m = M.margin or { 0, 0, 0 }
         love.graphics.clear(m[1], m[2], m[3])
         if lay.mode == "closed" then
-            -- (Words in the page's own colour scheme: dark text on a light page and the other way round.)
-            local lum = 0.3 * m[1] + 0.6 * m[2] + 0.1 * m[3]
-            local ink = lum > 0.5 and 0.2 or 0.9
+            -- Only one screen: the opening screen's look (the logo and name, cream
+            -- on the logo's navy, in the reader's own typeface), asking to open it.
             local W, H = love.graphics.getDimensions()
-            local u = W / 540                       -- (the note's size follows the window's width)
-            if ios_note_fonts and ios_note_fonts.w ~= W then ios_note_fonts = nil end
-            ios_note_fonts = ios_note_fonts or { love.graphics.newFont(math.floor(34 * u)), love.graphics.newFont(math.floor(22 * u)), w = W }
-            local pad = 24 * u
-            love.graphics.setColor(ink, ink, ink)
-            love.graphics.setFont(ios_note_fonts[1])
-            love.graphics.printf(M.duo and "Open your Surface Duo\nto read" or "Open your iPhone Duo\nto read",
-                pad, H / 2 - 70 * u, W - 2 * pad, "center")
-            love.graphics.setFont(ios_note_fonts[2])
-            love.graphics.setColor(ink, ink, ink, 0.7)
-            love.graphics.printf(M.duo and "eReaderDS is a two-page reader: drag it across both screens, held like a book."
-                or "eReaderDS is a two-page reader, made for the open Duo.", pad, H / 2 + 30 * u, W - 2 * pad, "center")
+            love.graphics.clear(40 / 255, 52 / 255, 78 / 255)
+            if not closed_art or closed_art.w ~= W then
+                local function font(file, size)
+                    local ok, f = pcall(love.graphics.newFont, "fonts/" .. file, math.floor(size))
+                    return ok and f or love.graphics.newFont(math.floor(size))
+                end
+                local ok, img = pcall(love.graphics.newImage, "splash.png")
+                closed_art = { w = W, img = ok and img or nil,
+                    name = font("GentiumBookPlus-Bold.ttf", W * 0.11), ask = font("GentiumBookPlus-Bold.ttf", W * 0.05),
+                    note = font("GentiumBookPlus-Regular.ttf", W * 0.04) }
+            end
+            local art = closed_art
+            local cream = { 240 / 255, 232 / 255, 208 / 255 }
+            local pad = W * 0.08
+            local ask = M.duo and "Open your Surface Duo to read" or "Open your iPhone Duo to read"
+            local note = M.duo and "eReaderDS is a two-page reader. Drag it across both screens, held like a book."
+                or "eReaderDS is a two-page reader, made for the open Duo."
+            local lw = W * 0.55
+            local logo_h = art.img and lw * art.img:getHeight() / art.img:getWidth() or 0
+            local _, ask_lines = art.ask:getWrap(ask, W - 2 * pad)
+            local _, note_lines = art.note:getWrap(note, W - 2 * pad)
+            local gap = W * 0.04
+            local total = logo_h + gap + art.name:getHeight() + gap * 1.6 + #ask_lines * art.ask:getHeight()
+                + gap * 0.6 + #note_lines * art.note:getHeight()
+            local y = (H - total) / 2
+            love.graphics.setColor(1, 1, 1)
+            if art.img then love.graphics.draw(art.img, (W - lw) / 2, y, 0, lw / art.img:getWidth()) end
+            y = y + logo_h + gap
+            love.graphics.setColor(cream[1], cream[2], cream[3])
+            love.graphics.setFont(art.name)
+            love.graphics.printf("eReaderDS", 0, y, W, "center")
+            y = y + art.name:getHeight() + gap * 1.6
+            love.graphics.setFont(art.ask)
+            love.graphics.printf(ask, pad, y, W - 2 * pad, "center")
+            y = y + #ask_lines * art.ask:getHeight() + gap * 0.6
+            love.graphics.setColor(cream[1], cream[2], cream[3], 0.7)
+            love.graphics.setFont(art.note)
+            love.graphics.printf(note, pad, y, W - 2 * pad, "center")
             love.graphics.setColor(1, 1, 1)
             return
         end

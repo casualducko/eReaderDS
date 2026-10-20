@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.26.1
+
+- **Surface Duo, one screen.** The note that asks you to span the app is drawn like the opening screen: the logo (`splash.png`) and name in cream on the logo's navy, in Gentium (it was plain system text on the theme colour).
+
 ## v1.26.0
 
 - **Microsoft Surface Duo (Android).** The Android APK now runs on a Surface Duo: spanned across both screens, a page on each (the hinge between them is left empty), with the right screen as the touchscreen as on the RG DS Plus. `android.duo` is true when `ro.product.manufacturer` is Microsoft (`android.phone` for it and iOS, which share `phone_layout()`); one screen shows a note asking to span the app. Each screen's page is drawn at its own pixels: `conf.lua` asks for real pixels on a Duo, and the frame and page canvases and the fonts are made 1.758x denser (`render_k`) so nothing is scaled up. System bars are hidden (immersive). The GammaOS setup (DualStack, gamepad profile), Quit, grip, lid and screens-off settings are left out; the first run opens Android's "all files access" page (`Files.smali`) and the folder test writes a file each start. GammaOS and the handhelds are unchanged.
