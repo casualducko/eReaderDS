@@ -177,6 +177,36 @@ Ports/eReaderDS/
 | `app/version.lua` | Version string shown in the app and used for releases |
 | `runtime/` | LÖVE 11.5 aarch64 engine and its libraries (see `runtime/NOTICES.md`) |
 
+## BananaOS
+
+[BananaOS](https://github.com/JorreFog/BananaLinux) is not ROCKNIX underneath: busybox, no compositor, no
+EmulationStation, no `/storage`. Its card has an exFAT data partition mounted at `/data`; games are in `/data/roms`,
+and this app is in `/data/roms/ports/eReaderDS`, with books and settings in `/data/roms/ebook`.
+
+**Getting in.** SSH is off by default and keys-only. Turn on **Settings → Network → File sharing** (the card is then
+`smb://<address>/banana`, as a guest), append your public key to `banana/ssh/authorized_keys` there, then switch
+**Settings → System → SSH** on. The keys are copied to `/run` only when SSH starts, so if the key isn't taken, restart
+the device and switch SSH on again (switching it off and on was not enough). Run `ssh root@<address>` once to trust
+the host key, then `./install.sh --ssh <address>` works (it detects `ID=bananaos` in `/etc/os-release`).
+The log is `roms/ports/eReaderDS/log.txt`.
+
+**Quirks.** The device has no `stat` (sizes: `wc -c`) and its `tar` has no `-z`; its SSH server has no SFTP, so
+`scp` needs `-O`. The app can only be started from the device's menu (Ports shelf): the menu holds the display until
+it launches a port, so launching over SSH fails.
+
+**Display.** With no compositor, `launch.sh` runs LÖVE on SDL's offscreen driver with `SDL_BANANA_PANELS=side`, and
+`runtime/libs.banana/libSDL2-2.0.so.0` (loaded only on BananaOS) puts the window on both panels. BananaOS's own SDL
+patch read every frame back from the GPU (about 125 ms a frame, 8 fps); `runtime/banana-sdl/0002-banana-zero-copy-panels.patch`
+draws into a GBM surface and flips both panels to it, each showing its half through the CRTC offset (about 15 ms, 60 fps).
+Ports start with the bottom panel's backlight off, which the launcher turns back on. `SDL_BANANA_TRACE=1` (set it in
+`launch.sh`) logs the setup and timings to `log.txt`. `SDL_BANANA_READBACK=1` should force the old read-back path; it
+has not been tested. Tested on an RG DS Plus (1024x768, `side`), not the RG DS or `stack`.
+
+**Rebuilding SDL.** `runtime/banana-sdl/build.sh` builds SDL 2.32.10 with `0001` (BananaLinux's, MIT) and `0002` in a
+Debian 13 arm64 container (Docker on an Apple-silicon Mac) and writes `runtime/libs.banana/libSDL2-2.0.so.0`. The
+release zip carries that library. The patch was offered upstream in
+[BananaLinux#39](https://github.com/JorreFog/BananaLinux/issues/39).
+
 ## Android (GammaOS)
 
 `android/build.sh` makes `dist/eReaderDS-vX.Y.Z-android.apk`: LÖVE 11.5's
