@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.27.2
 
 - **Find in Book matches the way you mean it.** Curly and straight quotes (`I'm` finds “I’m”, `"hi"` finds “hi” and «hi»), any dash (`-` finds – and —), non-breaking spaces, soft hyphens and zero-width spaces no longer stop a match, and capitals now count as the same for accented letters too (`école` finds ÉCOLE). The book's text is folded to the same byte lengths, so the highlighted match stays exact; pages with none of these characters still use the plain fast search.
 
