@@ -34,7 +34,7 @@ local DEFAULTS = {
     lid = "sleep",     -- closing the lid: "sleep" (suspend) or "screen" (screens off only)
     lib_hide_finished = false, -- My Books leaves out the books marked finished
     lib_shelf = "",      -- My Books shows only this collection ("": all books)
-    idle_min = Android.ios and 0 or 10,     -- left alone this many minutes, the screens dim, then turn off (0 = never; iOS has its own auto-lock)
+    idle_min = Android.phone and 0 or 10,     -- left alone this many minutes, the screens dim, then turn off (0 = never; iOS has its own auto-lock)
     -- KOReader sync (kosync.lua): the account (the key is the password's MD5,
     -- as KOReader keeps it), the server ("crosspoint", "koreader" or "custom":
     -- kosync_custom's address), how books are matched (CrossPoint's server
@@ -257,6 +257,7 @@ end
 function M.books_folder()
     local d = M.book_dirs()[1] or "/mnt/mmc/Ebook"
     if Android.ios and d == Android.BOOKS then return "Ebook", "in the Files app (On My iPhone, eReaderDS)" end
+    if Android.duo and d == Android.BOOKS then return "Ebook", "on the phone's storage" end
     if Android.active and d == Android.BOOKS then return "Ebook", "on the handheld's storage" end
     local rel = d:match("^/storage/(.+)$")
     if rel then return rel, nil end

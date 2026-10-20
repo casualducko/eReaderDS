@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.26.0
+
+- **Microsoft Surface Duo (Android).** The Android APK now runs on a Surface Duo: spanned across both screens, a page on each (the hinge between them is left empty), with the right screen as the touchscreen as on the RG DS Plus. `android.duo` is true when `ro.product.manufacturer` is Microsoft (`android.phone` for it and iOS, which share `phone_layout()`); one screen shows a note asking to span the app. Each screen's page is drawn at its own pixels: `conf.lua` asks for real pixels on a Duo, and the frame and page canvases and the fonts are made 1.758x denser (`render_k`) so nothing is scaled up. System bars are hidden (immersive). The GammaOS setup (DualStack, gamepad profile), Quit, grip, lid and screens-off settings are left out; the first run opens Android's "all files access" page (`Files.smali`) and the folder test writes a file each start. GammaOS and the handhelds are unchanged.
+- **Brightness** in Settings shows "System" until a level is set (it showed 0%).
+- `tools/duo-span.sh` spans the app in Microsoft's emulator; see docs/DEVELOPING.md.
+
 ## v1.25.0
 
 - **Add a catalog from the device.** Get Books → Add a Catalog asks for an address (`http://` is added if there is no scheme; a bare server also gets `/opds` tried, for Calibre and Calibre-Web), fetches it as an OPDS feed, and saves it to `opds.txt` only when that works. A 401 asks for a user name and password and checks again; a certificate error offers to trust the server (`verify = no`); the name is pre-filled from the feed's title. An address already in the list is refused. Catalog loading moved to `app.load_catalogs()`.

@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.26.0
+Now on the Microsoft Surface Duo: span eReaderDS across both screens and read like a book, with sharp text on each screen and everything by touch. It's the same Android download as GammaOS's.
+Brightness in Settings says System until you pick a level, instead of 0%.
+
 v1.25.0
 Add a catalog right on the device: in Get Books, choose Add a Catalog, type your server's address (like 192.168.1.20:8080) and it's checked before it's saved. It asks for a user name and password if the server needs one, and for a name at the end. No more editing a file.
 

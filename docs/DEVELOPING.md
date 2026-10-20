@@ -251,6 +251,40 @@ never comes and the app freezes. GammaOS's buttons
 come from a virtual "Xbox Wireless Controller" (`getevent -pl`); `sendevent`
 to it presses them, including in the front end.
 
+## Android on the Surface Duo
+
+The same APK runs on a Microsoft Surface Duo (`android.duo`, true when
+`ro.product.manufacturer` is Microsoft; `android.phone` is true for it and iOS).
+GammaOS is untouched: none of this runs there.
+
+- **Layout.** The app still draws its 2048x768 frame (two landscape screens
+  holding quarter-turned pages); `phone_layout()` in `app/android.lua` turns each
+  back into an upright 768x1024 page. Spanned (window wider than tall) the pages
+  sit at the two screens' outer edges with the hinge between them (Duo: 1350 +
+  84 + 1350 px wide, 1800 high; Duo 2: 1344 + 66 + 1344, 1892; from the
+  emulators' `hw.sensor.hinge.areas`). On one screen (tall) it shows a note.
+- **Sharp text.** `conf.lua` asks for real pixels on a Duo (`highdpi`, no
+  `usedpiscale`), and `render_k` (the pixels per page unit: 1.758 on a Duo)
+  makes the frame and page canvases and the fonts that dense, so the pages are
+  drawn at the screen's own pixels and nothing is scaled up. Other canvases stay 1:1.
+- **No GammaOS parts.** No DualStack setup, no gamepad profile, no Quit,
+  "Hold it with buttons", lid or screens-off rows. The Ebook folder needs
+  Android's "all files" permission: `Files.smali` opens its page, and Android
+  closes the app when it's switched on. `storage_ok()` writes a test file each
+  start on a Duo (a folder left by an earlier install passes `access()`
+  without the permission).
+- **Immersive.** `love.window.setFullscreen(true)` hides the system bars (the
+  window is then the full 1800 px, not 1680).
+
+**Testing on a Mac.** Microsoft's emulator (`~/SurfaceDuo`, both a Duo and a
+Duo 2) runs with `./run_SurfaceDuo.sh` (or `run_SurfaceDuo2.sh`); `adb install`
+the APK and `adb shell appops set com.casualducko.ereaderds
+MANAGE_EXTERNAL_STORAGE allow`, put books in `/sdcard/Ebook`, and `tools/duo-span.sh`
+spans the app (drags its bottom handle to the hinge with `input motionevent`;
+a plain `input swipe` only moves it to the other screen). `adb exec-out
+screencap -p` shows both screens at 2784x1800. A real phone is the only way
+to judge the spanning gesture, edge swipes and Android 12L/13 behaviour.
+
 ## Calibre wireless device (app/calibre.lua)
 
 Calibre's smart device driver (`calibre/devices/smart_device_app/driver.py`)

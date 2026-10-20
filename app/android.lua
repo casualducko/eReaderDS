@@ -6,6 +6,11 @@
 -- and shows it in whatever window the system gives (see "iOS" below). `active`
 -- is true for both; `android` and `ios` say which.
 --
+-- The Microsoft Surface Duo (Android) is the same kind of device as the
+-- iPhone Duo: two portrait screens either side of a hinge, held like a book,
+-- touch only. `duo` is true on one, and `phone` for any of these two-page
+-- touch phones (iOS or a Duo): they share the layout below ("phone_layout").
+--
 -- GammaOS's "DualStack" gives an app on its list one window across both
 -- screens, the top one above the bottom one (1024x1536). eReaderDS draws its
 -- usual 2048x768 frame (the two screens side by side, as on Linux) into a
@@ -95,6 +100,19 @@ function M.setprop(name, value)
     local ok, rc = pcall(C.__system_property_set, name, value)
     return ok and rc == 0 and (name:sub(1, 4) == "ctl." or M.getprop(name) == value)
 end
+
+-- A Surface Duo? (Microsoft's phone, or its emulator.) Its screens' size and
+-- the hinge between them, in pixels, from Microsoft's own emulator settings:
+-- { width of one screen, hinge, height }.
+local MODEL = M.android and M.getprop("ro.product.model") or ""
+M.duo = M.android and M.getprop("ro.product.manufacturer"):lower():find("microsoft", 1, true) ~= nil
+M.phone = M.ios or M.duo
+M.DUO_SHAPES = { ["Surface Duo"] = { 1350, 84, 1800 }, ["Surface Duo 2"] = { 1344, 66, 1892 } }
+M.duo_shape = M.DUO_SHAPES[MODEL] or { 1350, 84, 1800 }
+-- How many pixels a page (768x1024 units) gets on the Duo: what fits its
+-- screen. Canvases and fonts are made this dense, so the text is as sharp as
+-- the screen can show it, not drawn small and made bigger.
+M.render_k = M.duo and math.min(M.duo_shape[1] / 768, M.duo_shape[3] / 1024) or 1
 
 function M.dir_exists(path)
     local ok, d = pcall(C.opendir, path)
@@ -252,6 +270,12 @@ function M.window_brightness(value)
     return jni_call(BRIGHT[1], BRIGHT[2], BRIGHT[3], value)
 end
 
+-- Open Android's page for giving eReaderDS access to all files (the Ebook
+-- folder, on a phone that isn't GammaOS). False if it couldn't be opened.
+function M.open_files_access()
+    return jni_call("com/casualducko/ereaderds/Files", "open", "(Landroid/app/Activity;)V")
+end
+
 -- Install a downloaded update (an APK) without root: Android's installer,
 -- which lets an app update itself without asking (android/smali/.../Install).
 -- It works on in the background; M.install_status() says how it's going:
@@ -277,7 +301,7 @@ end
 
 -- Both screens: the window is taller than it's wide.
 function M.stacked()
-    if M.ios then return true end           -- (a window of any shape shows both screens)
+    if M.phone then return true end         -- (a window of any shape shows both screens)
     local w, h = love.graphics.getDimensions()
     return h > w
 end
@@ -357,25 +381,41 @@ end
 -- corners). When it's tall (the Duo closed) only a note asks to open it.
 --   M.lay = { mode = "book" | "closed", s (scale) }
 -- and the two pages' corners: M.lay.page, M.lay.menu = { x, y } (each 768s x 1024s).
-local function ios_layout()
+local function phone_layout()
     local W, H = love.graphics.getDimensions()
-    -- (The insets only change with the window or a pose: asked at most every half second.)
-    local now = love.timer.getTime()
-    local ins = M.insets
-    if not ins or ins.W ~= W or ins.H ~= H or now - ins.at > 0.5 then
-        local top, left, bottom, right = safe_insets()
-        ins = { W = W, H = H, at = now, top = top, left = left, bottom = bottom, right = right }
-        M.insets = ins
+    local x, y, w, h = 0, 0, W, H
+    if M.ios then
+        -- (The insets only change with the window or a pose: asked at most every half second.)
+        local now = love.timer.getTime()
+        local ins = M.insets
+        if not ins or ins.W ~= W or ins.H ~= H or now - ins.at > 0.5 then
+            local top, left, bottom, right = safe_insets()
+            ins = { W = W, H = H, at = now, top = top, left = left, bottom = bottom, right = right }
+            M.insets = ins
+        end
+        local top, left, bottom, right = ins.top, ins.left, ins.bottom, ins.right
+        x, y, w, h = left, top, W - left - right, H - top - bottom
+        if w <= 0 or h <= 0 then x, y, w, h = 0, 0, W, H end
     end
-    local top, left, bottom, right = ins.top, ins.left, ins.bottom, ins.right
-    local x, y, w, h = left, top, W - left - right, H - top - bottom
-    if w <= 0 or h <= 0 then x, y, w, h = 0, 0, W, H end
     local book = math.min(w / 1536, h / 1024)
     local lay = M.lay or {}
     -- A tall window (the Duo folded shut, a phone held upright) is too narrow for
     -- two pages: a dual screen reader is read open, so it only asks for that.
     if w < h then
         lay.mode, lay.s = "closed", book
+    elseif M.duo then
+        -- Spanned across both screens: a page on each, its own screen's width,
+        -- with the hinge between them (the hinge is part of the window, and
+        -- nothing may be under it). A window of another size than the phone's
+        -- own has a hinge of the same share of its height.
+        local shape = M.duo_shape
+        local hinge = W == shape[1] * 2 + shape[2] and shape[2] or math.max(0, W - 2 * (H * 0.75))
+        local pw = (W - hinge) / 2
+        local s = math.min(pw / 768, H / 1024)
+        local y0 = (H - 1024 * s) / 2
+        lay.mode, lay.s, lay.hinge = "book", s, hinge
+        lay.page = { x = (pw - 768 * s) / 2, y = y0 }
+        lay.menu = { x = W - pw + (pw - 768 * s) / 2, y = y0 }
     else
         local s = book
         local x0, y0 = x + (w - 1536 * s) / 2, y + (h - 1024 * s) / 2
@@ -387,7 +427,7 @@ local function ios_layout()
     M.lay = lay
     if M.lay_log ~= W .. "x" .. H .. ":" .. x .. "," .. y .. "," .. w .. "," .. h then
         M.lay_log = W .. "x" .. H .. ":" .. x .. "," .. y .. "," .. w .. "," .. h
-        print(string.format("[ios] window %dx%d (pixels %dx%d, scale %.2f), safe area %d,%d %dx%d -> %s %.3f",
+        print(string.format("[phone] window %dx%d (pixels %dx%d, scale %.2f), safe area %d,%d %dx%d -> %s %.3f",
             W, H, love.graphics.getPixelWidth(), love.graphics.getPixelHeight(), love.graphics.getDPIScale(),
             x, y, w, h, lay.mode, lay.s))
     end
@@ -400,7 +440,9 @@ function M.storage_ok()
     -- (Asking is enough when the folder is there, and quick: opening or making
     -- a file in shared storage costs Android much more.)
     local W_OK = 2
-    if C.access(M.DATA, W_OK) == 0 then return true end
+    -- (Not on a Duo: a folder left from an earlier install passes this without
+    -- the permission, so there the test file is written every time.)
+    if not M.duo and C.access(M.DATA, W_OK) == 0 then return true end
     M.mkdir_p(M.DATA)
     local test = M.DATA .. "/.write-test"
     local f = io.open(test, "wb")
@@ -416,7 +458,7 @@ end
 -- is changed if eReaderDS has a profile already (the reader's own).
 -- Returns whether there's one now, and whether it was just added.
 function M.gamepad_profile()
-    if M.ios then return true, false end
+    if M.phone then return true, false end
     local g = "persist.gammaos.gamepad.pa"
     local n = tonumber(M.getprop(g .. "_count")) or 0
     for i = 0, n - 1 do
@@ -431,7 +473,7 @@ end
 -- GammaOS's front end sometimes comes back from an app with its icons gone;
 -- asking it to refresh its apps list (a new value each time) redraws them.
 function M.refresh_front_end()
-    if M.ios then return end
+    if M.phone then return end
     M.setprop("sys.gammaos.nano.apps_refresh_req", tostring(os.time()))
 end
 
@@ -469,10 +511,19 @@ function M.setup()
         if C.access(f, 0) == 0 then os.remove(f) end
     end
     if not M.storage_ok() then
+        if M.duo then
+            -- (The page for the permission opens by itself; Android closes the app
+            -- when it's switched on, and the next start has the folder.)
+            M.open_files_access()
+            return "Almost there", "eReaderDS needs to use the Ebook folder, where your books and settings live.\n\n"
+                .. "Switch on \"Allow access to manage all files\" on the page that opened. "
+                .. "Android then closes eReaderDS: open it again."
+        end
         return "Almost there", "eReaderDS can't use the Ebook folder yet.\n\n"
             .. "Open the Quick Menu → System Settings → Apps → eReaderDS → Permissions, "
             .. "and allow access to all files. Then press A to close eReaderDS and open it again."
     end
+    if M.duo then return nil end            -- (a Duo has no DualStack and no Anbernic button)
     if not M.stacked() then
         local listed = dualstack_add()
         if listed == "listed" then
@@ -581,16 +632,40 @@ local target
 -- iOS draws to the screen's own pixels (a 3x display: 3x the points), and
 -- LÖVE would make every canvas that big too. The app's canvases are sized in
 -- its own units (the 2048x768 frame, pages), so they stay one pixel per unit.
-if M.ios then
+-- (On a Duo the two big ones, the frame and the pages, get the screen's own
+-- density instead: see render_k. The small ones, scaled-down pictures, don't.)
+if M.phone then
     local new_canvas = love.graphics.newCanvas
+    local function dense(w, h)
+        return M.duo and (w == 2048 and h == 768 or w == 768 and h == 1024) and M.render_k or 1
+    end
     function love.graphics.newCanvas(w, h, a, b)
         if type(a) == "table" and b == nil then
-            if a.dpiscale == nil then a.dpiscale = 1 end
+            if a.dpiscale == nil then a.dpiscale = dense(w, h) end
             return new_canvas(w, h, a)
         elseif a == nil then
-            return new_canvas(w, h, { dpiscale = 1 })
+            return new_canvas(w, h, { dpiscale = dense(w, h) })
         end
         return new_canvas(w, h, a, b)
+    end
+end
+-- Fonts the same: rasterized at the density, drawn at their size.
+if M.duo then
+    local new_rasterizer = love.font.newRasterizer
+    function love.font.newRasterizer(a, size, hinting, dpiscale, ...)
+        if type(size) == "number" and dpiscale == nil then
+            return new_rasterizer(a, size, hinting or "normal", M.render_k, ...)
+        end
+        return new_rasterizer(a, size, hinting, dpiscale, ...)
+    end
+    local new_font = love.graphics.newFont
+    function love.graphics.newFont(a, b, c, d)
+        if type(a) == "number" then                      -- (size, hinting, dpiscale)
+            return new_font(a, b or "normal", c or M.render_k)
+        elseif (type(a) == "string" or type(a) == "userdata") and type(b) == "number" and d == nil then
+            return new_font(a, b, c or "normal", M.render_k)
+        end
+        return new_font(a, b, c, d)
     end
 end
 function love.graphics.setCanvas(c, ...)
@@ -635,8 +710,8 @@ end
 -- the top screen's half.
 local quads, ios_note_fonts
 function M.present(canvas)
-    if M.ios then
-        local lay = ios_layout()
+    if M.phone then
+        local lay = phone_layout()
         love.graphics.setColor(1, 1, 1)
         local m = M.margin or { 0, 0, 0 }
         love.graphics.clear(m[1], m[2], m[3])
@@ -644,15 +719,19 @@ function M.present(canvas)
             -- (Words in the page's own colour scheme: dark text on a light page and the other way round.)
             local lum = 0.3 * m[1] + 0.6 * m[2] + 0.1 * m[3]
             local ink = lum > 0.5 and 0.2 or 0.9
-            ios_note_fonts = ios_note_fonts or { love.graphics.newFont(34), love.graphics.newFont(22) }
             local W, H = love.graphics.getDimensions()
-            local pad = 24
+            local u = W / 540                       -- (the note's size follows the window's width)
+            if ios_note_fonts and ios_note_fonts.w ~= W then ios_note_fonts = nil end
+            ios_note_fonts = ios_note_fonts or { love.graphics.newFont(math.floor(34 * u)), love.graphics.newFont(math.floor(22 * u)), w = W }
+            local pad = 24 * u
             love.graphics.setColor(ink, ink, ink)
             love.graphics.setFont(ios_note_fonts[1])
-            love.graphics.printf("Open your iPhone Duo\nto read", pad, H / 2 - 70, W - 2 * pad, "center")
+            love.graphics.printf(M.duo and "Open your Surface Duo\nto read" or "Open your iPhone Duo\nto read",
+                pad, H / 2 - 70 * u, W - 2 * pad, "center")
             love.graphics.setFont(ios_note_fonts[2])
             love.graphics.setColor(ink, ink, ink, 0.7)
-            love.graphics.printf("eReaderDS is a two-page reader, made for the open Duo.", pad, H / 2 + 30, W - 2 * pad, "center")
+            love.graphics.printf(M.duo and "eReaderDS is a two-page reader: drag it across both screens, held like a book."
+                or "eReaderDS is a two-page reader, made for the open Duo.", pad, H / 2 + 30 * u, W - 2 * pad, "center")
             love.graphics.setColor(1, 1, 1)
             return
         end
@@ -690,8 +769,8 @@ end
 -- coordinates, or nil when it isn't on the bottom screen (the top screen has
 -- no touch, but a desktop-style window might).
 function M.bottom_xy(x, y)
-    if M.ios then
-        local lay = M.lay or ios_layout()
+    if M.phone then
+        local lay = M.lay or phone_layout()
         if lay.mode == "closed" then return nil end
         local lx, ly = (x - lay.menu.x) / lay.s, (y - lay.menu.y) / lay.s
         if lx < 0 or lx >= 768 or ly < 0 or ly >= 1024 then return nil end

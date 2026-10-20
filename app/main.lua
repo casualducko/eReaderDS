@@ -3700,15 +3700,15 @@ function app.help_quit_rows()
           value_bold = app.upd.state == "available" and "Update" or nil,
           act = function() open_sub("about") end },
     }
-    if not require("android").ios then rows[#rows + 1] = { label = "Quit", act = function() love.event.quit() end } end
+    if not require("android").phone then rows[#rows + 1] = { label = "Quit", act = function() love.event.quit() end } end
     return rows
 end
 
 -- The Device section of Settings. (The grip, the lid and the screen-off timer
--- are for the handhelds: a phone has its own, in iOS's Settings.)
+-- are for the handhelds: a phone has its own, in its Settings.)
 function app.device_rows()
     local rows = {}
-    if not require("android").ios then
+    if not require("android").phone then
         -- The grip: buttons under the right hand (the usual), or turned
         -- round with them under the left (everything turns 180°).
         rows[#rows + 1] = { label = "Hold it with buttons", value = app.flipped() and "On the left" or "On the right", adjust = function()
@@ -3850,7 +3850,7 @@ local function menu_items()
         app.menu_on_page(1, section("Reading", join({
             { label = "Brightness",
               value = S.extra_dim > 0 and ("Extra dim " .. S.extra_dim)
-                  or (Backlight.available() and ((S.brightness >= 0 and S.brightness or Backlight.get() or 0) .. "%") or "Normal"),
+                  or (Backlight.available() and ((S.brightness >= 0 or Backlight.get()) and ((S.brightness >= 0 and S.brightness or Backlight.get()) .. "%") or "System") or "Normal"),
               adjust = function(d)
                   local avail = Backlight.available()
                   local cur = S.brightness >= 0 and S.brightness or (avail and Backlight.get()) or 50
@@ -6037,7 +6037,7 @@ local function draw_library(side)
         love.graphics.printf("Copy .epub, .cbz or .txt files into the " .. folder .. " folder"
             .. (where and (" " .. where) or "") .. " (folders inside it are fine), or tap Get Books to download some or send them from a phone or computer.", x, 180, w, "left")
         love.graphics.setFont(ui.small)
-        if not require("android").ios then app.hints(x, nil, { "Anbernic button", "quit" }) end
+        if not require("android").phone then app.hints(x, nil, { "Anbernic button", "quit" }) end
         love.graphics.printf("v" .. VERSION, x, PAGE_H - 70, w, "right")
         return
     end
@@ -10894,6 +10894,7 @@ end
 
 function app.system_name()
     if require("android").ios then return "iOS" end
+    if require("android").duo then return "Surface Duo (Android)" end
     if require("android").active then return "GammaOS (Android)" end
     local f = io.open("/etc/os-release", "rb")
     local s = f and f:read("*a") or ""
@@ -12110,8 +12111,10 @@ function love.load()
             love.graphics.present()
         end)
         app.frame_canvas = love.graphics.newCanvas(2048, 768)
-        -- iOS: the phone's auto-lock applies (LÖVE keeps the screen awake otherwise).
-        if require("android").ios then
+        -- A phone: its auto-lock applies (LÖVE keeps the screen awake otherwise).
+        if require("android").phone then
+            -- (A Duo: without the status bar and the navigation bar over the pages.)
+            if require("android").duo then pcall(love.window.setFullscreen, true) end
             love.window.setDisplaySleepEnabled(true)
             -- (No system keyboard: the app has its own. SDL may have started text input.)
             if love.keyboard.hasTextInput() then love.keyboard.setTextInput(false) end
@@ -12451,7 +12454,7 @@ function love.run()
             if name == "quit" then
                 if not love.quit() then return a or 0 end
             elseif name == "visible" or name == "focus" or name == "resize" or name == "displayrotated" then
-                if require("android").ios then print("[ios] " .. name, tostring(a), tostring(b)) end
+                if require("android").phone then print("[phone] " .. name, tostring(a), tostring(b)) end
                 redraw()
                 -- Android recreates the window's surfaces around these (and
                 -- GammaOS's DualStack reshapes it) without always saying when

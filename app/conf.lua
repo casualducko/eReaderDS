@@ -18,6 +18,20 @@ function love.conf(t)
     -- as it folds, unfolds or turns.
     t.window.highdpi = love._os == "iOS"
     if love._os == "iOS" then t.window.resizable = true end
+    -- A Surface Duo: real pixels, not Android's density-independent units (the
+    -- pages are drawn at the screen's own density: see android.lua).
+    if love._os == "Android" then
+        pcall(function()
+            local ffi = require("ffi")
+            pcall(ffi.cdef, "int __system_property_get(const char *name, char *value);")
+            local buf = ffi.new("char[92]")
+            local n = ffi.C.__system_property_get("ro.product.manufacturer", buf)
+            if n > 0 and ffi.string(buf, n):lower():find("microsoft", 1, true) then
+                t.window.highdpi = true
+                t.window.usedpiscale = false
+            end
+        end)
+    end
     t.window.vsync = 1
     t.window.display = tonumber(os.getenv("READER_DISPLAY")) or 1
     t.modules.audio = false

@@ -13,8 +13,9 @@ EPUB and text books, and comics and manga (`.cbz`) too.
 
 > For the **RG DS Plus on its stock firmware, ROCKNIX or GammaOS** (not the
 > original RG DS, and not other custom firmware such as KNULLI). For GammaOS
-> (Android), see [GammaOS](#gammaos-android). Found a problem? Please
-> [report it](#reporting-problems).
+> (Android), see [GammaOS](#gammaos-android). It also runs on the **Microsoft
+> Surface Duo**: see [Surface Duo](#microsoft-surface-duo-android). Found a
+> problem? Please [report it](#reporting-problems).
 
 ## Install
 
@@ -115,6 +116,40 @@ On GammaOS:
 - It's a little slower than on Linux: Android needs much of the handheld's
   1 GB of memory. If page turns start to stutter after a long session,
   restart the handheld: GammaOS runs short of memory over time.
+
+### Microsoft Surface Duo (Android)
+
+eReaderDS also runs on the **Surface Duo** (the first one; the Duo 2 is set up
+the same way but hasn't been tried on a real phone). It is the same
+`eReaderDS-vX.Y.Z-android.apk`. The app is spread across both screens like an
+open book: the left screen shows one page and the right screen is the
+touchscreen, with the same pages, menus, taps and swipes as on the RG DS Plus
+(there are no buttons, so everything is by touch). Each page is drawn at the
+screen's own pixels, so the text is sharp, and nothing is drawn under the
+hinge.
+
+1. On the Duo, open the
+   [latest release](https://github.com/casualducko/eReaderDS/releases/latest)
+   in a browser and download the `.apk` (or, from a computer,
+   `adb install eReaderDS-vX.Y.Z-android.apk`). Open it and choose **Install**;
+   if Android says installing from the browser isn't allowed, switch on
+   **Allow from this source** and go back.
+2. Open eReaderDS. The first time, Android's **Allow access to manage all
+   files** page opens by itself: switch it on. Android then closes
+   eReaderDS (that's normal): open it again. (The files are the **Ebook**
+   folder, where your books, settings and reading places live.)
+3. **Span it across both screens**, as with any Duo app (touch the bar at the
+   bottom of the app and drag it across to the hinge). On one screen only, it
+   asks you to open the Duo, because it's a two-page reader.
+
+**Books** go in the **Ebook** folder of the phone's storage (`/sdcard/Ebook`),
+or use **Get Books**: it downloads from Standard Ebooks, Project Gutenberg and
+your own catalogs, or receives books sent from a phone or computer over Wi-Fi.
+
+Updates install from inside the app, as on GammaOS (Android may ask you to
+confirm). There is no Quit: leave it as you leave any Android app. If the
+system's back gesture closes it when you swipe near an edge, your place is
+kept; switching Android to 3-button navigation avoids the gesture.
 
 ### Updating
 
@@ -797,7 +832,9 @@ problem (on ROCKNIX `roms/ports/eReaderDS/log.txt`; GammaOS has no log file).
 See [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 An iOS port (made for the iPhone Duo, running on any iPhone or iPad) lives in
-[ios/](ios/README.md). It has been tried in the simulator only so far.
+[ios/](ios/README.md). It has been tried in the simulator only so far. The
+Surface Duo build shares its two-page layout (`app/android.lua`, "phone_layout");
+testing it on a computer is in [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## License
 
