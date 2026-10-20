@@ -8121,17 +8121,17 @@ function app.update_draw(side)
     elseif u.state == "unpacking" then
         status = u.saving and "Saving to the SD card…" or ("Installing…  " .. math.floor((u.frac or 0) * 100) .. "%")
     elseif u.state == "ready" and u.apk then
-        status, button = "Downloaded. eReaderDS closes while it installs: open it again afterwards.", "Install now"
+        status, button = "Download finished.\n\nInstalling closes eReaderDS. Open it again afterwards.", "Install now"
     elseif u.state == "installing" then
-        status = "Installing…  eReaderDS closes when it's done: open it again afterwards."
+        status = "Installing the update…\n\neReaderDS closes when it's done. Open it again afterwards."
     elseif u.state == "confirm" then
-        status = "Android asks you to confirm the update: choose Update."
+        status = "Android is asking you to confirm.\n\nChoose Update in the message it shows."
     elseif u.state == "ready" then
-        status, button = "Ready. eReaderDS restarts with the new version.", "Restart now"
+        status, button = "Ready.\n\neReaderDS restarts with the new version.", "Restart now"
     elseif u.state == "checking" then
         status = "Checking for updates…"
     elseif u.state == "error" then
-        status, button = "Couldn't update: " .. (u.message or "unknown error"), "Try again"
+        status, button = "Couldn't update.\n\n" .. (u.message or "Something went wrong."), "Try again"
     elseif u.checked then
         status = "eReaderDS v" .. VERSION .. " is up to date."
     else
@@ -8139,7 +8139,18 @@ function app.update_draw(side)
     end
     love.graphics.setFont(ui.font)
     color(th.fg)
-    love.graphics.printf(status, x, 300, w, "center")
+    -- A blank line splits what's happening from the detail: the detail is drawn quieter, below it.
+    local head, detail = status:match("^(.-)\n\n(.+)$")
+    if head then
+        local _, lines = ui.font:getWrap(head, w)
+        local lh = ui.font:getHeight() * ui.font:getLineHeight()
+        love.graphics.printf(head, x, 280, w, "center")
+        color(th.dim)
+        love.graphics.printf(detail, x, 280 + #lines * lh + lh * 0.8, w, "center")
+        color(th.fg)
+    else
+        love.graphics.printf(status, x, 300, w, "center")
+    end
     local frac = (u.state == "downloading" and (u.total or 0) > 0 and u.got / u.total)
         or (u.state == "unpacking" and u.frac) or nil
     if frac then
@@ -11517,7 +11528,7 @@ function app.backup_start(whole)
     local function start()
         -- (Too big for a zip at all: said now, before old backups are offered up for it.)
         if whole and app.backup_size() > 3.9 * 1024 ^ 3 then
-            app.toast("Too big for one backup\n" .. app.size_words(app.backup_size()) .. ": the most is 3.9 GB", 6)
+            app.toast("Too big for one backup\n" .. app.size_words(app.backup_size()) .. ", and the limit is 3.9 GB", 6)
             return
         end
         local need = (whole and app.backup_size() or 0) + 16 * 1024 * 1024
@@ -11677,7 +11688,7 @@ function app.backup_poll()
             if bk.kind == "restore" or bk.kind == "reset" then
                 local skipped = (msg.skipped or 0) > 0
                     and ("\n" .. msg.skipped .. (msg.skipped == 1 and " book" or " books") .. " couldn't be copied") or ""
-                app.toast((bk.kind == "reset" and "Reset" or "Restored") .. skipped .. "\neReaderDS is closing: open it again", 3600)
+                app.toast((bk.kind == "reset" and "Reset" or "Restored") .. skipped .. "\neReaderDS is closing.\nOpen it again afterwards.", 3600)
                 app.bk_quit_at = love.timer.getTime() + (skipped ~= "" and 6 or 3)
             else
                 app.toast("Backed up\n" .. Store.books_folder() .. "/Backups/" .. bk.out:match("([^/]+)$"))
@@ -12084,7 +12095,7 @@ function love.filedropped(file)
         if not ok or size_of(dest .. ".part") ~= size then
             file:close()
             os.remove(dest .. ".part")
-            app.toast("Couldn't save " .. name .. " (is the phone full?)", 4)
+            app.toast("Couldn't save " .. name .. " (is the storage full?)", 4)
             return
         end
         os.rename(dest .. ".part", dest)

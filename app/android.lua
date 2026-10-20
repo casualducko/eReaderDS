@@ -516,12 +516,13 @@ function M.setup()
             -- when it's switched on, and the next start has the folder.)
             M.open_files_access()
             return "Almost there", "eReaderDS needs to use the Ebook folder, where your books and settings live.\n\n"
-                .. "Switch on \"Allow access to manage all files\" on the page that opened. "
-                .. "Android then closes eReaderDS: open it again."
+                .. "Switch on \"Allow access to manage all files\" on the page that opened.\n\n"
+                .. "Android then closes eReaderDS. Open it again afterwards."
         end
         return "Almost there", "eReaderDS can't use the Ebook folder yet.\n\n"
             .. "Open the Quick Menu → System Settings → Apps → eReaderDS → Permissions, "
-            .. "and allow access to all files. Then press A to close eReaderDS and open it again."
+            .. "and allow access to all files.\n\n"
+            .. "Then press A to close eReaderDS and open it again."
     end
     if M.duo then return nil end            -- (a Duo has no DualStack and no Anbernic button)
     if not M.stacked() then
@@ -542,7 +543,8 @@ function M.setup()
         -- (GammaOS wouldn't take the setting: the reader can add it by hand.)
         return "Almost there", "To use both screens, add eReaderDS to GammaOS's DualStack list.\n\n"
             .. "Open the Quick Menu → System Settings → GammaOS Toolbox → Allowed packages, and add "
-            .. "a comma and " .. M.PACKAGE .. " to the end. Then press A to close eReaderDS and open it again."
+            .. "a comma and " .. M.PACKAGE .. " to the end.\n\n"
+            .. "Then press A to close eReaderDS and open it again."
     end
     -- (Already on DualStack, from an earlier version: the button profile on
     -- its own. The gamepad service restarts to read it, so open eReaderDS

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.27.1
+
+- **Clearer messages.** The update screen's messages (download finished, installing, confirm, ready, errors) are a short headline with the detail below it in a quieter colour, and a failed update says "Couldn't update." with the reason underneath. GammaOS's and the Surface Duo's first-run setup steps are split into paragraphs, "eReaderDS is closing" after a restore says to open it again afterwards, the "too big for one backup" note reads more clearly, and a failed Android import asks if the storage (not "the phone") is full.
+- docs/DEVELOPING.md has a BananaOS section: getting in over SSH, the device's quirks, how both panels are drawn, and rebuilding SDL.
+
 ## v1.27.0
 
 - **Runs on BananaOS** ([BananaLinux](https://github.com/JorreFog/BananaLinux)), on both screens, at 60 frames a second. BananaOS has no window system, so the download carries `runtime/libs.banana`: SDL 2.32.10 with BananaLinux's two-panel patch and a zero-copy one (`runtime/banana-sdl`, rebuilt with `runtime/banana-sdl/build.sh`) that makes the GPU draw straight into buffers both panels show, instead of reading every frame back (8 frames a second, so page turns showed three frames). Only loaded on BananaOS.
