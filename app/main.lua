@@ -9039,6 +9039,18 @@ function app.find_open()
     redraw()
 end
 
+-- Lower-case, with curly quotes made straight. Each curly quote is three
+-- bytes, so the straight one is padded to three (\1 filler) and a straight
+-- one in the query is padded the same: matches land on the same offsets, and
+-- "I'm" finds "I’m".
+function app.find_fold(s)
+    s = s:lower()
+    s = s:gsub("\226\128[\152\153\155]", "'\1\1"):gsub("\226\128[\156\157\158]", '"\1\1')
+    s = s:gsub("'(\1?)", function(pad) return pad == "" and "'\1\1" or nil end)
+    s = s:gsub('"(\1?)', function(pad) return pad == "" and '"\1\1' or nil end)
+    return s
+end
+
 function app.find_keyboard(text)
     app.mode = "reader"
     app.kb_open({ title = "Find in Book", text = text,
@@ -9065,7 +9077,7 @@ function app.find_start(query, resume)
     local f = resume or { query = query, book = book, results = {}, sel = 1, top = 1, pct = 0 }
     app.find = f
     app.mode = "find"
-    local needle = query:lower()
+    local needle = app.find_fold(query)
     app.task_kind = "find"
     app.task = coroutine.create(function()
         local t0 = love.timer.getTime()
@@ -9083,7 +9095,7 @@ function app.find_start(query, resume)
                         local parts = {}
                         for _, r in ipairs(b.runs) do if r.text then parts[#parts + 1] = r.text end end
                         local text = table.concat(parts)
-                        local low = text:lower()
+                        local low = app.find_fold(text)
                         local at = 1
                         while #f.results < app.FIND_MAX do
                             local s0, s1 = low:find(needle, at, true)

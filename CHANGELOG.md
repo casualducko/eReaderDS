@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Find in Book ignores curly vs straight quotes.** Searching `I'm a widow` now finds “I’m a widow” (books use curly quotes; the keyboard types straight ones). Quotes are folded to the same length, so the highlighted match stays exact.
+
 ## v1.27.1
 
 - **Clearer messages.** The update screen's messages (download finished, installing, confirm, ready, errors) are a short headline with the detail below it in a quieter colour, and a failed update says "Couldn't update." with the reason underneath. GammaOS's and the Surface Duo's first-run setup steps are split into paragraphs, "eReaderDS is closing" after a restore says to open it again afterwards, the "too big for one backup" note reads more clearly, and a failed Android import asks if the storage (not "the phone") is full.
