@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Find in Book ignores curly vs straight quotes.** Searching `I'm a widow` now finds “I’m a widow” (books use curly quotes; the keyboard types straight ones). Quotes are folded to the same length, so the highlighted match stays exact.
+- **Find in Book matches the way you mean it.** Curly and straight quotes (`I'm` finds “I’m”, `"hi"` finds “hi” and «hi»), any dash (`-` finds – and —), non-breaking spaces, soft hyphens and zero-width spaces no longer stop a match, and capitals now count as the same for accented letters too (`école` finds ÉCOLE). The book's text is folded to the same byte lengths, so the highlighted match stays exact; pages with none of these characters still use the plain fast search.
 
 ## v1.27.1
 

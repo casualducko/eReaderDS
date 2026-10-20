@@ -9039,16 +9039,44 @@ function app.find_open()
     redraw()
 end
 
--- Lower-case, with curly quotes made straight. Each curly quote is three
--- bytes, so the straight one is padded to three (\1 filler) and a straight
--- one in the query is padded the same: matches land on the same offsets, and
--- "I'm" finds "I’m".
+-- Find in Book matches the way a reader means it: capitals, curly vs straight
+-- quotes, any dash, non-breaking spaces and soft hyphens don't matter. The
+-- book's text is folded to plain characters, each padded with \1 bytes up to
+-- its old length, so a match's offsets are still the original text's. (A
+-- query's own characters take no padding: its pattern lets \1s fall between.)
+app.FOLD = {
+    { "\226\128[\152\153\155]", "'\1\1" },             -- ‘ ’ ‛
+    { "\226\128[\156\157\158]", '"\1\1' },             -- “ ” „
+    { "\202\188", "'\1" },                              -- ʼ
+    { "\194[\171\187]", '"\1' },                         -- « »
+    { "\194\160", " \1" },                               -- non-breaking space
+    { "\226\128[\130-\138\175]", " \1\1" },              -- en/em/thin spaces
+    { "\226\128[\144-\149]", "-\1\1" },                  -- hyphens and dashes
+    { "\226\136\146", "-\1\1" },                        -- minus sign
+    { "\194\173", "\1\1" },                             -- soft hyphen
+    { "\226\128[\139-\141]", "\1\1\1" },                  -- zero-width spaces
+    { "\239\187\191", "\1\1\1" },                      -- byte order mark
+}
 function app.find_fold(s)
     s = s:lower()
-    s = s:gsub("\226\128[\152\153\155]", "'\1\1"):gsub("\226\128[\156\157\158]", '"\1\1')
-    s = s:gsub("'(\1?)", function(pad) return pad == "" and "'\1\1" or nil end)
-    s = s:gsub('"(\1?)', function(pad) return pad == "" and '"\1\1' or nil end)
+    -- (lower() only knows ASCII: À-Þ to à-þ by hand, keeping × as it is.)
+    s = s:gsub("\195([\128-\158])", function(c)
+        if c ~= "\151" then return "\195" .. string.char(c:byte() + 32) end
+    end)
+    for _, f in ipairs(app.FOLD) do s = s:gsub(f[1], f[2]) end
     return s
+end
+
+-- The query's search: its folded text (for a page with no padding in it),
+-- and a pattern that lets padding sit after any of its bytes.
+function app.find_needle(q)
+    local plain = app.find_fold(q):gsub("\1", "")
+    local pat = {}
+    for i = 1, #plain do
+        local ch = plain:sub(i, i)
+        pat[#pat + 1] = (ch:find("^[%^%$%(%)%%%.%[%]%*%+%-%?]") and "%" or "") .. ch .. "\1*"
+    end
+    return plain, table.concat(pat)
 end
 
 function app.find_keyboard(text)
@@ -9077,7 +9105,7 @@ function app.find_start(query, resume)
     local f = resume or { query = query, book = book, results = {}, sel = 1, top = 1, pct = 0 }
     app.find = f
     app.mode = "find"
-    local needle = app.find_fold(query)
+    local needle, npat = app.find_needle(query)
     app.task_kind = "find"
     app.task = coroutine.create(function()
         local t0 = love.timer.getTime()
@@ -9096,9 +9124,11 @@ function app.find_start(query, resume)
                         for _, r in ipairs(b.runs) do if r.text then parts[#parts + 1] = r.text end end
                         local text = table.concat(parts)
                         local low = app.find_fold(text)
+                        local padded = low:find("\1", 1, true)
                         local at = 1
                         while #f.results < app.FIND_MAX do
-                            local s0, s1 = low:find(needle, at, true)
+                            local s0, s1
+                            if padded then s0, s1 = low:find(npat, at) else s0, s1 = low:find(needle, at, true) end
                             if not s0 then break end
                             f.results[#f.results + 1] = { ch = i, off = b.off + s0 - 1,
                                 text = text, s0 = s0, s1 = s1 }
