@@ -16,10 +16,11 @@ body:
     id: device
     attributes:
       label: Device and firmware
-      description: eReaderDS is made for the RG DS Plus on its stock firmware or ROCKNIX.
+      description: eReaderDS is made for the RG DS Plus on its stock firmware, ROCKNIX or BananaOS.
       options:
         - RG DS Plus, stock firmware
         - RG DS Plus, ROCKNIX
+        - RG DS Plus, BananaOS
         - Something else (tell us below)
     validations:
       required: true

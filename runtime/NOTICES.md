@@ -19,8 +19,18 @@ decoder (BSD 3-Clause, © Xiph.org Foundation; see
 1.1.1+dfsg.1-16.1+deb12u1 arm64 package. LÖVE links to it and ROCKNIX doesn't
 ship it; it's only loaded there.
 
-Other libraries LÖVE uses (SDL2, FreeType, OpenAL and others) come from the
-device firmware and are not included.
+`libs.banana/libSDL2-2.0.so.0` is [SDL](https://libsdl.org) 2.32.10 (zlib; see
+`LICENSE-SDL2.txt`) with two patches, built for BananaOS and only loaded there:
+`banana-sdl/0001-banana-panels.patch` is
+[BananaLinux](https://github.com/JorreFog/BananaLinux)'s (MIT, © 2026 JorreFog
+and the Banana contributors; see `banana-sdl/BananaLinux-LICENSE.txt`), which
+puts one window on both of the RG DS's panels, and
+`banana-sdl/0002-banana-zero-copy-panels.patch` makes that window draw straight
+into buffers both panels scan out of, instead of reading each frame back (60
+frames a second instead of 8). `banana-sdl/build.sh` rebuilds it (Docker).
+
+Other libraries LÖVE uses (FreeType, OpenAL and others) come from the device
+firmware and are not included; SDL2 too, except on BananaOS.
 
 ## LuaJIT (MIT)
 

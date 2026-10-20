@@ -14,10 +14,12 @@ if [ "${1:-}" = "--ssh" ]; then
     [ -n "$HOST" ] || { echo "Usage: ./install.sh --ssh <device-ip>  (or put the IP in .device)"; exit 1; }
     [ -n "${2:-}" ] && echo "$HOST" > "$HERE/.device"
     SSH="ssh -o BatchMode=yes -o ConnectTimeout=8 root@$HOST"
-    # Stock firmware: /mnt/mmc with Ports and Ebook. ROCKNIX: /storage/roms with ports and ebook.
+    # Stock firmware: /mnt/mmc with Ports and Ebook. ROCKNIX: /storage/roms with ports and ebook. BananaOS:
+    # /data/roms with ports and ebook (its tar has no -z: see below).
     STORE=/storage/.config/rocknixds/ereaderds/eReaderDS     # installed by the ROCKNIXDS Store
     if $SSH test -d $STORE/app; then BASE=; PORTS=; EBOOK=
     elif $SSH test -d /mnt/mmc; then BASE=/mnt/mmc; PORTS=Ports; EBOOK=Ebook
+    elif $SSH "grep -q '^ID=bananaos' /etc/os-release" 2>/dev/null; then BASE=/data/roms; PORTS=ports; EBOOK=ebook; BANANA=1
     else BASE=/storage/roms; PORTS=ports; EBOOK=ebook; fi
     VERSION=$(sed -n 's/^return "\(.*\)"$/\1/p' "$HERE/app/version.lua")
     STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
@@ -44,13 +46,17 @@ if [ "${1:-}" = "--ssh" ]; then
         cp -R "$HERE/runtime/love.aarch64" "$HERE/runtime/libs.aarch64" "$P/runtime/"
         [ -d "$HERE/runtime/libs.rocknix" ] && cp -R "$HERE/runtime/libs.rocknix" "$P/runtime/"
     fi
+    # BananaOS: its own SDL (zero-copy panels), with every install (it can change between versions).
+    if [ -n "${BANANA:-}" ]; then mkdir -p "$P/runtime"; cp -R "$HERE/runtime/libs.banana" "$P/runtime/"; fi
     if [ "$PORTS" != Ports ]; then mv "$STAGE/Ports" "$STAGE/stage.tmp" && mv "$STAGE/stage.tmp" "$STAGE/$PORTS"; fi
-    COPYFILE_DISABLE=1 tar -C "$STAGE" -czf - "$PORTS" | $SSH "
+    # (BananaOS's busybox tar has no -z.)
+    TARZ=z; [ -n "${BANANA:-}" ] && TARZ=
+    COPYFILE_DISABLE=1 tar -C "$STAGE" -c${TARZ}f - "$PORTS" | $SSH "
         set -e
         cd $BASE
         mkdir -p $PORTS
         rm -rf $PORTS/eReaderDS/app
-        tar -xzf -
+        tar -x${TARZ}f -
         chmod +x $PORTS/eReaderDS.sh $PORTS/eReaderDS/launch.sh
         [ -f $PORTS/eReaderDS/runtime/love.aarch64 ] && chmod +x $PORTS/eReaderDS/runtime/love.aarch64
         mkdir -p $EBOOK/Fonts $EBOOK/Dictionaries
@@ -113,6 +119,7 @@ if [ -n "$SRC" ]; then
     cp "$SRC/love.aarch64" "$D/runtime/"
     cp "$SRC"/libs.aarch64/* "$D/runtime/libs.aarch64/"
     if [ -d "$HERE/runtime/libs.rocknix" ]; then mkdir -p "$D/runtime/libs.rocknix"; cp "$HERE"/runtime/libs.rocknix/* "$D/runtime/libs.rocknix/"; fi
+    if [ -d "$HERE/runtime/libs.banana" ]; then mkdir -p "$D/runtime/libs.banana"; cp "$HERE"/runtime/libs.banana/* "$D/runtime/libs.banana/"; fi
 elif [ ! -f "$D/runtime/love.aarch64" ]; then
     echo "No LÖVE 11.5 runtime found. Set LOVE_RUNTIME to a folder containing"
     echo "love.aarch64 and libs.aarch64/."

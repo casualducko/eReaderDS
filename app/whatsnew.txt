@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.27.0
+Now runs on BananaOS, on both screens at a smooth 60 frames a second, page turns included.
+
 v1.26.1
 On the Surface Duo, the screen that asks you to open the phone now shows the eReaderDS logo and colours, like the opening screen on the handheld.
 

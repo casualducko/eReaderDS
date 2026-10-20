@@ -1,5 +1,5 @@
 eReaderDS v@VERSION@ - two-page ebook reader for the Anbernic RG DS Plus
-Created by casualducko. For the RG DS Plus on its stock firmware or ROCKNIX.
+Created by casualducko. For the RG DS Plus on its stock firmware, ROCKNIX or BananaOS.
 
 INSTALL / UPDATE
   1. Copy "eReaderDS.sh" and the "eReaderDS" folder (inside this zip's Ports
@@ -14,6 +14,9 @@ INSTALL / UPDATE
   Go > Connect to Server > smb://<device address>; on Windows: \\<address>.
   Copy both into the games-roms share's "ports" folder, books into "ebook",
   then Start > Game settings > Update gamelists.
+  BananaOS: turn on File sharing (Start > Network) and copy the same two items
+  over Wi-Fi into the "banana" share's roms/ports folder (books into
+  roms/ebook). It shows on the menu's Ports shelf by itself; nothing to update.
 
   Updates install themselves over Wi-Fi: eReaderDS says when a new version
   is out (or use Settings > About eReaderDS > Check for updates).

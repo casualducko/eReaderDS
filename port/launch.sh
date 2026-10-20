@@ -1,11 +1,15 @@
 #!/bin/bash
 # eReaderDS for RG DS Plus: two-page ebook reader, hold the device sideways.
-# Runs on the stock firmware (Ports/eReaderDS) and on ROCKNIX (roms/ports).
+# Runs on the stock firmware (Ports/eReaderDS), on ROCKNIX (roms/ports) and on BananaOS (roms/ports).
 set -u
 T0=$(cut -d" " -f1 /proc/uptime 2>/dev/null)     # for the log: how long starting takes
 APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 ROCKNIX=""
 grep -qs 'OS_NAME="ROCKNIX"' /etc/os-release && ROCKNIX=1
+# BananaOS has no compositor: its SDL (runtime/libs.banana, with Banana's panel patches) puts one window on both
+# panels itself, drawing straight into buffers the panels scan out (SDL_BANANA_PANELS).
+BANANA=""
+grep -qs '^ID=bananaos' /etc/os-release && BANANA=1
 
 # ROCKNIX: put the menu icon in the Ports list. EmulationStation only shows an
 # image listed for the game, and it keeps its game list in memory: editing
@@ -113,8 +117,20 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/var/run}"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
 export SDL_VIDEODRIVER=wayland
 export SDL_VIDEO_DOUBLE_BUFFER=1
+if [ -n "$BANANA" ]; then
+    export SDL_VIDEODRIVER=offscreen SDL_BANANA_PANELS=side SDL_BANANA_TOP="${BANANA_TOP:-DSI-2}"
+    # (No window focus without a compositor: the pad must work in the background.)
+    export SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 HOME=/data/home
+    # Ports start with the bottom panel's backlight off (one panel); the reader uses both.
+    if [ -f /run/banana/panel-off ]; then
+        echo 0 > "$(cat /run/banana/panel-off)/bl_power" 2>/dev/null
+        rm -f /run/banana/panel-off
+    fi
+fi
 export LOVE_GRAPHICS_USE_OPENGLES=1
 export LD_LIBRARY_PATH="$APP_DIR/runtime/libs.aarch64:/usr/lib:/lib"
+# BananaOS: its own SDL build first (zero-copy panels); every other library is the system's.
+[ -n "$BANANA" ] && [ -f "$APP_DIR/runtime/libs.banana/libSDL2-2.0.so.0" ] && LD_LIBRARY_PATH="$APP_DIR/runtime/libs.banana:$LD_LIBRARY_PATH"
 # ROCKNIX lacks a library LÖVE links to (libtheoradec); only used there.
 [ -n "$ROCKNIX" ] && LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$APP_DIR/runtime/libs.rocknix"
 # Settings and reading progress live outside the app folder, so replacing
@@ -125,6 +141,12 @@ if [ -n "$ROCKNIX" ]; then
     export READER_FONTS="${READER_FONTS:-/storage/roms/ebook/Fonts}"
     export READER_DEFAULT_BRIGHTNESS=60     # (ROCKNIX's panels look dimmer at the same level than stock's 50%)
     mkdir -p /storage/roms/ebook/Fonts /storage/roms/ebook/Dictionaries 2>/dev/null
+elif [ -n "$BANANA" ]; then
+    export READER_DATA="${READER_DATA:-/data/roms/ebook/.ereaderds}"
+    export READER_BOOKS="${READER_BOOKS:-/data/roms/ebook}"
+    export READER_FONTS="${READER_FONTS:-/data/roms/ebook/Fonts}"
+    export READER_DEFAULT_BRIGHTNESS=60     # (BananaOS's panels look like ROCKNIX's)
+    mkdir -p /data/roms/ebook/Fonts /data/roms/ebook/Dictionaries 2>/dev/null
 elif [ -d /mnt/mmc ]; then
     export READER_DATA="${READER_DATA:-/mnt/mmc/Ebook/.ereaderds}"
 else
@@ -149,11 +171,11 @@ if [ -n "$FIRST_START" ] && [ ! -f "$READER_DATA/settings.txt" ]; then
     done
 fi
 # Stock firmware, first run: make the folders people put books and fonts in.
-[ -z "$ROCKNIX" ] && [ -d /mnt/mmc ] && mkdir -p /mnt/mmc/Ebook/Fonts 2>/dev/null
+[ -z "$ROCKNIX" ] && [ -z "$BANANA" ] && [ -d /mnt/mmc ] && mkdir -p /mnt/mmc/Ebook/Fonts 2>/dev/null
 # Stock firmware: the menu shows Ports/Imgs/<name>.png next to a port. Put the
 # icon there if it's missing (e.g. only eReaderDS.sh and the folder were
 # copied). The menu restarts when a port exits, so it shows on the way out.
-if [ -z "$ROCKNIX" ] && [ -d /mnt/mmc ] && [ -f "$APP_DIR/icon.png" ]; then
+if [ -z "$ROCKNIX" ] && [ -z "$BANANA" ] && [ -d /mnt/mmc ] && [ -f "$APP_DIR/icon.png" ]; then
     IMGS="$(dirname "$APP_DIR")/Imgs"
     [ -f "$IMGS/eReaderDS.png" ] || { mkdir -p "$IMGS" && cp "$APP_DIR/icon.png" "$IMGS/eReaderDS.png"; } 2>/dev/null
 fi

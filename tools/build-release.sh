@@ -23,7 +23,7 @@ fi
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 P="$STAGE/Ports/eReaderDS"
-mkdir -p "$P/app/fonts" "$P/app/hyph" "$P/app/dict" "$P/runtime/libs.aarch64" "$P/runtime/libs.rocknix" "$P/LICENSES"
+mkdir -p "$P/app/fonts" "$P/app/hyph" "$P/app/dict" "$P/runtime/libs.aarch64" "$P/runtime/libs.rocknix" "$P/runtime/libs.banana" "$P/LICENSES"
 
 cp "$ROOT"/app/*.lua "$ROOT/app/whatsnew.txt" "$ROOT/app/splash.png" "$P/app/"
 cp "$ROOT"/app/hyph/*.txt "$P/app/hyph/"
@@ -34,11 +34,13 @@ cp "$ROOT"/app/fonts/*-OFL.txt "$P/LICENSES/"
 cp "$ROOT/runtime/love.aarch64" "$P/runtime/"
 cp "$ROOT"/runtime/libs.aarch64/* "$P/runtime/libs.aarch64/"
 cp "$ROOT"/runtime/libs.rocknix/* "$P/runtime/libs.rocknix/"
+cp "$ROOT"/runtime/libs.banana/* "$P/runtime/libs.banana/"      # (BananaOS's SDL: only loaded there)
 cp "$ROOT"/runtime/LICENSE-*.txt "$ROOT/runtime/NOTICES.md" "$P/LICENSES/" 2>/dev/null || true
+cp "$ROOT"/runtime/banana-sdl/*.patch "$ROOT/runtime/banana-sdl/BananaLinux-LICENSE.txt" "$ROOT/runtime/banana-sdl/build.sh" "$P/LICENSES/"
 [ -f "$ROOT/LICENSE" ] && cp "$ROOT/LICENSE" "$P/LICENSES/eReaderDS-LICENSE.txt"
 cp "$ROOT/port/launch.sh" "$P/"
 cp "$ROOT/port/eReaderDS.sh" "$STAGE/Ports/"
-# Menu icon: Ports/Imgs on the stock firmware; ROCKNIX's launcher uses icon.png.
+# Menu icon: Ports/Imgs on the stock firmware; ROCKNIX's and BananaOS's launcher uses icon.png.
 mkdir -p "$STAGE/Ports/Imgs"
 cp "$ROOT/port/art/eReaderDS.png" "$STAGE/Ports/Imgs/eReaderDS.png"
 cp "$ROOT/port/art/eReaderDS.png" "$P/icon.png"

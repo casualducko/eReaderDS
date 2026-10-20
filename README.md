@@ -11,8 +11,8 @@ EPUB and text books, and comics and manga (`.cbz`) too.
 
 ![eReaderDS on the RG DS Plus: My Books, turning pages, a bookmark, brightness and text size by touch, Settings and the Themes page, looking up and highlighting a word, the bookmarks and highlights list, and syncing with KOReader](docs/demo.gif)
 
-> For the **RG DS Plus on its stock firmware, ROCKNIX or GammaOS** (not the
-> original RG DS, and not other custom firmware such as KNULLI). For GammaOS
+> For the **RG DS Plus on its stock firmware, ROCKNIX, BananaOS or GammaOS**
+> (not the original RG DS, and not other custom firmware such as KNULLI). For GammaOS
 > (Android), see [GammaOS](#gammaos-android). It also runs on the **Microsoft
 > Surface Duo**: see [Surface Duo](#microsoft-surface-duo-android). Found a
 > problem? Please [report it](#reporting-problems).
@@ -21,7 +21,7 @@ EPUB and text books, and comics and manga (`.cbz`) too.
 
 Get it from the
 [latest release](https://github.com/casualducko/eReaderDS/releases/latest):
-`eReaderDS-vX.Y.Z.zip` for the stock firmware and ROCKNIX (unzip it on your
+`eReaderDS-vX.Y.Z.zip` for the stock firmware, ROCKNIX and BananaOS (unzip it on your
 computer), or `eReaderDS-vX.Y.Z-android.apk` for GammaOS. Then follow the
 steps for your firmware.
 
@@ -59,6 +59,34 @@ it.
 
 While it runs, the bottom screen is turned on; closing the lid is handled by
 ROCKNIX.
+
+### BananaOS
+
+[BananaOS](https://github.com/JorreFog/BananaLinux) keeps games on an exFAT
+partition, so (unlike ROCKNIX) the card can also go in your computer, but
+copying over Wi-Fi is easier:
+
+1. Start BananaOS, join Wi-Fi (**Start → Network**) and turn on **File
+   sharing** there. Its address is in the Wi-Fi setting's description.
+2. On your computer, connect to the share: **Mac:** Finder → **Go → Connect to
+   Server…** (⌘K), `smb://192.168.1.50` (the device's address), as a guest;
+   **Windows:** `\\192.168.1.50` in File Explorer. Open **banana**.
+3. From the unzipped `Ports` folder, copy **`eReaderDS.sh`** and the
+   **`eReaderDS`** folder into **`roms/ports`**. (`Imgs` isn't needed.)
+4. Put books in **`roms/ebook`** (fonts in `roms/ebook/Fonts`).
+5. On the device, open **Ports → eReaderDS** on the menu's shelf; it appears
+   by itself a moment after the copy, with no list to update.
+
+Both screens show a page each. BananaOS has no window system, so the zip's
+`runtime/libs.banana` holds a build of SDL that puts the pages straight onto
+the two panels (60 frames a second, page turns included); it's only used on
+BananaOS (source and build script: `runtime/banana-sdl`). Settings and
+progress are in `roms/ebook/.ereaderds`, and the log is
+`roms/ports/eReaderDS/log.txt`. Update over Wi-Fi works as on ROCKNIX.
+
+From a clone of this repo, `./install.sh --ssh <address>` installs it over SSH
+(put your key in `banana/ssh/authorized_keys` on the card and switch on
+**Settings → System → SSH** first).
 
 ### GammaOS (Android)
 
@@ -160,8 +188,8 @@ no book open). The update screen lists what's new in plain words; **Update now**
 downloads it. Your books, settings and progress are kept. After an update, a
 note offers to show **What's New** (also in Settings → Help & About).
 
-- **Stock firmware and ROCKNIX:** it saves only the files that changed and
-  restarts by itself.
+- **Stock firmware, ROCKNIX and BananaOS:** it saves only the files that
+  changed and restarts by itself.
 - **GammaOS:** it installs the new `.apk` through Android's own installer,
   with no questions. eReaderDS closes when it's done; open it again.
 
@@ -169,9 +197,9 @@ To stop the automatic check and its notes, set **Update notices** to Off (same
 page); **Check for Updates** still works. To pass on just one version, choose
 **Skip this version** on the update screen; you'll still hear about the next.
 
-To update by hand on the stock firmware or ROCKNIX, copy the same two items
-from a newer zip over the old ones (on ROCKNIX, over Wi-Fi into
-`games-roms/ports`, as above). Your settings, reading positions, bookmarks and
+To update by hand on the stock firmware, ROCKNIX or BananaOS, copy the same two
+items from a newer zip over the old ones (on ROCKNIX, over Wi-Fi into
+`games-roms/ports`, as above; on BananaOS, into the share's `roms/ports`). Your settings, reading positions, bookmarks and
 fonts are kept. (Copy the two items, not the whole `Ports` folder: on a Mac,
 replacing `Ports` deletes your other ports.) On GammaOS, install the newer
 `.apk` the same way as the first time (steps 1-5); everything is kept.
@@ -418,7 +446,7 @@ press left/right, or tap one (that alone doesn't change your theme).
 The Themes pages themselves are a neutral grey, like a photo editor's, so a
 tinted theme doesn't color the swatches; naming a theme uses the same grey
 keyboard. Hidden built-in themes are left out of Night Mode's list. Your themes are kept
-in `Ebook/.ereaderds/themes.txt` (on ROCKNIX `ebook/.ereaderds`; on GammaOS
+in `Ebook/.ereaderds/themes.txt` (on ROCKNIX and BananaOS `ebook/.ereaderds`; on GammaOS
 `Ebook/.ereaderds` in the device's storage), and work as the night theme too.
 
 ## Back Up and Restore
@@ -433,7 +461,7 @@ it to another handheld or system:
   dictionaries (it shows the size, and asks first). If the SD card hasn't room
   for it, it says so before starting, and offers to delete your oldest
   Everything backups when that would make room (never without asking).
-- Backups are zips in **`Ebook/Backups`** (on ROCKNIX `roms/ebook/Backups`;
+- Backups are zips in **`Ebook/Backups`** (on ROCKNIX and BananaOS `roms/ebook/Backups`;
   on GammaOS `Ebook/Backups` in the device's storage), named by date:
   `eReaderDS-backup-2026-10-01-1215.zip`, or `…-settings.zip` for settings
   only. They include your logins, so keep them to yourself.
@@ -581,7 +609,7 @@ tap the keys, or use the D-pad and A.
 carefully proofread and beautifully typeset: the whole collection, by newest,
 subject, collection or author, and search) work with no setup. To add your
 own catalog, such as a Calibre content server or Calibre-Web, edit
-`Ebook/.ereaderds/opds.txt` (on the SD card; on ROCKNIX `ebook/.ereaderds`;
+`Ebook/.ereaderds/opds.txt` (on the SD card; on ROCKNIX and BananaOS `ebook/.ereaderds`;
 on GammaOS in the handheld's storage, over USB). It's created the first time
 eReaderDS runs:
 
@@ -783,7 +811,7 @@ name) only shows one weight.
 
 | Problem | Try this |
 |---|---|
-| Not in the Ports menu | `eReaderDS.sh` and the `eReaderDS` folder must be directly inside `Ports` (ROCKNIX: `roms/ports`, then **Start → Game settings → Update gamelists**). |
+| Not in the Ports menu | `eReaderDS.sh` and the `eReaderDS` folder must be directly inside `Ports` (ROCKNIX and BananaOS: `roms/ports`; ROCKNIX also needs **Start → Game settings → Update gamelists**). |
 | ROCKNIX: can't find `roms` on the SD card | It's on the card's Linux part, which Mac and Windows can't open. Copy over Wi-Fi instead ([ROCKNIX](#rocknix)); never let the computer format the card. |
 | Black screen, or it closes at once | Send `Ports/eReaderDS/log.txt` with a [report](#reporting-problems) (GammaOS has no log file: just describe it). |
 | GammaOS: only on one screen | Close eReaderDS and open it again. If it stays on one screen, please [report it](#reporting-problems). |
@@ -810,7 +838,7 @@ Or tell whoever sent you eReaderDS, or
 [open a bug report](https://github.com/casualducko/eReaderDS/issues/new?template=bug_report.yml).
 Include the **version** (top of Settings), **what happened** (a photo of the
 screens helps), and **`Ports/eReaderDS/log.txt`**, copied right after the
-problem (on ROCKNIX `roms/ports/eReaderDS/log.txt`; GammaOS has no log file).
+problem (on ROCKNIX and BananaOS `roms/ports/eReaderDS/log.txt`; GammaOS has no log file).
 
 ## Known limitations
 

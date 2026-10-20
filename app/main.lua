@@ -10899,6 +10899,7 @@ function app.system_name()
     local f = io.open("/etc/os-release", "rb")
     local s = f and f:read("*a") or ""
     if f then f:close() end
+    if s:find("\nID=bananaos", 1, true) then return "BananaOS" end
     return s:find('ROCKNIX') and "ROCKNIX" or (s ~= "" and "stock firmware" or "computer")
 end
 
@@ -11459,7 +11460,7 @@ function app.backup_label(b)
     local when = y and MONTHS[tonumber(mo)] and (tonumber(d) .. " " .. MONTHS[tonumber(mo)] .. " " .. hm) or b.name
     local kind = b.info.kind == "everything" and "Everything" or "Settings"
     -- (Made on another system: which, as its times are by that one's clock.)
-    local SHORT = { ["stock firmware"] = "Stock", ROCKNIX = "ROCKNIX", ["GammaOS (Android)"] = "GammaOS", computer = "Computer" }
+    local SHORT = { ["stock firmware"] = "Stock", ROCKNIX = "ROCKNIX", BananaOS = "BananaOS", ["GammaOS (Android)"] = "GammaOS", computer = "Computer" }
     local from = b.info.system and b.info.system ~= app.system_name() and SHORT[b.info.system]
     local empty = (b.info.places or 0) == 0 and " · nothing read yet" or ""
     from = from and (" · " .. from) or ""

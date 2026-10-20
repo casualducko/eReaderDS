@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.27.0
+
+- **Runs on BananaOS** ([BananaLinux](https://github.com/JorreFog/BananaLinux)), on both screens, at 60 frames a second. BananaOS has no window system, so the download carries `runtime/libs.banana`: SDL 2.32.10 with BananaLinux's two-panel patch and a zero-copy one (`runtime/banana-sdl`, rebuilt with `runtime/banana-sdl/build.sh`) that makes the GPU draw straight into buffers both panels show, instead of reading every frame back (8 frames a second, so page turns showed three frames). Only loaded on BananaOS.
+- The launcher finds BananaOS by `/etc/os-release`, keeps books, settings and progress in `roms/ebook` (like ROCKNIX), and turns the bottom panel's backlight back on (BananaOS's Ports shelf starts it dark). Backups made there say **BananaOS**.
+- **`install.sh --ssh`** installs on BananaOS (`/data/roms/ports`), sending the files uncompressed (its `tar` has no `-z`) with its own SDL.
+
 ## v1.26.1
 
 - **Surface Duo, one screen.** The note that asks you to span the app is drawn like the opening screen: the logo (`splash.png`) and name in cream on the logo's navy, in Gentium (it was plain system text on the theme colour).
