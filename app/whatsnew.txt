@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.27.3
+On BananaOS, the eReaderDS icon now shows in the Ports menu.
+On BananaOS, the clock now shows your local time instead of UTC.
+
 v1.27.2
 Search in a book is more forgiving: curly or straight quotes, any kind of dash, and accented capitals no longer stop a word or phrase from being found ("I'm a widow" now finds I’m a widow).
 

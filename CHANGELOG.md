@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.27.3
 
+- **BananaOS: the eReaderDS icon shows in the Ports menu.** Its menu takes a port's picture from `roms/ports/media/box/<script name>.png` (like a game's box art), not `Imgs/` or `icon.png`. `install.sh --ssh` puts it there, and `launch.sh` copies `icon.png` there on BananaOS if it's missing, so a zip install or an in-app update gets it too.
 - **BananaOS: the status bar clock shows local time.** BananaOS has no `/etc/localtime` (its zone is a POSIX rule in `/data/banana/settings.conf`, else `/etc/banana/settings.conf`), so the "Device clock" setting showed UTC. `launch.sh` now exports that rule as `TZ` on BananaOS, and "Device clock" in `timezone.lua` falls back to the launcher's `TZ` instead of clearing it.
 
 ## v1.27.2

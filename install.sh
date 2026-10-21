@@ -47,7 +47,9 @@ if [ "${1:-}" = "--ssh" ]; then
         [ -d "$HERE/runtime/libs.rocknix" ] && cp -R "$HERE/runtime/libs.rocknix" "$P/runtime/"
     fi
     # BananaOS: its own SDL (zero-copy panels), with every install (it can change between versions).
-    if [ -n "${BANANA:-}" ]; then mkdir -p "$P/runtime"; cp -R "$HERE/runtime/libs.banana" "$P/runtime/"; fi
+    if [ -n "${BANANA:-}" ]; then mkdir -p "$P/runtime"; cp -R "$HERE/runtime/libs.banana" "$P/runtime/"
+        # (its menu's picture for a port is media/box/<script name>.png, like a game's box art)
+        mkdir -p "$STAGE/Ports/media/box"; cp "$HERE/port/art/eReaderDS.png" "$STAGE/Ports/media/box/eReaderDS.png"; fi
     if [ "$PORTS" != Ports ]; then mv "$STAGE/Ports" "$STAGE/stage.tmp" && mv "$STAGE/stage.tmp" "$STAGE/$PORTS"; fi
     # (BananaOS's busybox tar has no -z.)
     TARZ=z; [ -n "${BANANA:-}" ] && TARZ=

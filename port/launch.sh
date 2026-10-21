@@ -187,6 +187,12 @@ if [ -z "$ROCKNIX" ] && [ -z "$BANANA" ] && [ -d /mnt/mmc ] && [ -f "$APP_DIR/ic
     IMGS="$(dirname "$APP_DIR")/Imgs"
     [ -f "$IMGS/eReaderDS.png" ] || { mkdir -p "$IMGS" && cp "$APP_DIR/icon.png" "$IMGS/eReaderDS.png"; } 2>/dev/null
 fi
+# BananaOS: its menu shows roms/ports/media/box/<script name>.png beside a port, not Imgs or icon.png. Put the
+# icon there if it's missing (it shows when the menu comes back).
+if [ -n "$BANANA" ] && [ -f "$APP_DIR/icon.png" ]; then
+    BOX="$(dirname "$APP_DIR")/media/box"
+    [ -f "$BOX/eReaderDS.png" ] || { mkdir -p "$BOX" && cp "$APP_DIR/icon.png" "$BOX/eReaderDS.png"; } 2>/dev/null
+fi
 exec > "$APP_DIR/log.txt" 2>&1
 printf '[launch] %s (uptime %s)\n' "$(date -Iseconds 2>/dev/null || date)" "${T0:-?}"
 printf '[launch] data=%s%s\n' "$READER_DATA" "${MIGRATED:+ (copied from $MIGRATED)}"
