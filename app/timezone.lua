@@ -55,12 +55,16 @@ if ok_ffi then
     ]])
 end
 
+-- A TZ the launcher set (BananaOS has no /etc/localtime, so launch.sh passes its zone this way).
+local launcher_tz = os.getenv("TZ")
+
 function M.apply(name)
     local rule = "UTC0"
     for _, z in ipairs(M.ZONES) do
         if z[1] == name then rule = z[2] end
     end
-    -- rule nil: no TZ, so the C library uses the system's zone (/etc/localtime).
+    -- rule nil: the system's zone: the launcher's TZ, else none, so the C library uses /etc/localtime.
+    rule = rule or launcher_tz
     if ok_ffi and pcall(function()
         if rule then ffi.C.setenv("TZ", rule, 1) else ffi.C.unsetenv("TZ") end
         ffi.C.tzset()

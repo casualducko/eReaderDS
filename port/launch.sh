@@ -10,6 +10,14 @@ grep -qs 'OS_NAME="ROCKNIX"' /etc/os-release && ROCKNIX=1
 # panels itself, drawing straight into buffers the panels scan out (SDL_BANANA_PANELS).
 BANANA=""
 grep -qs '^ID=bananaos' /etc/os-release && BANANA=1
+# BananaOS has no /etc/localtime: its time zone is a POSIX rule in settings.conf (the card's own, else the
+# system default), which the menu applies by itself. Give it to the app as TZ, or the clock shows UTC.
+if [ -n "$BANANA" ]; then
+    for f in /data/banana/settings.conf /etc/banana/settings.conf; do
+        tz=$(sed -n 's/^[[:space:]]*timezone[[:space:]]*=[[:space:]]*//p' "$f" 2>/dev/null | head -n 1 | tr -d '\r')
+        [ -n "$tz" ] && { export TZ="$tz"; break; }
+    done
+fi
 
 # ROCKNIX: put the menu icon in the Ports list. EmulationStation only shows an
 # image listed for the game, and it keeps its game list in memory: editing

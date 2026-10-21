@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **BananaOS: the status bar clock shows local time.** BananaOS has no `/etc/localtime` (its zone is a POSIX rule in `/data/banana/settings.conf`, else `/etc/banana/settings.conf`), so the "Device clock" setting showed UTC. `launch.sh` now exports that rule as `TZ` on BananaOS, and "Device clock" in `timezone.lua` falls back to the launcher's `TZ` instead of clearing it.
+
 ## v1.27.2
 
 - **Find in Book matches the way you mean it.** Curly and straight quotes (`I'm` finds “I’m”, `"hi"` finds “hi” and «hi»), any dash (`-` finds – and —), non-breaking spaces, soft hyphens and zero-width spaces no longer stop a match, and capitals now count as the same for accented letters too (`école` finds ÉCOLE). The book's text is folded to the same byte lengths, so the highlighted match stays exact; pages with none of these characters still use the plain fast search.
