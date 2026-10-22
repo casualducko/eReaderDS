@@ -6,8 +6,8 @@ T0=$(cut -d" " -f1 /proc/uptime 2>/dev/null)     # for the log: how long startin
 APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 ROCKNIX=""
 grep -qs 'OS_NAME="ROCKNIX"' /etc/os-release && ROCKNIX=1
-# BananaOS has no compositor: its SDL (runtime/libs.banana, with Banana's panel patches) puts one window on both
-# panels itself, drawing straight into buffers the panels scan out (SDL_BANANA_PANELS).
+# BananaOS has no compositor: its SDL (with Banana's panel patches; ours in runtime/libs.banana for versions before
+# 0.4.2) puts one window on both panels itself, drawing straight into buffers the panels scan out (SDL_BANANA_PANELS).
 BANANA=""
 grep -qs '^ID=bananaos' /etc/os-release && BANANA=1
 # BananaOS has no /etc/localtime: its time zone is a POSIX rule in settings.conf (the card's own, else the
@@ -138,7 +138,11 @@ fi
 export LOVE_GRAPHICS_USE_OPENGLES=1
 export LD_LIBRARY_PATH="$APP_DIR/runtime/libs.aarch64:/usr/lib:/lib"
 # BananaOS: its own SDL build first (zero-copy panels); every other library is the system's.
-[ -n "$BANANA" ] && [ -f "$APP_DIR/runtime/libs.banana/libSDL2-2.0.so.0" ] && LD_LIBRARY_PATH="$APP_DIR/runtime/libs.banana:$LD_LIBRARY_PATH"
+# BananaOS 0.4.2 and later have the zero-copy patch in their own SDL (it knows SDL_BANANA_READBACK): use that.
+if [ -n "$BANANA" ] && [ -f "$APP_DIR/runtime/libs.banana/libSDL2-2.0.so.0" ] &&
+        ! grep -qs SDL_BANANA_READBACK /usr/lib/libSDL2-2.0.so.0; then
+    LD_LIBRARY_PATH="$APP_DIR/runtime/libs.banana:$LD_LIBRARY_PATH"
+fi
 # ROCKNIX lacks a library LÖVE links to (libtheoradec); only used there.
 [ -n "$ROCKNIX" ] && LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$APP_DIR/runtime/libs.rocknix"
 # Settings and reading progress live outside the app folder, so replacing
@@ -189,7 +193,8 @@ if [ -z "$ROCKNIX" ] && [ -z "$BANANA" ] && [ -d /mnt/mmc ] && [ -f "$APP_DIR/ic
 fi
 # BananaOS: its menu shows roms/ports/media/box/<script name>.png beside a port, not Imgs or icon.png. Put the
 # icon there if it's missing (it shows when the menu comes back).
-if [ -n "$BANANA" ] && [ -f "$APP_DIR/icon.png" ]; then
+# (Not for a Store install, which lives under /data/store/apps and has its own tile.)
+if [ -n "$BANANA" ] && [ -f "$APP_DIR/icon.png" ] && [ "$(basename "$(dirname "$APP_DIR")")" = ports ]; then
     BOX="$(dirname "$APP_DIR")/media/box"
     [ -f "$BOX/eReaderDS.png" ] || { mkdir -p "$BOX" && cp "$APP_DIR/icon.png" "$BOX/eReaderDS.png"; } 2>/dev/null
 fi

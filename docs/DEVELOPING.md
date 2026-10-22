@@ -195,7 +195,8 @@ The log is `roms/ports/eReaderDS/log.txt`.
 it launches a port, so launching over SSH fails.
 
 **Display.** With no compositor, `launch.sh` runs LÖVE on SDL's offscreen driver with `SDL_BANANA_PANELS=side`, and
-`runtime/libs.banana/libSDL2-2.0.so.0` (loaded only on BananaOS) puts the window on both panels. BananaOS's own SDL
+`runtime/libs.banana/libSDL2-2.0.so.0` (loaded only on BananaOS before 0.4.2: `launch.sh` skips it when the system SDL
+knows `SDL_BANANA_READBACK`, which 0.4.2 added from this patch) puts the window on both panels. BananaOS's own SDL
 patch read every frame back from the GPU (about 125 ms a frame, 8 fps); `runtime/banana-sdl/0002-banana-zero-copy-panels.patch`
 draws into a GBM surface and flips both panels to it, each showing its half through the CRTC offset (about 15 ms, 60 fps).
 Ports start with the bottom panel's backlight off, which the launcher turns back on. `SDL_BANANA_TRACE=1` (set it in

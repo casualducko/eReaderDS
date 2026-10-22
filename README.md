@@ -80,7 +80,7 @@ copying over Wi-Fi is easier:
 Both screens show a page each. BananaOS has no window system, so the zip's
 `runtime/libs.banana` holds a build of SDL that puts the pages straight onto
 the two panels (60 frames a second, page turns included); it's only used on
-BananaOS (source and build script: `runtime/banana-sdl`). Settings and
+BananaOS before 0.4.2, which has the same thing built in (source and build script: `runtime/banana-sdl`). Settings and
 progress are in `roms/ebook/.ereaderds`, and the log is
 `roms/ports/eReaderDS/log.txt`. Update over Wi-Fi works as on ROCKNIX.
 

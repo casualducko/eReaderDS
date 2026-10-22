@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.27.4
+
+- **BananaOS 0.4.2 and later: uses the system's SDL.** The zero-copy panel patch went into BananaOS 0.4.2 (BananaLinux issue #39), so `launch.sh` now loads our `runtime/libs.banana` SDL only when the system's `libSDL2` doesn't know `SDL_BANANA_READBACK` (BananaOS 0.4.1 and earlier). Checked on 0.4.2: the running app maps only `/usr/lib/libSDL2-2.0.so.0.3200.10`, still 60 frames a second on both panels. The bundled copy stays in the zip as the fallback.
+- **BananaOS: the menu picture is made only for a Ports install.** An App Store install (under `/data/store/apps`) has its own tile, so `launch.sh` no longer creates `media/box` beside it.
+
 ## v1.27.3
 
 - **BananaOS: the eReaderDS icon shows in the Ports menu.** Its menu takes a port's picture from `roms/ports/media/box/<script name>.png` (like a game's box art), not `Imgs/` or `icon.png`. `install.sh --ssh` puts it there, and `launch.sh` copies `icon.png` there on BananaOS if it's missing, so a zip install or an in-app update gets it too.
