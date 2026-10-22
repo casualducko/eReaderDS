@@ -184,11 +184,23 @@ EmulationStation, no `/storage`. Its card has an exFAT data partition mounted at
 and this app is in `/data/roms/ports/eReaderDS`, with books and settings in `/data/roms/ebook`.
 
 **Getting in.** SSH is off by default and keys-only. Turn on **Settings → Network → File sharing** (the card is then
-`smb://<address>/banana`, as a guest), append your public key to `banana/ssh/authorized_keys` there, then switch
-**Settings → System → SSH** on. The keys are copied to `/run` only when SSH starts, so if the key isn't taken, restart
+`smb://<address>/banana`; from 0.4.2 it asks for name `banana`, password `linux`, or can go back to Guest), append your
+public key to `banana/ssh/authorized_keys` there, then switch SSH on (**Settings → Network** from 0.4.2, **Settings →
+System** before). The keys are copied to `/run` only when SSH starts, so if the key isn't taken, restart
 the device and switch SSH on again (switching it off and on was not enough). Run `ssh root@<address>` once to trust
 the host key, then `./install.sh --ssh <address>` works (it detects `ID=bananaos` in `/etc/os-release`).
-The log is `roms/ports/eReaderDS/log.txt`.
+The log is `roms/ports/eReaderDS/log.txt`. If the device's OS changed under the same address, the host key changes
+too: point `ssh` at a throwaway `UserKnownHostsFile` rather than editing your own `known_hosts`.
+
+**Other ways in.** BananaOS 0.4.2 has an App Store (Apps shelf; its catalog is `/usr/share/banana/apps/store/catalog.json`)
+that lists eReaderDS and follows this repo's releases (`casualducko/eReaderDS`, asset `eReaderDS-v{version}.zip`), so
+the zip's name and its `Ports/eReaderDS/...` layout must stay as they are. A Store install runs through
+`run-store-app` from `/data/store/apps/ereaderds/eReaderDS` (log there too), with `HOME=/data/home`; `launch.sh` still
+keeps books and settings in `/data/roms/ebook`, and only makes the menu picture (`roms/ports/media/box/eReaderDS.png`,
+which is where the menu looks for a port's picture) when it runs from `roms/ports`. BananaOS has no `/etc/localtime`:
+its zone is a POSIX rule in `/data/banana/settings.conf` (else `/etc/banana/settings.conf`), which `launch.sh` passes
+to the app as `TZ`. The OS itself updates from `banana/updates/banana-rgds-plus-<version>.update.tar` (Settings →
+System → Update). Not yet tried: this app's own updater on a Store install.
 
 **Quirks.** The device has no `stat` (sizes: `wc -c`) and its `tar` has no `-z`; its SSH server has no SFTP, so
 `scp` needs `-O`. The app can only be started from the device's menu (Ports shelf): the menu holds the display until

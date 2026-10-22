@@ -69,8 +69,10 @@ copying over Wi-Fi is easier:
 1. Start BananaOS, join Wi-Fi (**Start → Network**) and turn on **File
    sharing** there. Its address is in the Wi-Fi setting's description.
 2. On your computer, connect to the share: **Mac:** Finder → **Go → Connect to
-   Server…** (⌘K), `smb://192.168.1.50` (the device's address), as a guest;
-   **Windows:** `\\192.168.1.50` in File Explorer. Open **banana**.
+   Server…** (⌘K), `smb://192.168.1.50` (the device's address);
+   **Windows:** `\\192.168.1.50` in File Explorer. Open **banana**. (BananaOS
+   0.4.2 and later asks for a login: name `banana`, password `linux`, which
+   Settings → Network changes, or turns back to Guest.)
 3. From the unzipped `Ports` folder, copy **`eReaderDS.sh`** and the
    **`eReaderDS`** folder into **`roms/ports`**. (`Imgs` isn't needed.)
 4. Put books in **`roms/ebook`** (fonts in `roms/ebook/Fonts`).
@@ -84,9 +86,16 @@ BananaOS before 0.4.2, which has the same thing built in (source and build scrip
 progress are in `roms/ebook/.ereaderds`, and the log is
 `roms/ports/eReaderDS/log.txt`. Update over Wi-Fi works as on ROCKNIX.
 
+**From the App Store (BananaOS 0.4.2 and later):** the **Apps** tab of the
+Store lists eReaderDS and follows its releases. Press Install, and it appears on
+the **Apps** shelf (not Ports) with its own icon. Your books and settings are
+in `roms/ebook` either way, so moving between the two kinds of install keeps
+them; use one or the other, or there will be two eReaderDS entries. The Store's
+copy and its log are in `store/apps/ereaderds/eReaderDS` on the card.
+
 From a clone of this repo, `./install.sh --ssh <address>` installs it over SSH
-(put your key in `banana/ssh/authorized_keys` on the card and switch on
-**Settings → System → SSH** first).
+(put your key in `banana/ssh/authorized_keys` on the card and switch on SSH:
+**Settings → Network** on 0.4.2 and later, **Settings → System** before).
 
 ### GammaOS (Android)
 
