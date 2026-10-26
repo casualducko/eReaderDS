@@ -10882,6 +10882,7 @@ end
 -- Back key; see KEYS below, where it toggles Settings.)
 local EXTRA = { [9] = "stick" }        -- pressing the stick in
 function love.joystickpressed(joystick, b)
+    if app.is_motion(joystick) then return end
     -- Every press goes to log.txt, so unknown buttons can be identified.
     log_input("joystick %q button %d", joystick:getName(), b - 1)
     local extra = joystick:getName() == "ANBERNIC-rk3568-keys" and EXTRA[b - 1]
@@ -10893,7 +10894,13 @@ end
 -- Raw axes: log big movements on any axis (to identify axes on new hardware),
 -- and act on them directly when there's no gamepad mapping (axis 1 = x, 2 = y).
 local raw_logged = {}
+-- Android lists a phone's accelerometer as a joystick: tilting the phone moved its
+-- "stick", and so turned pages. Motion sensors are not controllers.
+function app.is_motion(joystick)
+    return (joystick:getName() or ""):lower():find("accelerometer", 1, true) ~= nil
+end
 function love.joystickaxis(joystick, axis, value)
+    if app.is_motion(joystick) then return end
     local big = math.abs(value) >= STICK_PRESS
     if big and not raw_logged[axis] then
         log_input("raw axis %d = %.2f", axis - 1, value)
@@ -10904,7 +10911,7 @@ function love.joystickaxis(joystick, axis, value)
     elseif axis == 2 then stick_axis("y", value) end
 end
 function love.joystickhat(joystick, _, dir)
-    if joystick:isGamepad() then return end
+    if joystick:isGamepad() or app.is_motion(joystick) then return end
     local map = { u = "up", d = "down", l = "left", r = "right" }
     if map[dir] then dpad(map[dir]) end
 end
@@ -12171,7 +12178,10 @@ function love.load()
         -- A phone: its auto-lock applies (LÖVE keeps the screen awake otherwise).
         if require("android").phone then
             -- (A Duo: without the status bar and the navigation bar over the pages.)
-            if require("android").duo then pcall(love.window.setFullscreen, true) end
+            if require("android").duo then
+                pcall(love.window.setFullscreen, true)
+                pcall(require("android").lock_orientation)      -- (turning the phone mustn't make the spread a tall window)
+            end
             love.window.setDisplaySleepEnabled(true)
             -- (No system keyboard: the app has its own. SDL may have started text input.)
             if love.keyboard.hasTextInput() then love.keyboard.setTextInput(false) end

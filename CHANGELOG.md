@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Android: tilting the phone no longer turns pages.** Android lists a phone's accelerometer as a joystick ("Android Accelerometer", not a gamepad), and the raw-axis fallback for controllers without a mapping (axis 1 = left/right, axis 2 = up/down) read its tilt as D-pad presses. `love.joystickaxis`, `love.joystickpressed` and `love.joystickhat` now ignore any joystick whose name contains "accelerometer" (`app.is_motion`). Real gamepads are unchanged.
+- **Surface Duo: turning the phone keeps the two-page spread.** The manifest stays `unspecified` (GammaOS's DualStack needs that), so on a Duo only, `Orient.smali` calls `setRequestedOrientation(NOSENSOR)` through JNI (`android.lock_orientation`, called at startup beside `setFullscreen`): the window stays in the phone's own orientation instead of turning into a tall window that shows the "Open your Surface Duo" note. Tried on a real Surface Duo.
+
 ## v1.27.5
 
 - **Surface Duo (and iPhone Duo): touch works on the left page too.** `touch.lua` used to take only the right (menu) page's touches, as on the handheld, whose top screen has no touchscreen. A finger now belongs to the page it went down on (`Touch` passes `side`, `Android.book_xy` maps the left page), so while reading a tap on the left page turns pages (the half nearest the spine forward, the outer half back), a swipe turns pages, a vertical slide sets brightness and a hold looks a word up; the right page is unchanged, and lists and menus still answer on the right only (a tap on the dimmed book page closes Settings, as the code already did). Tried on a real Surface Duo.

@@ -270,6 +270,12 @@ function M.window_brightness(value)
     return jni_call(BRIGHT[1], BRIGHT[2], BRIGHT[3], value)
 end
 
+-- Keep the window in the device's own orientation (a Duo only: see
+-- android/smali/.../Orient). False if it couldn't be done.
+function M.lock_orientation()
+    return jni_call("com/casualducko/ereaderds/Orient", "lock", "(Landroid/app/Activity;)V")
+end
+
 -- Open Android's page for giving eReaderDS access to all files (the Ebook
 -- folder, on a phone that isn't GammaOS). False if it couldn't be opened.
 function M.open_files_access()
