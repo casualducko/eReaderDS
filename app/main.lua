@@ -12181,6 +12181,7 @@ function love.load()
             if require("android").duo then
                 pcall(love.window.setFullscreen, true)
                 pcall(require("android").lock_orientation)      -- (turning the phone mustn't make the spread a tall window)
+                pcall(require("android").take_volume_keys)      -- (the volume rocker turns pages)
             end
             love.window.setDisplaySleepEnabled(true)
             -- (No system keyboard: the app has its own. SDL may have started text input.)

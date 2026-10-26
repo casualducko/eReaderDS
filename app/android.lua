@@ -276,6 +276,12 @@ function M.lock_orientation()
     return jni_call("com/casualducko/ereaderds/Orient", "lock", "(Landroid/app/Activity;)V")
 end
 
+-- Take the volume keys from Android (a Duo only): volume down turns to the next
+-- page, volume up to the previous one (android/smali/.../MainActivity, Volume).
+function M.take_volume_keys()
+    return jni_call("com/casualducko/ereaderds/Volume", "take", "(Landroid/app/Activity;)V")
+end
+
 -- Open Android's page for giving eReaderDS access to all files (the Ebook
 -- folder, on a phone that isn't GammaOS). False if it couldn't be opened.
 function M.open_files_access()

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Surface Duo: the volume rocker turns pages.** Volume down is the next page, volume up the previous one, and holding repeats. SDL gives the volume keys back to Android ("ignore certain special keys"), so the app never saw them; the manifest now starts `com.casualducko.ereaderds.MainActivity` (`android/smali/.../MainActivity.smali`, a subclass of LÖVE's `GameActivity`) whose `dispatchKeyEvent` turns them, while `Volume.on` is set, into Page Down and Page Up key events for SDL (which the reader already maps to next and previous) and consumes them, so there's no volume bar. `Volume.on` is set through JNI (`android.take_volume_keys`) on a Duo only; GammaOS and the handhelds keep their volume. Tried on a real Surface Duo.
+
 ## v1.27.6
 
 - **Android: tilting the phone no longer turns pages.** Android lists a phone's accelerometer as a joystick ("Android Accelerometer", not a gamepad), and the raw-axis fallback for controllers without a mapping (axis 1 = left/right, axis 2 = up/down) read its tilt as D-pad presses. `love.joystickaxis`, `love.joystickpressed` and `love.joystickhat` now ignore any joystick whose name contains "accelerometer" (`app.is_motion`). Real gamepads are unchanged.

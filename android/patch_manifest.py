@@ -45,6 +45,9 @@ s = sub(r'(<activity[^>]*SelectorActivity.*?)<category android:name="android.int
 s = sub(r'(<activity[^>]*GameActivity[^>]*>)(.*?)(<intent-filter>\s*<action android:name="android.intent.action.MAIN"/>)',
         r'\1\n            \3', s, flags=re.S)
 
+# The game's own activity, one that lets the volume keys through (android/smali/.../MainActivity).
+s = sub(r'android:name="org\.love2d\.android\.GameActivity"', 'android:name="com.casualducko.ereaderds.MainActivity"', s)
+
 # Any orientation and resizable: DualStack makes the window 1024x1536.
 s = sub(r'android:resizeableActivity="false"', 'android:resizeableActivity="true"', s)
 s = sub(r'android:screenOrientation="landscape"', 'android:screenOrientation="unspecified"', s)
