@@ -8029,6 +8029,7 @@ function app.update_action(a)
         elseif u.state == "available" or (u.state == "error" and u.url) then app.update_start()
         elseif u.state == "error" or (u.state == "none" and not u.checked) then app.update_check(true)
         elseif u.state == "ready" and u.apk then app.update_install(u.apk)
+        elseif u.state == "confirm" and u.apk then app.update_install(u.apk)   -- (Android's message was closed: ask again)
         elseif u.state == "ready" then love.event.quit(app.UPDATE_EXIT) end
     elseif a == "back" or a == "menu" then
         if u.state == "downloading" and u.job then
@@ -8125,7 +8126,10 @@ function app.update_draw(side)
     elseif u.state == "installing" then
         status = "Installing the update…\n\neReaderDS closes when it's done. Open it again afterwards."
     elseif u.state == "confirm" then
+        -- (Android only says when its message is answered by something that finishes the install: a message
+        -- closed without choosing leaves this up, so it can ask again.)
         status = "Android is asking you to confirm.\n\nChoose Update in the message it shows."
+        if u.apk then status, button = status .. "\n\nNo message? Ask again.", "Ask again" end
     elseif u.state == "ready" then
         status, button = "Ready.\n\neReaderDS restarts with the new version.", "Restart now"
     elseif u.state == "checking" then

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Android: the app's old component name works again.** v1.27.7 replaced LÖVE's `org.love2d.android.GameActivity` in the manifest with `MainActivity` (for the volume keys), so anything that had stored the old name (a shortcut pinned to a home screen, a front end's entry for the app) got "Activity class ... does not exist" after updating. `patch_manifest.py` now declares `GameActivity` as an `<activity-alias>` for `MainActivity` and moves the launcher entries to it. Tried in the emulator: the old name starts the app, there is one launcher entry, and the volume keys and left-page touch still work when it is started through the alias.
+- **Android: a closed update prompt can be asked again.** Android shows its own "install this update?" message, and when it's closed without choosing (for example the "isn't allowed to install unknown apps" message), it sends nothing back, so the update screen stayed on "Android is asking you to confirm" with no way on. It now has an **Ask again** button (the downloaded file is installed again). Found by running the in-app update on the Duo emulator.
+
 ## v1.27.7
 
 - **Surface Duo: the volume rocker turns pages.** Volume down is the next page, volume up the previous one, and holding repeats. SDL gives the volume keys back to Android ("ignore certain special keys"), so the app never saw them; the manifest now starts `com.casualducko.ereaderds.MainActivity` (`android/smali/.../MainActivity.smali`, a subclass of LÖVE's `GameActivity`) whose `dispatchKeyEvent` turns them, while `Volume.on` is set, into Page Down and Page Up key events for SDL (which the reader already maps to next and previous) and consumes them, so there's no volume bar. `Volume.on` is set through JNI (`android.take_volume_keys`) on a Duo only; GammaOS and the handhelds keep their volume. Tried on a real Surface Duo.

@@ -47,6 +47,14 @@ s = sub(r'(<activity[^>]*GameActivity[^>]*>)(.*?)(<intent-filter>\s*<action andr
 
 # The game's own activity, one that lets the volume keys through (android/smali/.../MainActivity).
 s = sub(r'android:name="org\.love2d\.android\.GameActivity"', 'android:name="com.casualducko.ereaderds.MainActivity"', s)
+# Its old name stays valid, as an alias for it that now carries the launcher entries: whatever stored the
+# component name (a shortcut on a home screen, a front end's entry for the app) keeps launching it after an
+# update, instead of "Activity class ... does not exist".
+m = re.search(r'(<activity[^>]*MainActivity[^>]*>)(.*?)(</activity>)', s, flags=re.S)
+assert m, "no MainActivity in the manifest"
+alias = ('<activity-alias android:exported="true" android:name="org.love2d.android.GameActivity" '
+         'android:targetActivity="com.casualducko.ereaderds.MainActivity">' + m.group(2) + '</activity-alias>')
+s = s[:m.start()] + m.group(1) + '\n        ' + m.group(3) + '\n        ' + alias + s[m.end():]
 
 # Any orientation and resizable: DualStack makes the window 1024x1536.
 s = sub(r'android:resizeableActivity="false"', 'android:resizeableActivity="true"', s)
