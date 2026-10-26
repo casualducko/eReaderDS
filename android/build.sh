@@ -66,6 +66,18 @@ for f in "$work"/res/drawable-*/love.png; do
     else convert "$here/icon.png" -resize "${size}x${size}" "$f"; fi
 done
 
+# Android 8 and later: an adaptive icon (a navy background and the book, which a launcher masks to its own shape)
+# under the same name, so the manifest's @drawable/love picks it there and the PNGs above stay for older Androids.
+mkdir -p "$work/res/drawable-nodpi" "$work/res/drawable-anydpi-v26"
+python3 "$here/make-adaptive-icon.py" "$here/icon.png" "$work/res/drawable-nodpi"
+cat > "$work/res/drawable-anydpi-v26/love.xml" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+</adaptive-icon>
+XML
+
 # The app itself, unzipped in the APK's assets: LÖVE reads it there in place.
 # (Packed as assets/game.love instead, LÖVE copies all of it to its cache on
 # every launch: about three seconds of black screen for our 22 MB.)
