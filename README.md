@@ -159,9 +159,12 @@ On GammaOS:
 eReaderDS also runs on the **Surface Duo** (the first one; the Duo 2 is set up
 the same way but hasn't been tried on a real phone). It is the same
 `eReaderDS-vX.Y.Z-android.apk`. The app is spread across both screens like an
-open book: the left screen shows one page and the right screen is the
-touchscreen, with the same pages, menus, taps and swipes as on the RG DS Plus
-(there are no buttons, so everything is by touch). Each page is drawn at the
+open book: one page on each screen, with the same pages, menus, taps and
+swipes as on the RG DS Plus (there are no buttons, so everything is by touch).
+Both screens take touch while reading: tap the half of a page nearest the
+spine to go forward and the outer half to go back, swipe to turn pages, slide
+up or down for brightness, and hold a word to look it up. Menus and lists
+answer on the right screen (a tap on the dimmed book page closes Settings). Each page is drawn at the
 screen's own pixels, so the text is sharp, and nothing is drawn under the
 hinge.
 

@@ -37,26 +37,35 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
         elseif pinching then
             if n == 0 then pinching = false; queue[#queue + 1] = { "pinch_end" } end
             was_down = false
-        elseif st and not was_down then queue[#queue + 1] = { "down", st.x, st.y }
-        elseif st then queue[#queue + 1] = { "move", st.x, st.y }
-        elseif was_down then queue[#queue + 1] = { "up", M.last_x or 0, M.last_y or 0 } end
-        if st then M.last_x, M.last_y = st.x, st.y end
+        elseif st and not was_down then queue[#queue + 1] = { "down", st.x, st.y, st.side }
+        elseif st then queue[#queue + 1] = { "move", st.x, st.y, st.side }
+        elseif was_down then queue[#queue + 1] = { "up", M.last_x or 0, M.last_y or 0, M.last_side } end
+        if st then M.last_x, M.last_y, M.last_side = st.x, st.y, st.side end
         if not pinching and n < 2 then was_down = st ~= nil end
     end
 
     local function touch(id, x, y, down)
-        local bx, by = Android.bottom_xy(x, y)
+        -- A finger belongs to the page it went down on (a slide across the hinge
+        -- stays on that page's terms): the right page (the touchscreen's, as on
+        -- the handheld) or, on a Duo, the left one (side "left").
+        local side = fingers[id] and fingers[id].side
+        local bx, by
+        if side == "left" then bx, by = Android.book_xy(x, y)
+        else
+            bx, by = Android.bottom_xy(x, y)
+            if not bx and not fingers[id] then bx, by = Android.book_xy(x, y); side = bx and "left" or nil end
+        end
         if os.getenv("READER_DEBUG") then
-            print(string.format("[debug] touch %s %.0f,%.0f -> %s,%s", down and "down" or "up", x, y, tostring(bx), tostring(by)))
+            print(string.format("[debug] touch %s %.0f,%.0f -> %s,%s %s", down and "down" or "up", x, y, tostring(bx), tostring(by), tostring(side)))
         end
         if down then
             if not bx then return end
             if not fingers[id] and next(fingers) == nil then first = id end
-            fingers[id] = { x = bx, y = by }
+            fingers[id] = { x = bx, y = by, side = side }
         else
             if not fingers[id] then return end
             if bx then fingers[id].x, fingers[id].y = bx, by end
-            M.last_x, M.last_y = fingers[id].x, fingers[id].y
+            M.last_x, M.last_y, M.last_side = fingers[id].x, fingers[id].y, fingers[id].side
             fingers[id] = nil
             if id == first then first = nil end
         end
@@ -78,7 +87,7 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
         for i, e in ipairs(q) do
             local nxt = q[i + 1]
             if not (nxt and nxt[1] == e[1] and (e[1] == "move" or e[1] == "pinch")) then
-                handler(e[1], e[2], e[3])
+                handler(e[1], e[2], e[3], e[4])
             end
         end
         return true

@@ -792,6 +792,19 @@ function M.present(canvas)
     end
 end
 
+-- A touch on a phone's left (book) page -> the same kind of coordinates as
+-- bottom_xy gives for the right page, or nil when it isn't on that page. (The
+-- handheld has no touch on its top screen; a Duo or iPhone Duo has, and the
+-- page code takes the side it came from.)
+function M.book_xy(x, y)
+    if not M.phone then return nil end
+    local lay = M.lay or phone_layout()
+    if lay.mode == "closed" then return nil end
+    local lx, ly = (x - lay.page.x) / lay.s, (y - lay.page.y) / lay.s
+    if lx < 0 or lx >= 768 or ly < 0 or ly >= 1024 then return nil end
+    return 1024 - ly, lx
+end
+
 -- A touch in window coordinates -> the bottom screen's own 1024x768
 -- coordinates, or nil when it isn't on the bottom screen (the top screen has
 -- no touch, but a desktop-style window might).

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Surface Duo (and iPhone Duo): touch works on the left page too.** `touch.lua` used to take only the right (menu) page's touches, as on the handheld, whose top screen has no touchscreen. A finger now belongs to the page it went down on (`Touch` passes `side`, `Android.book_xy` maps the left page), so while reading a tap on the left page turns pages (the half nearest the spine forward, the outer half back), a swipe turns pages, a vertical slide sets brightness and a hold looks a word up; the right page is unchanged, and lists and menus still answer on the right only (a tap on the dimmed book page closes Settings, as the code already did). Tried on a real Surface Duo.
 - **Android: an adaptive icon.** The icon (the open book on navy) was a single square picture that launchers cropped or put on a plain backing. `android/make-adaptive-icon.py` now splits `android/icon.png` into a navy background layer and a book layer (scaled to sit inside the area no launcher mask cuts), and `android/build.sh` adds them as `drawable-anydpi-v26/love.xml`, so Android 8 and later mask it to the launcher's own shape (circle, squircle, rounded square) while older Androids keep the PNGs. Checked on the Surface Duo emulator's launcher.
 
 ## v1.27.4

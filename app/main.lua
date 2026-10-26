@@ -9812,7 +9812,10 @@ function app.untoast() overlay = nil; redraw() end
 local gesture = nil        -- current touch: { side, u0, v0, mode, p0 }
 
 -- Bottom-screen native coordinates (0..1024 x 0..768) -> page side + page coords.
-local function touch_to_page(sx, sy)
+-- (from == "left": a touch on a Duo's left page, which Touch reports as the
+-- same kind of coordinates, turned the same way.)
+local function touch_to_page(sx, sy, from)
+    if from == "left" then return "left", sy, SCREEN_W - sx end
     if not app.flipped() then return "right", sy, SCREEN_W - sx end
     return app.touch_side(), SCREEN_H - sy, sx
 end
@@ -9846,7 +9849,7 @@ function app.add_busy(d)
     if d > 0.05 then app.busy = app.busy + d - 0.05 end
 end
 
-local function touch_event(kind, sx, sy)
+local function touch_event(kind, sx, sy, from)
     local now = love.timer.getTime()
     -- A touch that wakes the screens does nothing else, until the finger lifts.
     if (kind == "down" or kind == "pinch_start") and app.idle_input() then app.idle_swallow = true end
@@ -9885,7 +9888,7 @@ local function touch_event(kind, sx, sy)
         gesture = nil
         return
     end
-    local side, u, v = touch_to_page(sx, sy)
+    local side, u, v = touch_to_page(sx, sy, from)
     -- The magnifier: a finger on the page moves the box to it (the hints
     -- along the foot are tapped as usual).
     if app.mode == "zoom" and side == app.touch_side() and not app.asking then
