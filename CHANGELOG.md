@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.27.6
 
 - **Android: tilting the phone no longer turns pages.** Android lists a phone's accelerometer as a joystick ("Android Accelerometer", not a gamepad), and the raw-axis fallback for controllers without a mapping (axis 1 = left/right, axis 2 = up/down) read its tilt as D-pad presses. `love.joystickaxis`, `love.joystickpressed` and `love.joystickhat` now ignore any joystick whose name contains "accelerometer" (`app.is_motion`). Real gamepads are unchanged.
 - **Surface Duo: turning the phone keeps the two-page spread.** The manifest stays `unspecified` (GammaOS's DualStack needs that), so on a Duo only, `Orient.smali` calls `setRequestedOrientation(NOSENSOR)` through JNI (`android.lock_orientation`, called at startup beside `setFullscreen`): the window stays in the phone's own orientation instead of turning into a tall window that shows the "Open your Surface Duo" note. Tried on a real Surface Duo.
