@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.27.7
+On the Surface Duo, the volume buttons turn pages: volume down for the next page, volume up for the previous one.
+
 v1.27.6
 On Android, tilting the phone no longer turns pages by itself.
 On the Surface Duo, turning the phone keeps the two-page spread instead of switching to the "open your Duo" message.
