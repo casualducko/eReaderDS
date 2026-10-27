@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.27.8
 
 - **Android: the app's old component name works again.** v1.27.7 replaced LÖVE's `org.love2d.android.GameActivity` in the manifest with `MainActivity` (for the volume keys), so anything that had stored the old name (a shortcut pinned to a home screen, a front end's entry for the app) got "Activity class ... does not exist" after updating. `patch_manifest.py` now declares `GameActivity` as an `<activity-alias>` for `MainActivity` and moves the launcher entries to it. Tried in the emulator: the old name starts the app, there is one launcher entry, and the volume keys and left-page touch still work when it is started through the alias.
 - **Android: a closed update prompt can be asked again.** Android shows its own "install this update?" message, and when it's closed without choosing (for example the "isn't allowed to install unknown apps" message), it sends nothing back, so the update screen stayed on "Android is asking you to confirm" with no way on. It now has an **Ask again** button (the downloaded file is installed again). Found by running the in-app update on the Duo emulator.
