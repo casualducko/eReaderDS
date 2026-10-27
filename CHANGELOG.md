@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## v1.27.9
 
+- **BananaOS: the time zone line is cleaned before it's used.** `launch.sh` now drops a trailing `# comment` and trailing spaces from the `timezone =` value before exporting `TZ`.
+- **README:** the Android section mentions the "Install unknown apps" switch the in-app update needs and the Ask again button.
 - **Surface Duo: pinching with one finger on each page measures the distance correctly.** `touch.lua` measured the gap between two fingers in each finger's own page frame, and the left and right pages' frames differ (`book_xy` vs `bottom_xy`), so a finger on each page gave a wrong distance and the text size jumped. When the two fingers are on different pages the distance is now taken between their window positions and divided by the page scale (`Android.window_dist`; both pages are turned the same way at the same scale). Same-page pinches are unchanged. Checked with a stubbed touch run (500 and 700 px apart give 284.4 and 398.2 page units at scale 1.758); not yet tried with real fingers.
 
 ## v1.27.8

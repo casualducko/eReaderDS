@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.27.9
+On the Surface Duo, pinching with one finger on each page changes the text size smoothly.
+On BananaOS, a stray space or note after the time zone setting no longer upsets the clock.
+
 v1.27.8
 On Android, shortcuts and launchers that opened eReaderDS by its old name work again after the last update.
 If you close Android's "install this update?" message without answering, the update screen now has an Ask again button instead of getting stuck.

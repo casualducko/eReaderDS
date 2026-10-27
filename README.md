@@ -187,7 +187,9 @@ or use **Get Books**: it downloads from Standard Ebooks, Project Gutenberg and
 your own catalogs, or receives books sent from a phone or computer over Wi-Fi.
 
 Updates install from inside the app, as on GammaOS (Android may ask you to
-confirm). There is no Quit: leave it as you leave any Android app. If the
+confirm; the first time, it may also need Settings > Apps > eReaderDS >
+Install unknown apps switched on, and if you close the prompt, the update
+screen's Ask again button brings it back). There is no Quit: leave it as you leave any Android app. If the
 system's back gesture closes it when you swipe near an edge, your place is
 kept; switching Android to 3-button navigation avoids the gesture.
 

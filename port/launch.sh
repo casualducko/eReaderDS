@@ -14,7 +14,7 @@ grep -qs '^ID=bananaos' /etc/os-release && BANANA=1
 # system default), which the menu applies by itself. Give it to the app as TZ, or the clock shows UTC.
 if [ -n "$BANANA" ]; then
     for f in /data/banana/settings.conf /etc/banana/settings.conf; do
-        tz=$(sed -n 's/^[[:space:]]*timezone[[:space:]]*=[[:space:]]*//p' "$f" 2>/dev/null | head -n 1 | tr -d '\r')
+        tz=$(sed -n 's/^[[:space:]]*timezone[[:space:]]*=[[:space:]]*//p' "$f" 2>/dev/null | head -n 1 | tr -d '\r' | sed 's/[[:space:]]*#.*//; s/[[:space:]]*$//')
         [ -n "$tz" ] && { export TZ="$tz"; break; }
     done
 fi
