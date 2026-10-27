@@ -32,7 +32,9 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
             local p, q = st or any, nil
             for _, f in pairs(fingers) do if f ~= p then q = f break end end
             local dx, dy = p.x - q.x, p.y - q.y
-            queue[#queue + 1] = { pinching and "pinch" or "pinch_start", math.sqrt(dx * dx + dy * dy) }
+            local d = math.sqrt(dx * dx + dy * dy)
+            if (p.side or "right") ~= (q.side or "right") then d = Android.window_dist(p.wx, p.wy, q.wx, q.wy) end
+            queue[#queue + 1] = { pinching and "pinch" or "pinch_start", d }
             pinching = true
         elseif pinching then
             if n == 0 then pinching = false; queue[#queue + 1] = { "pinch_end" } end
@@ -61,10 +63,10 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
         if down then
             if not bx then return end
             if not fingers[id] and next(fingers) == nil then first = id end
-            fingers[id] = { x = bx, y = by, side = side }
+            fingers[id] = { x = bx, y = by, side = side, wx = x, wy = y }
         else
             if not fingers[id] then return end
-            if bx then fingers[id].x, fingers[id].y = bx, by end
+            if bx then fingers[id].x, fingers[id].y, fingers[id].wx, fingers[id].wy = bx, by, x, y end
             M.last_x, M.last_y, M.last_side = fingers[id].x, fingers[id].y, fingers[id].side
             fingers[id] = nil
             if id == first then first = nil end

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Surface Duo: pinching with one finger on each page measures the distance correctly.** `touch.lua` measured the gap between two fingers in each finger's own page frame, and the left and right pages' frames differ (`book_xy` vs `bottom_xy`), so a finger on each page gave a wrong distance and the text size jumped. When the two fingers are on different pages the distance is now taken between their window positions and divided by the page scale (`Android.window_dist`; both pages are turned the same way at the same scale). Same-page pinches are unchanged. Checked with a stubbed touch run (500 and 700 px apart give 284.4 and 398.2 page units at scale 1.758); not yet tried with real fingers.
+
 ## v1.27.8
 
 - **Android: the app's old component name works again.** v1.27.7 replaced LÖVE's `org.love2d.android.GameActivity` in the manifest with `MainActivity` (for the volume keys), so anything that had stored the old name (a shortcut pinned to a home screen, a front end's entry for the app) got "Activity class ... does not exist" after updating. `patch_manifest.py` now declares `GameActivity` as an `<activity-alias>` for `MainActivity` and moves the launcher entries to it. Tried in the emulator: the old name starts the app, there is one launcher entry, and the volume keys and left-page touch still work when it is started through the alias.

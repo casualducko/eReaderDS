@@ -817,6 +817,15 @@ function M.book_xy(x, y)
     return 1024 - ly, lx
 end
 
+-- The distance between two touches in window coordinates, in page units. Both
+-- pages are turned the same way at the same scale, so this holds for a finger
+-- on each page, where book_xy and bottom_xy give points in different frames.
+function M.window_dist(x1, y1, x2, y2)
+    local lay = M.lay or phone_layout()
+    local dx, dy = x2 - x1, y2 - y1
+    return math.sqrt(dx * dx + dy * dy) / lay.s
+end
+
 -- A touch in window coordinates -> the bottom screen's own 1024x768
 -- coordinates, or nil when it isn't on the bottom screen (the top screen has
 -- no touch, but a desktop-style window might).
