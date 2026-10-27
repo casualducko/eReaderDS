@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Android: the update screen and README say what to do when Google Play Protect blocks an update.** Play Protect showed "Harmful app blocked" on a Surface Duo for an update signed with the usual key; the way through is **Install anyway**, which is easy to miss under the message. The confirm screen now says so, and the README explains it.
+
 ## v1.27.9
 
 - **BananaOS: the time zone line is cleaned before it's used.** `launch.sh` now drops a trailing `# comment` and trailing spaces from the `timezone =` value before exporting `TZ`.

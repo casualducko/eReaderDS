@@ -8129,7 +8129,9 @@ function app.update_draw(side)
         -- (Android only says when its message is answered by something that finishes the install: a message
         -- closed without choosing leaves this up, so it can ask again.)
         status = "Android is asking you to confirm.\n\nChoose Update in the message it shows."
-        if u.apk then status, button = status .. "\n\nNo message? Ask again.", "Ask again" end
+        if u.apk then
+            status, button = status .. "\n\nIf Google Play Protect blocks it, choose Install anyway.\nNo message? Ask again.", "Ask again"
+        end
     elseif u.state == "ready" then
         status, button = "Ready.\n\neReaderDS restarts with the new version.", "Restart now"
     elseif u.state == "checking" then

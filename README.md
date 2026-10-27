@@ -189,7 +189,10 @@ your own catalogs, or receives books sent from a phone or computer over Wi-Fi.
 Updates install from inside the app, as on GammaOS (Android may ask you to
 confirm; the first time, it may also need Settings > Apps > eReaderDS >
 Install unknown apps switched on, and if you close the prompt, the update
-screen's Ask again button brings it back). There is no Quit: leave it as you leave any Android app. If the
+screen's Ask again button brings it back). Google Play Protect may also block
+the update as a "Harmful app" because it doesn't come from the Play Store:
+choose **Install anyway** (the small text above Got it), or turn off "Scan apps
+with Play Protect" in the Play Store's settings for the update). There is no Quit: leave it as you leave any Android app. If the
 system's back gesture closes it when you swipe near an edge, your place is
 kept; switching Android to 3-button navigation avoids the gesture.
 
