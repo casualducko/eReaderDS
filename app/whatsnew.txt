@@ -11,6 +11,10 @@ New font: Libron, the goated e-reader font. Get it from Get More Fonts.
 On Android, your own fonts and fonts from Get More Fonts now show up.
 On Android, the update screen now says what to do if Google Play Protect blocks an update: choose Install anyway.
 
+v1.27.10
+If an update fails because the device's clock is wrong, the update screen now says so and shows the date the device thinks it is.
+On Android, the update screen tells you to choose Install anyway if Google Play Protect blocks an update.
+
 v1.27.9
 On the Surface Duo, pinching with one finger on each page changes the text size smoothly.
 On BananaOS, a stray space or note after the time zone setting no longer upsets the clock.
