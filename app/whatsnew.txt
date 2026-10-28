@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.27.10
+New font: Libron, the goated e-reader font. Get it from Get More Fonts.
+On Android, your own fonts and fonts from Get More Fonts now show up.
+On Android, the update screen now says what to do if Google Play Protect blocks an update: choose Install anyway.
+
 v1.27.9
 On the Surface Duo, pinching with one finger on each page changes the text size smoothly.
 On BananaOS, a stray space or note after the time zone setting no longer upsets the clock.
