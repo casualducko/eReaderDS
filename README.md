@@ -812,7 +812,7 @@ Vollkorn, Bitter, Atkinson Hyperlegible Next, Inter, Lexend, Andika and
 OpenDyslexic.
 
 **Get More Fonts:** the **Get More Fonts** button beside the title of the font page (or Y) downloads more over Wi-Fi:
-Alegreya, Cardo, Gelasio, IBM Plex Serif, Libre Baskerville,
+Alegreya, Cardo, Gelasio, IBM Plex Serif, Libre Baskerville, Libron,
 Newsreader, Noticia Text, Zilla Slab, Alegreya Sans, Fira Sans, IBM Plex Sans,
 Lato and Source Sans 3 (free, SIL Open Font License, from Google Fonts; about
 200 KB–1.4 MB each). Each is shown in its own typeface; A downloads it into the

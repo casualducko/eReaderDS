@@ -11,6 +11,12 @@ Commit the fontpack folder; the app downloads from it on GitHub:
 
 Variable-only families are cut into static instances like the bundled fonts
 (see build-fonts.py). Needs fontTools and Pillow.
+
+Give family names to build only those (the rest of catalog.json and the other
+zips are left as they are):  tools/build-font-pack.py Libron
+
+Libron (OFL 1.1, with Libron as a Reserved Font Name) is copied from its own
+release exactly as published: the files are not renamed or edited.
 """
 import io
 import json
@@ -37,6 +43,8 @@ def static(prefix, styles=("Regular", "Italic", "Bold", "BoldItalic")):
     return {s: "%s-%s.ttf" % (prefix, s) for s in styles}
 
 
+LIBRON = "https://github.com/nicoverbruggen/libron"
+
 # name: (folder, file stem, files, extra axes, kind, about)
 FAMILIES = [
     ("Alegreya", "alegreya", "Alegreya", ("Alegreya[wght].ttf", "Alegreya-Italic[wght].ttf"), {}, "serif",
@@ -50,6 +58,9 @@ FAMILIES = [
     ("Libre Baskerville", "librebaskerville", "LibreBaskerville",
      ("LibreBaskerville[wght].ttf", "LibreBaskerville-Italic[wght].ttf"), {}, "serif",
      "A Baskerville cut for screens: open, tall and elegant."),
+    ("Libron", None, "Libron", {"zip": LIBRON + "/releases/download/v0.32/Libron.zip",
+                                "license": LIBRON + "/raw/v0.32/LICENSE"}, {}, "serif",
+     "A calm, neutral book face with reduced serifs, made for e-readers."),
     ("Newsreader", "newsreader", "Newsreader", ("Newsreader[opsz,wght].ttf", "Newsreader-Italic[opsz,wght].ttf"),
      {"opsz": 16}, "serif", "Designed for reading long stretches of text on screens."),
     ("Noticia Text", "noticiatext", "NoticiaText", static("NoticiaText"), {}, "serif",
@@ -90,6 +101,15 @@ def faces(folder, stem, files, axes, family):
     return out
 
 
+def released(files):
+    """[(file name, bytes)] of a family's released zip, untouched, plus its licence text."""
+    z = zipfile.ZipFile(io.BytesIO(fetch(files["zip"])))
+    order = [st for st, _, _ in STYLES]
+    out = [(n, z.read(n)) for n in z.namelist() if n.endswith(".ttf")]
+    out.sort(key=lambda t: order.index(t[0].rsplit("-", 1)[1][:-4]))
+    return out, fetch(files["license"])
+
+
 def preview(ttf_bytes, text, path):
     """The family's name set in its regular face: white on transparent (the app tints it
     to the theme's text colour)."""
@@ -101,27 +121,45 @@ def preview(ttf_bytes, text, path):
 
 
 def main():
+    only = set(sys.argv[1:])
     os.makedirs(OUT, exist_ok=True)
+    cat_path = os.path.join(OUT, "catalog.json")
+    old = {}
+    if only and os.path.exists(cat_path):
+        old = {e["name"]: e for e in json.load(open(cat_path))["fonts"]}
     catalog = []
     for name, folder, stem, files, axes, kind, about in FAMILIES:
+        if only and name not in only:
+            if name in old:
+                catalog.append(old[name])
+            continue
         print(name)
         zname = stem + ".zip"
         styles = []
         regular = None
         with zipfile.ZipFile(os.path.join(OUT, zname), "w", zipfile.ZIP_DEFLATED) as z:
-            for fname, font in faces(folder, stem, files, axes, name):
-                buf = io.BytesIO()
-                font.save(buf)
-                z.writestr(fname, buf.getvalue())
-                styles.append(fname.rsplit("-", 1)[1][:-4])
-                if fname.endswith("-Regular.ttf"):
-                    regular = buf.getvalue()
-            z.writestr(stem + "-OFL.txt", fetch(BASE + folder + "/OFL.txt"))
+            if folder is None:
+                fonts, licence = released(files)
+                for fname, data in fonts:
+                    z.writestr(fname, data)
+                    styles.append(fname.rsplit("-", 1)[1][:-4])
+                    if fname.endswith("-Regular.ttf"):
+                        regular = data
+                z.writestr(stem + "-OFL.txt", licence)
+            else:
+                for fname, font in faces(folder, stem, files, axes, name):
+                    buf = io.BytesIO()
+                    font.save(buf)
+                    z.writestr(fname, buf.getvalue())
+                    styles.append(fname.rsplit("-", 1)[1][:-4])
+                    if fname.endswith("-Regular.ttf"):
+                        regular = buf.getvalue()
+                z.writestr(stem + "-OFL.txt", fetch(BASE + folder + "/OFL.txt"))
         preview(regular, name, os.path.join(OUT, stem + ".png"))
         catalog.append({"name": name, "kind": kind, "about": about, "zip": zname, "preview": stem + ".png",
                         "size": os.path.getsize(os.path.join(OUT, zname)), "styles": styles,
                         "license": "SIL Open Font License 1.1"})
-    with open(os.path.join(OUT, "catalog.json"), "w") as f:
+    with open(cat_path, "w") as f:
         json.dump({"version": 1, "fonts": catalog}, f, indent=1, ensure_ascii=False)
     print(len(catalog), "families ->", OUT)
 

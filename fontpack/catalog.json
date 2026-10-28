@@ -76,6 +76,21 @@
    "license": "SIL Open Font License 1.1"
   },
   {
+   "name": "Libron",
+   "kind": "serif",
+   "about": "A calm, neutral book face with reduced serifs, made for e-readers.",
+   "zip": "Libron.zip",
+   "preview": "Libron.png",
+   "size": 521508,
+   "styles": [
+    "Regular",
+    "Italic",
+    "Bold",
+    "BoldItalic"
+   ],
+   "license": "SIL Open Font License 1.1"
+  },
+  {
    "name": "Newsreader",
    "kind": "serif",
    "about": "Designed for reading long stretches of text on screens.",

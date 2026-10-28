@@ -34,6 +34,10 @@ local function user_dirs()
         for d in env:gmatch("[^:]+") do dirs[#dirs + 1] = d end
     else
         dirs = { "/mnt/mmc/Ebook/Fonts", "/mnt/sdcard/Ebook/Fonts", "/mnt/vendor/bin/ebook/resources/fonts" }
+        -- Android (and iOS): the Ebook folder the books use. (Android 11 and later
+        -- keep apps out of /mnt/sdcard, so the paths above find nothing there.)
+        local A = require("android")
+        if A.active then table.insert(dirs, 1, A.BOOKS .. "/Fonts") end
     end
     return dirs
 end

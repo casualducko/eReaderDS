@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Get More Fonts: Libron.** Nico Verbruggen's e-reader serif (a reduced-serif revision of Readerly, itself based on Newsreader; SIL OFL 1.1, Reserved Font Name "Libron"). It's in `fontpack/` as an unmodified copy of the v0.32 release (the files aren't renamed or edited, as the Reserved Font Name requires) with its licence as `Libron-OFL.txt`, so it shows up for every version once this is pushed. `tools/build-font-pack.py` can now build named families only (`tools/build-font-pack.py Libron`), leaving the other zips alone, and copies a family from its own release.
+- **Android: your own fonts and Get More Fonts work on a Surface Duo.** `fonts.lua` only looked in `/mnt/mmc/Ebook/Fonts` and `/mnt/sdcard/Ebook/Fonts` (the handheld's paths); Android 11 and later keep apps out of `/mnt/sdcard`, so fonts copied to `Ebook/Fonts` were never listed and a downloaded font had nowhere to go. On Android and iOS the Ebook folder the books use (`Android.BOOKS .. "/Fonts"`) is now tried first. Found when Libron copied to `/sdcard/Ebook/Fonts` didn't appear.
+
 - **Android: the update screen and README say what to do when Google Play Protect blocks an update.** Play Protect showed "Harmful app blocked" on a Surface Duo for an update signed with the usual key; the way through is **Install anyway**, which is easy to miss under the message. The confirm screen now says so, and the README explains it.
 
 ## v1.27.9
