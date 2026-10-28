@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.27.12
+
+- **Updates: a wrong device clock is named as the cause.** A handheld whose clock was far behind (GammaOS, after being off for a while) showed "the server's certificate couldn't be verified (certificate is not yet valid)" on the update screen. `app.update_error` now turns a "not yet valid" or "expired" certificate into "This device's clock looks wrong (it says <date>). Set the right date and time on the device, then try again." The check is on the OpenSSL text, so it only affects update errors.
+
 ## v1.27.11
 
 - **A two-finger tap opens Settings while reading.** The swipe up from the bottom edge is also Android's gesture for closing an app, so on a phone it's easy to leave the reader by mistake. Touching with two fingers and lifting within a third of a second (without spreading or moving them) now does what the swipe does. `touch.lua` holds back the pinch until the fingers spread or close more than a wobble, move together, or stay down past that time, so a tap no longer flashes the text-size preview, and sends `two_tap`; `touch_event` answers it only while reading, with no dialog up (a tap that wakes the screens does nothing else, as for any touch). Also works with one finger on each page on a Duo. Help lists it under Settings. Checked with a stubbed touch run (a tap, a tap across both pages, a spread, a long still hold and a two-finger drag); not yet tried with real fingers.

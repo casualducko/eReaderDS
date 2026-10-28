@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.27.12
+If an update fails because the device's clock is wrong, the update screen now says so and shows the date the device thinks it is.
+
 v1.27.11
 On Android, tap with two fingers to open Settings while reading, so you don't have to swipe up from the bottom edge (which Android also uses to close apps).
 On Android, tap with three fingers to put eReaderDS in the background, like pressing Home.
