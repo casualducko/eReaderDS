@@ -24,6 +24,13 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
     local queue = {}
     local pinching, was_down = false, false
 
+    -- Two fingers that touch and lift at once (a tap) don't make a pinch: nothing
+    -- is sent until they spread or close past a wobble, move together, or stay
+    -- down, and a quick lift is one { "two_tap" } instead. A third finger in that
+    -- time makes it a { "three_tap" } (and no pinch, whichever pair is left).
+    local TAP_TIME, TAP_WOBBLE = 0.35, 40      -- seconds; page units
+    local pend = nil                           -- { t0, d0, cx, cy, three } while that's undecided
+
     local function report()
         local n, any = 0, nil
         for _, f in pairs(fingers) do n = n + 1; any = any or f end
@@ -34,10 +41,32 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
             local dx, dy = p.x - q.x, p.y - q.y
             local d = math.sqrt(dx * dx + dy * dy)
             if (p.side or "right") ~= (q.side or "right") then d = Android.window_dist(p.wx, p.wy, q.wx, q.wy) end
-            queue[#queue + 1] = { pinching and "pinch" or "pinch_start", d }
+            local cx, cy = (p.wx + q.wx) / 2, (p.wy + q.wy) / 2
+            if not pinching then
+                pend = { t0 = love.timer.getTime(), d0 = d, cx = cx, cy = cy }
+            end
+            if pend and n >= 3 then pend.three = true end
+            if pend and not pend.three and (math.abs(d - pend.d0) > TAP_WOBBLE
+                    or Android.window_dist(pend.cx, pend.cy, cx, cy) > TAP_WOBBLE
+                    or love.timer.getTime() - pend.t0 > TAP_TIME) then
+                queue[#queue + 1] = { "pinch_start", pend.d0 }
+                pend = nil
+            end
+            if not pend then queue[#queue + 1] = { pinching and "pinch" or "pinch_start", d } end
             pinching = true
         elseif pinching then
-            if n == 0 then pinching = false; queue[#queue + 1] = { "pinch_end" } end
+            if n == 0 then
+                pinching = false
+                if pend then
+                    -- (Held still too long for a tap: nothing, but the gesture is over.)
+                    local ev = "pinch_end"
+                    if love.timer.getTime() - pend.t0 <= TAP_TIME then ev = pend.three and "three_tap" or "two_tap" end
+                    queue[#queue + 1] = { ev }
+                    pend = nil
+                else
+                    queue[#queue + 1] = { "pinch_end" }
+                end
+            end
             was_down = false
         elseif st and not was_down then queue[#queue + 1] = { "down", st.x, st.y, st.side }
         elseif st then queue[#queue + 1] = { "move", st.x, st.y, st.side }

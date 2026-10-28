@@ -276,6 +276,12 @@ function M.lock_orientation()
     return jni_call("com/casualducko/ereaderds/Orient", "lock", "(Landroid/app/Activity;)V")
 end
 
+-- Send the app to the background, as Home does (android/smali/.../Background).
+-- False if it couldn't be done.
+function M.to_background()
+    return M.android and jni_call("com/casualducko/ereaderds/Background", "hide", "(Landroid/app/Activity;)V")
+end
+
 -- Take the volume keys from Android (a Duo only): volume down turns to the next
 -- page, volume up to the previous one (android/smali/.../MainActivity, Volume).
 function M.take_volume_keys()

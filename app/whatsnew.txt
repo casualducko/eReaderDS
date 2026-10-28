@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.27.11
+On Android, tap with two fingers to open Settings while reading, so you don't have to swipe up from the bottom edge (which Android also uses to close apps).
+On Android, tap with three fingers to put eReaderDS in the background, like pressing Home.
+
 v1.27.10
 New font: Libron, the goated e-reader font. Get it from Get More Fonts.
 On Android, your own fonts and fonts from Get More Fonts now show up.

@@ -7300,7 +7300,7 @@ app.HELP = {
         { "Pinch", "Text size" },
         { "Top-right corner", "Bookmark" },
         { "Top edge", "Show or hide the status bars" },
-        { "Bottom edge", "Swipe up: Settings" },
+        { "Settings", "Swipe up from the bottom edge, or tap with two fingers" },
         { "Hold a word", "Look it up (drag: highlight)" },
         { "Tap a word", "While highlighting: highlight up to it" },
         { "Note number", "Show the footnote" },
@@ -9860,7 +9860,7 @@ local function touch_event(kind, sx, sy, from)
     -- A touch that wakes the screens does nothing else, until the finger lifts.
     if (kind == "down" or kind == "pinch_start") and app.idle_input() then app.idle_swallow = true end
     if app.idle_swallow then
-        if kind == "up" or kind == "pinch_end" then app.idle_swallow = nil end
+        if kind == "up" or kind == "pinch_end" or kind == "two_tap" or kind == "three_tap" then app.idle_swallow = nil end
         return
     end
     if kind == "move" or kind == "pinch" then app.idle.last = now end
@@ -9880,6 +9880,19 @@ local function touch_event(kind, sx, sy, from)
                 hide_at = now + 1e9 }
             redraw()
         end
+        return
+    elseif kind == "two_tap" then
+        -- A tap with two fingers: Settings, while reading (the swipe up from the bottom
+        -- edge is also how Android closes an app).
+        gesture = nil
+        if app.mode == "reader" and not app.asking and not app.choosing then app.press_hint("menu") end
+        return
+    elseif kind == "three_tap" then
+        -- A tap with three fingers sends an Android app to the background, as Home does
+        -- (it keeps its place and window); if that can't be done, it quits (not on iOS,
+        -- where an app isn't closed from inside).
+        gesture = nil
+        if not require("android").to_background() then app.press_hint("quit") end
         return
     elseif kind == "pinch_end" then
         if gesture and gesture.mode == "pinch" then
@@ -12403,6 +12416,8 @@ local function run_test_script()
                 if what == "start" then touch_event("pinch_start", tonumber(d))
                 elseif what == "end" then touch_event("pinch_end")
                 else touch_event("pinch", tonumber(a:match("([%d.]+)$"))) end
+            elseif a == "twotap" then touch_event("two_tap")      -- a two-finger tap
+            elseif a == "threetap" then touch_event("three_tap")
             elseif a == "poll" then shop.net_poll()
             elseif a:match("^type:") then app.kb_type((a:sub(6):gsub("_", " ")))
             elseif a == "update" then app.update_open()

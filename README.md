@@ -192,7 +192,7 @@ Install unknown apps switched on, and if you close the prompt, the update
 screen's Ask again button brings it back). Google Play Protect may also block
 the update as a "Harmful app" because it doesn't come from the Play Store:
 choose **Install anyway** (the small text above Got it), or turn off "Scan apps
-with Play Protect" in the Play Store's settings for the update). There is no Quit: leave it as you leave any Android app. If the
+with Play Protect" in the Play Store's settings for the update). There is no Quit button: tap with three fingers (it goes to the background, as with Home), or leave it as you leave any Android app. If the
 system's back gesture closes it when you swipe near an edge, your place is
 kept; switching Android to 3-button navigation avoids the gesture.
 
@@ -250,7 +250,9 @@ About) is a one-page summary of the buttons and touchscreen.
   a list longer than the screen, such as My Books, Get Books, Table of
   Contents, Fonts or Themes, sliding up/down scrolls it instead; on Themes
   that never changes your theme.)
-- Swipe up from the very bottom edge to open Settings (as X does).
+- Swipe up from the very bottom edge to open Settings (as X does), or tap
+  once with two fingers anywhere on the page (on Android, where the swipe up
+  from the bottom is how you close an app). Tap with three fingers to send it to the background, as Home does.
 - Pinch with two fingers to make the text bigger or smaller (not in a comic).
 - Tap the top-right corner to bookmark the page.
 - Tap the top edge (left of that corner) to show or hide all the status bars.
