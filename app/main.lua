@@ -7793,6 +7793,12 @@ function app.update_error(msg)
         return "The connection dropped. Check Wi-Fi and try again."
     end
     if msg:find("404") then return "The update isn't on GitHub (any more). Try again later." end
+    -- A certificate "not yet valid" (or "expired") is nearly always a device clock that is wrong, as after
+    -- a long time switched off with no battery-backed clock.
+    if msg:find("certificate") and (msg:find("not yet valid") or msg:find("expired")) then
+        return "This device's clock looks wrong (it says " .. os.date("%B %d, %Y")
+            .. ").\n\nSet the right date and time on the device, then try again."
+    end
     if msg:find("couldn't find") or msg:find("couldn't connect") then
         return "Couldn't reach GitHub. Check Wi-Fi and try again."
     end
