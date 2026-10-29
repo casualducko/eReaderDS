@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Surface Duo: volume down then volume up turns touch off and on.** For reading in bed with a hand on the phone: a forward page and straight back (volume down then volume up within 0.8 s, and neither held) toggles `app.touch_locked`, which makes `touch_event` ignore everything; the volume buttons keep turning pages. A message says "Touch off" or "Touch on", and a small minus sign (`app.draw_lock`) shows in the lower right corner of the touchscreen's page while it's off. The two page turns cancel out; if the book was at its end the page is put back with `set_spread`. Turning it off works only while reading (the buttons change values in menus), turning it on works anywhere, and it's never saved, so every start has touch on. Both volume buttons held together can't be used: on the Surface Duo Android takes that chord before the app sees it (the raw events show both down within 30 ms, and the app got none). Tried on a real Surface Duo.
+
 ## v1.27.12
 
 - **Updates: a wrong device clock is named as the cause.** A handheld whose clock was far behind (GammaOS, after being off for a while) showed "the server's certificate couldn't be verified (certificate is not yet valid)" on the update screen. `app.update_error` now turns a "not yet valid" or "expired" certificate into "This device's clock looks wrong (it says <date>). Set the right date and time on the device, then try again." The check is on the OpenSSL text, so it only affects update errors.

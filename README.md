@@ -164,7 +164,12 @@ swipes as on the RG DS Plus (there are no buttons, so everything is by touch).
 Both screens take touch while reading: tap the half of a page nearest the
 spine to go forward and the outer half to go back, swipe to turn pages, slide
 up or down for brightness, and hold a word to look it up. Menus and lists
-answer on the right screen (a tap on the dimmed book page closes Settings). Each page is drawn at the
+answer on the right screen (a tap on the dimmed book page closes Settings).
+The volume buttons turn pages too (down is forward, up is back). To read in
+bed without a finger turning the page, press **volume down and then volume up**
+within a second: touch switches off (a small minus sign shows in the lower
+right corner, and the volume buttons keep turning pages) and the same press
+switches it back on. Touch always starts on when the app opens. Each page is drawn at the
 screen's own pixels, so the text is sharp, and nothing is drawn under the
 hinge.
 

@@ -9863,6 +9863,7 @@ end
 
 local function touch_event(kind, sx, sy, from)
     local now = love.timer.getTime()
+    if app.touch_locked then return end           -- both volume buttons turned the touchscreens off
     -- A touch that wakes the screens does nothing else, until the finger lifts.
     if (kind == "down" or kind == "pinch_start") and app.idle_input() then app.idle_swallow = true end
     if app.idle_swallow then
@@ -10206,6 +10207,19 @@ local function draw_extra_dim()
     end
 end
 
+-- A small minus sign in the lower right corner of the touchscreen's page while touch is off, in the
+-- theme's dim text colour (clear of the progress bar along the bottom edge).
+function app.draw_lock()
+    if not app.touch_locked then return end
+    local bar = (S.sb_show and S.sb_bar ~= "none") and (app.BAR_PX[S.sb_bar_size] or 6) or 0
+    local w, h = 22, 4
+    love.graphics.push()
+    page_transform(app.touch_side())
+    color(theme().dim, 0.9)
+    love.graphics.rectangle("fill", PAGE_W - 24 - w, PAGE_H - 10 - bar - 14 - h, w, h, 2, 2)
+    love.graphics.pop()
+end
+
 function love.draw()
     -- Android: the usual side-by-side frame is drawn off screen, then shown
     -- as the two stacked screens (android.lua).
@@ -10215,6 +10229,7 @@ function love.draw()
     frame()
     draw_extra_dim()
     draw_overlay()
+    app.draw_lock()
     love.graphics.pop()
     if app.frame_canvas then
         require("android").finish()
@@ -10951,14 +10966,47 @@ local KEYS = {
     appback = "menu", apphome = "menu", menu = "menu", application = "menu",
 }
 local REPEATABLE = { right = true, left = true, up = true, down = true, next = true, prev = true }
+-- Surface Duo: volume down then volume up within 0.8 s (a page forward and straight back) turns touch off,
+-- for reading in bed with a hand on the phone, and the same again turns it back on. (Android swallows both
+-- volume buttons held together, so a chord never reaches the app.) The two turns cancel out; at the end of
+-- the book the forward turn did nothing, so the back turn is undone. `pre` is where the book was before.
+-- It only turns touch off while reading (the volume buttons change values in menus), but turns it on anywhere.
+function app.volume_toggle(pre)
+    if pre and spread and app.mode == "reader" then
+        -- (set_spread directly, not a page turn with its flip: nothing to animate and no setting to change)
+        if spread.ch ~= pre.ch or spread.pi ~= pre.pi then set_spread(pre.ch, pre.pi) end
+        redraw()
+    end
+    app.touch_locked = not app.touch_locked or nil
+    if app.touch_locked then gesture, app.idle_swallow, overlay = nil, nil, nil end
+    app.toast(app.touch_locked and "Touch off\nVolume down then up turns it back on" or "Touch on", 2.5)
+    redraw()
+end
+
 function love.keypressed(key, scancode, isrepeat)
     local a = KEYS[key]
+    local vol = (key == "pagedown" or key == "pageup") and require("android").duo
     if isrepeat then
         -- Holding a key repeats movement only (the Back button toggles Settings).
+        if vol and app.vol then app.vol.held = true end         -- (a held button is reading, not the toggle)
         if a and REPEATABLE[a] then action(a) end
         return
     end
     log_input("key %s (scancode %s)", key, scancode)
+    if vol then
+        local now, v = love.timer.getTime(), app.vol
+        if key == "pagedown" then
+            app.vol = { t = now, pre = spread and app.mode == "reader" and { ch = spread.ch, pi = spread.pi } or nil }
+        elseif v and v.t and not v.held and now - v.t < 0.8 and (app.touch_locked or app.mode == "reader") then
+            app.vol = nil
+            log_input("volume toggle: down then up, %.2fs apart", now - v.t)
+            action(a)                                -- (the page back, as it would be)
+            app.volume_toggle(v.pre)
+            return
+        else
+            app.vol = nil
+        end
+    end
     if a then action(a) end
 end
 
