@@ -2,6 +2,9 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.27.13
+On the Surface Duo, press volume down and then volume up to turn touch off, so you can hold the phone in bed without turning the page by accident. Do the same again to turn it back on. The volume buttons still turn pages meanwhile.
+
 v1.27.12
 If an update fails because the device's clock is wrong, the update screen now says so and shows the date the device thinks it is.
 
