@@ -1,0 +1,8 @@
+name = "ereaderds-themes"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# After `npx wrangler kv namespace create THEMES`, paste its id here.
+[[kv_namespaces]]
+binding = "THEMES"
+id = "PASTE_THE_ID_HERE"

@@ -4922,6 +4922,7 @@ function app.theme_set_filter(filter, keep)
     if filter == "custom" then
         -- Your own themes, after a row for making a new one.
         T.list[1] = app.NEW_THEME
+        T.list[2] = { name = "Sync with your other devices", hidden_row = true, action = function() app.tsync_open() end }
         for _, t in ipairs(THEMES) do if t.custom and not t.hidden then T.list[#T.list + 1] = t end end
     elseif filter == "hidden" then
         -- (Those of the list it was opened from: all, or just light or dark ones.)
@@ -4982,7 +4983,7 @@ end
 function app.theme_use()
     local t = app.themes.list[app.themes.sel]
     if t and t.new then app.tedit_new() return end
-    if t and t.hidden_row then app.theme_open_hidden() return end
+    if t and t.hidden_row then (t.action or app.theme_open_hidden)() return end
 
     app.theme_pick()
     app.theme_leave()
@@ -5199,10 +5200,13 @@ function app.theme_draw(side)
         end
     end)
     if T.filter == "custom" then
-        app.hints(x, nil, { "A", T.list[T.sel] and T.list[T.sel].new and "new" or "use", "Y", "options", "‹ ›", "filter", "B", "back" })
+        local cur = T.list[T.sel]
+        if cur and cur.action then app.hints(x, nil, { "A", "sync", "‹ ›", "filter", "B", "back" })
+        else app.hints(x, nil, { "A", cur and cur.new and "new" or "use", "Y", "options", "‹ ›", "filter", "B", "back" }) end
     else
         local t = T.list[T.sel]
-        if t and t.hidden_row then app.hints(x, nil, { "A", "show them", "‹ ›", "filter", "B", "back" })
+        if t and t.hidden_row and t.action then app.hints(x, nil, { "A", "sync", "‹ ›", "filter", "B", "back" })
+        elseif t and t.hidden_row then app.hints(x, nil, { "A", "show them", "‹ ›", "filter", "B", "back" })
         elseif T.filter == "hidden" then app.hints(x, nil, { "A", "use", "Y", "options", "B", "back" })
         else app.hints(x, nil, { "A", "use", "Y", "options", "‹ ›", "filter", "B", "back" }) end
     end
@@ -5369,14 +5373,19 @@ function app.my_themes_load()
     end
 end
 
-function app.my_themes_save()
+-- Your themes as { name, fg, bg } (colours as text), in order.
+function app.my_themes_list()
     local list = {}
     for _, t in ipairs(THEMES) do
         if t.custom and not t.hidden then
             list[#list + 1] = { name = t.name, fg = app.colour_string(t.c_fg), bg = app.colour_string(t.c_bg) }
         end
     end
-    Store.save_themes(list)
+    return list
+end
+
+function app.my_themes_save()
+    Store.save_themes(app.my_themes_list())
 end
 
 function app.theme_named(name)
@@ -8664,6 +8673,330 @@ function app.font_draw(side)
     app.count(x, w, fp.sel, #fp.list)
 end
 
+---------------------------------------------------------------- sync your themes
+
+-- Your own themes (Themes → Custom → Sync with your other devices) compared with
+-- the copy on your sync server (tools/themesync-worker): what's only there,
+-- what's only here, what differs. Each can be added, uploaded, deleted or left,
+-- and nothing happens until Apply.
+app.TSync = require("themesync")
+app.TSYNC_ROW_H = 84
+app.tsync = { sel = 1, top = 1 }
+
+-- The server's address for the list, from what was typed ("themes.me.workers.dev").
+function app.tsync_url()
+    local u = (S.themes_url or ""):gsub("%s+", ""):gsub("/+$", "")
+    if u == "" then return nil end
+    if not u:find("^https?://") then u = "https://" .. u end
+    return u .. "/v1/themes"
+end
+
+function app.tsync_ready() return app.tsync_url() ~= nil and (S.themes_key or ""):match("^%w+$") ~= nil end
+
+function app.tsync_open()
+    if not app.tsync_ready() then app.tsync_setup() return end
+    local g = app.tsync
+    g.sel, g.top, g.rows, g.error = 1, 1, nil, nil
+    app.mode = "themesync"
+    app.tsync_load()
+    redraw()
+end
+
+function app.tsync_back()
+    app.theme_open()
+    app.theme_set_filter("custom", app.theme_current())
+    redraw()
+end
+
+-- The address, then the key (made here, or typed in from another device).
+function app.tsync_setup()
+    app.kb_open({ title = "Sync Server Address", text = S.themes_url or "", url = true, ok = "Next",
+        hint = "Where your theme server is, such as ereaderds-themes.you.workers.dev (see tools/themesync-worker).",
+        submit = function(t)
+            t = t:gsub("%s+", "")
+            if t == "" then return end
+            S.themes_url = t
+            Store.save_settings(S)
+            if app.tsync_ready() then app.tsync_open() else app.tsync_key_choose() end
+        end })
+end
+
+function app.tsync_key_choose()
+    app.choose({ title = "Sync key", options = {
+        { "Make a new key", function()
+            S.themes_key = app.TSync.new_key()
+            Store.save_settings(S)
+            app.ask({ question = "Your sync key", detail = S.themes_key .. "\n\nType it on your other devices.",
+                yes = "Continue", on_yes = function() app.tsync_open() end, on_no = function() app.tsync_open() end })
+        end },
+        { "I have a key already", function() app.tsync_key_type() end },
+    } })
+end
+
+function app.tsync_key_type()
+    app.kb_open({ title = "Sync Key", ok = "Save", max = 64,
+        hint = "The key made on your first device (16 or more letters and numbers).",
+        submit = function(t)
+            t = t:gsub("%s+", "")
+            if not t:match("^%w+$") or #t < 16 then app.toast("That isn't a sync key\n(16 or more letters and numbers)", 3) return end
+            S.themes_key = t
+            Store.save_settings(S)
+            app.tsync_open()
+        end })
+end
+
+-- Y: the server's settings.
+function app.tsync_options()
+    app.choose({ title = "Sync server", options = {
+        { "Check Again", function() app.tsync_open() end },
+        { "Show the Key", function()
+            app.ask({ question = "Your sync key", detail = (S.themes_key or "") .. "\n\n" .. (S.themes_url or ""),
+                yes = "Close", on_yes = function() end })
+        end },
+        { "Change Address", function() app.tsync_setup() end },
+        { "Change Key", function() app.tsync_key_choose() end },
+        { "Stop Syncing", function()
+            app.ask({ question = "Stop syncing?", detail = "Forgets the address and key here. Your themes stay.", yes = "Stop",
+                on_yes = function() S.themes_url, S.themes_key = "", ""; Store.save_settings(S); app.tsync_back() end })
+        end },
+    } })
+end
+
+function app.tsync_headers(json)
+    local h = { ["X-Sync-Key"] = S.themes_key }
+    if json then h["Content-Type"] = "application/json" end
+    return h
+end
+
+function app.tsync_load()
+    local g = app.tsync
+    if g.loading then return end
+    if not shop.online(true) then g.error = "Not connected to Wi-Fi."; redraw() return end
+    g.loading, g.error = true, nil
+    shop.net_job({ kind = "call", method = "GET", url = app.tsync_url(), headers = app.tsync_headers(), timeout = 15 }, function(msg)
+        g.loading = false
+        if msg.kind ~= "done" then g.error = app.update_error(msg.message)
+        elseif msg.status == 401 then g.error = "The server doesn't accept this key.\nY, then Change Key."
+        elseif msg.status ~= 200 then g.error = "The server answered " .. tostring(msg.status) .. ".\nIs the address right?"
+        else
+            local ok, data = pcall(require("json").decode, msg.body or "")
+            if not ok or type(data) ~= "table" or type(data.themes) ~= "table" then
+                g.error = "That address didn't answer like a theme server."
+            else
+                app.tsync_compare(data.themes)
+            end
+        end
+        redraw()
+    end)
+end
+
+-- The server's themes against yours. (Not ones named like a built-in theme, which this
+-- device can't hold: they're left alone on the server.)
+function app.tsync_compare(theirs)
+    local g = app.tsync
+    local usable, skipped = {}, {}
+    for _, e in ipairs(app.TSync.clean(theirs)) do
+        local taken = e.name:lower() == "off"
+        for _, t in ipairs(THEMES) do
+            if not t.custom and t.name:lower() == e.name:lower() then taken = true end
+        end
+        if taken then skipped[#skipped + 1] = e else usable[#usable + 1] = e end
+    end
+    g.mine, g.theirs, g.skipped = app.my_themes_list(), usable, skipped
+    g.diff, g.same = app.TSync.diff(g.mine, usable)
+    app.TSync.defaults(g.diff)
+    g.rows = {}
+    for _, r in ipairs(g.diff) do g.rows[#g.rows + 1] = r end
+    if #g.diff > 0 then g.rows[#g.rows + 1] = { apply = true, name = "Apply" } end
+    g.sel, g.top = 1, 1
+end
+
+function app.tsync_apply_ask()
+    local g = app.tsync
+    if not g.diff or #g.diff == 0 or g.applying then return end
+    local here, server, counts = app.TSync.plan(g.mine, g.theirs, g.diff)
+    local sum = app.TSync.summary(counts)
+    if not sum then app.toast("Nothing is set to change") return end
+    app.ask({ question = sum .. "?", detail = server and "This device and the server both change." or "",
+        yes = "Apply", on_yes = function() app.tsync_apply(here, server, sum) end })
+end
+
+-- The server first (so a failure leaves everything as it was), then this device.
+function app.tsync_apply(here, server, sum)
+    local g = app.tsync
+    local function finish()
+        g.applying = false
+        Store.save_themes(here)
+        app.my_themes_load()
+        if not app.theme_named(S.theme) then S.theme = "Sepia" end
+        if S.night_theme ~= "off" and not app.theme_named(S.night_theme) then S.night_theme = "off" end
+        app.night_check()
+        Store.save_settings(S)
+        app.tsync_back()
+        app.toast("Themes synced\n" .. sum, 3)
+    end
+    if not server then finish() return end
+    for _, e in ipairs(g.skipped or {}) do server[#server + 1] = e end
+    local body = #server == 0 and '{"version":1,"themes":[]}' or require("json").encode({ version = 1, themes = server })
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
+    g.applying = true
+    app.toast("Syncing…", 20)
+    shop.net_job({ kind = "call", method = "PUT", url = app.tsync_url(), headers = app.tsync_headers(true), body = body,
+            timeout = 20 }, function(msg)
+        app.untoast()
+        if msg.kind ~= "done" or msg.status ~= 200 then
+            g.applying = false
+            app.toast("Couldn't update the server\nNothing was changed.", 3)
+            print("[themesync] PUT " .. tostring(msg.status or msg.message))
+            redraw()
+            return
+        end
+        finish()
+    end)
+end
+
+function app.tsync_action(a)
+    local g = app.tsync
+    local rows = g.rows or {}
+    local r = rows[g.sel]
+    if a == "up" then g.sel = math.max(1, g.sel - 1)
+    elseif a == "down" then g.sel = math.min(math.max(1, #rows), g.sel + 1)
+    elseif (a == "left" or a == "prev" or a == "right" or a == "next") and r and r.kind then
+        app.TSync.cycle(r, (a == "left" or a == "prev") and -1 or 1)
+    elseif a == "confirm" then
+        if r and r.apply then app.tsync_apply_ask()
+        elseif r then app.TSync.cycle(r)
+        elseif g.error and not g.loading then app.tsync_load() end
+    elseif a == "menu" then app.tsync_apply_ask()
+    elseif a == "toc" then app.tsync_options()
+    elseif a == "back" then app.tsync_back() return end
+    redraw()
+end
+
+function app.tsync_tap(side, u, v)
+    local g = app.tsync
+    if side ~= "right" then return end
+    if not g.rows then
+        if g.error and not g.loading then app.tsync_load() end
+        return
+    end
+    if v < 160 then return end
+    local idx = g.top + math.floor((v - 160) / app.TSYNC_ROW_H)
+    local r = g.rows[idx]
+    if idx >= g.top + list_rows(app.TSYNC_ROW_H) or not r then return end
+    if r.apply then g.sel = idx; app.tsync_apply_ask()
+    elseif idx == g.sel then app.TSync.cycle(r); redraw()
+    else g.sel = idx; redraw() end
+end
+
+-- A theme's page with "Aa" in its ink.
+function app.tsync_swatch(e, x, y, w, h)
+    local th = theme()
+    local bg = app.lab_rgb(app.colour_parse(e.bg, app.TEDIT_DEFAULT.bg))
+    local fg = app.lab_rgb(app.colour_parse(e.fg, app.TEDIT_DEFAULT.fg))
+    love.graphics.setColor(bg[1], bg[2], bg[3])
+    love.graphics.rectangle("fill", x, y, w, h, 8, 8)
+    color(th.dim, 0.6)
+    love.graphics.setLineWidth(1)
+    love.graphics.rectangle("line", x, y, w, h, 8, 8)
+    love.graphics.setFont(ui.font)
+    love.graphics.setColor(fg[1], fg[2], fg[3])
+    love.graphics.printf("Aa", x, centered_y(ui.font, UI_SIZE, y, h), w, "center")
+end
+
+app.TSYNC_KIND = {
+    remote = "On your server, not on this device.",
+    ["local"] = "On this device, not on your server.",
+    differs = "Different here and on the server.",
+}
+
+function app.tsync_draw(side)
+    local th = theme()
+    local g = app.tsync
+    local m = MARGINS[2]
+    local w = PAGE_W - m.outer - m.inner
+    local rows = g.rows or {}
+    local r = rows[g.sel]
+    if side == "left" then
+        local x = m.outer
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Sync Themes", x, 60)
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        if not g.diff then
+            love.graphics.printf(g.loading and "Asking your server…" or (g.error or ""), x, 180, w, "left")
+            return
+        end
+        if #g.diff == 0 then
+            love.graphics.printf("Everything matches.\n\n" .. g.same .. (g.same == 1 and " theme is" or " themes are")
+                .. " the same here and on your server.", x, 180, w, "left")
+        elseif r and r.apply then
+            local _, _, counts = app.TSync.plan(g.mine, g.theirs, g.diff)
+            love.graphics.printf((app.TSync.summary(counts) or "Nothing is set to change") .. ".\n\nA applies it.", x, 180, w, "left")
+        elseif r then
+            love.graphics.printf(r.name .. "\n" .. app.TSYNC_KIND[r.kind], x, 180, w, "left")
+            local y = 180 + ui.font:getHeight() * 3 + 20
+            local sw, sh = math.floor((w - 30) / 2), 200
+            if r.kind == "differs" then
+                app.tsync_swatch(r.mine, x, y, sw, sh)
+                app.tsync_swatch(r.theirs, x + sw + 30, y, sw, sh)
+                love.graphics.setFont(ui.small)
+                color(th.dim)
+                love.graphics.printf("This device", x, y + sh + 10, sw, "center")
+                love.graphics.printf("Server", x + sw + 30, y + sh + 10, sw, "center")
+            else
+                app.tsync_swatch(r.mine or r.theirs, x, y, sw, sh)
+            end
+        end
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf(g.same .. " already match", x, PAGE_H - 70, w, "left")
+        return
+    end
+    local x = m.inner
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print(g.diff and "Changes" or "", x, 60)
+    if not g.rows then return end
+    local rows_n = list_rows(app.TSYNC_ROW_H)
+    if g.sel < g.top then g.top = g.sel end
+    if g.sel >= g.top + rows_n then g.top = g.sel - rows_n + 1 end
+    draw_list(side, g.rows, g.sel, g.top, rows_n, x, 160, w, app.TSYNC_ROW_H, function(it, _, rx, ry, rw)
+        local h = app.TSYNC_ROW_H - 4
+        if it.apply then
+            love.graphics.setFont(ui.bold)
+            color(th.fg)
+            love.graphics.print("Apply", rx, centered_y(ui.bold, UI_SIZE, ry, h))
+            return
+        end
+        local e = it.mine or it.theirs
+        local sw = 72
+        local sy = ry + 8
+        local bg = app.lab_rgb(app.colour_parse(e.bg, app.TEDIT_DEFAULT.bg))
+        local fg = app.lab_rgb(app.colour_parse(e.fg, app.TEDIT_DEFAULT.fg))
+        love.graphics.setColor(bg[1], bg[2], bg[3])
+        love.graphics.rectangle("fill", rx, sy, sw, h - 16, 8, 8)
+        color(th.dim, 0.6)
+        love.graphics.rectangle("line", rx, sy, sw, h - 16, 8, 8)
+        love.graphics.setFont(ui.small)
+        love.graphics.setColor(fg[1], fg[2], fg[3])
+        love.graphics.printf("Aa", rx, centered_y(ui.small, SMALL_SIZE, sy, h - 16), sw, "center")
+        local label = app.TSync.LABELS[it.choice]
+        love.graphics.setFont(ui.small)
+        local lw = ui.small:getWidth(label)
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.print(fit_text(ui.font, it.name, rw - sw - 24 - lw - 56), rx + sw + 24, centered_y(ui.font, UI_SIZE, ry, h))
+        love.graphics.setFont(ui.small)
+        color(it.choice == "skip" and th.dim or th.fg)
+        love.graphics.printf(label, rx, centered_y(ui.small, SMALL_SIZE, ry, h), rw, "right")
+    end)
+    local sel_apply = r and r.apply
+    app.hints(x, nil, { "A", sel_apply and "apply" or "change", "X", "apply", "Y", "server", "B", "back" })
+    if g.diff and #g.diff > 0 then app.count(x, w, math.min(g.sel, #g.diff), #g.diff) end
+end
+
 ---------------------------------------------------------------- get more fonts
 
 -- Free reading fonts to download (SIL Open Font License, from Google Fonts),
@@ -9500,6 +9833,7 @@ local function render_canvases()
     elseif app.mode == "splash" then painter = app.splash_draw
     elseif app.mode == "report" then painter = app.report_draw
     elseif app.mode == "fontget" then painter = app.fget_draw
+    elseif app.mode == "themesync" then painter = app.tsync_draw
     elseif app.mode == "receive" then painter = app.recv_draw
     elseif app.mode == "calibre" then painter = app.cal_draw
     else painter = draw_library end
@@ -10058,6 +10392,8 @@ function app.scroll_list()
     elseif m == "themes" then l, n, shown, row_h = app.themes, #app.themes.list, list_rows(app.THEME_ROW_H), app.THEME_ROW_H
     elseif m == "fonts" and app.font_pick then
         l, n, shown, row_h = app.font_pick, #app.font_pick.list, app.font_rows(), app.FONT_ROW_H
+    elseif m == "themesync" and app.tsync.rows then
+        l, n, shown, row_h = app.tsync, #app.tsync.rows, list_rows(app.TSYNC_ROW_H), app.TSYNC_ROW_H
     elseif m == "fontget" and app.fget.list then
         l, n, shown, row_h = app.fget, #app.fget.list, list_rows(app.FGET_ROW_H), app.FGET_ROW_H
     end
@@ -10485,6 +10821,7 @@ function handle_action(a)
     if mode == "find" then app.find_action(a) return end
     if mode == "report" then app.report_action(a) return end
     if mode == "fontget" then app.fget_action(a) return end
+    if mode == "themesync" then app.tsync_action(a) return end
     if mode == "receive" then app.recv_action(a) return end
     if mode == "calibre" then app.cal_action(a) return end
 
@@ -10804,6 +11141,8 @@ function app.on_tap(side, u, v)
         app.tedit_tap(side, u, v)
     elseif mode == "fontget" then
         app.fget_tap(side, u, v)
+    elseif mode == "themesync" then
+        app.tsync_tap(side, u, v)
     elseif mode == "receive" then
         app.recv_tap(side, u, v)
     elseif mode == "calibre" then
@@ -12620,6 +12959,7 @@ local function run_test_script()
             elseif a == "report" then app.report_open()
             elseif a == "receive" then app.recv_open()
             elseif a == "recvpoll" then app.recv_poll()
+            elseif a == "tsync" then app.tsync_open()
             elseif a == "calibre" then app.cal_open()
             elseif a == "calpoll" then app.cal_poll()
             elseif a == "work" then                -- finish a background task

@@ -466,6 +466,12 @@ press left/right, or tap one (that alone doesn't change your theme).
     deleting your night theme turns Night Mode off).
 - **A** (or **Save**) saves the theme and uses it. **B** goes back; if
   you've changed anything it asks first, and B again keeps editing.
+- **Sync with your other devices** (second row): compares your themes with a
+  list on your own tiny server and asks what to do with each difference: add
+  it here, upload it, delete it (here or on the server) or leave it. Nothing
+  changes until you press Apply. The server is a free Cloudflare Worker, set
+  up once ([tools/themesync-worker](tools/themesync-worker/README.md)); every
+  device uses the same address and sync key.
 
 The Themes pages themselves are a neutral grey, like a photo editor's, so a
 tinted theme doesn't color the swatches; naming a theme uses the same grey
