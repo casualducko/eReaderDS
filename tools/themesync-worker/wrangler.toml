@@ -14,3 +14,11 @@ namespace_id = "1001"
   [ratelimits.simple]
   limit = 60
   period = 60
+
+# At most 5 new codes a minute from one address.
+[[ratelimits]]
+name = "NEWLIM"
+namespace_id = "1002"
+  [ratelimits.simple]
+  limit = 5
+  period = 60

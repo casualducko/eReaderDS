@@ -8741,89 +8741,63 @@ end
 
 function app.tsync_key_choose()
     app.choose({ title = "Sync your themes", options = {
-        { "Start syncing (first device)", function()
-            S.themes_key = app.TSync.new_key()
-            Store.save_settings(S)
-            app.tsync_open()
-        end },
+        { "Start syncing (first device)", function() app.tsync_create() end },
         { "Join with a code (other devices)", function() app.tsync_code_type() end },
     } })
 end
 
--- A new device: the 8-digit code from another one, traded for the key.
-function app.tsync_code_type()
-    app.kb_open({ title = "Pairing Code", ok = "Pair", max = 9,
-        hint = "On a device that already syncs, open Sync and choose Link another device. Type the 8 digits it shows.",
-        submit = function(t) app.tsync_redeem(t) end })
-end
-
-function app.tsync_redeem(text)
-    local code = text:gsub("%D", "")
-    if #code ~= 8 then app.toast("The code is 8 digits", 3) return end
+-- The first device: the server makes a fresh code (8 letters and digits) and keeps a list for it.
+function app.tsync_create()
     if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
-    app.toast("Pairing…", 15)
-    local base = app.tsync_url():gsub("/themes$", "/pair/")
-    shop.net_job({ kind = "call", method = "GET", url = base .. code, timeout = 15 }, function(msg)
+    app.toast("Setting up…", 15)
+    local base = app.tsync_url():gsub("/themes$", "/new")
+    shop.net_job({ kind = "call", method = "POST", url = base, timeout = 15 }, function(msg)
         app.untoast()
-        if msg.kind ~= "done" then app.toast("Couldn't pair\n" .. app.update_error(msg.message), 4) return end
-        if msg.status == 404 then app.toast("That code isn't right, or it has run out.\nGet a new one on the other device.", 4) return end
-        if msg.status == 429 then app.toast("Too many tries.\nWait a minute.", 4) return end
         local ok, data = pcall(require("json").decode, msg.body or "")
-        if msg.status ~= 200 or not ok or type(data) ~= "table" or type(data.key) ~= "string" or not data.key:match("^%w+$") then
-            app.toast("Couldn't pair (the server answered " .. tostring(msg.status) .. ")", 4)
+        if msg.kind ~= "done" then app.toast("Couldn't start syncing\n" .. app.update_error(msg.message), 4) return end
+        if msg.status == 429 then app.toast("Too many new codes from here.\nTry again in a minute.", 4) return end
+        if msg.status ~= 200 or not ok or type(data) ~= "table" or type(data.code) ~= "string" or not data.code:match("^%w+$") then
+            app.toast("Couldn't start syncing\n(the server answered " .. tostring(msg.status) .. ")", 4)
             return
         end
-        S.themes_key = data.key
+        S.themes_key = data.code
         Store.save_settings(S)
         app.tsync_open()
     end)
 end
 
--- An already-syncing device: a code for adding another one (works once, for 10 minutes).
-function app.tsync_pair_make()
-    if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
-    app.toast("Making a code…", 15)
-    local base = app.tsync_url():gsub("/themes$", "/pair")
-    shop.net_job({ kind = "call", method = "POST", url = base, headers = app.tsync_headers(), timeout = 15 }, function(msg)
-        app.untoast()
-        local ok, data = pcall(require("json").decode, msg.body or "")
-        if msg.kind ~= "done" or msg.status ~= 200 or not ok or type(data) ~= "table" or type(data.code) ~= "string" then
-            app.toast("Couldn't make a code\n" .. (msg.kind ~= "done" and app.update_error(msg.message)
-                or ("(the server answered " .. tostring(msg.status) .. ")")), 4)
-            return
-        end
-        print("[themesync] pairing code " .. data.code:sub(1, 4) .. " " .. data.code:sub(5))
-        app.tsync.code = data.code
-        if app.mode ~= "themesync" then app.mode = "themesync" end
-        redraw()
-    end)
+-- Other devices: type the code. It's asked about first, so a typo is said at once.
+function app.tsync_code_type()
+    app.kb_open({ title = "Sync Code", ok = "Join", max = 14,
+        hint = "The code from your first device: open Sync there and choose Show my sync code. Capitals don't matter.",
+        submit = function(t) app.tsync_join(t) end })
 end
 
-function app.tsync_key_type()
-    app.kb_open({ title = "Sync Key", ok = "Save", max = 64,
-        hint = "The key made on your first device (16 or more letters and numbers).",
-        submit = function(t)
-            t = t:gsub("%s+", "")
-            if not t:match("^%w+$") or #t < 16 then app.toast("That isn't a sync key\n(16 or more letters and numbers)", 3) return end
-            S.themes_key = t
-            Store.save_settings(S)
-            app.tsync_open()
-        end })
+function app.tsync_join(text)
+    local code = text:lower():gsub("[^%w]", "")
+    if #code < 8 then app.toast("The code is 8 letters and numbers", 3) return end
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
+    app.toast("Checking…", 15)
+    shop.net_job({ kind = "call", method = "GET", url = app.tsync_url(), headers = { ["X-Sync-Key"] = code }, timeout = 15 }, function(msg)
+        app.untoast()
+        if msg.kind ~= "done" then app.toast("Couldn't check it\n" .. app.update_error(msg.message), 4) return end
+        if msg.status == 404 or msg.status == 401 then app.toast("No list has that code.\nCheck it and try again.", 4) return end
+        if msg.status == 429 then app.toast("Too many tries.\nWait a minute.", 4) return end
+        if msg.status ~= 200 then app.toast("Couldn't check it (the server answered " .. tostring(msg.status) .. ")", 4) return end
+        S.themes_key = code
+        Store.save_settings(S)
+        app.tsync_open()
+    end)
 end
 
 -- Y: the less usual things.
 function app.tsync_options()
     app.choose({ title = "Sync", options = {
         { "Check Again", function() app.tsync_open() end },
-        { "Join with a Code", function() app.tsync_code_type() end },
-        { "Type a Key Instead", function() app.tsync_key_type() end },
-        { "Show the Key", function()
-            app.ask({ question = "Your sync key", detail = (S.themes_key or "") .. "\n\n" .. ((S.themes_url or "") ~= "" and S.themes_url or "Shared server"),
-                yes = "Close", no = "Close", on_yes = function() end })
-        end },
+        { "Join with a Different Code", function() app.tsync_code_type() end },
         { "Use Another Server", function() app.tsync_setup() end },
         { "Stop Syncing", function()
-            app.ask({ question = "Stop syncing?", detail = "Forgets the key on this device. Your themes stay.", yes = "Stop",
+            app.ask({ question = "Stop syncing?", detail = "Forgets the code on this device. Your themes stay.", yes = "Stop",
                 on_yes = function() S.themes_url, S.themes_key = "", ""; Store.save_settings(S); app.tsync_back() end })
         end },
     } })
@@ -8843,7 +8817,7 @@ function app.tsync_load()
     shop.net_job({ kind = "call", method = "GET", url = app.tsync_url(), headers = app.tsync_headers(), timeout = 15 }, function(msg)
         g.loading = false
         if msg.kind ~= "done" then g.error = app.update_error(msg.message)
-        elseif msg.status == 401 then g.error = "The server doesn't accept this key.\nY, then Change Key."
+        elseif msg.status == 404 or msg.status == 401 then g.error = "No list has this code on the server.\nY, then Join with a Different Code."
         elseif msg.status ~= 200 then g.error = "The server answered " .. tostring(msg.status) .. ".\nIs the address right?"
         else
             local ok, data = pcall(require("json").decode, msg.body or "")
@@ -8875,7 +8849,7 @@ function app.tsync_compare(theirs)
     g.rows = {}
     for _, r in ipairs(g.diff) do g.rows[#g.rows + 1] = r end
     if #g.diff > 0 then g.rows[#g.rows + 1] = { apply = true, name = "Sync now" } end
-    g.rows[#g.rows + 1] = { link = true, name = "Link another device" }
+    g.rows[#g.rows + 1] = { link = true, name = "Show my sync code" }
     g.sel, g.top = 1, 1
 end
 
@@ -8950,7 +8924,7 @@ function app.tsync_action(a)
         app.TSync.cycle(r, (a == "left" or a == "prev") and -1 or 1)
     elseif a == "confirm" then
         if r and r.apply then app.tsync_apply_ask()
-        elseif r and r.link then app.tsync_pair_make()
+        elseif r and r.link then g.code = S.themes_key; redraw()
         elseif r then app.TSync.cycle(r)
         elseif g.error and not g.loading then app.tsync_load() end
     elseif a == "menu" then app.tsync_apply_ask()
@@ -8973,7 +8947,7 @@ function app.tsync_tap(side, u, v)
     local idx = g.top + math.floor((v - 160) / app.TSYNC_ROW_H)
     local r = g.rows[idx]
     if idx >= g.top + list_rows(app.TSYNC_ROW_H) or not r then return end
-    if r.link then g.sel = idx; app.tsync_pair_make()
+    if r.link then g.sel = idx; g.code = S.themes_key; redraw()
     elseif r.apply then g.sel = idx; app.tsync_apply_ask()
     elseif idx == g.sel then app.TSync.cycle(r); redraw()
     else g.sel = idx; redraw() end
@@ -9000,31 +8974,33 @@ app.TSYNC_KIND = {
     differs = "Different here and on the server.",
 }
 
--- The pairing code, big, with what to do with it.
+-- The sync code, big, with what to do with it.
 function app.tsync_code_draw(side)
     local th = theme()
     local m = MARGINS[2]
-    local code = app.tsync.code
-    local shown = code:sub(1, 4) .. "  " .. code:sub(5)
+    local code = app.tsync.code:upper()
+    local shown = #code == 8 and (code:sub(1, 4) .. "  " .. code:sub(5)) or code
     if side == "left" then
         local x, w = m.outer, PAGE_W - m.outer - m.inner
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Link Another Device", x, 60)
+        love.graphics.print("Your Sync Code", x, 60)
         love.graphics.setFont(ui.font)
         color(th.fg)
-        love.graphics.printf("1.  On the other device, open Themes, then Custom, then Sync with your other devices.", x, 190, w, "left")
-        love.graphics.printf("2.  Choose Join with a code.", x, 400, w, "left")
-        love.graphics.printf("3.  Type the 8 digits shown on the right.", x, 500, w, "left")
+        love.graphics.printf("On each of your other devices:", x, 190, w, "left")
+        love.graphics.printf("1.  Open Themes, then Custom, then Sync with your other devices.", x, 290, w, "left")
+        love.graphics.printf("2.  Choose Join with a code.", x, 500, w, "left")
+        love.graphics.printf("3.  Type the code shown on the right.", x, 600, w, "left")
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.printf("The code works once, for 10 minutes.", x, PAGE_H - 70, w, "left")
+        love.graphics.printf("The same code works on all your devices. Keep it private: anyone with it can change your themes.",
+            x, PAGE_H - 150, w, "left")
         return
     end
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
     color(th.dim)
-    love.graphics.printf("Your code", x, 60, w, "center")
+    love.graphics.printf("Sync code", x, 60, w, "center")
     local f = ui.title
     local sc = math.min(3.4, (w - 20) / f:getWidth(shown))
     love.graphics.push()
@@ -9071,10 +9047,10 @@ function app.tsync_draw(side)
         end
         if #g.diff == 0 then
             love.graphics.printf("Everything matches.\n\n" .. g.same .. (g.same == 1 and " theme is" or " themes are")
-                .. " the same here and on your server.\n\nTo add another device, choose Link another device: it shows "
-                .. "an 8-digit code to type there (Join with a code).", x, 180, w, "left")
+                .. " the same here and on your server.\n\nTo add another device, choose Show my sync code and type "
+                .. "it there (Join with a code).", x, 180, w, "left")
         elseif r and r.link then
-            love.graphics.printf("Link another device\n\nShows an 8-digit code. On the other device, choose Join with a code and type it.", x, 180, w, "left")
+            love.graphics.printf("Show my sync code\n\nThe code to type on your other devices (Join with a code).", x, 180, w, "left")
         elseif r and r.apply then
             local _, _, counts = app.TSync.plan(g.mine, g.theirs, g.diff)
             love.graphics.printf((app.TSync.summary(counts) or "Nothing is set to change") .. ".\n\nA applies it.", x, 180, w, "left")
@@ -13069,11 +13045,11 @@ local function run_test_script()
             local wait = tonumber(a:match("^wait:([%d.]+)$") or "")
             local cx, cy = a:match("^click:([%d.]+):([%d.]+)$")      -- (a Mac: a mouse click at window x:y)
             local ck = a:match("^cmd:(.+)$")                         -- (a Mac: Command + that key)
-            local redeem = a:match("^tredeem:(%d+)$")                 -- (pairing: trade a code for the key)
+            local join = a:match("^tjoin:(%w+)$")                     -- (sync: join with a code)
             local tx = a:match("^type:(.+)$")                        -- (a Mac: typing into a text box)
             local wx, wy = a:match("^wheel:([%-%d.]+):([%-%d.]+)$")  -- (a Mac: a two-finger slide)
-            if redeem then app.tsync_redeem(redeem)
-            elseif a == "tpair" then app.tsync_pair_make()
+            if join then app.tsync_join(join)
+            elseif a == "tcreate" then app.tsync_create()
             elseif ck then app.mac_key(ck, false, true)
             elseif wx then love.wheelmoved(tonumber(wx), tonumber(wy))
             elseif tx then love.textinput(tx)
