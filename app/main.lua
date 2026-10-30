@@ -8740,15 +8740,67 @@ function app.tsync_setup()
 end
 
 function app.tsync_key_choose()
-    app.choose({ title = "Sync key", options = {
+    app.choose({ title = "Sync", options = {
+        { "I have a code (other devices)", function() app.tsync_code_type() end },
         { "Make a new key (first device)", function()
             S.themes_key = app.TSync.new_key()
             Store.save_settings(S)
-            app.ask({ question = "Your sync key", detail = S.themes_key .. "\n\nType it on your other devices.",
+            app.ask({ question = "Your sync key is made", detail = "To add another device, open this page there and choose "
+                .. "I have a code. Get the code here: Y, then Add Another Device.",
                 yes = "Continue", on_yes = function() app.tsync_open() end, on_no = function() app.tsync_open() end })
         end },
-        { "I have a key (other devices)", function() app.tsync_key_type() end },
+        { "I have a key (typed in)", function() app.tsync_key_type() end },
     } })
+end
+
+-- A new device: the 8-digit code from another one, traded for the key.
+function app.tsync_code_type()
+    app.kb_open({ title = "Pairing Code", ok = "Pair", max = 9,
+        hint = "On a device that already syncs: Y, then Add Another Device. Type the 8 digits it shows.",
+        submit = function(t) app.tsync_redeem(t) end })
+end
+
+function app.tsync_redeem(text)
+    local code = text:gsub("%D", "")
+    if #code ~= 8 then app.toast("The code is 8 digits", 3) return end
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
+    app.toast("Pairing…", 15)
+    local base = app.tsync_url():gsub("/themes$", "/pair/")
+    shop.net_job({ kind = "call", method = "GET", url = base .. code, timeout = 15 }, function(msg)
+        app.untoast()
+        if msg.kind ~= "done" then app.toast("Couldn't pair\n" .. app.update_error(msg.message), 4) return end
+        if msg.status == 404 then app.toast("That code isn't right, or it has run out.\nGet a new one on the other device.", 4) return end
+        if msg.status == 429 then app.toast("Too many tries.\nWait a minute.", 4) return end
+        local ok, data = pcall(require("json").decode, msg.body or "")
+        if msg.status ~= 200 or not ok or type(data) ~= "table" or type(data.key) ~= "string" or not data.key:match("^%w+$") then
+            app.toast("Couldn't pair (the server answered " .. tostring(msg.status) .. ")", 4)
+            return
+        end
+        S.themes_key = data.key
+        Store.save_settings(S)
+        app.tsync_open()
+    end)
+end
+
+-- An already-syncing device: a code for adding another one (works once, for 10 minutes).
+function app.tsync_pair_make()
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
+    app.toast("Making a code…", 15)
+    local base = app.tsync_url():gsub("/themes$", "/pair")
+    shop.net_job({ kind = "call", method = "POST", url = base, headers = app.tsync_headers(), timeout = 15 }, function(msg)
+        app.untoast()
+        local ok, data = pcall(require("json").decode, msg.body or "")
+        if msg.kind ~= "done" or msg.status ~= 200 or not ok or type(data) ~= "table" or type(data.code) ~= "string" then
+            app.toast("Couldn't make a code\n" .. (msg.kind ~= "done" and app.update_error(msg.message)
+                or ("(the server answered " .. tostring(msg.status) .. ")")), 4)
+            return
+        end
+        local shown = data.code:sub(1, 4) .. " " .. data.code:sub(5)
+        print("[themesync] pairing code " .. shown)
+        app.ask({ question = "Code: " .. shown, detail = "On the other device, open Themes → Custom → Sync, choose I have a code, "
+            .. "and type these 8 digits. It works once, for 10 minutes.", yes = "Done", no = "Close", on_yes = function() end,
+            on_no = function() end })
+    end)
 end
 
 function app.tsync_key_type()
@@ -8766,13 +8818,14 @@ end
 -- Y: the server's settings.
 function app.tsync_options()
     app.choose({ title = "Sync server", options = {
+        { "Add Another Device", function() app.tsync_pair_make() end },
         { "Check Again", function() app.tsync_open() end },
         { "Show the Key", function()
             app.ask({ question = "Your sync key", detail = (S.themes_key or "") .. "\n\n" .. ((S.themes_url or "") ~= "" and S.themes_url or "Shared server"),
                 yes = "Close", on_yes = function() end })
         end },
         { "Use Another Server", function() app.tsync_setup() end },
-        { "Change Key", function() app.tsync_key_choose() end },
+        { "Change Key or Pair Again", function() app.tsync_key_choose() end },
         { "Stop Syncing", function()
             app.ask({ question = "Stop syncing?", detail = "Forgets the address and key here. Your themes stay.", yes = "Stop",
                 on_yes = function() S.themes_url, S.themes_key = "", ""; Store.save_settings(S); app.tsync_back() end })
@@ -12957,9 +13010,12 @@ local function run_test_script()
             local wait = tonumber(a:match("^wait:([%d.]+)$") or "")
             local cx, cy = a:match("^click:([%d.]+):([%d.]+)$")      -- (a Mac: a mouse click at window x:y)
             local ck = a:match("^cmd:(.+)$")                         -- (a Mac: Command + that key)
+            local redeem = a:match("^tredeem:(%d+)$")                 -- (pairing: trade a code for the key)
             local tx = a:match("^type:(.+)$")                        -- (a Mac: typing into a text box)
             local wx, wy = a:match("^wheel:([%-%d.]+):([%-%d.]+)$")  -- (a Mac: a two-finger slide)
-            if ck then app.mac_key(ck, false, true)
+            if redeem then app.tsync_redeem(redeem)
+            elseif a == "tpair" then app.tsync_pair_make()
+            elseif ck then app.mac_key(ck, false, true)
             elseif wx then love.wheelmoved(tonumber(wx), tonumber(wy))
             elseif tx then love.textinput(tx)
             elseif cx and Touch.mouse then
