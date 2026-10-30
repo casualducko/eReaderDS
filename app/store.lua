@@ -19,7 +19,7 @@ local DEFAULTS = {
     -- Backlight in percent; -1 = leave the system setting alone. ROCKNIX's
     -- panels are dimmer at the same level, so its launcher asks for more.
     brightness = tonumber(os.getenv("READER_DEFAULT_BRIGHTNESS") or "") or ((Android.active or Android.mac) and -1 or 50),
-    fullscreen = Android.mac or false,   -- a Mac: the window fills the screen (no title bar or menu bar); remembered
+    fullscreen = false,   -- a Mac: the window fills the screen (no title bar or menu bar); remembered
     extra_dim = 0,     -- 0-3: dark layer over the page, dimmer than the backlight allows
     seen_version = "", -- the version last run: after an update, "what's new" is offered once
     update_notices = true, -- check for a newer version on launch and say so
