@@ -5143,7 +5143,7 @@ function app.theme_draw(side)
         local h = row_h - 4
         if t.hidden_row then
             love.graphics.setFont(ui.font)
-            color(th.dim)
+            color(t.action and th.fg or th.dim)
             love.graphics.print(t.name .. "  ›", rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
             return
         end
@@ -12959,6 +12959,7 @@ local function run_test_script()
             elseif a == "report" then app.report_open()
             elseif a == "receive" then app.recv_open()
             elseif a == "recvpoll" then app.recv_poll()
+            elseif a == "themes" then app.theme_open(); app.theme_set_filter("custom", "")     -- the Custom list
             elseif a == "tsync" then app.tsync_open()
             elseif a == "calibre" then app.cal_open()
             elseif a == "calpoll" then app.cal_poll()
