@@ -11040,8 +11040,8 @@ function love.textinput(text)
 end
 
 -- Two fingers sliding on a Mac's trackpad (or a wheel): up is brighter and down is dimmer, as a
--- slide on the touchscreen is (the same steps, the dimmest ones the page's own extra dimming); a
--- sideways flick turns a page. The direction follows the system's "natural scrolling" setting.
+-- slide on the touchscreen is (the same steps, the dimmest ones the page's own extra dimming). It never
+-- turns a page: a slide that drifts sideways would. The direction follows the "natural scrolling" setting.
 function app.natural_scroll()
     if app.natural == nil then
         local p = io.popen("defaults read -g com.apple.swipescrolldirection 2>/dev/null")
@@ -11056,13 +11056,6 @@ function love.wheelmoved(x, y)
     if not require("android").mac or app.mode ~= "reader" or app.asking or app.choosing then return end
     local now = love.timer.getTime()
     local natural = app.natural_scroll()
-    if math.abs(x) > math.abs(y) then
-        -- (A trackpad's momentum would turn many pages: one turn, then a short rest.)
-        if math.abs(x) < 1 or now < (app.wheel_rest or 0) then return end
-        app.wheel_rest = now + 0.45
-        action(((natural and x < 0) or (not natural and x > 0)) and "next" or "prev")
-        return
-    end
     if y == 0 then return end
     -- Where the slide is: kept while it goes on, taken afresh from the screen after a rest.
     if not app.bri_p or now - (app.bri_t or 0) > 1.2 then
