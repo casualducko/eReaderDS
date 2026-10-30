@@ -8715,7 +8715,7 @@ function app.tsync_ready() return (S.themes_key or ""):match("^%w+$") ~= nil end
 function app.tsync_open()
     if not app.tsync_ready() then app.tsync_key_choose() return end
     local g = app.tsync
-    g.sel, g.top, g.rows, g.error, g.result = 1, 1, nil, nil, nil
+    g.sel, g.top, g.rows, g.error, g.result, g.code = 1, 1, nil, nil, nil, nil
     app.mode = "themesync"
     app.tsync_load()
     redraw()
@@ -8792,11 +8792,10 @@ function app.tsync_pair_make()
                 or ("(the server answered " .. tostring(msg.status) .. ")")), 4)
             return
         end
-        local shown = data.code:sub(1, 4) .. " " .. data.code:sub(5)
-        print("[themesync] pairing code " .. shown)
-        app.ask({ question = "Code: " .. shown, detail = "On the other device, open Themes → Custom → Sync, choose I have a code, "
-            .. "and type these 8 digits. It works once, for 10 minutes.", yes = "Done", no = "Close", on_yes = function() end,
-            on_no = function() end })
+        print("[themesync] pairing code " .. data.code:sub(1, 4) .. " " .. data.code:sub(5))
+        app.tsync.code = data.code
+        if app.mode ~= "themesync" then app.mode = "themesync" end
+        redraw()
     end)
 end
 
@@ -8934,6 +8933,10 @@ end
 
 function app.tsync_action(a)
     local g = app.tsync
+    if g.code then                                  -- the code page
+        if a == "confirm" or a == "back" or a == "menu" then g.code = nil; redraw() end
+        return
+    end
     if g.result then                                -- the result page: any of these goes back
         if a == "confirm" or a == "back" or a == "menu" then g.result = nil; app.tsync_back() return end
         return
@@ -8958,6 +8961,7 @@ end
 
 function app.tsync_tap(side, u, v)
     local g = app.tsync
+    if g.code then g.code = nil; redraw() return end
     if g.result then g.result = nil; app.tsync_back() return end
     if g.applying then return end
     if side ~= "right" then return end
@@ -8996,7 +9000,45 @@ app.TSYNC_KIND = {
     differs = "Different here and on the server.",
 }
 
+-- The pairing code, big, with what to do with it.
+function app.tsync_code_draw(side)
+    local th = theme()
+    local m = MARGINS[2]
+    local code = app.tsync.code
+    local shown = code:sub(1, 4) .. "  " .. code:sub(5)
+    if side == "left" then
+        local x, w = m.outer, PAGE_W - m.outer - m.inner
+        love.graphics.setFont(ui.title)
+        color(th.fg)
+        love.graphics.print("Link Another Device", x, 60)
+        love.graphics.setFont(ui.font)
+        color(th.fg)
+        love.graphics.printf("1.  On the other device, open Themes, then Custom, then Sync with your other devices.", x, 190, w, "left")
+        love.graphics.printf("2.  Choose Join with a code.", x, 400, w, "left")
+        love.graphics.printf("3.  Type the 8 digits shown on the right.", x, 500, w, "left")
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("The code works once, for 10 minutes.", x, PAGE_H - 70, w, "left")
+        return
+    end
+    local x, w = m.inner, PAGE_W - m.outer - m.inner
+    love.graphics.setFont(ui.title)
+    color(th.dim)
+    love.graphics.printf("Your code", x, 60, w, "center")
+    local f = ui.title
+    local sc = math.min(3.4, (w - 20) / f:getWidth(shown))
+    love.graphics.push()
+    love.graphics.translate(x + w / 2, 360)
+    love.graphics.scale(sc, sc)
+    color(th.fg)
+    love.graphics.setFont(f)
+    love.graphics.print(shown, -f:getWidth(shown) / 2, -f:getHeight() / 2)
+    love.graphics.pop()
+    app.hints(x, nil, { "A", "done" })
+end
+
 function app.tsync_draw(side)
+    if app.tsync.code then app.tsync_code_draw(side) return end
     local th = theme()
     local g = app.tsync
     local m = MARGINS[2]
