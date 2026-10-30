@@ -8698,18 +8698,22 @@ app.TSync = require("themesync")
 app.TSYNC_ROW_H = 84
 app.tsync = { sel = 1, top = 1 }
 
+-- The shared server the app comes with. Another one (your own, see
+-- tools/themesync-worker) can be set under Y -> Use Another Server.
+app.TSYNC_DEFAULT = "ereaderds-themes.themesync-worker.workers.dev"
+
 -- The server's address for the list, from what was typed ("themes.me.workers.dev").
 function app.tsync_url()
     local u = (S.themes_url or ""):gsub("%s+", ""):gsub("/+$", "")
-    if u == "" then return nil end
+    if u == "" then u = app.TSYNC_DEFAULT end
     if not u:find("^https?://") then u = "https://" .. u end
     return u .. "/v1/themes"
 end
 
-function app.tsync_ready() return app.tsync_url() ~= nil and (S.themes_key or ""):match("^%w+$") ~= nil end
+function app.tsync_ready() return (S.themes_key or ""):match("^%w+$") ~= nil end
 
 function app.tsync_open()
-    if not app.tsync_ready() then app.tsync_setup() return end
+    if not app.tsync_ready() then app.tsync_key_choose() return end
     local g = app.tsync
     g.sel, g.top, g.rows, g.error, g.result = 1, 1, nil, nil, nil
     app.mode = "themesync"
@@ -8723,14 +8727,13 @@ function app.tsync_back()
     redraw()
 end
 
--- The address, then the key (made here, or typed in from another device).
+-- Another server than the shared one (empty: back to the shared one).
 function app.tsync_setup()
-    app.kb_open({ title = "Sync Server Address", text = S.themes_url or "", url = true, ok = "Next",
-        hint = "Where your theme server is, such as ereaderds-themes.you.workers.dev (see tools/themesync-worker).",
+    app.kb_open({ title = "Sync Server Address", text = S.themes_url or "", url = true, ok = "Save", allow_empty = true,
+        hint = "Leave it empty for the shared server, or enter your own, such as ereaderds-themes.you.workers.dev "
+            .. "(see tools/themesync-worker).",
         submit = function(t)
-            t = t:gsub("%s+", "")
-            if t == "" then return end
-            S.themes_url = t
+            S.themes_url = t:gsub("%s+", "")
             Store.save_settings(S)
             if app.tsync_ready() then app.tsync_open() else app.tsync_key_choose() end
         end })
@@ -8738,13 +8741,13 @@ end
 
 function app.tsync_key_choose()
     app.choose({ title = "Sync key", options = {
-        { "Make a new key", function()
+        { "Make a new key (first device)", function()
             S.themes_key = app.TSync.new_key()
             Store.save_settings(S)
             app.ask({ question = "Your sync key", detail = S.themes_key .. "\n\nType it on your other devices.",
                 yes = "Continue", on_yes = function() app.tsync_open() end, on_no = function() app.tsync_open() end })
         end },
-        { "I have a key already", function() app.tsync_key_type() end },
+        { "I have a key (other devices)", function() app.tsync_key_type() end },
     } })
 end
 
@@ -8765,10 +8768,10 @@ function app.tsync_options()
     app.choose({ title = "Sync server", options = {
         { "Check Again", function() app.tsync_open() end },
         { "Show the Key", function()
-            app.ask({ question = "Your sync key", detail = (S.themes_key or "") .. "\n\n" .. (S.themes_url or ""),
+            app.ask({ question = "Your sync key", detail = (S.themes_key or "") .. "\n\n" .. ((S.themes_url or "") ~= "" and S.themes_url or "Shared server"),
                 yes = "Close", on_yes = function() end })
         end },
-        { "Change Address", function() app.tsync_setup() end },
+        { "Use Another Server", function() app.tsync_setup() end },
         { "Change Key", function() app.tsync_key_choose() end },
         { "Stop Syncing", function()
             app.ask({ question = "Stop syncing?", detail = "Forgets the address and key here. Your themes stay.", yes = "Stop",

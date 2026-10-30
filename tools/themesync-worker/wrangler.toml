@@ -6,3 +6,11 @@ compatibility_date = "2026-01-01"
 [[kv_namespaces]]
 binding = "THEMES"
 id = "9d80a3063853415dbf217c3856fa71f5"
+
+# At most 60 requests a minute from one address.
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 60
+  period = 60

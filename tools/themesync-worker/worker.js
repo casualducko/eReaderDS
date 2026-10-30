@@ -3,8 +3,10 @@
 //   PUT /v1/themes  <- the same shape; replaces the list
 // The key (header X-Sync-Key, 16 to 64 letters and digits) is never stored,
 // only its SHA-256, so the key is the only secret.
-const MAX_BODY = 64 * 1024
-const MAX_THEMES = 500
+// Shared by every user of the app, so it is kept small: 200 themes and 32 KB a list,
+// a request limit per address (the LIMITER binding), and a write only when the list changed.
+const MAX_BODY = 32 * 1024
+const MAX_THEMES = 200
 
 async function slot(key) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("eReaderDS themes " + key))
@@ -32,6 +34,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url)
     if (url.pathname !== "/v1/themes") return json({ error: "not found" }, 404)
+    if (env.LIMITER) {
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown"
+      const { success } = await env.LIMITER.limit({ key: ip })
+      if (!success) return json({ error: "slow down" }, 429)
+    }
     const key = request.headers.get("X-Sync-Key") || ""
     if (!/^[A-Za-z0-9]{16,64}$/.test(key)) return json({ error: "bad key" }, 401)
     const id = await slot(key)
@@ -47,7 +54,8 @@ export default {
       try { body = JSON.parse(text) } catch { return json({ error: "bad json" }, 400) }
       const themes = clean(body && body.themes)
       if (!themes) return json({ error: "bad themes" }, 400)
-      await env.THEMES.put(id, JSON.stringify(themes))
+      const text2 = JSON.stringify(themes)
+      if ((await env.THEMES.get(id)) !== text2) await env.THEMES.put(id, text2)
       return json({ version: 1, themes })
     }
     return json({ error: "method not allowed" }, 405)

@@ -467,11 +467,15 @@ press left/right, or tap one (that alone doesn't change your theme).
 - **A** (or **Save**) saves the theme and uses it. **B** goes back; if
   you've changed anything it asks first, and B again keeps editing.
 - **Sync with your other devices** (second row): compares your themes with a
-  list on your own tiny server and asks what to do with each difference: add
-  it here, upload it, delete it (here or on the server) or leave it. Nothing
-  changes until you press Apply. The server is a free Cloudflare Worker, set
-  up once ([tools/themesync-worker](tools/themesync-worker/README.md)); every
-  device uses the same address and sync key.
+  list on a small server and asks what to do with each difference: add it
+  here, upload it, delete it (here or on the server) or leave it. The confirm
+  card lists exactly what will change, and nothing changes until you press
+  **Sync now**. On the first device choose **Make a new key** and write it
+  down; on each other device choose **I have a key** and type it. The key is
+  the whole account: anyone with it can read and change your list (names and
+  colours only). It uses the shared server that comes with the app; to use
+  your own, see [tools/themesync-worker](tools/themesync-worker/README.md)
+  and press Y → **Use Another Server**.
 
 The Themes pages themselves are a neutral grey, like a photo editor's, so a
 tinted theme doesn't color the swatches; naming a theme uses the same grey
