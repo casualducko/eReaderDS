@@ -18,7 +18,7 @@ function M.close() end
 -- Android (GammaOS) and iOS: no evdev for apps, but LÖVE gets the touches itself.
 -- They're turned into the same events, on the same terms: the first finger
 -- down is the one followed, and two fingers make a pinch until all lift.
-if love and love.system and (love.system.getOS() == "Android" or love.system.getOS() == "iOS") then
+if love and love.system and (love.system.getOS() == "Android" or love.system.getOS() == "iOS" or love.system.getOS() == "OS X") then
     local Android = require("android")
     local fingers, first = {}, nil           -- id -> { x, y } (bottom screen only)
     local queue = {}
@@ -106,6 +106,15 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
     function love.touchpressed(id, x, y) touch(id, x, y, true) end
     function love.touchmoved(id, x, y) if fingers[id] then touch(id, x, y, true) end end
     function love.touchreleased(id, x, y) touch(id, x, y, false) end
+
+    -- A Mac: the mouse is the finger, on either page (the trackpad's own touches aren't used).
+    if love.system.getOS() == "OS X" then
+        love.touchpressed, love.touchmoved, love.touchreleased = function() end, function() end, function() end
+        function M.mouse(kind, x, y)
+            if kind == "move" and not fingers.mouse then return end
+            touch("mouse", x, y, kind ~= "up")
+        end
+    end
 
     function M.open() M.enabled = true; return true end
     function M.poll(handler)

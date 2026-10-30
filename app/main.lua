@@ -10241,16 +10241,19 @@ function love.draw()
 end
 
 -- Desktop testing: the mouse on the bottom-screen half acts as a finger.
-function love.mousepressed(x, y)
+function love.mousepressed(x, y, button)
+    if Touch.mouse then if button == 1 then Touch.mouse("down", x, y) end return end      -- (a Mac)
     x, y = x / app.scale, y / app.scale
     if x >= SCREEN_W and not Touch.enabled then touch_event("down", x - SCREEN_W, y) end
 end
 function love.mousemoved(x, y)
+    if Touch.mouse then Touch.mouse("move", x, y) return end
     if gesture and not Touch.enabled and love.mouse.isDown(1) then
         touch_event("move", math.max(0, x / app.scale - SCREEN_W), y / app.scale)
     end
 end
 function love.mousereleased(x, y)
+    if Touch.mouse then Touch.mouse("up", x, y) return end
     if gesture and not Touch.enabled then touch_event("up", x / app.scale - SCREEN_W, y / app.scale) end
 end
 
@@ -12236,7 +12239,7 @@ end
 
 function love.load()
     app.scale = love.graphics.getWidth() / 2048
-    if require("android").active then
+    if require("android").active or require("android").mac then
         app.scale = 1
         -- The navy straight away (so the launch is navy, not black, during
         -- the setup below). Not the logo yet: GammaOS's DualStack resizes and
@@ -12461,7 +12464,11 @@ local function run_test_script()
             local dir = a:match("^dp(%a+)$")
             local sa, sv = a:match("^stick:(%a):([%-%d.]+)$")
             local wait = tonumber(a:match("^wait:([%d.]+)$") or "")
-            if wait then
+            local cx, cy = a:match("^click:([%d.]+):([%d.]+)$")      -- (a Mac: a mouse click at window x:y)
+            if cx and Touch.mouse then
+                Touch.mouse("down", tonumber(cx), tonumber(cy)); Touch.mouse("up", tonumber(cx), tonumber(cy))
+                Touch.poll(touch_event)
+            elseif wait then
                 love.timer.sleep(wait)           -- simulate time spent reading
             elseif a == "lid:close" or a == "lid:open" then
                 app.on_raw_key(LID_DEVICE, a == "lid:close" and LID_CLOSE or LID_OPEN)

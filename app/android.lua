@@ -21,6 +21,7 @@ local M = {}
 
 M.android = love.system.getOS() == "Android"
 M.ios = love.system.getOS() == "iOS"
+M.mac = love.system.getOS() == "OS X"          -- a Mac: the Duo's two-page layout in a window, the mouse as the finger
 M.active = M.android or M.ios
 M.PACKAGE = "com.casualducko.ereaderds"
 M.ROOT = "/storage/emulated/0"                  -- what Android apps see as /sdcard
@@ -33,6 +34,7 @@ if M.ios then
     M.ROOT = home .. "/Documents"
     M.CACHE = home .. "/Library/Caches"     -- (not backed up; what's copied out of the app goes here)
 end
+if M.mac then M.ROOT = (os.getenv("HOME") or "") .. "/Documents" end
 M.BOOKS = M.ROOT .. "/Ebook"
 M.DATA = M.BOOKS .. "/.ereaderds"
 M.CA_FILE = M.DATA .. "/cacerts.pem"            -- (net.lua looks for it at this path)
@@ -63,7 +65,7 @@ function M.is_dir(dir)
     return r == 0 or r == true
 end
 
-if not M.active then return M end
+if not (M.active or M.mac) then return M end
 
 ---------------------------------------------------------------- without a shell
 
@@ -106,7 +108,7 @@ end
 -- { width of one screen, hinge, height }.
 local MODEL = M.android and M.getprop("ro.product.model") or ""
 M.duo = M.android and M.getprop("ro.product.manufacturer"):lower():find("microsoft", 1, true) ~= nil
-M.phone = M.ios or M.duo
+M.phone = M.ios or M.duo or M.mac
 M.DUO_SHAPES = { ["Surface Duo"] = { 1350, 84, 1800 }, ["Surface Duo 2"] = { 1344, 66, 1892 } }
 M.duo_shape = M.DUO_SHAPES[MODEL] or { 1350, 84, 1800 }
 -- How many pixels a page (768x1024 units) gets on the Duo: what fits its
@@ -454,7 +456,7 @@ end
 
 -- Can we write to the books folder? (Needs Android's all-files access.)
 function M.storage_ok()
-    if M.ios then M.mkdir_p(M.DATA) return true end     -- (the app's own sandbox)
+    if M.ios or M.mac then M.mkdir_p(M.DATA) return true end     -- (the app's own sandbox)
     -- (Asking is enough when the folder is there, and quick: opening or making
     -- a file in shared storage costs Android much more.)
     local W_OK = 2
@@ -523,7 +525,7 @@ end
 -- One-time setup: all-files access, and the DualStack list. Returns a
 -- heading and a message when something's left for the reader to do, else nil.
 function M.setup()
-    if M.ios then M.mkdir_p(M.DATA) return nil end
+    if M.ios or M.mac then M.mkdir_p(M.DATA) return nil end
     -- An update installed since the last launch: its download isn't needed.
     for _, f in ipairs({ M.DATA .. "/.update.apk", M.INSTALL_STATUS }) do
         if C.access(f, 0) == 0 then os.remove(f) end

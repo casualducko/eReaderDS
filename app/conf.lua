@@ -32,6 +32,12 @@ function love.conf(t)
             end
         end)
     end
+    -- A Mac: a resizable window with a book's proportions (two pages), at the screen's own pixels.
+    if love._os == "OS X" and os.getenv("READER_SCALE") == nil then
+        t.window.width, t.window.height = 1440, 960
+        t.window.borderless, t.window.resizable, t.window.highdpi = false, true, true
+        t.window.minwidth, t.window.minheight = 720, 480
+    end
     t.window.vsync = 1
     t.window.display = tonumber(os.getenv("READER_DISPLAY")) or 1
     t.modules.audio = false
