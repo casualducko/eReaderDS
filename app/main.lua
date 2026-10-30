@@ -8740,23 +8740,20 @@ function app.tsync_setup()
 end
 
 function app.tsync_key_choose()
-    app.choose({ title = "Sync", options = {
-        { "I have a code (other devices)", function() app.tsync_code_type() end },
-        { "Make a new key (first device)", function()
+    app.choose({ title = "Sync your themes", options = {
+        { "Start syncing (first device)", function()
             S.themes_key = app.TSync.new_key()
             Store.save_settings(S)
-            app.ask({ question = "Your sync key is made", detail = "To add another device, open this page there and choose "
-                .. "I have a code. Get the code here: Y, then Add Another Device.",
-                yes = "Continue", on_yes = function() app.tsync_open() end, on_no = function() app.tsync_open() end })
+            app.tsync_open()
         end },
-        { "I have a key (typed in)", function() app.tsync_key_type() end },
+        { "Join with a code (other devices)", function() app.tsync_code_type() end },
     } })
 end
 
 -- A new device: the 8-digit code from another one, traded for the key.
 function app.tsync_code_type()
     app.kb_open({ title = "Pairing Code", ok = "Pair", max = 9,
-        hint = "On a device that already syncs: Y, then Add Another Device. Type the 8 digits it shows.",
+        hint = "On a device that already syncs, open Sync and choose Link another device. Type the 8 digits it shows.",
         submit = function(t) app.tsync_redeem(t) end })
 end
 
@@ -8815,19 +8812,19 @@ function app.tsync_key_type()
         end })
 end
 
--- Y: the server's settings.
+-- Y: the less usual things.
 function app.tsync_options()
-    app.choose({ title = "Sync server", options = {
-        { "Add Another Device", function() app.tsync_pair_make() end },
+    app.choose({ title = "Sync", options = {
         { "Check Again", function() app.tsync_open() end },
+        { "Join with a Code", function() app.tsync_code_type() end },
+        { "Type a Key Instead", function() app.tsync_key_type() end },
         { "Show the Key", function()
             app.ask({ question = "Your sync key", detail = (S.themes_key or "") .. "\n\n" .. ((S.themes_url or "") ~= "" and S.themes_url or "Shared server"),
-                yes = "Close", on_yes = function() end })
+                yes = "Close", no = "Close", on_yes = function() end })
         end },
         { "Use Another Server", function() app.tsync_setup() end },
-        { "Change Key or Pair Again", function() app.tsync_key_choose() end },
         { "Stop Syncing", function()
-            app.ask({ question = "Stop syncing?", detail = "Forgets the address and key here. Your themes stay.", yes = "Stop",
+            app.ask({ question = "Stop syncing?", detail = "Forgets the key on this device. Your themes stay.", yes = "Stop",
                 on_yes = function() S.themes_url, S.themes_key = "", ""; Store.save_settings(S); app.tsync_back() end })
         end },
     } })
@@ -8878,7 +8875,8 @@ function app.tsync_compare(theirs)
     app.TSync.defaults(g.diff)
     g.rows = {}
     for _, r in ipairs(g.diff) do g.rows[#g.rows + 1] = r end
-    if #g.diff > 0 then g.rows[#g.rows + 1] = { apply = true, name = "Apply" } end
+    if #g.diff > 0 then g.rows[#g.rows + 1] = { apply = true, name = "Sync now" } end
+    g.rows[#g.rows + 1] = { link = true, name = "Link another device" }
     g.sel, g.top = 1, 1
 end
 
@@ -8889,6 +8887,12 @@ function app.tsync_apply_ask()
     local sum = app.TSync.summary(counts)
     if not sum then app.toast("Nothing is set to change") return end
     local lines = app.TSync.describe(g.diff)
+    -- (Only adding and uploading: no question. Deleting or replacing a theme asks first.)
+    local risky = false
+    for _, r in ipairs(g.diff) do
+        if r.choice == "delete" or r.choice == "server_delete" or r.choice == "mine" or r.choice == "theirs" then risky = true end
+    end
+    if not risky then app.tsync_apply(here, server, g.diff) return end
     app.ask({ question = "Make these changes?", detail = table.concat(lines, "\n"),
         yes = "Sync now", no = "Not yet", on_yes = function() app.tsync_apply(here, server, g.diff) end })
 end
@@ -8943,6 +8947,7 @@ function app.tsync_action(a)
         app.TSync.cycle(r, (a == "left" or a == "prev") and -1 or 1)
     elseif a == "confirm" then
         if r and r.apply then app.tsync_apply_ask()
+        elseif r and r.link then app.tsync_pair_make()
         elseif r then app.TSync.cycle(r)
         elseif g.error and not g.loading then app.tsync_load() end
     elseif a == "menu" then app.tsync_apply_ask()
@@ -8964,7 +8969,8 @@ function app.tsync_tap(side, u, v)
     local idx = g.top + math.floor((v - 160) / app.TSYNC_ROW_H)
     local r = g.rows[idx]
     if idx >= g.top + list_rows(app.TSYNC_ROW_H) or not r then return end
-    if r.apply then g.sel = idx; app.tsync_apply_ask()
+    if r.link then g.sel = idx; app.tsync_pair_make()
+    elseif r.apply then g.sel = idx; app.tsync_apply_ask()
     elseif idx == g.sel then app.TSync.cycle(r); redraw()
     else g.sel = idx; redraw() end
 end
@@ -9023,7 +9029,10 @@ function app.tsync_draw(side)
         end
         if #g.diff == 0 then
             love.graphics.printf("Everything matches.\n\n" .. g.same .. (g.same == 1 and " theme is" or " themes are")
-                .. " the same here and on your server.", x, 180, w, "left")
+                .. " the same here and on your server.\n\nTo add another device, choose Link another device: it shows "
+                .. "an 8-digit code to type there (Join with a code).", x, 180, w, "left")
+        elseif r and r.link then
+            love.graphics.printf("Link another device\n\nShows an 8-digit code. On the other device, choose Join with a code and type it.", x, 180, w, "left")
         elseif r and r.apply then
             local _, _, counts = app.TSync.plan(g.mine, g.theirs, g.diff)
             love.graphics.printf((app.TSync.summary(counts) or "Nothing is set to change") .. ".\n\nA applies it.", x, 180, w, "left")
@@ -9067,7 +9076,15 @@ function app.tsync_draw(side)
         if it.apply then
             love.graphics.setFont(ui.bold)
             color(th.fg)
-            love.graphics.print("Apply", rx, centered_y(ui.bold, UI_SIZE, ry, h))
+            love.graphics.print(it.name, rx, centered_y(ui.bold, UI_SIZE, ry, h))
+            return
+        end
+        if it.link then
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.print(it.name, rx, centered_y(ui.font, UI_SIZE, ry, h))
+            color(th.dim)
+            love.graphics.printf("›", rx, centered_y(ui.font, UI_SIZE, ry, h), rw - 12, "right")
             return
         end
         local e = it.mine or it.theirs
@@ -9092,8 +9109,8 @@ function app.tsync_draw(side)
         color(it.choice == "skip" and th.dim or th.fg)
         love.graphics.printf(label, rx, centered_y(ui.small, SMALL_SIZE, ry, h), rw, "right")
     end)
-    local sel_apply = r and r.apply
-    app.hints(x, nil, { "A", sel_apply and "apply" or "change", "X", "apply", "Y", "server", "B", "back" })
+    local what = r and (r.apply and "sync" or (r.link and "link" or "change")) or "change"
+    app.hints(x, nil, { "A", what, "X", "sync", "Y", "more", "B", "back" })
     if g.diff and #g.diff > 0 then app.count(x, w, math.min(g.sel, #g.diff), #g.diff) end
 end
 
