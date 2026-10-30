@@ -55,6 +55,7 @@ pb "Set :CFBundleVersion $version"
 pb "Set :CFBundleIconFile eReaderDS"
 pb "Delete :CFBundleDocumentTypes"
 pb "Delete :UTExportedTypeDeclarations"
+pb "Set :LSApplicationCategoryType public.app-category.reference"      # (not a game: macOS turns Game Mode on for those)
 pb "Set :NSHumanReadableCopyright eReaderDS"
 pb "Add :NSDocumentsFolderUsageDescription string eReaderDS keeps your books and reading places in the Ebook folder in Documents."
 rm -f "$res/OS X AppIcon.icns" "$res/Assets.car" "$res/GameIcon.icns" 2>/dev/null || true

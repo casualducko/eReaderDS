@@ -11004,6 +11004,13 @@ function app.font_step(d)
     app.toast("Text size " .. size, 1)
 end
 
+-- A Mac: the window fills the screen, with the menu bar and the Dock out of the way (the pointer
+-- at the top edge brings the menu bar back), or is a window again. Remembered for the next start.
+function app.mac_fullscreen(on)
+    pcall(love.window.setFullscreen, on, "desktop")
+    if S.fullscreen ~= on then S.fullscreen = on; Store.save_settings(S) end
+end
+
 function app.mac_key(key, isrepeat, force_cmd)
     local cmd = force_cmd or love.keyboard.isDown("lgui", "rgui")
     local kb = app.mode == "keyboard" and app.kb
@@ -11028,7 +11035,7 @@ function app.mac_key(key, isrepeat, force_cmd)
     elseif key == "l" and reading then action("toc")
     elseif key == "b" and reading then action("bookmark")
     elseif key == "f" then
-        if love.keyboard.isDown("lctrl", "rctrl") then love.window.setFullscreen(not love.window.getFullscreen(), "desktop")
+        if love.keyboard.isDown("lctrl", "rctrl") then app.mac_fullscreen(not love.window.getFullscreen())
         elseif reading and book and not book.comic then app.find_open() end
     elseif key == "w" then love.event.quit()
     else return false end
@@ -12428,6 +12435,7 @@ function love.load()
         end)
     end
     Touch.open("gt9xx-0")
+    if require("android").mac and S.fullscreen then pcall(love.window.setFullscreen, true, "desktop") end
     if Touch.trackpad then Touch.trackpad() end            -- (a Mac: the trackpad's pinch)
     if not require("android").active then KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
         { ["gt9xx-0"] = true, ["Goodix Capacitive TouchScreen"] = true },  -- stock, ROCKNIX
@@ -12708,6 +12716,10 @@ function love.run()
                 if not love.quit() then return a or 0 end
             elseif name == "visible" or name == "focus" or name == "resize" or name == "displayrotated" then
                 if require("android").phone then print("[phone] " .. name, tostring(a), tostring(b)) end
+                -- (A Mac: the green button, or Escape-less ways out of full screen, are remembered too.)
+                if name == "resize" and require("android").mac and S.fullscreen ~= love.window.getFullscreen() then
+                    S.fullscreen = love.window.getFullscreen(); Store.save_settings(S)
+                end
                 redraw()
                 -- Android recreates the window's surfaces around these (and
                 -- GammaOS's DualStack reshapes it) without always saying when
