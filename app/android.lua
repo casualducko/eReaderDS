@@ -115,6 +115,8 @@ M.duo_shape = M.DUO_SHAPES[MODEL] or { 1350, 84, 1800 }
 -- screen. Canvases and fonts are made this dense, so the text is as sharp as
 -- the screen can show it, not drawn small and made bigger.
 M.render_k = M.duo and math.min(M.duo_shape[1] / 768, M.duo_shape[3] / 1024) or 1
+-- A Mac: the display's own density (2 on a Retina screen), so the text isn't drawn small and stretched.
+if M.mac then M.render_k = math.max(1, love.graphics.getDPIScale()) end
 
 function M.dir_exists(path)
     local ok, d = pcall(C.opendir, path)
@@ -659,7 +661,7 @@ local target
 if M.phone then
     local new_canvas = love.graphics.newCanvas
     local function dense(w, h)
-        return M.duo and (w == 2048 and h == 768 or w == 768 and h == 1024) and M.render_k or 1
+        return (M.duo or M.mac) and (w == 2048 and h == 768 or w == 768 and h == 1024) and M.render_k or 1
     end
     function love.graphics.newCanvas(w, h, a, b)
         if type(a) == "table" and b == nil then
@@ -672,7 +674,7 @@ if M.phone then
     end
 end
 -- Fonts the same: rasterized at the density, drawn at their size.
-if M.duo then
+if M.duo or (M.mac and M.render_k > 1) then
     local new_rasterizer = love.font.newRasterizer
     function love.font.newRasterizer(a, size, hinting, dpiscale, ...)
         if type(size) == "number" and dpiscale == nil then
