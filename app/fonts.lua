@@ -37,7 +37,7 @@ local function user_dirs()
         -- Android (and iOS): the Ebook folder the books use. (Android 11 and later
         -- keep apps out of /mnt/sdcard, so the paths above find nothing there.)
         local A = require("android")
-        if A.active then table.insert(dirs, 1, A.BOOKS .. "/Fonts") end
+        if A.active or A.mac then table.insert(dirs, 1, A.BOOKS .. "/Fonts") end
     end
     return dirs
 end

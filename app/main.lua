@@ -10986,7 +10986,70 @@ function app.volume_toggle(pre)
     redraw()
 end
 
+-- A Mac has a keyboard where the touchscreen has gestures: these stand in for them.
+--   Command + / -   text size (the pinch)           Command ,    Settings (the two-finger tap)
+--   Command 0       the standard text size          Command L    look up a word (the hold)
+--   Command F       find in the book                Command B    bookmark
+--   Control Command F   full screen                 Command W    close
+--   Scroll (trackpad or wheel)  turns pages
+-- and in a text box the keyboard types, Return confirms, Escape cancels, Command V pastes.
+function app.font_step(d)
+    if app.mode ~= "reader" or not book or book.comic then return end
+    local size = d == 0 and 40 or math.max(18, math.min(64, S.font_size + d * 2))
+    if size == S.font_size then return end
+    S.font_size = size
+    build_fonts()
+    goto_pos(pos.ch, pos.off)
+    Store.save_settings(S)
+    app.toast("Text size " .. size, 1)
+end
+
+function app.mac_key(key, isrepeat, force_cmd)
+    local cmd = force_cmd or love.keyboard.isDown("lgui", "rgui")
+    local kb = app.mode == "keyboard" and app.kb
+    if kb then
+        -- (Letters arrive as text, through love.textinput.)
+        if key == "backspace" then app.kb_press("del") return true
+        elseif isrepeat and key ~= "left" and key ~= "right" then return true
+        elseif key == "return" or key == "kpenter" then app.kb_press("ok") return true
+        elseif key == "escape" then app.kb_press("cancel") return true
+        elseif key == "left" then kb.pos = app.kb_prev(kb.text, kb.pos); redraw() return true
+        elseif key == "right" then kb.pos = app.kb_next(kb.text, kb.pos); redraw() return true
+        elseif cmd and key == "v" then app.kb_type((love.system.getClipboardText() or ""):gsub("[\r\n]+", " ")) return true
+        end
+        return not cmd
+    end
+    if not cmd or isrepeat then return false end
+    local reading = app.mode == "reader"
+    if key == "=" or key == "kp+" then app.font_step(1)
+    elseif key == "-" or key == "kp-" then app.font_step(-1)
+    elseif key == "0" then app.font_step(0)
+    elseif key == "," then action("menu")
+    elseif key == "l" and reading then action("toc")
+    elseif key == "b" and reading then action("bookmark")
+    elseif key == "f" then
+        if love.keyboard.isDown("lctrl", "rctrl") then love.window.setFullscreen(not love.window.getFullscreen(), "desktop")
+        elseif reading and book and not book.comic then app.find_open() end
+    elseif key == "w" then love.event.quit()
+    else return false end
+    return true
+end
+
+function love.textinput(text)
+    if app.mode == "keyboard" and app.kb and require("android").mac then app.kb_type(text) end
+end
+
+-- Scrolling turns pages (a trackpad's momentum would turn many: one turn, then a short rest).
+function love.wheelmoved(x, y)
+    if not require("android").mac or app.mode ~= "reader" or app.asking or app.choosing then return end
+    local now = love.timer.getTime()
+    if math.abs(y) < 0.5 or now < (app.wheel_rest or 0) then return end
+    app.wheel_rest = now + 0.4
+    action(y < 0 and "next" or "prev")
+end
+
 function love.keypressed(key, scancode, isrepeat)
+    if require("android").mac and app.mac_key(key, isrepeat) then return end
     local a = KEYS[key]
     local vol = (key == "pagedown" or key == "pageup") and require("android").duo
     if isrepeat then
@@ -12261,7 +12324,7 @@ function love.load()
             end
             love.window.setDisplaySleepEnabled(true)
             -- (No system keyboard: the app has its own. SDL may have started text input.)
-            if love.keyboard.hasTextInput() then love.keyboard.setTextInput(false) end
+            if love.keyboard.hasTextInput() and not require("android").mac then love.keyboard.setTextInput(false) end
         end
         app.redraw_until = love.timer.getTime() + 8           -- (see love.run: surfaces settling)
         print(string.format("[android] window %dx%d, pixels %dx%d, dpi scale %.2f",
@@ -12465,7 +12528,11 @@ local function run_test_script()
             local sa, sv = a:match("^stick:(%a):([%-%d.]+)$")
             local wait = tonumber(a:match("^wait:([%d.]+)$") or "")
             local cx, cy = a:match("^click:([%d.]+):([%d.]+)$")      -- (a Mac: a mouse click at window x:y)
-            if cx and Touch.mouse then
+            local ck = a:match("^cmd:(.+)$")                         -- (a Mac: Command + that key)
+            local tx = a:match("^type:(.+)$")                        -- (a Mac: typing into a text box)
+            if ck then app.mac_key(ck, false, true)
+            elseif tx then love.textinput(tx)
+            elseif cx and Touch.mouse then
                 Touch.mouse("down", tonumber(cx), tonumber(cy)); Touch.mouse("up", tonumber(cx), tonumber(cy))
                 Touch.poll(touch_event)
             elseif wait then

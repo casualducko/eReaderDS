@@ -123,6 +123,12 @@ local function load_ssl()
     if bundle and io.open(bundle .. "/Frameworks/libssl.3.dylib", "rb") then
         names = { bundle .. "/Frameworks/libssl.3.dylib" }
     end
+    -- A Mac app (mac/build.sh): LÖVE's own layout, with OpenSSL beside its frameworks.
+    local ok_src, src = pcall(function() return love.filesystem.getSourceBaseDirectory() end)
+    local fw = ok_src and src and src:match("^(.*%.app/Contents)/Resources$")
+    if fw and io.open(fw .. "/Frameworks/libssl.3.dylib", "rb") then
+        names = { fw .. "/Frameworks/libssl.3.dylib" }
+    end
     for _, name in ipairs(names) do
         local ok, lib = pcall(ffi.load, name)
         if ok and pcall(function() return lib.TLS_client_method end) then

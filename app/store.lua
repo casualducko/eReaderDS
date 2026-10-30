@@ -48,7 +48,7 @@ local DEFAULTS = {
 
 local function data_dir()
     local d = os.getenv("READER_DATA")
-    if not d then d = Android.active and Android.DATA or (love.filesystem.getSource() .. "/data") end
+    if not d then d = (Android.active or Android.mac) and Android.DATA or (love.filesystem.getSource() .. "/data") end
     Android.mkdir(d)
     return d
 end
@@ -218,7 +218,7 @@ function M.book_dirs()
     local dirs = {}
     if env then
         for d in env:gmatch("[^:]+") do dirs[#dirs + 1] = d end
-    elseif Android.active then
+    elseif Android.active or Android.mac then
         dirs = { Android.BOOKS }
     else
         dirs = { "/mnt/mmc/Ebook", "/mnt/sdcard/Ebook", "/mnt/mmc/Books" }
