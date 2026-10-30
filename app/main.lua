@@ -11039,13 +11039,53 @@ function love.textinput(text)
     if app.mode == "keyboard" and app.kb and require("android").mac then app.kb_type(text) end
 end
 
--- Scrolling turns pages (a trackpad's momentum would turn many: one turn, then a short rest).
+-- Two fingers sliding on a Mac's trackpad (or a wheel): up is brighter and down is dimmer, as a
+-- slide on the touchscreen is (the same steps, the dimmest ones the page's own extra dimming); a
+-- sideways flick turns a page. The direction follows the system's "natural scrolling" setting.
+function app.natural_scroll()
+    if app.natural == nil then
+        local p = io.popen("defaults read -g com.apple.swipescrolldirection 2>/dev/null")
+        local v = p and p:read("*l")
+        if p then p:close() end
+        app.natural = v ~= "0"
+    end
+    return app.natural
+end
+
 function love.wheelmoved(x, y)
     if not require("android").mac or app.mode ~= "reader" or app.asking or app.choosing then return end
     local now = love.timer.getTime()
-    if math.abs(y) < 0.5 or now < (app.wheel_rest or 0) then return end
-    app.wheel_rest = now + 0.4
-    action(y < 0 and "next" or "prev")
+    local natural = app.natural_scroll()
+    if math.abs(x) > math.abs(y) then
+        -- (A trackpad's momentum would turn many pages: one turn, then a short rest.)
+        if math.abs(x) < 1 or now < (app.wheel_rest or 0) then return end
+        app.wheel_rest = now + 0.45
+        action(((natural and x < 0) or (not natural and x > 0)) and "next" or "prev")
+        return
+    end
+    if y == 0 then return end
+    -- Where the slide is: kept while it goes on, taken afresh from the screen after a rest.
+    if not app.bri_p or now - (app.bri_t or 0) > 1.2 then
+        app.bri_p = S.extra_dim > 0 and (0.1 - S.extra_dim * 0.05) or math.sqrt(current_brightness() / 100)
+    end
+    app.bri_t = now
+    local up = (natural and y < 0) or (not natural and y > 0)
+    local p = math.max(0.1 - 0.05 * #EXTRA_DIM, math.min(1, app.bri_p + (up and 1 or -1) * math.abs(y) * 0.0015))
+    app.bri_p = p
+    local pct, extra = 1, 0
+    if p < 0.1 then
+        extra = math.max(1, math.min(#EXTRA_DIM, math.ceil((0.1 - p) / 0.05)))
+    else
+        pct = math.max(1, math.min(100, math.floor(p * p * 100 + 0.5)))
+    end
+    S.extra_dim = extra
+    if Backlight.available() and pct ~= S.brightness then
+        S.brightness = pct
+        Backlight.set(pct)
+    end
+    overlay = { pct = Backlight.available() and pct or nil, extra = extra, hide_at = now + 0.9 }
+    app.bri_save = now + 0.6
+    redraw()
 end
 
 function love.keypressed(key, scancode, isrepeat)
@@ -12395,6 +12435,7 @@ function love.load()
         end)
     end
     Touch.open("gt9xx-0")
+    if Touch.trackpad then Touch.trackpad() end            -- (a Mac: the trackpad's pinch)
     if not require("android").active then KeyProbe.open(function(device, code) app.on_raw_key(device, code) end,
         { ["gt9xx-0"] = true, ["Goodix Capacitive TouchScreen"] = true },  -- stock, ROCKNIX
         { [LID_DEVICE] = true, [app.BACK_DEVICE] = true }) end
@@ -12530,7 +12571,9 @@ local function run_test_script()
             local cx, cy = a:match("^click:([%d.]+):([%d.]+)$")      -- (a Mac: a mouse click at window x:y)
             local ck = a:match("^cmd:(.+)$")                         -- (a Mac: Command + that key)
             local tx = a:match("^type:(.+)$")                        -- (a Mac: typing into a text box)
+            local wx, wy = a:match("^wheel:([%-%d.]+):([%-%d.]+)$")  -- (a Mac: a two-finger slide)
             if ck then app.mac_key(ck, false, true)
+            elseif wx then love.wheelmoved(tonumber(wx), tonumber(wy))
             elseif tx then love.textinput(tx)
             elseif cx and Touch.mouse then
                 Touch.mouse("down", tonumber(cx), tonumber(cy)); Touch.mouse("up", tonumber(cx), tonumber(cy))
@@ -12736,6 +12779,7 @@ function love.run()
             overlay = nil; redraw()
         end
         if save_due and love.timer.getTime() >= save_due then save_progress() end
+        if app.bri_save and love.timer.getTime() >= app.bri_save then app.bri_save = nil; Store.save_settings(S) end
         if app.mode == "library" and not lid.closed then
             -- Wi-Fi coming or going changes the Get Books button.
             local was = shop.online_v

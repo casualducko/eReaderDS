@@ -15,6 +15,27 @@ local devices
 local ANDROID = love and love.system and (love.system.getOS() == "Android" or love.system.getOS() == "iOS")
 local android_pct                               -- what it was last set to
 
+-- A Mac: the built-in display's brightness, through DisplayServices (the same private
+-- framework the keyboard's brightness keys use). An external display, or a Mac without it,
+-- answers with an error and brightness stays the system's.
+local MAC = love and love.system and love.system.getOS() == "OS X"
+local mac                                       -- false, or { ds, id }
+local function mac_open()
+    if mac ~= nil then return mac end
+    mac = false
+    pcall(function()
+        local ffi = require("ffi")
+        pcall(ffi.cdef, [[ unsigned int CGMainDisplayID(void);
+            int DisplayServicesGetBrightness(unsigned int d, float *b);
+            int DisplayServicesSetBrightness(unsigned int d, float b); ]])
+        local ds = ffi.load("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices")
+        local id = ffi.C.CGMainDisplayID()
+        local b = ffi.new("float[1]")
+        if ds.DisplayServicesGetBrightness(id, b) == 0 then mac = { ds = ds, id = id, buf = b } end
+    end)
+    return mac
+end
+
 local function write(path, value)
     if ANDROID then return false end
     local f = io.open(path, "w")
@@ -49,12 +70,18 @@ local function scan()
 end
 
 function M.available()
+    if MAC then return mac_open() and true or false end
     if ANDROID then return require("android").window_brightness_ok() end
     return #(devices or scan()) > 0
 end
 
 -- Current brightness in percent (of the first backlight).
 function M.get()
+    if MAC then
+        local m = mac_open()
+        if m and m.ds.DisplayServicesGetBrightness(m.id, m.buf) == 0 then return math.floor(m.buf[0] * 100 + 0.5) end
+        return nil
+    end
     if ANDROID and android_pct then return android_pct end
     if ANDROID and require("android").ios then
         local v = require("android").ios_brightness()
@@ -67,6 +94,11 @@ function M.get()
 end
 
 function M.set(pct)
+    if MAC then
+        local m = mac_open()
+        if m then m.ds.DisplayServicesSetBrightness(m.id, math.max(0.01, math.min(1, pct / 100))) end
+        return
+    end
     if ANDROID then
         -- (Android's own scale: 1/255 is its dimmest, as the backlight's 1.)
         android_pct = pct
@@ -85,6 +117,7 @@ end
 -- Turn the screens' backlights off or back on (for the lid). Uses bl_power when
 -- the driver has it (4 = powered down), otherwise brightness 0; `pct` restores.
 function M.power(on, pct)
+    if MAC then return end
     if ANDROID then
         -- (0 is as dark as Android goes for a window.)
         if on then M.set(pct or android_pct or 50)

@@ -114,6 +114,60 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
             if kind == "move" and not fingers.mouse then return end
             touch("mouse", x, y, kind ~= "up")
         end
+
+        -- The trackpad's pinch (SDL has no event for it): a monitor on the app's own events,
+        -- through the Objective-C runtime. Its callback only notes what happened; the pinch
+        -- goes out with the other touches, from poll(). The size follows the pinch as a
+        -- distance, as two fingers on a touchscreen would give it: 300 apart at the start,
+        -- and the page's text size scales with the square of that ratio's root, so the
+        -- distance goes with the square of the trackpad's scale.
+        local pad_scale
+        local function magnify(phase, mag)
+            if phase == 1 or not pad_scale then
+                pad_scale = 1
+                queue[#queue + 1] = { "pinch_start", 300 }
+            end
+            pad_scale = math.max(0.2, pad_scale * (1 + mag))
+            queue[#queue + 1] = { "pinch", 300 * pad_scale * pad_scale }
+            if phase == 8 or phase == 16 then               -- ended, or cancelled
+                queue[#queue + 1] = { "pinch_end" }
+                pad_scale = nil
+            end
+        end
+        function M.trackpad()
+            local ok, err = pcall(function()
+                local ffi = require("ffi")
+                ffi.cdef([[
+                    typedef void *rgds_id;
+                    typedef void *rgds_SEL;
+                    typedef struct { unsigned long reserved, size; } rgds_block_desc;
+                    typedef struct { void *isa; int flags, reserved; void *invoke; rgds_block_desc *desc; } rgds_block;
+                    extern void *_NSConcreteGlobalBlock[32];
+                    rgds_id objc_getClass(const char *name);
+                    rgds_SEL sel_registerName(const char *name);
+                    rgds_id pad_send_mon(rgds_id self, rgds_SEL op, unsigned long long mask, void *block) __asm__("objc_msgSend");
+                    double pad_send_dbl(rgds_id self, rgds_SEL op) __asm__("objc_msgSend");
+                    unsigned long pad_send_ul(rgds_id self, rgds_SEL op) __asm__("objc_msgSend");
+                ]])
+                local C = ffi.C
+                local sel_mag, sel_phase = C.sel_registerName("magnification"), C.sel_registerName("phase")
+                -- (a block that returns the event it was given, so it carries on to the window)
+                local callback = ffi.cast("void *(*)(void *, void *)", function(_, event)
+                    pcall(function() magnify(tonumber(C.pad_send_ul(event, sel_phase)), C.pad_send_dbl(event, sel_mag)) end)
+                    return event
+                end)
+                local block = ffi.new("rgds_block")
+                block.isa = ffi.cast("void *", C._NSConcreteGlobalBlock)
+                block.flags = 0x10000000                        -- BLOCK_IS_GLOBAL
+                block.invoke = ffi.cast("void *", callback)
+                block.desc = ffi.new("rgds_block_desc", 0, ffi.sizeof("rgds_block"))
+                M.pad_keep = { callback, block }                -- (kept alive, or the garbage collector frees them)
+                local mask = 2 ^ 30                             -- NSEventMaskMagnify
+                C.pad_send_mon(C.objc_getClass("NSEvent"), C.sel_registerName("addLocalMonitorForEventsMatchingMask:handler:"),
+                    mask, block)
+            end)
+            if not ok then print("[trackpad] pinch not available: " .. tostring(err)) end
+        end
     end
 
     function M.open() M.enabled = true; return true end
