@@ -167,4 +167,29 @@ function M.summary(counts)
     return s:sub(1, 1):upper() .. s:sub(2)
 end
 
+-- What the chosen changes are, one line per kind, for the confirm card and the
+-- result page: "Add to this device: Ducko, My Dracula". `done` is past tense.
+local WHAT = {
+    { "add", "Add to this device", "Added to this device" },
+    { "upload", "Upload to your server", "Uploaded to your server" },
+    { "theirs", "Use the server's version of", "Now using the server's version of" },
+    { "mine", "Send your version of", "Sent your version of" },
+    { "delete", "Delete from this device", "Deleted from this device" },
+    { "server_delete", "Delete from your server", "Deleted from your server" },
+}
+function M.describe(rows, done)
+    local lines = {}
+    for _, w in ipairs(WHAT) do
+        local names = {}
+        for _, r in ipairs(rows) do if r.choice == w[1] then names[#names + 1] = r.name end end
+        if #names > 0 then
+            local shown = {}
+            for i = 1, math.min(3, #names) do shown[i] = names[i] end
+            local more = #names > 3 and (" and " .. (#names - 3) .. " more") or ""
+            lines[#lines + 1] = (done and w[3] or w[2]) .. ": " .. table.concat(shown, ", ") .. more
+        end
+    end
+    return lines
+end
+
 return M

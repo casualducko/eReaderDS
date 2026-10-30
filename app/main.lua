@@ -5141,9 +5141,24 @@ function app.theme_draw(side)
     T.row_btns = {}
     draw_list(side, T.list, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw, selected)
         local h = row_h - 4
+        if t.action then
+            -- "Sync with your other devices": a tile like New Theme's, the word Sync in it, and a ›.
+            color(th.dim)
+            love.graphics.setLineWidth(2)
+            love.graphics.rectangle("line", rx, ry + 8, 96, h - 16, 8, 8)
+            love.graphics.setLineWidth(1)
+            love.graphics.setFont(ui.small)
+            color(th.fg)
+            love.graphics.printf("Sync", rx, centered_y(ui.small, SMALL_SIZE, ry + 4, h - 8), 96, "center")
+            love.graphics.setFont(ui.font)
+            love.graphics.print(fit_text(ui.font, t.name, rw - 96 - 24 - 60), rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
+            color(th.dim)
+            love.graphics.printf("›", rx, centered_y(ui.font, UI_SIZE, ry, h), rw - 12, "right")
+            return
+        end
         if t.hidden_row then
             love.graphics.setFont(ui.font)
-            color(t.action and th.fg or th.dim)
+            color(th.dim)
             love.graphics.print(t.name .. "  ›", rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
             return
         end
@@ -8696,7 +8711,7 @@ function app.tsync_ready() return app.tsync_url() ~= nil and (S.themes_key or ""
 function app.tsync_open()
     if not app.tsync_ready() then app.tsync_setup() return end
     local g = app.tsync
-    g.sel, g.top, g.rows, g.error = 1, 1, nil, nil
+    g.sel, g.top, g.rows, g.error, g.result = 1, 1, nil, nil, nil
     app.mode = "themesync"
     app.tsync_load()
     redraw()
@@ -8817,12 +8832,14 @@ function app.tsync_apply_ask()
     local here, server, counts = app.TSync.plan(g.mine, g.theirs, g.diff)
     local sum = app.TSync.summary(counts)
     if not sum then app.toast("Nothing is set to change") return end
-    app.ask({ question = sum .. "?", detail = server and "This device and the server both change." or "",
-        yes = "Apply", on_yes = function() app.tsync_apply(here, server, sum) end })
+    local lines = app.TSync.describe(g.diff)
+    app.ask({ question = "Make these changes?", detail = table.concat(lines, "\n"),
+        yes = "Sync now", no = "Not yet", on_yes = function() app.tsync_apply(here, server, g.diff) end })
 end
 
 -- The server first (so a failure leaves everything as it was), then this device.
-function app.tsync_apply(here, server, sum)
+-- Afterwards the page says what was done (A, B or a tap goes back to the themes).
+function app.tsync_apply(here, server, rows)
     local g = app.tsync
     local function finish()
         g.applying = false
@@ -8832,18 +8849,18 @@ function app.tsync_apply(here, server, sum)
         if S.night_theme ~= "off" and not app.theme_named(S.night_theme) then S.night_theme = "off" end
         app.night_check()
         Store.save_settings(S)
-        app.tsync_back()
-        app.toast("Themes synced\n" .. sum, 3)
+        g.result = app.TSync.describe(rows, true)
+        g.rows, g.diff = nil, nil
+        redraw()
     end
     if not server then finish() return end
     for _, e in ipairs(g.skipped or {}) do server[#server + 1] = e end
     local body = #server == 0 and '{"version":1,"themes":[]}' or require("json").encode({ version = 1, themes = server })
     if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
     g.applying = true
-    app.toast("Syncing…", 20)
+    redraw()
     shop.net_job({ kind = "call", method = "PUT", url = app.tsync_url(), headers = app.tsync_headers(true), body = body,
             timeout = 20 }, function(msg)
-        app.untoast()
         if msg.kind ~= "done" or msg.status ~= 200 then
             g.applying = false
             app.toast("Couldn't update the server\nNothing was changed.", 3)
@@ -8857,6 +8874,11 @@ end
 
 function app.tsync_action(a)
     local g = app.tsync
+    if g.result then                                -- the result page: any of these goes back
+        if a == "confirm" or a == "back" or a == "menu" then g.result = nil; app.tsync_back() return end
+        return
+    end
+    if g.applying then return end
     local rows = g.rows or {}
     local r = rows[g.sel]
     if a == "up" then g.sel = math.max(1, g.sel - 1)
@@ -8875,6 +8897,8 @@ end
 
 function app.tsync_tap(side, u, v)
     local g = app.tsync
+    if g.result then g.result = nil; app.tsync_back() return end
+    if g.applying then return end
     if side ~= "right" then return end
     if not g.rows then
         if g.error and not g.loading then app.tsync_load() end
@@ -8924,6 +8948,19 @@ function app.tsync_draw(side)
         love.graphics.print("Sync Themes", x, 60)
         love.graphics.setFont(ui.font)
         color(th.dim)
+        if g.result then
+            color(th.fg)
+            love.graphics.setFont(ui.bold)
+            love.graphics.printf("✓  Themes synced", x, 180, w, "left")
+            love.graphics.setFont(ui.font)
+            color(th.dim)
+            love.graphics.printf(#g.result > 0 and table.concat(g.result, "\n\n") or "Nothing needed changing.", x, 260, w, "left")
+            return
+        end
+        if g.applying then
+            love.graphics.printf("Syncing…\n\nSending your themes to the server.", x, 180, w, "left")
+            return
+        end
         if not g.diff then
             love.graphics.printf(g.loading and "Asking your server…" or (g.error or ""), x, 180, w, "left")
             return
@@ -8957,7 +8994,14 @@ function app.tsync_draw(side)
     local x = m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(g.diff and "Changes" or "", x, 60)
+    love.graphics.print(g.result and "Done" or (g.diff and "Changes" or ""), x, 60)
+    if g.result then
+        love.graphics.setFont(ui.font)
+        color(th.dim)
+        love.graphics.printf("Tap, or press A, to go back to your themes.", x, 180, w, "left")
+        app.hints(x, nil, { "A", "done" })
+        return
+    end
     if not g.rows then return end
     local rows_n = list_rows(app.TSYNC_ROW_H)
     if g.sel < g.top then g.top = g.sel end
