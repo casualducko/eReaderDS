@@ -4797,7 +4797,7 @@ local function draw_list(side, items, sel, first, rows, x, y, w, row_h, render)
         local it = items[idx]
         if not it then break end
         local ry = y + r * row_h
-        if idx == sel then
+        if idx == sel and not it.no_highlight then
             color(th.sel)
             love.graphics.rectangle("fill", x - 14, ry, w + 28, row_h - 4, 10, 10)
         end
@@ -5162,17 +5162,22 @@ function app.theme_draw(side)
             return
         end
         if t.new then
-            -- "New Theme" and "Sync" side by side: two buttons on the one row.
+            -- "New" and "Sync" side by side: two buttons on the one row. (No highlight bar behind
+            -- them: the ring on New shows the row is selected; Y is Sync.)
             local bh, by, gap = h - 8, ry + 4, 18
-            local sw = math.floor(rw * 0.34)
-            local nw = rw - sw - gap
-            T.btn_new, T.btn_sync = { rx, by, nw, bh }, { rx + nw + gap, by, sw, bh }
-            app.button(rx, by, nw, bh, "+  New Theme", nil, "soft")
-            app.button(rx + nw + gap, by, sw, bh, "Sync", "Y", "soft")
-            color(th.dim, 0.8)                      -- (an outline: the row's highlight is the same colour as a button)
+            local bw = math.floor((rw - gap) / 2)
+            T.btn_new, T.btn_sync = { rx, by, bw, bh }, { rx + bw + gap, by, bw, bh }
+            app.button(rx, by, bw, bh, "New", "A", "soft")
+            app.button(rx + bw + gap, by, bw, bh, "Sync", "Y", "soft")
+            color(th.dim, 0.8)                      -- (an outline: a button is the same colour as the panel's row)
             love.graphics.setLineWidth(2)
-            love.graphics.rectangle("line", rx, by, nw, bh, bh / 2, bh / 2)
-            love.graphics.rectangle("line", rx + nw + gap, by, sw, bh, bh / 2, bh / 2)
+            love.graphics.rectangle("line", rx, by, bw, bh, bh / 2, bh / 2)
+            love.graphics.rectangle("line", rx + bw + gap, by, bw, bh, bh / 2, bh / 2)
+            if selected then
+                color(th.fg)
+                love.graphics.setLineWidth(3)
+                love.graphics.rectangle("line", rx - 5, by - 5, bw + 10, bh + 10, (bh + 10) / 2, (bh + 10) / 2)
+            end
             love.graphics.setLineWidth(1)
             return
         end
@@ -5249,7 +5254,7 @@ end
 -- and the highlight are mixed from the two colours. Kept in themes.txt
 -- (store.lua) and listed in THEMES like the others (custom = true), so one
 -- can be the reading theme or the night theme.
-app.NEW_THEME = { name = "New Theme", new = true }
+app.NEW_THEME = { name = "New Theme", new = true, no_highlight = true }     -- (a row of two buttons: no highlight bar)
 app.EDIT_THEME = { name = "\0editing", custom = true, hidden = true }
 THEMES[#THEMES + 1] = app.EDIT_THEME
 -- The Themes pages' own look: a neutral mid-dark grey.
