@@ -758,15 +758,21 @@ function M.present(canvas)
             local cream = { 240 / 255, 232 / 255, 208 / 255 }
             local pad = W * 0.08
             local ask = M.duo and "Open your Surface Duo to read" or "Open your iPhone Duo to read"
-            local note = M.duo and "eReaderDS is a two-page reader. Drag it across both screens, held like a book."
-                or "eReaderDS is a two-page reader, made for the open Duo."
+            -- (Paragraphs, each its own: a gap after the heading and between them.)
+            local notes = M.duo and { "eReaderDS is a two-page reader.", "Drag it across both screens, held like a book." }
+                or { "eReaderDS is a two-page reader, made for the open Duo." }
             local lw = W * 0.55
             local logo_h = art.img and lw * art.img:getHeight() / art.img:getWidth() or 0
             local _, ask_lines = art.ask:getWrap(ask, W - 2 * pad)
-            local _, note_lines = art.note:getWrap(note, W - 2 * pad)
             local gap = W * 0.04
+            local after_ask, between = gap * 1.1, gap * 0.8
+            local note_h = 0
+            for i, text in ipairs(notes) do
+                local _, lines = art.note:getWrap(text, W - 2 * pad)
+                note_h = note_h + #lines * art.note:getHeight() + (i > 1 and between or 0)
+            end
             local total = logo_h + gap + art.name:getHeight() + gap * 1.6 + #ask_lines * art.ask:getHeight()
-                + gap * 0.6 + #note_lines * art.note:getHeight()
+                + after_ask + note_h
             local y = (H - total) / 2
             love.graphics.setColor(1, 1, 1)
             if art.img then love.graphics.draw(art.img, (W - lw) / 2, y, 0, lw / art.img:getWidth()) end
@@ -777,10 +783,14 @@ function M.present(canvas)
             y = y + art.name:getHeight() + gap * 1.6
             love.graphics.setFont(art.ask)
             love.graphics.printf(ask, pad, y, W - 2 * pad, "center")
-            y = y + #ask_lines * art.ask:getHeight() + gap * 0.6
+            y = y + #ask_lines * art.ask:getHeight() + after_ask
             love.graphics.setColor(cream[1], cream[2], cream[3], 0.7)
             love.graphics.setFont(art.note)
-            love.graphics.printf(note, pad, y, W - 2 * pad, "center")
+            for i, text in ipairs(notes) do
+                local _, lines = art.note:getWrap(text, W - 2 * pad)
+                love.graphics.printf(text, pad, y, W - 2 * pad, "center")
+                y = y + #lines * art.note:getHeight() + between
+            end
             love.graphics.setColor(1, 1, 1)
             return
         end
