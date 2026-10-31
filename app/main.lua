@@ -8981,37 +8981,72 @@ function app.tsync_code_draw(side)
     local th = theme()
     local m = MARGINS[2]
     local code = app.tsync.code:upper()
-    local shown = #code == 8 and (code:sub(1, 4) .. "  " .. code:sub(5)) or code
     if side == "left" then
         local x, w = m.outer, PAGE_W - m.outer - m.inner
         love.graphics.setFont(ui.title)
         color(th.fg)
-        love.graphics.print("Your Sync Code", x, 60)
-        love.graphics.setFont(ui.font)
-        color(th.fg)
-        love.graphics.printf("On each of your other devices:", x, 190, w, "left")
-        love.graphics.printf("1.  Open Themes, then Custom, then Sync with your other devices.", x, 290, w, "left")
-        love.graphics.printf("2.  Choose Join with a code.", x, 500, w, "left")
-        love.graphics.printf("3.  Type the code shown on the right.", x, 600, w, "left")
+        love.graphics.print("Add Another Device", x, 60)
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.printf("The same code works on all your devices. Keep it private: anyone with it can change your themes.",
-            x, PAGE_H - 150, w, "left")
+        love.graphics.printf("On each of your other devices:", x, 170, w, "left")
+        -- Three steps, each a numbered circle and its words.
+        local steps = {
+            "Open Theme in Settings, then Custom, then Sync with your other devices.",
+            "Choose Join with a code.",
+            "Type the code shown on the right page.",
+        }
+        local y, d = 230, 56
+        for i, text in ipairs(steps) do
+            color(th.fg)
+            love.graphics.circle("fill", x + d / 2, y + d / 2, d / 2)
+            color(th.bg)
+            love.graphics.setFont(ui.bold)
+            love.graphics.printf(tostring(i), x, centered_y(ui.bold, UI_SIZE, y, d), d, "center")
+            color(th.fg)
+            love.graphics.setFont(ui.font)
+            local tw = w - d - 24
+            local _, lines = ui.font:getWrap(text, tw)
+            local th_ = #lines * ui.font:getHeight()
+            love.graphics.printf(text, x + d + 24, y + math.max(0, (d - th_) / 2), tw, "left")
+            y = y + math.max(d, th_) + 44
+        end
+        -- A note, in a card at the foot.
+        local ch = 150
+        local cy = PAGE_H - 70 - ch - 30
+        color(th.sel)
+        love.graphics.rectangle("fill", x - 14, cy, w + 28, ch, 14, 14)
+        love.graphics.setFont(ui.bold)
+        color(th.fg)
+        love.graphics.print("Keep it private", x + 10, cy + 18)
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf("The same code works on all your devices. Anyone who has it can change your themes.",
+            x + 10, cy + 18 + ui.bold:getHeight() + 8, w - 20, "left")
         return
     end
     local x, w = m.inner, PAGE_W - m.outer - m.inner
     love.graphics.setFont(ui.title)
-    color(th.dim)
-    love.graphics.printf("Sync code", x, 60, w, "center")
-    local f = ui.title
-    local sc = math.min(3.4, (w - 20) / f:getWidth(shown))
-    love.graphics.push()
-    love.graphics.translate(x + w / 2, 360)
-    love.graphics.scale(sc, sc)
     color(th.fg)
+    love.graphics.printf("Your Sync Code", x, 60, w, "center")
+    -- The code in a card, in a real large font (not a small one stretched).
+    local shown = #code == 8 and (code:sub(1, 4) .. "  " .. code:sub(5)) or code
+    local one_line = #code == 8 and ui.big:getWidth(shown) <= w - 50
+    local f = ui.big
+    local lines = one_line and { shown } or (#code == 8 and { code:sub(1, 4), code:sub(5) } or nil)
+    if not lines then f = ui.title; lines = { code } end
+    local lh = f:getHeight()
+    local ch = #lines * lh + 90
+    local cy = 220
+    color(th.sel)
+    love.graphics.rectangle("fill", x - 14, cy, w + 28, ch, 18, 18)
     love.graphics.setFont(f)
-    love.graphics.print(shown, -f:getWidth(shown) / 2, -f:getHeight() / 2)
-    love.graphics.pop()
+    color(th.fg)
+    for i, line in ipairs(lines) do
+        love.graphics.printf(line, x, cy + 45 + (i - 1) * lh, w, "center")
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.printf("Capitals and spaces don't matter.", x, cy + ch + 24, w, "center")
     app.hints(x, nil, { "A", "done" })
 end
 
