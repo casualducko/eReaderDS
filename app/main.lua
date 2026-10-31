@@ -5157,9 +5157,18 @@ function app.theme_draw(side)
             return
         end
         if t.hidden_row then
-            love.graphics.setFont(ui.font)
+            -- "3 hidden themes": a tile with the number (like New Theme's plus), the words, and a ›.
             color(th.dim)
-            love.graphics.print(t.name .. "  ›", rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
+            love.graphics.setLineWidth(2)
+            love.graphics.rectangle("line", rx, ry + 8, 96, h - 16, 8, 8)
+            love.graphics.setLineWidth(1)
+            love.graphics.setFont(ui.bold)
+            color(th.fg)
+            love.graphics.printf(t.name:match("^%d+") or "", rx, centered_y(ui.bold, UI_SIZE, ry + 4, h - 8), 96, "center")
+            love.graphics.setFont(ui.font)
+            love.graphics.print(fit_text(ui.font, (t.name:gsub("^%d+ ", "")), rw - 96 - 24 - 60), rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
+            color(th.dim)
+            love.graphics.printf("›", rx, centered_y(ui.font, UI_SIZE, ry, h), rw - 12, "right")
             return
         end
         if t.new then
@@ -6156,6 +6165,10 @@ function shop.draw(side)
                 or pg.error and ("Couldn't load this page:\n" .. pg.error)
                 or "Nothing here."
             love.graphics.printf(text, x, 180, w, "left")
+            if pg.error and not pg.loading then
+                local bx, by, bw, bh = app.recv_button()
+                app.button(bx, by - 90, bw, bh, "Try again", "A", "strong")
+            end
         else
             local row_h = 96
             local rows = list_rows(row_h)
@@ -9097,35 +9110,23 @@ end
 function app.tsync_draw_buttons(x, w, have_sync, sel_sync, sel_code)
     local th = theme()
     local g = app.tsync
-    local bh = 72
+    local bh = app.BUTTON_H
     local y_code = PAGE_H - 150 - bh
-    local y_sync = y_code - 20 - bh
+    local y_sync = y_code - 24 - bh
+    local function ring(y)
+        color(th.fg)
+        love.graphics.setLineWidth(3)
+        love.graphics.rectangle("line", x - 7, y - 7, w + 14, bh + 14, (bh + 14) / 2, (bh + 14) / 2)
+        love.graphics.setLineWidth(1)
+    end
     g.btn_sync, g.btn_code = nil, { x, y_code, w, bh }
     if have_sync then
         g.btn_sync = { x, y_sync, w, bh }
-        color(th.fg)
-        love.graphics.rectangle("fill", x, y_sync, w, bh, bh / 2, bh / 2)
-        color(th.bg)
-        love.graphics.setFont(ui.bold)
-        love.graphics.printf("Sync now", x, centered_y(ui.bold, UI_SIZE, y_sync, bh), w, "center")
-        if sel_sync then
-            color(th.fg)
-            love.graphics.setLineWidth(3)
-            love.graphics.rectangle("line", x - 7, y_sync - 7, w + 14, bh + 14, (bh + 14) / 2, (bh + 14) / 2)
-            love.graphics.setLineWidth(1)
-        end
+        app.button(x, y_sync, w, bh, "Sync now", "X", "strong")
+        if sel_sync then ring(y_sync) end
     end
-    if sel_code then
-        color(th.sel)
-        love.graphics.rectangle("fill", x, y_code, w, bh, bh / 2, bh / 2)
-    end
-    color(sel_code and th.fg or th.dim)
-    love.graphics.setLineWidth(sel_code and 3 or 2)
-    love.graphics.rectangle("line", x, y_code, w, bh, bh / 2, bh / 2)
-    love.graphics.setLineWidth(1)
-    color(th.fg)
-    love.graphics.setFont(ui.font)
-    love.graphics.printf("Show my sync code", x, centered_y(ui.font, UI_SIZE, y_code, bh), w, "center")
+    app.button(x, y_code, w, bh, "Show my sync code", nil, "soft")
+    if sel_code then ring(y_code) end
 end
 
 function app.tsync_draw(side)
@@ -9227,7 +9228,14 @@ function app.tsync_draw(side)
         app.hints(x, nil, { "A", "done" })
         return
     end
-    if not g.rows then return end
+    if not g.rows then
+        if g.error and not g.loading then
+            local bx, by, bw, bh = app.recv_button()
+            app.button(bx, by - 90, bw, bh, "Try again", "A", "strong")
+            app.hints(x, nil, { "A", "try again", "Y", "more", "B", "back" })
+        end
+        return
+    end
     local ndiff = #g.diff
     g.btn_sync, g.btn_code = nil, nil
     if ndiff == 0 then
@@ -9624,6 +9632,10 @@ function app.fget_draw(side)
         love.graphics.setFont(ui.font)
         color(th.dim)
         love.graphics.printf(g.loading and "Loading…" or (g.error or ""), x, 180, w, "left")
+        if g.error and not g.loading then
+            local bx, by, bw, bh = app.recv_button()
+            app.button(bx, by - 90, bw, bh, "Try again", "A", "strong")
+        end
         app.hints(x, nil, g.error and { "A", "try again", "B", "back" } or { "B", "back" })
         return
     end
@@ -12152,15 +12164,32 @@ function app.recv_button()
     return math.floor((PAGE_W - w) / 2), PAGE_H - 96, w, h
 end
 
+-- The server couldn't start or stopped: start it again (same page to go back to).
+function app.recv_retry()
+    local r = app.recv
+    local back = r and r.back
+    app.recv_stop()
+    app.recv_open()
+    if app.recv and back then app.recv.back = back end
+end
+
+function app.recv_retry_button()
+    local bx, by, bw, bh = app.recv_button()
+    return bx, by - 84, bw, bh
+end
+
 function app.recv_action(a)
-    if a == "back" or a == "menu" then app.recv_close() end
+    if a == "back" or a == "menu" then app.recv_close()
+    elseif a == "confirm" and app.recv and app.recv.error then app.recv_retry() end
 end
 
 function app.recv_tap(side, u, v)
     if side ~= "right" then return end
     local bx, by, bw, bh = app.recv_button()
     local p = app.TAP_PAD
-    if u >= bx - p and u <= bx + bw + p and v >= by - p and v <= by + bh + p then app.recv_close() end
+    local rx, ry, rw, rh = app.recv_retry_button()
+    if app.recv and app.recv.error and u >= rx - p and u <= rx + rw + p and v >= ry - p and v <= ry + rh + p then app.recv_retry()
+    elseif u >= bx - p and u <= bx + bw + p and v >= by - p and v <= by + bh + p then app.recv_close() end
 end
 
 function app.recv_draw(side)
@@ -12261,6 +12290,10 @@ function app.recv_draw(side)
         love.graphics.setFont(ui.small)
         color(th.dim)
         love.graphics.printf(r.url, x, qy + size + 20, w, "center")
+    end
+    if r.error then
+        local rx, ry, rw, rh = app.recv_retry_button()
+        app.button(rx, ry, rw, rh, "Try again", "A", "strong")
     end
     local bx, by, bw, bh = app.recv_button()
     app.button(bx, by, bw, bh, "Done", "B", "soft")
@@ -12627,6 +12660,21 @@ function app.cal_stop()
     return c
 end
 
+-- The connection stopped: start looking again (same page to go back to).
+function app.cal_retry()
+    local c = app.cal
+    local back = c and c.back
+    app.cal_stop()
+    app.cal_open()
+    if app.cal and back then app.cal.back = back end
+end
+
+-- The "Try again" button of an error: above "Computers & Password".
+function app.cal_retry_button()
+    local ox, oy, ow, oh = app.cal_buttons()
+    return ox, oy - 84, ow, oh
+end
+
 function app.cal_close()
     local c = app.cal_stop()
     app.mode = c and c.back or "library"
@@ -12801,6 +12849,7 @@ end
 function app.cal_action(a)
     if not app.cal then app.mode = "library"; redraw() return end
     if a == "back" or a == "menu" then app.cal_close()
+    elseif a == "confirm" and app.cal.error then app.cal_retry()
     elseif a == "toc" then app.cal_options() end
 end
 
@@ -12809,7 +12858,9 @@ function app.cal_tap(side, u, v)
     local bx, by, bw, bh = app.recv_button()
     local ox, oy, ow, oh = app.cal_buttons()
     local p = app.TAP_PAD
-    if u >= bx - p and u <= bx + bw + p and v >= by - p and v <= by + bh + p then app.cal_close()
+    local rx, ry, rw, rh = app.cal_retry_button()
+    if app.cal.error and u >= rx - p and u <= rx + rw + p and v >= ry - p and v <= ry + rh + p then app.cal_retry()
+    elseif u >= bx - p and u <= bx + bw + p and v >= by - p and v <= by + bh + p then app.cal_close()
     elseif u >= ox - p and u <= ox + ow + p and v >= oy - p and v <= oy + oh + p then app.cal_options() end
 end
 
@@ -12891,7 +12942,7 @@ function app.cal_draw(side)
         color(th.dim)
         love.graphics.printf("None yet: Calibre is usually found by itself. Add one if it isn't.", x, y, w, "left")
     end
-    local limit = select(2, app.cal_buttons()) - 30
+    local limit = select(2, app.cal_buttons()) - 30 - (c.error and 84 or 0)
     for _, sv in ipairs(list) do
         if y + 80 > limit then break end
         local here = c.state == "connected" and (c.name == sv.name or c.name == sv.address:match("^[^:]+"))
@@ -12904,6 +12955,10 @@ function app.cal_draw(side)
         y = y + 84
     end
     local ox, oy, ow, oh = app.cal_buttons()
+    if c.error then
+        local rx, ry, rw, rh = app.cal_retry_button()
+        app.button(rx, ry, rw, rh, "Try again", "A", "strong")
+    end
     app.button(ox, oy, ow, oh, "Computers & Password", "Y", "soft")
     local bx, by, bw, bh = app.recv_button()
     app.button(bx, by, bw, bh, "Done", "B", "soft")
@@ -13260,6 +13315,10 @@ local function run_test_script()
             elseif a == "tsync" then app.tsync_open()
             elseif a == "calibre" then app.cal_open()
             elseif a == "calpoll" then app.cal_poll()
+            elseif a == "calerr" then                          -- the Calibre page as after its connection stopped
+                app.cal_open(); if app.cal then app.cal.error = "The connection stopped: (a test)" end
+            elseif a == "recverr" then                         -- Send Books as after the server couldn't start
+                app.recv_open(); if app.recv then app.recv.error = "Couldn't start the server: (a test)" end
             elseif a == "work" then                -- finish a background task
                 while app.task do app.task_step() end
                 while library.pending do app.library_meta_step() end
