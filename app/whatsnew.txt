@@ -2,6 +2,11 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.28.0
+Sync your themes between your devices. In Themes, tap Custom, then Sync. On your first device choose Start syncing, and on your other devices choose Join with a code and type the code it shows. You pick what to add, upload or delete, and nothing changes until you press Sync now.
+When something goes wrong on the Get More Fonts, Get Books, Calibre and Send Books screens, there is now a Try again button, so you no longer have to leave and come back.
+The list of hidden themes now looks like a button, and the Night Mode theme page's title no longer runs into the filter names.
+
 v1.27.13
 On the Surface Duo, press volume down and then volume up to turn touch off, so you can hold the phone in bed without turning the page by accident. Do the same again to turn it back on. The volume buttons still turn pages meanwhile.
 
