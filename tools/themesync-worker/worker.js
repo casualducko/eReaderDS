@@ -26,7 +26,7 @@ function clean(list) {
   for (const e of list) {
     if (!e || typeof e.name !== "string" || typeof e.fg !== "string" || typeof e.bg !== "string") return null
     if (e.name.length < 1 || e.name.length > 60 || /[\u0000-\u001f]/.test(e.name)) return null
-    if (!/^[\d,\/:.\-]{1,60}$/.test(e.fg) || !/^[\d,\/:.\-]{1,60}$/.test(e.bg)) return null
+    if (!/^[\d,\/:\-]{1,60}$/.test(e.fg) || !/^[\d,\/:\-]{1,60}$/.test(e.bg)) return null
     if (seen.has(e.name.toLowerCase())) continue
     seen.add(e.name.toLowerCase())
     out.push({ name: e.name, fg: e.fg, bg: e.bg })

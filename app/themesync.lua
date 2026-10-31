@@ -2,20 +2,6 @@
 -- Pure (no screen, no network): main.lua draws the result and applies it.
 local M = {}
 
--- A key for a new sync (20 letters and digits; no look-alikes).
-local ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
-function M.new_key()
-    local f = io.open("/dev/urandom", "rb")
-    local bytes = f and f:read(20)
-    if f then f:close() end
-    local out = {}
-    for i = 1, 20 do
-        local b = bytes and bytes:byte(i) or math.random(0, 255)
-        out[i] = ALPHABET:sub(b % #ALPHABET + 1, b % #ALPHABET + 1)
-    end
-    return table.concat(out)
-end
-
 -- "L:a:b" as numbers; two colours match when every part is within a hair.
 local function parts(s)
     local t = {}
@@ -38,7 +24,7 @@ function M.clean(list)
     for _, e in ipairs(list) do
         if type(e) == "table" and type(e.name) == "string" and type(e.fg) == "string" and type(e.bg) == "string"
                 and #e.name > 0 and #e.name <= 60 and not e.name:find("[%c]")
-                and e.fg:match("^[%d,/:%-%.]+$") and e.bg:match("^[%d,/:%-%.]+$")
+                and e.fg:match("^[%d,/:%-]+$") and e.bg:match("^[%d,/:%-]+$")
                 and #e.fg <= 60 and #e.bg <= 60 and not seen[e.name:lower()] then
             seen[e.name:lower()] = true
             out[#out + 1] = { name = e.name, fg = e.fg, bg = e.bg }

@@ -13,13 +13,13 @@ npx wrangler kv namespace create THEMES      # paste the id it prints into wrang
 npx wrangler deploy                          # prints https://ereaderds-themes.<you>.workers.dev
 ```
 
-In the app: Themes → Custom → Sync with your other devices, press Y → **Use Another
-Server** and enter that address, then **Make a new key**. On each other device, enter
-the same address and the same key.
+In the app: Themes → Custom → **Sync**, press Y → **Use Another Server** and enter that
+address, then **Start syncing**. On each other device, do the same with the address, then
+choose **Join with a code** and type the code from **Show my sync code**.
 
 ## How it works
 
-- One list per sync key. The server keeps only a hash of the key.
+- One list per sync code (8 letters and digits made by the server, `POST /v1/new`). The server keeps only a hash of the code.
 - Kept small for sharing: 200 themes and 32 KB per list, 60 requests a minute per address,
   and a write only when the list changed (the free tier allows about 1,000 writes a day).
 - `GET /v1/themes` and `PUT /v1/themes` with header `X-Sync-Key`.

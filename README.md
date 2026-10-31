@@ -466,16 +466,17 @@ press left/right, or tap one (that alone doesn't change your theme).
     deleting your night theme turns Night Mode off).
 - **A** (or **Save**) saves the theme and uses it. **B** goes back; if
   you've changed anything it asks first, and B again keeps editing.
-- **Sync with your other devices** (second row): compares your themes with a
-  list on a small server and asks what to do with each difference: add it
-  here, upload it, delete it (here or on the server) or leave it. The confirm
-  card lists exactly what will change, and nothing changes until you press
-  **Sync now**. On the first device choose **Make a new key** and write it
-  down; on each other device choose **I have a key** and type it. The key is
-  the whole account: anyone with it can read and change your list (names and
-  colours only). It uses the shared server that comes with the app; to use
-  your own, see [tools/themesync-worker](tools/themesync-worker/README.md)
-  and press Y → **Use Another Server**.
+- **Sync** (the button beside New Theme): compares your themes with a list on
+  a small server and asks what to do with each difference: add it here,
+  upload it, delete it (here or on the server) or leave it. The confirm card
+  (only when something is deleted or replaced) lists exactly what will change.
+  On the first device choose **Start syncing**; the sync page then has **Show
+  my sync code**, 8 letters and numbers. On each other device choose **Join
+  with a code** and type it. The code is the whole account: anyone with it can
+  read and change your list (names and colours only). It uses the shared server
+  that comes with the app; to use your own, see
+  [tools/themesync-worker](tools/themesync-worker/README.md) and press Y →
+  **Use Another Server**.
 
 The Themes pages themselves are a neutral grey, like a photo editor's, so a
 tinted theme doesn't color the swatches; naming a theme uses the same grey

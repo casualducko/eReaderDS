@@ -8785,7 +8785,10 @@ function app.tsync_join(text)
     shop.net_job({ kind = "call", method = "GET", url = app.tsync_url(), headers = { ["X-Sync-Key"] = code }, timeout = 15 }, function(msg)
         app.untoast()
         if msg.kind ~= "done" then app.toast("Couldn't check it\n" .. app.update_error(msg.message), 4) return end
-        if msg.status == 404 or msg.status == 401 then app.toast("No list has that code.\nCheck it and try again.", 4) return end
+        if msg.status == 404 or msg.status == 401 then
+            app.toast("No list has that code.\nCheck it, or wait a minute if it was just made.", 5)
+            return
+        end
         if msg.status == 429 then app.toast("Too many tries.\nWait a minute.", 4) return end
         if msg.status ~= 200 then app.toast("Couldn't check it (the server answered " .. tostring(msg.status) .. ")", 4) return end
         S.themes_key = code
@@ -8821,7 +8824,10 @@ function app.tsync_load()
     shop.net_job({ kind = "call", method = "GET", url = app.tsync_url(), headers = app.tsync_headers(), timeout = 15 }, function(msg)
         g.loading = false
         if msg.kind ~= "done" then g.error = app.update_error(msg.message)
-        elseif msg.status == 404 or msg.status == 401 then g.error = "No list has this code on the server.\nY, then Join with a Different Code."
+        elseif msg.status == 404 or msg.status == 401 then
+            g.error = "No list has this code on the server.\n\nIf it was only just made, wait a minute and try again. "
+                .. "Otherwise: Y, then Join with a Different Code."
+        elseif msg.status == 429 then g.error = "Too many requests from here.\nWait a minute and try again."
         elseif msg.status ~= 200 then g.error = "The server answered " .. tostring(msg.status) .. ".\nIs the address right?"
         else
             local ok, data = pcall(require("json").decode, msg.body or "")
@@ -8958,27 +8964,6 @@ function app.tsync_tap(side, u, v)
     if idx == g.sel then app.TSync.cycle(r); redraw()
     else g.sel = idx; redraw() end
 end
-
--- A theme's page with "Aa" in its ink.
-function app.tsync_swatch(e, x, y, w, h)
-    local th = theme()
-    local bg = app.lab_rgb(app.colour_parse(e.bg, app.TEDIT_DEFAULT.bg))
-    local fg = app.lab_rgb(app.colour_parse(e.fg, app.TEDIT_DEFAULT.fg))
-    love.graphics.setColor(bg[1], bg[2], bg[3])
-    love.graphics.rectangle("fill", x, y, w, h, 8, 8)
-    color(th.dim, 0.6)
-    love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", x, y, w, h, 8, 8)
-    love.graphics.setFont(ui.font)
-    love.graphics.setColor(fg[1], fg[2], fg[3])
-    love.graphics.printf("Aa", x, centered_y(ui.font, UI_SIZE, y, h), w, "center")
-end
-
-app.TSYNC_KIND = {
-    remote = "On your server, not on this device.",
-    ["local"] = "On this device, not on your server.",
-    differs = "Different here and on the server.",
-}
 
 -- The sync code, big, with what to do with it.
 function app.tsync_code_draw(side)
