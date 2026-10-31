@@ -8943,13 +8943,15 @@ function app.tsync_tap(side, u, v)
         if g.error and not g.loading then app.tsync_load() end
         return
     end
-    if v < 160 then return end
-    local idx = g.top + math.floor((v - 160) / app.TSYNC_ROW_H)
-    local r = g.rows[idx]
-    if idx >= g.top + list_rows(app.TSYNC_ROW_H) or not r then return end
-    if r.link then g.sel = idx; g.code = S.themes_key; redraw()
-    elseif r.apply then g.sel = idx; app.tsync_apply_ask()
-    elseif idx == g.sel then app.TSync.cycle(r); redraw()
+    local p = app.TAP_PAD
+    local function hit(b) return b and u >= b[1] - p and u <= b[1] + b[3] + p and v >= b[2] - p and v <= b[2] + b[4] + p end
+    if hit(g.btn_code) then g.sel = #g.rows; g.code = S.themes_key; redraw() return end
+    if hit(g.btn_sync) then g.sel = #g.rows - 1; app.tsync_apply_ask() return end
+    if v < 170 then return end
+    local idx = g.top + math.floor((v - 170) / app.TSYNC_ROW_H)
+    local r = g.diff and g.diff[idx]
+    if idx >= g.top + (g.rows_n or 5) or not r then return end
+    if idx == g.sel then app.TSync.cycle(r); redraw()
     else g.sel = idx; redraw() end
 end
 
@@ -9013,6 +9015,84 @@ function app.tsync_code_draw(side)
     app.hints(x, nil, { "A", "done" })
 end
 
+app.TSYNC_WILL = {
+    add = "Will be added to this device.", server_delete = "Will be deleted from your server.",
+    upload = "Will be uploaded to your server.", delete = "Will be deleted from this device.",
+    mine = "Your version will replace the server's.", theirs = "The server's version will replace yours.",
+    skip = "Will be left as it is.",
+}
+
+function app.tsync_plural(n, one, many) return n .. " " .. (n == 1 and one or many) end
+
+-- What the choices come to, one line each: "Upload 4 themes to your server".
+function app.tsync_summary_lines(counts)
+    local out = {}
+    if counts.add > 0 then out[#out + 1] = "Add " .. app.tsync_plural(counts.add, "theme", "themes") .. " to this device" end
+    if counts.upload > 0 then out[#out + 1] = "Upload " .. app.tsync_plural(counts.upload, "theme", "themes") .. " to your server" end
+    if counts.theirs > 0 then out[#out + 1] = "Use the server's version of " .. app.tsync_plural(counts.theirs, "theme", "themes") end
+    if counts.mine > 0 then out[#out + 1] = "Send your version of " .. app.tsync_plural(counts.mine, "theme", "themes") end
+    if counts.delete > 0 then out[#out + 1] = "Delete " .. app.tsync_plural(counts.delete, "theme", "themes") .. " from this device" end
+    if counts.server_delete > 0 then out[#out + 1] = "Delete " .. app.tsync_plural(counts.server_delete, "theme", "themes") .. " from your server" end
+    return out
+end
+
+-- A theme shown as it will look: its page colour, its name and some text in its ink.
+function app.tsync_preview(e, x, y, w, h, caption)
+    local th = theme()
+    local bg = app.lab_rgb(app.colour_parse(e.bg, app.TEDIT_DEFAULT.bg))
+    local fg = app.lab_rgb(app.colour_parse(e.fg, app.TEDIT_DEFAULT.fg))
+    love.graphics.setColor(bg[1], bg[2], bg[3])
+    love.graphics.rectangle("fill", x, y, w, h, 12, 12)
+    color(th.dim, 0.5)
+    love.graphics.setLineWidth(1)
+    love.graphics.rectangle("line", x, y, w, h, 12, 12)
+    love.graphics.setColor(fg[1], fg[2], fg[3])
+    love.graphics.setFont(ui.bold)
+    love.graphics.printf(fit_text(ui.bold, e.name, w - 36), x + 18, y + 16, w - 36, "left")
+    love.graphics.setFont(ui.small)
+    love.graphics.printf("The quick brown fox jumps over the lazy dog.", x + 18, y + 16 + ui.bold:getHeight() + 8, w - 36, "left")
+    if caption then
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.printf(caption, x, y + h + 8, w, "center")
+    end
+end
+
+-- The two buttons under the list: Sync now (when there is something to do) and Show my sync code.
+function app.tsync_draw_buttons(x, w, have_sync, sel_sync, sel_code)
+    local th = theme()
+    local g = app.tsync
+    local bh = 72
+    local y_code = PAGE_H - 150 - bh
+    local y_sync = y_code - 20 - bh
+    g.btn_sync, g.btn_code = nil, { x, y_code, w, bh }
+    if have_sync then
+        g.btn_sync = { x, y_sync, w, bh }
+        color(th.fg)
+        love.graphics.rectangle("fill", x, y_sync, w, bh, bh / 2, bh / 2)
+        color(th.bg)
+        love.graphics.setFont(ui.bold)
+        love.graphics.printf("Sync now", x, centered_y(ui.bold, UI_SIZE, y_sync, bh), w, "center")
+        if sel_sync then
+            color(th.fg)
+            love.graphics.setLineWidth(3)
+            love.graphics.rectangle("line", x - 7, y_sync - 7, w + 14, bh + 14, (bh + 14) / 2, (bh + 14) / 2)
+            love.graphics.setLineWidth(1)
+        end
+    end
+    if sel_code then
+        color(th.sel)
+        love.graphics.rectangle("fill", x, y_code, w, bh, bh / 2, bh / 2)
+    end
+    color(sel_code and th.fg or th.dim)
+    love.graphics.setLineWidth(sel_code and 3 or 2)
+    love.graphics.rectangle("line", x, y_code, w, bh, bh / 2, bh / 2)
+    love.graphics.setLineWidth(1)
+    color(th.fg)
+    love.graphics.setFont(ui.font)
+    love.graphics.printf("Show my sync code", x, centered_y(ui.font, UI_SIZE, y_code, bh), w, "center")
+end
+
 function app.tsync_draw(side)
     if app.tsync.code then app.tsync_code_draw(side) return end
     local th = theme()
@@ -9045,39 +9125,66 @@ function app.tsync_draw(side)
             love.graphics.printf(g.loading and "Asking your server…" or (g.error or ""), x, 180, w, "left")
             return
         end
-        if #g.diff == 0 then
-            love.graphics.printf("Everything matches.\n\n" .. g.same .. (g.same == 1 and " theme is" or " themes are")
-                .. " the same here and on your server.\n\nTo add another device, choose Show my sync code and type "
-                .. "it there (Join with a code).", x, 180, w, "left")
-        elseif r and r.link then
-            love.graphics.printf("Show my sync code\n\nThe code to type on your other devices (Join with a code).", x, 180, w, "left")
-        elseif r and r.apply then
-            local _, _, counts = app.TSync.plan(g.mine, g.theirs, g.diff)
-            love.graphics.printf((app.TSync.summary(counts) or "Nothing is set to change") .. ".\n\nA applies it.", x, 180, w, "left")
-        elseif r then
-            love.graphics.printf(r.name .. "\n" .. app.TSYNC_KIND[r.kind], x, 180, w, "left")
-            local y = 180 + ui.font:getHeight() * 3 + 20
-            local sw, sh = math.floor((w - 30) / 2), 200
-            if r.kind == "differs" then
-                app.tsync_swatch(r.mine, x, y, sw, sh)
-                app.tsync_swatch(r.theirs, x + sw + 30, y, sw, sh)
-                love.graphics.setFont(ui.small)
-                color(th.dim)
-                love.graphics.printf("This device", x, y + sh + 10, sw, "center")
-                love.graphics.printf("Server", x + sw + 30, y + sh + 10, sw, "center")
-            else
-                app.tsync_swatch(r.mine or r.theirs, x, y, sw, sh)
-            end
-        end
+        -- What will happen.
         love.graphics.setFont(ui.small)
         color(th.dim)
-        love.graphics.printf(g.same .. " already match", x, PAGE_H - 70, w, "left")
+        love.graphics.print(#g.diff == 0 and "Status" or "What will happen", x, 170)
+        local y = 170 + ui.small:getHeight() + 10
+        love.graphics.setFont(ui.bold)
+        color(th.fg)
+        if #g.diff == 0 then
+            love.graphics.printf("✓  Everything matches", x, y, w, "left")
+            y = y + ui.bold:getHeight() + 6
+        else
+            local _, _, counts = app.TSync.plan(g.mine, g.theirs, g.diff)
+            local lines = app.tsync_summary_lines(counts)
+            if #lines == 0 then lines = { "Nothing is set to change" } end
+            for _, line in ipairs(lines) do
+                love.graphics.printf(line, x, y, w, "left")
+                y = y + ui.bold:getHeight() + 6
+            end
+        end
+        -- The numbers: this device, the server, already the same.
+        y = math.max(y + 30, 360)
+        local col = math.floor(w / 3)
+        local stats = { { #g.mine, "On this device" }, { #g.theirs + #(g.skipped or {}), "On your server" }, { g.same, "In sync" } }
+        for i, st in ipairs(stats) do
+            local cx = x + (i - 1) * col
+            love.graphics.setFont(ui.title)
+            color(th.fg)
+            love.graphics.printf(tostring(st[1]), cx, y, col, "center")
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.printf(st[2], cx, y + ui.title:getHeight() + 2, col, "center")
+        end
+        y = y + ui.title:getHeight() + ui.small:getHeight() + 50
+        -- The theme highlighted, as it will look.
+        local row = g.diff[math.min(math.max(g.sel, 1), #g.diff)]
+        if row then
+            love.graphics.setFont(ui.small)
+            color(th.dim)
+            love.graphics.print("The highlighted theme", x, y)
+            y = y + ui.small:getHeight() + 12
+            local ph = 150
+            if row.kind == "differs" then
+                local pw = math.floor((w - 24) / 2)
+                app.tsync_preview(row.mine, x, y, pw, ph, "This device")
+                app.tsync_preview(row.theirs, x + pw + 24, y, pw, ph, "Server")
+                y = y + ph + 8 + ui.small:getHeight() + 22
+            else
+                app.tsync_preview(row.mine or row.theirs, x, y, w, ph)
+                y = y + ph + 20
+            end
+            love.graphics.setFont(ui.font)
+            color(th.fg)
+            love.graphics.printf(app.TSYNC_WILL[row.choice] or "", x, y, w, "left")
+        end
         return
     end
     local x = m.inner
     love.graphics.setFont(ui.title)
     color(th.fg)
-    love.graphics.print(g.result and "Done" or (g.diff and "Changes" or ""), x, 60)
+    love.graphics.print(g.result and "Done" or (g.diff and (#g.diff == 0 and "Up to date" or "Changes") or ""), x, 60)
     if g.result then
         love.graphics.setFont(ui.font)
         color(th.dim)
@@ -9086,25 +9193,29 @@ function app.tsync_draw(side)
         return
     end
     if not g.rows then return end
-    local rows_n = list_rows(app.TSYNC_ROW_H)
-    if g.sel < g.top then g.top = g.sel end
-    if g.sel >= g.top + rows_n then g.top = g.sel - rows_n + 1 end
-    draw_list(side, g.rows, g.sel, g.top, rows_n, x, 160, w, app.TSYNC_ROW_H, function(it, _, rx, ry, rw)
+    local ndiff = #g.diff
+    g.btn_sync, g.btn_code = nil, nil
+    if ndiff == 0 then
+        love.graphics.setFont(ui.title)
+        color(th.dim)
+        love.graphics.printf("✓", x, 250, w, "center")
+        love.graphics.setFont(ui.font)
+        love.graphics.printf("Your themes are the same here and on your server.", x + 20, 380, w - 40, "center")
+        app.tsync_draw_buttons(x, w, false, false, true)
+        app.hints(x, nil, { "A", "show code", "Y", "more", "B", "back" })
+        return
+    end
+    love.graphics.setFont(ui.small)
+    color(th.dim)
+    love.graphics.print("Tap a theme to change what happens to it.", x, 60 + ui.title:getHeight() + 6)
+    local rows_n = math.max(3, math.floor((PAGE_H - 170 - 300) / app.TSYNC_ROW_H))
+    g.rows_n = rows_n
+    if g.sel <= ndiff then
+        if g.sel < g.top then g.top = g.sel end
+        if g.sel >= g.top + rows_n then g.top = g.sel - rows_n + 1 end
+    end
+    draw_list(side, g.diff, g.sel <= ndiff and g.sel or 0, g.top, rows_n, x, 170, w, app.TSYNC_ROW_H, function(it, _, rx, ry, rw)
         local h = app.TSYNC_ROW_H - 4
-        if it.apply then
-            love.graphics.setFont(ui.bold)
-            color(th.fg)
-            love.graphics.print(it.name, rx, centered_y(ui.bold, UI_SIZE, ry, h))
-            return
-        end
-        if it.link then
-            love.graphics.setFont(ui.font)
-            color(th.fg)
-            love.graphics.print(it.name, rx, centered_y(ui.font, UI_SIZE, ry, h))
-            color(th.dim)
-            love.graphics.printf("›", rx, centered_y(ui.font, UI_SIZE, ry, h), rw - 12, "right")
-            return
-        end
         local e = it.mine or it.theirs
         local sw = 72
         local sy = ry + 8
@@ -9117,19 +9228,32 @@ function app.tsync_draw(side)
         love.graphics.setFont(ui.small)
         love.graphics.setColor(fg[1], fg[2], fg[3])
         love.graphics.printf("Aa", rx, centered_y(ui.small, SMALL_SIZE, sy, h - 16), sw, "center")
+        -- What it will do, as a pill: filled when something happens, an outline for Skip.
         local label = app.TSync.LABELS[it.choice]
-        love.graphics.setFont(ui.small)
-        local lw = ui.small:getWidth(label)
+        local pw, ph = 180, 44
+        local px, py = rx + rw - pw, ry + math.floor((h - ph) / 2)
         love.graphics.setFont(ui.font)
         color(th.fg)
-        love.graphics.print(fit_text(ui.font, it.name, rw - sw - 24 - lw - 56), rx + sw + 24, centered_y(ui.font, UI_SIZE, ry, h))
-        love.graphics.setFont(ui.small)
-        color(it.choice == "skip" and th.dim or th.fg)
-        love.graphics.printf(label, rx, centered_y(ui.small, SMALL_SIZE, ry, h), rw, "right")
+        love.graphics.print(fit_text(ui.font, it.name, rw - sw - 24 - pw - 20), rx + sw + 24, centered_y(ui.font, UI_SIZE, ry, h))
+        if it.choice == "skip" then
+            color(th.dim)
+            love.graphics.setLineWidth(2)
+            love.graphics.rectangle("line", px, py, pw, ph, ph / 2, ph / 2)
+            love.graphics.setLineWidth(1)
+            love.graphics.setFont(ui.small)
+            love.graphics.printf(label, px, centered_y(ui.small, SMALL_SIZE, py, ph), pw, "center")
+        else
+            color(th.fg)
+            love.graphics.rectangle("fill", px, py, pw, ph, ph / 2, ph / 2)
+            color(th.bg)
+            love.graphics.setFont(ui.small)
+            love.graphics.printf(label, px, centered_y(ui.small, SMALL_SIZE, py, ph), pw, "center")
+        end
     end)
-    local what = r and (r.apply and "sync" or (r.link and "link" or "change")) or "change"
+    app.tsync_draw_buttons(x, w, true, r and r.apply, r and r.link)
+    local what = r and (r.apply and "sync" or (r.link and "show code" or "change")) or "change"
     app.hints(x, nil, { "A", what, "X", "sync", "Y", "more", "B", "back" })
-    if g.diff and #g.diff > 0 then app.count(x, w, math.min(g.sel, #g.diff), #g.diff) end
+    app.count(x, w, math.min(g.sel, ndiff), ndiff)
 end
 
 ---------------------------------------------------------------- get more fonts
