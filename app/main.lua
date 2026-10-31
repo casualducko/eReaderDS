@@ -4922,7 +4922,6 @@ function app.theme_set_filter(filter, keep)
     if filter == "custom" then
         -- Your own themes, after a row for making a new one.
         T.list[1] = app.NEW_THEME
-        T.list[2] = { name = "Sync with your other devices", hidden_row = true, action = function() app.tsync_open() end }
         for _, t in ipairs(THEMES) do if t.custom and not t.hidden then T.list[#T.list + 1] = t end end
     elseif filter == "hidden" then
         -- (Those of the list it was opened from: all, or just light or dark ones.)
@@ -4983,7 +4982,7 @@ end
 function app.theme_use()
     local t = app.themes.list[app.themes.sel]
     if t and t.new then app.tedit_new() return end
-    if t and t.hidden_row then (t.action or app.theme_open_hidden)() return end
+    if t and t.hidden_row then app.theme_open_hidden() return end
 
     app.theme_pick()
     app.theme_leave()
@@ -4991,7 +4990,11 @@ end
 
 function app.theme_action(a)
     local T = app.themes
-    if a == "toc" then app.theme_options(T.list[T.sel]) return end      -- Y: copy (or change) it
+    if a == "toc" then                                                  -- Y: copy (or change) it; on New Theme: sync
+        local cur = T.list[T.sel]
+        if cur and cur.new then app.tsync_open() else app.theme_options(cur) end
+        return
+    end
     -- The hidden themes' list: B (or left/right) goes back to All.
     if T.filter == "hidden" and (a == "back" or a == "menu" or a == "left" or a == "right" or a == "prev" or a == "next") then
         app.theme_close_hidden()
@@ -5089,6 +5092,8 @@ function app.theme_tap(side, u, v)
     local rows = list_rows(app.THEME_ROW_H)
     local idx = T.top + math.floor((v - 160) / app.THEME_ROW_H)
     if idx < T.top + rows and T.list[idx] then
+        local sb = T.list[idx].new and T.btn_sync
+        if sb and u >= sb[1] - app.TAP_PAD and u <= sb[1] + sb[3] + app.TAP_PAD then app.tsync_open() return end
         if idx == T.sel or T.list[idx].hidden_row then T.sel = idx; app.theme_use()
         else T.sel = idx; app.theme_pick(); redraw() end
     end
@@ -5141,21 +5146,6 @@ function app.theme_draw(side)
     T.row_btns = {}
     draw_list(side, T.list, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw, selected)
         local h = row_h - 4
-        if t.action then
-            -- "Sync with your other devices": a tile like New Theme's, the word Sync in it, and a ›.
-            color(th.dim)
-            love.graphics.setLineWidth(2)
-            love.graphics.rectangle("line", rx, ry + 8, 96, h - 16, 8, 8)
-            love.graphics.setLineWidth(1)
-            love.graphics.setFont(ui.small)
-            color(th.fg)
-            love.graphics.printf("Sync", rx, centered_y(ui.small, SMALL_SIZE, ry + 4, h - 8), 96, "center")
-            love.graphics.setFont(ui.font)
-            love.graphics.print(fit_text(ui.font, t.name, rw - 96 - 24 - 60), rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
-            color(th.dim)
-            love.graphics.printf("›", rx, centered_y(ui.font, UI_SIZE, ry, h), rw - 12, "right")
-            return
-        end
         if t.hidden_row then
             -- "3 hidden themes": a tile with the number (like New Theme's plus), the words, and a ›.
             color(th.dim)
@@ -5172,16 +5162,18 @@ function app.theme_draw(side)
             return
         end
         if t.new then
-            -- "New Theme": a dashed-looking swatch with a plus.
-            color(th.dim)
+            -- "New Theme" and "Sync" side by side: two buttons on the one row.
+            local bh, by, gap = h - 8, ry + 4, 18
+            local sw = math.floor(rw * 0.34)
+            local nw = rw - sw - gap
+            T.btn_new, T.btn_sync = { rx, by, nw, bh }, { rx + nw + gap, by, sw, bh }
+            app.button(rx, by, nw, bh, "+  New Theme", nil, "soft")
+            app.button(rx + nw + gap, by, sw, bh, "Sync", "Y", "soft")
+            color(th.dim, 0.8)                      -- (an outline: the row's highlight is the same colour as a button)
             love.graphics.setLineWidth(2)
-            love.graphics.rectangle("line", rx, ry + 8, 96, h - 16, 8, 8)
+            love.graphics.rectangle("line", rx, by, nw, bh, bh / 2, bh / 2)
+            love.graphics.rectangle("line", rx + nw + gap, by, sw, bh, bh / 2, bh / 2)
             love.graphics.setLineWidth(1)
-            love.graphics.setFont(ui.title)
-            love.graphics.printf("+", rx, centered_y(ui.title, UI_SIZE, ry + 4, h - 8), 96, "center")
-            love.graphics.setFont(ui.font)
-            color(th.fg)
-            love.graphics.print(t.name, rx + 96 + 24, centered_y(ui.font, UI_SIZE, ry, h))
             return
         end
         -- A swatch: the theme's page with "Aa" in its ink.
@@ -5225,12 +5217,11 @@ function app.theme_draw(side)
     end)
     if T.filter == "custom" then
         local cur = T.list[T.sel]
-        if cur and cur.action then app.hints(x, nil, { "A", "sync", "‹ ›", "filter", "B", "back" })
-        else app.hints(x, nil, { "A", cur and cur.new and "new" or "use", "Y", "options", "‹ ›", "filter", "B", "back" }) end
+        if cur and cur.new then app.hints(x, nil, { "A", "new theme", "Y", "sync", "‹ ›", "filter", "B", "back" })
+        else app.hints(x, nil, { "A", "use", "Y", "options", "‹ ›", "filter", "B", "back" }) end
     else
         local t = T.list[T.sel]
-        if t and t.hidden_row and t.action then app.hints(x, nil, { "A", "sync", "‹ ›", "filter", "B", "back" })
-        elseif t and t.hidden_row then app.hints(x, nil, { "A", "show them", "‹ ›", "filter", "B", "back" })
+        if t and t.hidden_row then app.hints(x, nil, { "A", "show them", "‹ ›", "filter", "B", "back" })
         elseif T.filter == "hidden" then app.hints(x, nil, { "A", "use", "Y", "options", "B", "back" })
         else app.hints(x, nil, { "A", "use", "Y", "options", "‹ ›", "filter", "B", "back" }) end
     end
