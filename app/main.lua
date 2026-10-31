@@ -3662,8 +3662,11 @@ function app.night_preview(side)
     -- The Themes pages themselves on a neutral grey, as photo editors are,
     -- so a tinted theme doesn't colour the swatches and sliders.
     if side == "right" and (app.mode == "themes" or app.mode == "theme_edit") then return app.PANEL_THEME.name end
-    -- Naming a theme: the keyboard in the same grey (both screens).
-    if app.mode == "keyboard" and app.kb and app.kb.back == "theme_edit" then return app.PANEL_THEME.name end
+    -- The sync pages (both screens): the same grey, for the swatches and previews.
+    if app.mode == "themesync" then return app.PANEL_THEME.name end
+    -- Naming a theme, or typing a sync code: the keyboard in the same grey (both screens).
+    if app.mode == "keyboard" and app.kb and (app.kb.back == "theme_edit" or app.kb.back == "themes"
+            or app.kb.back == "themesync") then return app.PANEL_THEME.name end
 end
 
 
