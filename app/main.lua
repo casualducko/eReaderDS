@@ -5115,10 +5115,7 @@ function app.theme_draw(side)
         if T.sel < T.top then T.top = math.max(1, T.sel) end
         if T.sel >= T.top + rows then T.top = T.sel - rows + 1 end
     end
-    love.graphics.setFont(ui.title)
-    color(th.fg)
-    local title = T.filter == "hidden" and "Hidden Themes" or app.night and "Night Mode Theme" or "Themes"
-    love.graphics.print(title, x, 60)
+    local title = T.filter == "hidden" and "Hidden Themes" or app.night and "Night Theme" or "Themes"
     -- All / Light / Dark, right-aligned on the title line; the current one bold.
     -- (Hidden Themes: a Restore All button there instead; B goes back.)
     T.tabs = {}
@@ -5145,6 +5142,10 @@ function app.theme_draw(side)
             love.graphics.print("  ·  ", tx, ty)
         end
     end
+    -- The title, in the room left of the tabs (shortened if it would run into them).
+    love.graphics.setFont(ui.title)
+    color(th.fg)
+    love.graphics.print(fit_text(ui.title, title, math.max(60, tx - x - 24)), x, 60)
     local cur = app.theme_current()
     T.row_btns = {}
     draw_list(side, T.list, T.sel, T.top, rows, x, 160, w, row_h, function(t, _, rx, ry, rw, selected)
@@ -13304,6 +13305,7 @@ local function run_test_script()
             elseif a == "receive" then app.recv_open()
             elseif a == "recvpoll" then app.recv_poll()
             elseif a == "themes" then app.theme_open(); app.theme_set_filter("custom", "")     -- the Custom list
+            elseif a == "themesnight" then app.night = true; app.theme_open()            -- as when it's night (the night theme is picked)
             elseif a == "tsync" then app.tsync_open()
             elseif a == "calibre" then app.cal_open()
             elseif a == "calpoll" then app.cal_poll()
