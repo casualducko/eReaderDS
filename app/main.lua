@@ -7417,7 +7417,8 @@ app.KB_MAX = 120                             -- characters
 
 -- Open the keyboard. opts: title, hint, text, submit(text), cancel(),
 -- ok (the confirm key's label, "Search" by default), secret (show dots),
--- url (a web address: https:// and the like on keys of their own).
+-- url (a web address: https:// and the like on keys of their own),
+-- caps (start with caps lock on: a code shown in capitals).
 function app.kb_open(opts)
     -- No key is highlighted until the D-pad is used (r, c = nil).
     app.kb = { title = opts.title, hint = opts.hint, text = opts.text or "",
@@ -7425,6 +7426,7 @@ function app.kb_open(opts)
         allow_empty = opts.allow_empty, url = opts.url, pos = #(opts.text or ""), start = opts.text or "",
         max = opts.max or app.KB_MAX }                -- (max: bytes)
     app.kb_layer("lower")
+    if opts.caps then app.kb_layer("upper"); app.kb.caps = true end
     app.mode = "keyboard"
     redraw()
 end
@@ -8780,7 +8782,7 @@ end
 
 -- Other devices: type the code. It's asked about first, so a typo is said at once.
 function app.tsync_code_type()
-    app.kb_open({ title = "Sync Code", ok = "Join", max = 14,
+    app.kb_open({ title = "Sync Code", ok = "Join", max = 14, caps = true,
         hint = "The code from your first device: open Sync there and choose Show my sync code. Capitals don't matter.",
         submit = function(t) app.tsync_join(t) end })
 end
@@ -13253,6 +13255,7 @@ local function run_test_script()
             local wx, wy = a:match("^wheel:([%-%d.]+):([%-%d.]+)$")  -- (a Mac: a two-finger slide)
             if join then app.tsync_join(join)
             elseif a == "tcreate" then app.tsync_create()
+            elseif a == "tcode" then app.tsync_code_type()                    -- the keyboard for typing a sync code
             elseif ck then app.mac_key(ck, false, true)
             elseif wx then love.wheelmoved(tonumber(wx), tonumber(wy))
             elseif tx then love.textinput(tx)
