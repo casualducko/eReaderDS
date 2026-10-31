@@ -8881,8 +8881,10 @@ function app.tsync_apply_ask()
 end
 
 -- The server first (so a failure leaves everything as it was), then this device.
+-- Only the changes go to the server (ops: { set, remove }), which applies them to its list as it
+-- is then, so another device's changes in the meantime are kept.
 -- Afterwards the page says what was done (A, B or a tap goes back to the themes).
-function app.tsync_apply(here, server, rows)
+function app.tsync_apply(here, ops, rows)
     local g = app.tsync
     local function finish()
         g.applying = false
@@ -8896,9 +8898,12 @@ function app.tsync_apply(here, server, rows)
         g.rows, g.diff = nil, nil
         redraw()
     end
-    if not server then finish() return end
-    for _, e in ipairs(g.skipped or {}) do server[#server + 1] = e end
-    local body = #server == 0 and '{"version":1,"themes":[]}' or require("json").encode({ version = 1, themes = server })
+    if not ops then finish() return end
+    -- (The encoder writes an empty list as {}: only what has something in it is sent.)
+    local request = { version = 2 }
+    if #ops.set > 0 then request.set = ops.set end
+    if #ops.remove > 0 then request.remove = ops.remove end
+    local body = require("json").encode(request)
     if not shop.online(true) then app.toast("Not connected to Wi-Fi"); return end
     g.applying = true
     redraw()

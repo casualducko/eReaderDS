@@ -2,10 +2,12 @@ name = "ereaderds-themes"
 main = "worker.js"
 compatibility_date = "2026-01-01"
 
-# After `npx wrangler kv namespace create THEMES`, paste its id here.
-[[kv_namespaces]]
-binding = "THEMES"
-id = "9d80a3063853415dbf217c3856fa71f5"
+# After `npx wrangler d1 create ereaderds-themes`, paste its id here, then
+# `npx wrangler d1 execute ereaderds-themes --remote --file=schema.sql`.
+[[d1_databases]]
+binding = "DB"
+database_name = "ereaderds-themes"
+database_id = "e4302def-1677-45a3-b335-68cbeba5992b"
 
 # At most 60 requests a minute from one address.
 [[ratelimits]]

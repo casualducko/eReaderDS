@@ -89,53 +89,47 @@ end
 
 -- Turns the choices into the work to do:
 --   here   = the themes this device ends up with (all of them, in order),
---   server = the list to send, or nil if the server stays as it is,
+--   ops    = what to tell the server, { set = { themes }, remove = { names } } (either may be
+--            empty), or nil if the server stays as it is. Only the changes are sent: the
+--            server applies them to its list as it is then, so another device's changes
+--            made meanwhile are kept,
 --   counts = { add, upload, delete, server_delete, mine, theirs }
 function M.plan(mine, theirs, rows)
     local pick = {}
     for _, r in ipairs(rows) do pick[r.name:lower()] = r end
-    local here, server, counts = {}, {}, { add = 0, upload = 0, delete = 0, server_delete = 0, mine = 0, theirs = 0 }
-    local server_changed = false
+    local here, counts = {}, { add = 0, upload = 0, delete = 0, server_delete = 0, mine = 0, theirs = 0 }
+    local set, remove = {}, {}
     for _, e in ipairs(mine) do
         local r = pick[e.name:lower()]
         local c = r and r.choice
         if c == "delete" then
             counts.delete = counts.delete + 1
+        elseif c == "theirs" then
+            here[#here + 1] = { name = e.name, fg = r.theirs.fg, bg = r.theirs.bg }
+            counts.theirs = counts.theirs + 1
         else
-            if c == "theirs" then
-                here[#here + 1] = { name = e.name, fg = r.theirs.fg, bg = r.theirs.bg }
-                counts.theirs = counts.theirs + 1
-            else
-                here[#here + 1] = e
-                if c == "mine" then counts.mine = counts.mine + 1 end
+            here[#here + 1] = e
+            if c == "mine" then
+                counts.mine = counts.mine + 1
+                set[#set + 1] = e
+            elseif c == "upload" then
+                counts.upload = counts.upload + 1
+                set[#set + 1] = e
             end
         end
     end
     for _, e in ipairs(theirs) do
-        local r = pick[e.name:lower()]
-        local c = r and r.choice
+        local c = (pick[e.name:lower()] or {}).choice
         if c == "add" then
             here[#here + 1] = e
             counts.add = counts.add + 1
-            server[#server + 1] = e
         elseif c == "server_delete" then
             counts.server_delete = counts.server_delete + 1
-            server_changed = true
-        elseif c == "mine" then
-            server[#server + 1] = { name = e.name, fg = r.mine.fg, bg = r.mine.bg }
-            server_changed = true
-        else
-            server[#server + 1] = e
+            remove[#remove + 1] = e.name
         end
     end
-    for _, r in ipairs(rows) do
-        if r.kind == "local" and r.choice == "upload" then
-            server[#server + 1] = r.mine
-            counts.upload = counts.upload + 1
-            server_changed = true
-        end
-    end
-    return here, server_changed and server or nil, counts
+    local ops = (#set > 0 or #remove > 0) and { set = set, remove = remove } or nil
+    return here, ops, counts
 end
 
 -- "Add 3, upload 1, delete 1 here" for the confirm card; nil if nothing to do.
