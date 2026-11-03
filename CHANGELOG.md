@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Reading-place sync names the right device.** `kosync.lua` sent "RG DS Plus" as the device name from every device, so a Surface Duo's place showed on the Mac as "Continue from your RG DS Plus?". It now sends "Surface Duo", "iPhone" or "Mac" on those, and "RG DS Plus" on the handhelds (stock, ROCKNIX, GammaOS, BananaOS).
+
 ## v1.28.0
 
 - **Text that was really a button now looks like one.** The "hidden themes" row on the Themes list is a tile with the number in it; the error pages of Get More Fonts, Get Books catalogs, Sync, Calibre and Send Books have a visible Try again button (`app.button`, "strong"; Calibre and Send Books had none: a stopped Calibre or server connection needed leaving and coming back, so `app.cal_retry` and `app.recv_retry` stop and start it again). The sync page's two buttons use `app.button` too. Script actions `calerr` and `recverr` draw the error pages for tests.

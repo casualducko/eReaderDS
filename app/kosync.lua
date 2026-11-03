@@ -17,7 +17,9 @@ local M = {}
 M.SERVERS = { crosspoint = "https://sync.crosspointreader.com", koreader = "https://sync.koreader.rocks" }
 M.SERVER_NAMES = { crosspoint = "CrossPoint", koreader = "KOReader", custom = "Your own" }
 M.DEFAULT_SERVER = M.SERVERS.crosspoint
-M.DEVICE = "RG DS Plus"
+-- What this device calls itself to the other readers ("Saved on Surface Duo 3 minutes ago").
+local A = require("android")
+M.DEVICE = A.duo and "Surface Duo" or A.ios and "iPhone" or A.mac and "Mac" or "RG DS Plus"
 M.TIMEOUT = 8        -- seconds to connect and to start answering (quitting waits for a request)
 
 local function md5hex(s) return love.data.encode("string", "hex", love.data.hash("md5", s)) end
