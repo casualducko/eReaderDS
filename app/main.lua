@@ -2370,6 +2370,7 @@ function shop.hints(pg, it)
     if it.search then return { "A", "search", "B", "back" } end
     if it.receive or it.calibre then return { "A", "start", "B", "back" } end
     if it.add then return { "A", "add", "B", "back" } end
+    if it.catalog and not it.catalog.key then return { "A", "open", "Y", "remove", "B", "back" } end
     if it.href or it.catalog then return { "A", "open", "B", "back" } end
     return { "B", "back" }
 end
@@ -2471,6 +2472,28 @@ function shop.back()
         scan_library()
         app.mode = "library"
     end
+end
+
+function shop.remove_button(rx, ry, rw, row_h)
+    return rx + rw - 170, ry + 14, 170, row_h - 32
+end
+
+-- Take one of your own catalogs out of opds.txt (after asking). The built-in ones
+-- have no key to remove; "gutenberg = off" in opds.txt hides them.
+function shop.remove_catalog(it)
+    local c = it and it.catalog
+    if not c or c.key then return end
+    app.ask({ question = "Remove " .. c.name .. "?", detail = "It's taken out of your list of catalogs.",
+        yes = "Remove", on_yes = function()
+            local ok, err = Opds.remove_catalog(Store.data_path("opds.txt"), c.url, c.name)
+            if not ok then app.toast("Couldn't remove: " .. tostring(err)); return end
+            app.load_catalogs()
+            local sel = shop.stack[1] and shop.stack[1].sel or 1
+            shop.start()
+            local pg = shop.stack[1]
+            if pg then pg.sel = math.max(1, math.min(sel, #pg.entries)) end
+            app.toast("Removed " .. c.name)
+        end })
 end
 
 function shop.confirm()
@@ -6190,12 +6213,19 @@ function shop.draw(side)
                 end
                 love.graphics.setFont(ui.font)
                 color((e.book or e.href or e.catalog or e.receive or e.calibre or e.search or e.add) and th.fg or th.dim)
-                love.graphics.print(fit_text(ui.font, e.title, rw - 60), rx, ty)
+                local can_remove = e.catalog and not e.catalog.key and e == pg.entries[pg.sel]
+                local room = rw - 60 - (can_remove and 170 or 0)
+                love.graphics.print(fit_text(ui.font, e.title, room), rx, ty)
+                if can_remove then
+                    mark = nil
+                    local bx, by, bw, bh = shop.remove_button(rx, ry, rw, row_h)
+                    app.button(bx, by, bw, bh, "Remove", "Y", "soft")
+                end
                 if mark then love.graphics.printf(mark, rx, ty, rw, "right") end
                 if sub ~= "" then
                     love.graphics.setFont(ui.small)
                     color(th.dim)
-                    love.graphics.print(fit_text(ui.small, sub, rw - 60), rx, ty + 40)
+                    love.graphics.print(fit_text(ui.small, sub, room), rx, ty + 40)
                 end
             end)
         end
@@ -11218,6 +11248,7 @@ function handle_action(a)
         if a == "up" then shop.move(-1)
         elseif a == "down" then shop.move(1)
         elseif a == "confirm" then shop.confirm()
+        elseif a == "toc" and #shop.stack == 1 then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
         elseif a == "back" then shop.back()
         elseif a == "menu" and not shop.dl then shop.stack = {}; shop.back() end
         redraw()
@@ -11424,7 +11455,13 @@ function app.on_tap(side, u, v)
         if v >= 160 then
             local idx = pg.top + math.floor((v - 160) / 96)
             if pg.entries[idx] and idx < pg.top + list_rows(96) then
-                if idx == pg.sel then action("confirm") else pg.sel = idx; redraw() end
+                local e = pg.entries[idx]
+                local m = MARGINS[2]
+                local bx, _, bw = shop.remove_button(m.inner, 0, PAGE_W - m.outer - m.inner, 96)
+                if idx == pg.sel and #shop.stack == 1 and e.catalog and not e.catalog.key and u >= bx - app.TAP_PAD then
+                    shop.remove_catalog(e)
+                    redraw()
+                elseif idx == pg.sel then action("confirm") else pg.sel = idx; redraw() end
             end
         end
     elseif mode == "about" or mode == "help" or mode == "report" then
@@ -13309,6 +13346,10 @@ local function run_test_script()
             elseif a == "tsync" then app.tsync_open()
             elseif a == "calibre" then app.cal_open()
             elseif a == "calpoll" then app.cal_poll()
+            elseif a == "getbooks" then shop.start()
+            elseif a == "catsel" then local pg = shop.stack[1]; pg.sel = 3          -- (the first catalog of yours)
+            elseif a == "catremove" then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
+            elseif a == "catyes" then action("confirm")
             elseif a == "calerr" then                          -- the Calibre page as after its connection stopped
                 app.cal_open(); if app.cal then app.cal.error = "The connection stopped: (a test)" end
             elseif a == "recverr" then                         -- Send Books as after the server couldn't start

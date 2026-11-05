@@ -86,6 +86,46 @@ function M.candidates(url)
     return list
 end
 
+-- Take a catalog out of opds.txt (the block with this address, and this name if
+-- there are several): its lines go, comments and the other catalogs stay.
+-- Returns true, or false and why not.
+function M.remove_catalog(file, url, name)
+    local f = io.open(file, "rb")
+    if not f then return false, "no catalogs file" end
+    local lines = {}
+    for line in f:lines() do lines[#lines + 1] = (line:gsub("\r$", "")) end
+    f:close()
+    local blocks, cur = {}, nil
+    for i, line in ipairs(lines) do
+        local k, v = line:match("^%s*([%a_]+)%s*=%s*(.-)%s*$")
+        if k and not line:match("^%s*#") and k:lower() ~= "gutenberg" and k:lower() ~= "standardebooks" then
+            k = k:lower()
+            if not cur or (k == "name" and cur.name) or (k == "url" and cur.url) then
+                cur = { rows = {} }
+                blocks[#blocks + 1] = cur
+            end
+            cur.rows[#cur.rows + 1] = i
+            if k == "name" or k == "url" then cur[k] = v end
+        end
+    end
+    local drop, found = {}, false
+    for _, b in ipairs(blocks) do
+        if not found and b.url == url and (name == nil or b.name == nil or b.name == name) then
+            found = true
+            for _, i in ipairs(b.rows) do drop[i] = true end
+        end
+    end
+    if not found then return false, "not in the file" end
+    local out = {}
+    for i, line in ipairs(lines) do if not drop[i] then out[#out + 1] = line end end
+    local w, err = io.open(file, "wb")
+    if not w then return false, err end
+    local ok = w:write(table.concat(out, "\n"), "\n")
+    w:close()
+    if not ok then return false, "couldn't write to the SD card" end
+    return true
+end
+
 -- Add a catalog to the end of opds.txt (made with its examples if it isn't
 -- there yet). Returns true, or false and why not.
 function M.add_catalog(file, c)
