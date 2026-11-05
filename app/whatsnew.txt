@@ -2,6 +2,10 @@
 # "v" lines start a version; every other line is one change, in plain words.
 # Add the new version's lines at the top with each release.
 
+v1.28.1
+In Get Books you can now remove a catalog you added. Select it and press Y, or tap Remove on its row, then confirm.
+When you continue reading from another device, the question now names that device correctly (for example "Surface Duo" or "Mac") instead of always saying RG DS Plus. This shows once the other device has the new version.
+
 v1.28.0
 Sync your themes between your devices. In Themes, tap Custom, then Sync. On your first device choose Start syncing, and on your other devices choose Join with a code and type the code it shows. You pick what to add, upload or delete, and nothing changes until you press Sync now.
 When something goes wrong on the Get More Fonts, Get Books, Calibre and Send Books screens, there is now a Try again button, so you no longer have to leave and come back.

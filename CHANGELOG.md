@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.28.1
 
 - **Get Books: remove a catalog of yours.** The only way was to edit `opds.txt` by hand. Select one of your own catalogs and Y (or the Remove button that appears on its row, for the touchscreen) asks "Remove <name>?" and takes its lines out of `opds.txt` (`Opds.remove_catalog`: comments and other catalogs stay). Project Gutenberg and Standard Ebooks have no Remove; `gutenberg = off` / `standardebooks = off` in `opds.txt` hides them. Script actions `getbooks`, `catsel`, `catremove`, `catyes`.
 - **Reading-place sync names the right device.** `kosync.lua` sent "RG DS Plus" as the device name from every device, so a Surface Duo's place showed on the Mac as "Continue from your RG DS Plus?". It now sends "Surface Duo", "iPhone" or "Mac" on those, and "RG DS Plus" on the handhelds (stock, ROCKNIX, GammaOS, BananaOS).
