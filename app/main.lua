@@ -2364,7 +2364,7 @@ function shop.start()
 end
 
 -- The hints under a catalog page: what A does to the selected entry.
-function shop.hints(pg, it)
+function shop.hints0(pg, it)
     if pg.error and (#pg.entries == 0 or not (it and it.book)) then return { "A", "try again", "B", "back" } end
     if not it then return { "B", "back" } end
     if it.book then
@@ -2381,6 +2381,16 @@ function shop.hints(pg, it)
     if it.catalog and not it.catalog.key then return { "A", "open", "Y", "remove", "B", "back" } end
     if it.href or it.catalog then return { "A", "open", "B", "back" } end
     return { "B", "back" }
+end
+
+function shop.hints(pg, it)
+    local h = shop.hints0(pg, it)
+    if shop.covers_page(pg) and #h >= 4 and h[#h - 1] == "B" then
+        local n = #h
+        table.insert(h, n - 1, "Y")
+        table.insert(h, n, shop.use_grid(pg) and "list" or "grid")
+    end
+    return h
 end
 
 -- Is this book already in the library (same file name, or same title)?
@@ -2441,7 +2451,7 @@ function shop.keep_cover(url, img)
     end
     shop.covers[url] = img
     shop.cover_order[#shop.cover_order + 1] = url
-    if #shop.cover_order > 12 then
+    if #shop.cover_order > (shop.cover_cap or 12) then
         local old = table.remove(shop.cover_order, 1)
         if shop.covers[old] then shop.covers[old]:release() end
         shop.covers[old] = nil
@@ -2469,6 +2479,85 @@ function shop.start_download(it)
             end
         end
     end)
+end
+
+---------------------------------------------------------------- cover grid
+
+-- Pages of books with covers (a library's list, Standard Ebooks) can be a grid
+-- of covers, three across, instead of rows; Y switches (S.shop_grid).
+function shop.covers_page(pg)
+    if not pg or pg.bo == "home" or #pg.entries < 4 then return false end
+    local c = 0
+    for _, e in ipairs(pg.entries) do if e.cover then c = c + 1 end end
+    return c * 2 >= #pg.entries
+end
+
+function shop.use_grid(pg) return S.shop_grid ~= false and shop.covers_page(pg) end
+
+function shop.grid_geom()
+    local m = MARGINS[2]
+    local w = PAGE_W - m.outer - m.inner
+    local g = { cols = 3, gap = 14, x = m.inner, y = 160 }
+    g.cw = math.floor((w - g.gap * (g.cols - 1)) / g.cols)
+    g.ch = math.floor(g.cw * 1.35)
+    g.label = ui.small:getHeight() * 2
+    g.cell_h = g.ch + 8 + g.label
+    g.rows = math.max(1, math.floor((PAGE_H - 70 - 24 - g.y + g.gap) / (g.cell_h + g.gap)))
+    return g
+end
+
+function shop.draw_grid(side, pg)
+    local th = theme()
+    local g = shop.grid_geom()
+    shop.cover_cap = g.cols * (g.rows + 2) + 2         -- (the visible covers, and some above and below)
+    local sel_row = math.floor((pg.sel - 1) / g.cols)
+    pg.gtop = pg.gtop or 0
+    if sel_row < pg.gtop then pg.gtop = sel_row end
+    if sel_row >= pg.gtop + g.rows then pg.gtop = sel_row - g.rows + 1 end
+    for r = 0, g.rows - 1 do
+        for c = 0, g.cols - 1 do
+            local idx = (pg.gtop + r) * g.cols + c + 1
+            local e = pg.entries[idx]
+            if not e then return end
+            local cx, cy = g.x + c * (g.cw + g.gap), g.y + r * (g.cell_h + g.gap)
+            if idx == pg.sel then
+                color(th.sel)
+                love.graphics.rectangle("fill", cx - 8, cy - 8, g.cw + 16, g.cell_h + 16, 10, 10)
+            end
+            local img = shop.cover(e)
+            if img and img:getWidth() < 64 then img = nil end
+            if img then
+                local iw, ih = img:getDimensions()
+                local sc = math.min(g.cw / iw, g.ch / ih)
+                love.graphics.setColor(1, 1, 1)
+                love.graphics.draw(img, cx + (g.cw - iw * sc) / 2, cy + g.ch - ih * sc, 0, sc, sc)
+            else
+                color(th.dim, 0.18)
+                love.graphics.rectangle("fill", cx, cy, g.cw, g.ch, 6, 6)
+            end
+            if e.book and (e.have or shop.have(e)) then
+                color(th.fg)
+                love.graphics.circle("fill", cx + g.cw - 22, cy + 22, 16)
+                color(th.bg)
+                love.graphics.setFont(ui.small)
+                love.graphics.printf("✓", cx + g.cw - 38, cy + 22 - ui.small:getHeight() / 2, 32, "center")
+            end
+            love.graphics.setFont(ui.small)
+            color(th.fg)
+            shop.print_clipped(ui.small, e.title, cx, cy + g.ch + 8, g.cw, g.label, "center")
+        end
+    end
+end
+
+-- Which cell a tap on the touchscreen (u, v) is on, or nil.
+function shop.grid_hit(pg, u, v)
+    local g = shop.grid_geom()
+    if v < g.y - 8 or u < g.x - 8 then return nil end
+    local r = math.floor((v - g.y + 8) / (g.cell_h + g.gap))
+    local c = math.floor((u - g.x + 8) / (g.cw + g.gap))
+    if r < 0 or r >= g.rows or c < 0 or c >= g.cols then return nil end
+    local idx = ((pg.gtop or 0) + r) * g.cols + c + 1
+    return pg.entries[idx] and idx or nil
 end
 
 ---------------------------------------------------------------- BookOrbit
@@ -6303,6 +6392,7 @@ function shop.draw(side)
         else
             local row_h = 96
             local rows = list_rows(row_h)
+            if shop.use_grid(pg) then shop.draw_grid(side, pg) rows = 0 end
             if pg.sel < pg.top then pg.top = pg.sel end
             if pg.sel >= pg.top + rows then pg.top = pg.sel - rows + 1 end
             draw_list(side, pg.entries, pg.sel, pg.top, rows, x, 160, w, row_h, function(e, _, rx, ry, rw)
@@ -11353,10 +11443,13 @@ function handle_action(a)
     end
 
     if mode == "shop" then
-        if a == "up" then shop.move(-1)
-        elseif a == "down" then shop.move(1)
+        local step = shop.use_grid(shop.page()) and 3 or 1
+        if a == "up" then shop.move(-step)
+        elseif a == "down" then shop.move(step)
         elseif a == "confirm" then shop.confirm()
         elseif a == "toc" and #shop.stack == 1 then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
+        elseif a == "toc" and shop.covers_page(shop.page()) then S.shop_grid = not shop.use_grid(shop.page()); Store.save_settings(S)
+        elseif (a == "left" or a == "right") and shop.use_grid(shop.page()) then shop.move(a == "left" and -1 or 1)
         elseif a == "back" then shop.back()
         elseif a == "menu" and not shop.dl then shop.stack = {}; shop.back() end
         redraw()
@@ -11558,6 +11651,13 @@ function app.on_tap(side, u, v)
         if not pg or side ~= "right" then return end
         if #pg.entries == 0 then
             if pg.error then action("confirm") end        -- try again
+            return
+        end
+        if shop.use_grid(pg) then
+            local idx = shop.grid_hit(pg, u, v)
+            if idx then
+                if idx == pg.sel then action("confirm") else pg.sel = idx; redraw() end
+            end
             return
         end
         if v >= 160 then
@@ -13458,6 +13558,7 @@ local function run_test_script()
             elseif a == "catsel" then local pg = shop.stack[1]; pg.sel = 3          -- (the first catalog of yours)
             elseif a == "catremove" then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
             elseif a == "catyes" then action("confirm")
+            elseif a:match("^act:%a+$") then action(a:sub(5))                 -- (a logical action: up, down, left, right, confirm, toc ...)
             elseif a == "cover" then local pg = shop.page(); shop.cover(pg.entries[pg.sel])      -- (ask for the selected row's cover)
             elseif a:match("^bosel:%d+$") then local pg = shop.page(); pg.sel = tonumber(a:match("%d+")) -- (BookOrbit: select a row)
             elseif a == "calerr" then                          -- the Calibre page as after its connection stopped

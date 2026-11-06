@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Get Books: a grid of covers.** A page of books that mostly have covers (BookOrbit's lists, Standard Ebooks) is a grid, three covers across and two rows, with the title under each and a mark on the ones you already have; Y (or a tap on its hint) switches between the grid and the list, and the choice is kept (`S.shop_grid`). The D-pad moves by cover (left/right) and by row (up/down), a tap selects and a second tap opens. Covers are fetched only for what's on screen, one at a time as before, and the cover memory grows to the visible covers and a row either side (`shop.cover_cap`). Script actions `act:NAME` (a logical button) for tests.
 - **Get Books: BookOrbit.** When KOReader Sync is set to a BookOrbit server (the address ends `/api/v1/koreader`) and logged in, Get Books lists BookOrbit, which uses that same login (`app/bookorbit.lua`, `shop.bo_*` in `main.lua`). Its first page is the server's dashboard (`/api/v1/koreader/plugin/catalog/dashboard`): the books you're reading with their progress, then Discover, Finished this year, Recently added, All Books and the lists of Libraries, Collections, SmartScopes, Authors and Series, each opening a list of books with covers (loaded with the login in headers: `job.headers` in `networker.lua`, `catalog.headers` in `shop.catalog_opts`) and paged as you reach the end. A book's file address comes from its details, then the usual download (EPUB and TXT; other formats say so). Tested against a real server and a unit test (`tools/test-bookorbit.lua`). Script actions `bosel:N`, `cover`.
 ## v1.28.1
 
