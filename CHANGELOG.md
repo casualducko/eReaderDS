@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+
+- **Get Books: BookOrbit.** When KOReader Sync is set to a BookOrbit server (the address ends `/api/v1/koreader`) and logged in, Get Books lists BookOrbit, which uses that same login (`app/bookorbit.lua`, `shop.bo_*` in `main.lua`). Its first page is the server's dashboard (`/api/v1/koreader/plugin/catalog/dashboard`): the books you're reading with their progress, then Discover, Finished this year, Recently added, All Books and the lists of Libraries, Collections, SmartScopes, Authors and Series, each opening a list of books with covers (loaded with the login in headers: `job.headers` in `networker.lua`, `catalog.headers` in `shop.catalog_opts`) and paged as you reach the end. A book's file address comes from its details, then the usual download (EPUB and TXT; other formats say so). Tested against a real server and a unit test (`tools/test-bookorbit.lua`). Script actions `bosel:N`, `cover`.
 ## v1.28.1
 
 - **Get Books: remove a catalog of yours.** The only way was to edit `opds.txt` by hand. Select one of your own catalogs and Y (or the Remove button that appears on its row, for the touchscreen) asks "Remove <name>?" and takes its lines out of `opds.txt` (`Opds.remove_catalog`: comments and other catalogs stay). Project Gutenberg and Standard Ebooks have no Remove; `gutenberg = off` / `standardebooks = off` in `opds.txt` hides them. Script actions `getbooks`, `catsel`, `catremove`, `catyes`.

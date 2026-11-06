@@ -2253,6 +2253,7 @@ function shop.page() return shop.stack[#shop.stack] end
 function shop.catalog_opts(job)
     local c = shop.catalog
     job.user, job.password, job.verify = c.user, c.password, c.verify
+    job.headers = c.headers                 -- (BookOrbit: its login travels in headers)
     return job
 end
 
@@ -2340,6 +2341,12 @@ function shop.start()
             formats = {}, calibre = true, summary = "Send books from Calibre as to any e-reader. In Calibre, click "
                 .. "Connect/share, then Start wireless device connection; then open this. eReaderDS appears as a "
                 .. "device: send books to it (they go to the Calibre folder in My Books), or delete them there." } }
+    local bo = app.bookorbit_catalog()
+    if bo then
+        entries[#entries + 1] = { title = "BookOrbit", author = bo.url:gsub("^%a+://", ""), formats = {}, bookorbit = bo,
+            summary = "Your BookOrbit server: what you're reading, books to discover, and your libraries, "
+                .. "authors and series. It uses your KOReader Sync login." }
+    end
     for _, c in ipairs(library.catalogs or {}) do
         local u = Opds.parse_url(c.url)
         entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = c.about or "",
@@ -2370,6 +2377,7 @@ function shop.hints(pg, it)
     if it.search then return { "A", "search", "B", "back" } end
     if it.receive or it.calibre then return { "A", "start", "B", "back" } end
     if it.add then return { "A", "add", "B", "back" } end
+    if it.bookorbit or it.bo then return { "A", "open", "B", "back" } end
     if it.catalog and not it.catalog.key then return { "A", "open", "Y", "remove", "B", "back" } end
     if it.href or it.catalog then return { "A", "open", "B", "back" } end
     return { "B", "back" }
@@ -2441,6 +2449,7 @@ function shop.keep_cover(url, img)
 end
 
 function shop.start_download(it)
+    if it.bo and not it.book.href then return shop.bo_file(it) end        -- BookOrbit: its file address first
     shop.dir = shop.dir or Store.download_dir()
     local dest = shop.dir .. "/" .. Opds.file_name(it)
     local dl = { item = it, got = 0, total = it.book.size or 0, dest = dest }
@@ -2459,6 +2468,101 @@ function shop.start_download(it)
                 it.failed = shop.online(true) and msg.message or "not connected to Wi-Fi"
             end
         end
+    end)
+end
+
+---------------------------------------------------------------- BookOrbit
+
+-- BookOrbit is offered in Get Books when KOReader Sync is set to a BookOrbit address
+-- (".../api/v1/koreader") and logged in: the same login does for its catalog.
+function app.bookorbit_catalog()
+    if not app.sync_on() then return nil end
+    local base = require("bookorbit").base(app.sync_url())
+    if not base then return nil end
+    return { name = "BookOrbit", url = base, headers = app.KOSync.headers(S.kosync_user, S.kosync_key), verify = true,
+        bookorbit = true }
+end
+
+-- GET a path on the server; the handler gets the decoded answer, or nil and a message.
+function shop.bo_get(url, done)
+    shop.net_job({ kind = "call", method = "GET", url = url, headers = shop.catalog.headers, timeout = 20 }, function(msg)
+        if msg.kind == "error" then
+            return done(nil, shop.online(true) and msg.message or "Not connected to Wi-Fi.")
+        end
+        if msg.status == 401 then return done(nil, "BookOrbit didn't accept the KOReader Sync login.") end
+        if msg.status == 403 then return done(nil, "BookOrbit refused access (403). Does the user have KOReader sync?") end
+        if msg.status ~= 200 then return done(nil, "BookOrbit answered " .. tostring(msg.status)) end
+        local ok, data = pcall(require("json").decode, msg.body or "")
+        if not ok or type(data) ~= "table" then return done(nil, "BookOrbit's answer wasn't understood.") end
+        done(data)
+    end)
+end
+
+-- Fill (or add to) a page with what the server answers: a book list or a dashboard.
+function shop.bo_load(pg, path, append)
+    local base = shop.catalog.url
+    local url = require("bookorbit").url(base, path)
+    pg.loading, pg.error = true, nil
+    pg.redo = function() shop.bo_load(pg, pg.bo_path or path, false) end
+    shop.bo_get(url, function(data, err)
+        pg.loading = false
+        if not data then
+            if append then pg.next = path; app.toast("Couldn't load more: " .. err) else pg.error = err end
+            redraw()
+            return
+        end
+        local list
+        if pg.bo == "home" then list = require("bookorbit").home(data, base)
+        elseif pg.bo == "sections" then list = require("bookorbit").sections(data, base)
+        else list = require("bookorbit").books(data.items, base) end
+        if append then for _, e in ipairs(list) do pg.entries[#pg.entries + 1] = e end else pg.entries = list end
+        pg.next = data.hasNext and data.nextUrl or nil
+        pg.sel = math.max(1, math.min(pg.sel, #pg.entries))
+        pg.top = math.max(1, math.min(pg.top, pg.sel))
+        redraw()
+    end)
+end
+
+function shop.bo_push(title, kind, path)
+    local pg = { title = title, url = path, entries = {}, sel = 1, top = 1, bo = kind, bo_path = path }
+    shop.stack[#shop.stack + 1] = pg
+    shop.bo_load(pg, path)
+    redraw()
+end
+
+-- Get Books → require("bookorbit").
+function shop.bo_open(catalog)
+    shop.catalog = catalog
+    shop.bo_push("BookOrbit", "home", require("bookorbit").plugin("catalog/dashboard"))
+end
+
+-- A row of the home page or of a list: lists already held, or a page to fetch.
+function shop.bo_enter(it)
+    local bo = it.bo
+    if bo.kind == "list" then
+        local pg = { title = bo.title, entries = bo.entries, sel = 1, top = 1, bo = "books" }
+        shop.stack[#shop.stack + 1] = pg
+    elseif bo.kind == "books" then shop.bo_push(bo.title, "books", bo.href)
+    elseif bo.kind == "sections" then shop.bo_push(bo.title, "sections", bo.href)
+    end
+    redraw()
+end
+
+-- A book's file address comes from its details; then the usual download.
+function shop.bo_file(it)
+    if it.fetching then return end
+    it.fetching, it.failed = true, nil
+    shop.bo_get(it.bo.detail, function(data, err)
+        it.fetching = nil
+        local f = data and require("bookorbit").file(data, shop.catalog.url)
+        if not f then
+            it.failed = err or "no EPUB file for this book"
+            redraw()
+            return
+        end
+        it.book.href, it.book.size = f.href, f.size
+        shop.start_download(it)
+        redraw()
     end)
 end
 
@@ -2510,6 +2614,10 @@ function shop.confirm()
         if shop.dl then return end
         local have = it.have or shop.have(it)
         if have then open_book(have) else it.failed = nil; shop.start_download(it) end
+    elseif it.bookorbit then
+        shop.bo_open(it.bookorbit)
+    elseif it.bo then
+        shop.bo_enter(it)
     elseif it.catalog then
         shop.catalog = it.catalog
         shop.push_page(it.catalog.name, it.catalog.url, true)
@@ -2654,7 +2762,7 @@ function shop.move(d)
     if pg.sel >= #pg.entries - 2 and pg.next and not pg.loading and not pg.error then
         local url = pg.next
         pg.next = nil
-        shop.load_page(pg, url, true)
+        if pg.bo then shop.bo_load(pg, url, true) else shop.load_page(pg, url, true) end
     end
 end
 
@@ -6208,11 +6316,11 @@ function shop.draw(side)
                 if e.book then
                     mark = (shop.dl and shop.dl.item == e) and "…"
                         or (e.have or shop.have(e)) and "✓" or nil
-                elseif e.href or e.catalog or e.receive or e.calibre or e.search or e.add then
+                elseif e.href or e.catalog or e.receive or e.calibre or e.search or e.add or e.bo or e.bookorbit then
                     mark = "›"
                 end
                 love.graphics.setFont(ui.font)
-                color((e.book or e.href or e.catalog or e.receive or e.calibre or e.search or e.add) and th.fg or th.dim)
+                color((e.book or e.href or e.catalog or e.receive or e.calibre or e.search or e.add or e.bo or e.bookorbit) and th.fg or th.dim)
                 local can_remove = e.catalog and not e.catalog.key and e == pg.entries[pg.sel]
                 local room = rw - 60 - (can_remove and 170 or 0)
                 love.graphics.print(fit_text(ui.font, e.title, room), rx, ty)
@@ -13350,6 +13458,8 @@ local function run_test_script()
             elseif a == "catsel" then local pg = shop.stack[1]; pg.sel = 3          -- (the first catalog of yours)
             elseif a == "catremove" then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
             elseif a == "catyes" then action("confirm")
+            elseif a == "cover" then local pg = shop.page(); shop.cover(pg.entries[pg.sel])      -- (ask for the selected row's cover)
+            elseif a:match("^bosel:%d+$") then local pg = shop.page(); pg.sel = tonumber(a:match("%d+")) -- (BookOrbit: select a row)
             elseif a == "calerr" then                          -- the Calibre page as after its connection stopped
                 app.cal_open(); if app.cal then app.cal.error = "The connection stopped: (a test)" end
             elseif a == "recverr" then                         -- Send Books as after the server couldn't start

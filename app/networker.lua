@@ -32,7 +32,7 @@ Net.abort = function()
 end
 
 local function run(job)
-    local opts = { user = job.user, password = job.password, verify = job.verify }
+    local opts = { user = job.user, password = job.password, verify = job.verify, headers = job.headers }
     if job.kind == "fetch" then
         local body, final = Net.get(job.url, opts)
         out:push({ id = job.id, kind = "done", body = body, url = final })
