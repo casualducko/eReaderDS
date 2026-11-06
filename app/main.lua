@@ -2345,7 +2345,12 @@ function shop.start()
     if bo then
         entries[#entries + 1] = { title = "BookOrbit", author = bo.url:gsub("^%a+://", ""), formats = {}, bookorbit = bo,
             summary = "Your BookOrbit server: what you're reading, books to discover, and your libraries, "
-                .. "authors and series. It uses your KOReader Sync login." }
+                .. "authors and series. Y for its settings." }
+    else
+        entries[#entries + 1] = { title = "BookOrbit", author = "Connect your server", formats = {}, bookorbit_setup = true,
+            summary = "Connect eReaderDS to your own BookOrbit server: what you're reading, books to discover, "
+                .. "your libraries, authors and series, and downloads. Sign in with the KOReader login from "
+                .. "BookOrbit's Settings → KOReader." }
     end
     for _, c in ipairs(library.catalogs or {}) do
         local u = Opds.parse_url(c.url)
@@ -2377,7 +2382,10 @@ function shop.hints0(pg, it)
     if it.search then return { "A", "search", "B", "back" } end
     if it.receive or it.calibre then return { "A", "start", "B", "back" } end
     if it.add then return { "A", "add", "B", "back" } end
-    if it.bookorbit or it.bo then return { "A", "open", "B", "back" } end
+    if it.bookorbit then return { "A", "open", "Y", "settings", "B", "back" } end
+    if it.bookorbit_setup then return { "A", "connect", "B", "back" } end
+    if it.bo_act then return { "A", it.title == "Open BookOrbit" and "open" or "change", "B", "back" } end
+    if it.bo then return { "A", "open", "B", "back" } end
     if it.catalog and not it.catalog.key then return { "A", "open", "Y", "remove", "B", "back" } end
     if it.href or it.catalog then return { "A", "open", "B", "back" } end
     return { "B", "back" }
@@ -2774,14 +2782,23 @@ end
 
 ---------------------------------------------------------------- BookOrbit
 
--- BookOrbit is offered in Get Books when KOReader Sync is set to a BookOrbit address
--- (".../api/v1/koreader") and logged in: the same login does for its catalog.
+-- BookOrbit's address and login (Settings → BookOrbit). A KOReader Sync login to a
+-- BookOrbit server from before there was a page of its own is taken over once.
+function app.bo_account()
+    if S.bo_url == "" and app.sync_on() then
+        local base = require("bookorbit").base(app.sync_url())
+        if base then
+            S.bo_url, S.bo_user, S.bo_key = base, S.kosync_user, S.kosync_key
+            Store.save_settings(S)
+        end
+    end
+    if S.bo_url ~= "" and S.bo_user ~= "" and S.bo_key ~= "" then return S.bo_url, S.bo_user, S.bo_key end
+end
+
 function app.bookorbit_catalog()
-    if not app.sync_on() then return nil end
-    local base = require("bookorbit").base(app.sync_url())
+    local base, user, key = app.bo_account()
     if not base then return nil end
-    return { name = "BookOrbit", url = base, headers = app.KOSync.headers(S.kosync_user, S.kosync_key), verify = true,
-        bookorbit = true }
+    return { name = "BookOrbit", url = base, headers = app.KOSync.headers(user, key), verify = true, bookorbit = true }
 end
 
 -- GET a path on the server; the handler gets the decoded answer, or nil and a message.
@@ -2872,10 +2889,14 @@ function shop.back()
         love.thread.getChannel("net_cancel"):push(shop.dl.id)
         return
     end
-    table.remove(shop.stack)
+    local was = table.remove(shop.stack)
     if #shop.stack == 0 then
         scan_library()
         app.mode = "library"
+    elseif #shop.stack == 1 and was and was.bo == "settings" then
+        local sel = shop.stack[1].sel
+        shop.start()                                   -- (BookOrbit's row may have changed)
+        if shop.stack[1] then shop.stack[1].sel = sel end
     end
 end
 
@@ -2917,6 +2938,10 @@ function shop.confirm()
         if have then open_book(have) else it.failed = nil; shop.start_download(it) end
     elseif it.bookorbit then
         shop.bo_open(it.bookorbit)
+    elseif it.bookorbit_setup then
+        app.bo_settings_open()
+    elseif it.bo_act then
+        it.bo_act()
     elseif it.bo then
         shop.bo_enter(it)
     elseif it.catalog then
@@ -4055,6 +4080,170 @@ function app.sync_register(user, key)
     end)
 end
 
+---------------------------------------------------------------- Settings → BookOrbit
+
+-- Get Books → BookOrbit → settings: a page of Get Books (the settings menu needs a book
+-- open), B goes back to the list. Settings → BookOrbit has the same rows.
+function app.bo_settings_open()
+    app.asking = nil
+    local pg = { title = "BookOrbit", entries = shop.bo_settings_entries(), sel = 1, top = 1, bo = "settings", url = "" }
+    shop.stack[#shop.stack + 1] = pg
+    app.mode = "shop"
+    redraw()
+end
+
+function shop.bo_settings_entries()
+    local base, user = app.bo_account()
+    local function host(u) return (u:gsub("^%a+://", "")) end
+    local rows = {
+        { title = "Server", author = S.bo_url ~= "" and host(S.bo_url) or "Not set", formats = {},
+          summary = "Where your BookOrbit server is, such as https://books.example.com or http://192.168.1.20:3000.",
+          bo_act = function() app.bo_server() end },
+        { title = "Account", author = (base and user) or "Not logged in", formats = {},
+          summary = "The KOReader sync login from BookOrbit's Settings → KOReader (the user name and password "
+              .. "made there, not your web login).", bo_act = function() app.bo_login() end },
+    }
+    if base then
+        rows[#rows + 1] = { title = "Open BookOrbit", author = "", formats = {}, bo_act = function() app.bo_go() end,
+            summary = "What you're reading, books to discover, and your libraries, authors and series." }
+        rows[#rows + 1] = { title = "Sync my reading place", author = app.bo_sync_is_on() and "On" or "Off", formats = {},
+            summary = "Use this login for KOReader Sync too, so a book read here and in KOReader on another "
+                .. "device keeps its place.", bo_act = function() app.bo_sync_toggle() end }
+        rows[#rows + 1] = { title = "Log out", author = "", formats = {}, bo_act = function()
+            app.ask({ question = "Log out of BookOrbit?", detail = user .. " on " .. host(S.bo_url),
+                yes = "Log out", no = "Stay", on_yes = function()
+                    S.bo_user, S.bo_key = "", ""
+                    Store.save_settings(S)
+                    app.toast("Logged out of BookOrbit")
+                end })
+        end, summary = "" }
+    end
+    return rows
+end
+
+-- The page's own API address for KOReader Sync, if this account is also its login.
+function app.bo_sync_url() return S.bo_url .. require("bookorbit").API end
+
+function app.bo_sync_is_on()
+    local base, user = app.bo_account()
+    return base ~= nil and app.sync_on() and S.kosync_server == "custom" and S.kosync_custom == app.bo_sync_url()
+        and S.kosync_user == user
+end
+
+function app.bo_items()
+    local base, user = app.bo_account()
+    local items = {
+        { label = "Server", value = S.bo_url ~= "" and (S.bo_url:gsub("^%a+://", "")) or "Set up", act = function() app.bo_server() end },
+        { label = "Account", value = (base and user) or "Log in", act = function() app.bo_login() end },
+    }
+    if base then
+        items[#items + 1] = { label = "Open BookOrbit", value = "›", act = function() app.bo_go() end }
+        items[#items + 1] = { label = "Sync my reading place", value = app.bo_sync_is_on() and "On" or "Off", act = function() app.bo_sync_toggle() end }
+        items[#items + 1] = { label = "Log out", act = function()
+            app.ask({ question = "Log out of BookOrbit?", detail = user .. " on " .. S.bo_url:gsub("^%a+://", ""),
+                yes = "Log out", no = "Stay", on_yes = function()
+                    S.bo_user, S.bo_key = "", ""
+                    Store.save_settings(S)
+                    app.toast("Logged out of BookOrbit")
+                end })
+        end }
+    end
+    return join(section(nil, items), section("", { { label = "Back", act = close_sub } }))
+end
+
+-- Its address: the part up to the host (and port); https:// unless a home address.
+function app.bo_server(then_login)
+    app.kb_open({ title = "BookOrbit Address", text = S.bo_url, ok = then_login and "Next" or "Save", url = true,
+        hint = "Where your BookOrbit server is, such as https://books.example.com or http://192.168.1.20:3000",
+        submit = function(text)
+            local u = require("opds").normalize_address(text)
+            local base = u and u:match("^(https?://[^/]+)")
+            if not base then app.toast("That isn't an address") return end
+            if app.KOSync.insecure(base) then
+                app.toast("A server on the internet needs https://. (http:// is for your home network.)", 6)
+                return
+            end
+            if base ~= S.bo_url then S.bo_user, S.bo_key = "", "" end
+            S.bo_url = base
+            Store.save_settings(S)
+            if then_login then app.bo_login() else redraw() end
+        end })
+end
+
+-- The login is the KOReader one (BookOrbit's Settings → KOReader), not the web login.
+function app.bo_login()
+    if S.bo_url == "" then return app.bo_server(true) end
+    app.kb_open({ title = "BookOrbit User Name", text = S.bo_user, ok = "Next",
+        hint = "The KOReader sync user name from BookOrbit's Settings → KOReader (not your web login).",
+        submit = function(user)
+            app.kb_open({ title = "Password for " .. user, secret = true, ok = "Log in",
+                hint = "The KOReader sync password for " .. user .. ".",
+                submit = function(pw) app.bo_auth(user, app.KOSync.md5(pw)) end })
+        end })
+end
+
+function app.bo_auth(user, key)
+    if not shop.online(true) then app.toast("Not connected to Wi-Fi") return end
+    app.toast("Logging in to BookOrbit…", 20)
+    local url = S.bo_url .. require("bookorbit").API .. "/users/auth"
+    shop.net_job({ kind = "call", method = "GET", url = url, headers = app.KOSync.headers(user, key), timeout = 15 }, function(msg)
+        app.untoast()
+        if msg.kind ~= "done" then
+            app.toast("Couldn't reach BookOrbit: " .. tostring(msg.message), 5)
+        elseif msg.status == 200 then
+            S.bo_user, S.bo_key = user, key
+            Store.save_settings(S)
+            app.toast("Logged in as " .. user)
+            if app.mode == "shop" then app.bo_go() else redraw() end
+        elseif msg.status == 401 then
+            app.toast("BookOrbit didn't accept that login. It's the KOReader one (Settings → KOReader).", 6)
+        elseif msg.status == 403 then
+            app.toast("That user can't use KOReader sync on this server.", 6)
+        else
+            app.toast("BookOrbit answered " .. tostring(msg.status) .. ". Is the address right?", 5)
+        end
+    end)
+end
+
+-- Straight into BookOrbit's home page.
+function app.bo_go()
+    local cat = app.bookorbit_catalog()
+    if not cat then return end
+    shop.start()
+    if app.mode == "shop" then shop.bo_open(cat) end
+end
+
+-- Use this login for KOReader Sync too (the same server, so a book read here and in
+-- KOReader on another device keeps its place), or stop doing so.
+function app.bo_sync_toggle()
+    local base, user, key = app.bo_account()
+    if not base then return end
+    if app.bo_sync_is_on() then
+        app.ask({ question = "Stop syncing your reading place?", detail = "This logs out of KOReader Sync.",
+            yes = "Stop", no = "Keep", on_yes = function()
+                S.kosync_user, S.kosync_key = "", ""
+                Store.save_settings(S)
+                app.sync.checked, app.sync.pushed = {}, {}
+                app.toast("Reading place sync is off")
+            end })
+        return
+    end
+    local function on()
+        S.kosync_custom, S.kosync_custom_name, S.kosync_user, S.kosync_key = app.bo_sync_url(), "BookOrbit", user, key
+        app.sync_set_server("custom")
+        S.kosync_user, S.kosync_key = user, key
+        Store.save_settings(S)
+        app.sync.checked, app.sync.pushed = {}, {}
+        app.toast("Your reading place now syncs with BookOrbit")
+    end
+    if app.sync_on() then
+        app.ask({ question = "Use BookOrbit for KOReader Sync?", detail = "It now syncs with " .. app.sync_account(),
+            yes = "Switch", no = "Keep", on_yes = on })
+    else
+        on()
+    end
+end
+
 -- Night Mode: another theme, used automatically between two hours (by
 -- the device's clock, like the status bar). app.night says whether it's on
 -- now; checked once a minute.
@@ -4242,6 +4431,7 @@ local function menu_items()
     if menu.page == "night" then return app.night_items() end
     if menu.page == "about" then return app.about_items() end
     if menu.page == "sync" then return app.sync_items() end
+    if menu.page == "bookorbit" then return app.bo_items() end
     if menu.page == "server" then return app.server_items() end
     local th = theme()
     local u = app.upd
@@ -4336,6 +4526,7 @@ local function menu_items()
             { label = "Reading & Device", value = "›", act = function() open_sub("more") end },
             { label = "Back Up & Restore", value = "›", act = function() app.bk_size = nil; open_sub("backup") end },
             { label = "KOReader Sync", value = app.sync_on() and "On" or "Off", opens = true, act = function() open_sub("sync") end },
+            { label = "BookOrbit", value = app.bo_account() and "On" or "Off", opens = true, act = function() open_sub("bookorbit") end },
         })),
         app.menu_on_page(2, section("", app.help_quit_rows()))
     )
@@ -6580,6 +6771,10 @@ function shop.draw(side)
     local m = MARGINS[2]
     local pg = shop.page()
     if not pg then return end
+    if pg.bo == "settings" then
+        pg.entries = shop.bo_settings_entries()                  -- (they show the current state)
+        pg.sel = math.max(1, math.min(pg.sel, #pg.entries))
+    end
     local it = pg.entries[pg.sel]
     -- The list is on the right page (the touchscreen), so rows can be
     -- tapped; the selected entry (cover, details) is on the left.
@@ -6619,11 +6814,11 @@ function shop.draw(side)
                 if e.book then
                     mark = (shop.dl and shop.dl.item == e) and "…"
                         or (e.have or shop.have(e)) and "✓" or nil
-                elseif e.href or e.catalog or e.receive or e.calibre or e.search or e.add or e.bo or e.bookorbit then
+                elseif e.href or e.catalog or e.receive or e.calibre or e.search or e.add or e.bo or e.bookorbit or e.bookorbit_setup or e.bo_act then
                     mark = "›"
                 end
                 love.graphics.setFont(ui.font)
-                color((e.book or e.href or e.catalog or e.receive or e.calibre or e.search or e.add or e.bo or e.bookorbit) and th.fg or th.dim)
+                color((e.book or e.href or e.catalog or e.receive or e.calibre or e.search or e.add or e.bo or e.bookorbit or e.bookorbit_setup or e.bo_act) and th.fg or th.dim)
                 local can_remove = e.catalog and not e.catalog.key and e == pg.entries[pg.sel]
                 local room = rw - 60 - (can_remove and 170 or 0)
                 love.graphics.print(fit_text(ui.font, e.title, room), rx, ty)
@@ -6844,7 +7039,7 @@ local function draw_menu_panel(side)
     love.graphics.setFont(ui.title)
     color(th.fg)
     love.graphics.print(({ status = "Status Bar", more = "Reading & Device", night = "Night Mode",
-        about = "Help & About", sync = "KOReader Sync", server = "Sync Server",
+        about = "Help & About", sync = "KOReader Sync", server = "Sync Server", bookorbit = "BookOrbit",
         backup = "Back Up & Restore" })[menu.page] or "Settings", x, 60)
     if menu.page == "main" then
         love.graphics.setFont(ui.font)               -- the version, on the title's baseline
@@ -11664,6 +11859,7 @@ function handle_action(a)
         elseif a == "up" then shop.move(-step)
         elseif a == "down" then shop.move(step)
         elseif a == "confirm" then shop.confirm()
+        elseif a == "toc" and #shop.stack == 1 and (shop.stack[1].entries[shop.stack[1].sel] or {}).bookorbit then app.bo_settings_open(true)
         elseif a == "toc" and #shop.stack == 1 then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
         elseif a == "toc" and shop.covers_page(shop.page()) then S.shop_grid = not shop.use_grid(shop.page()); Store.save_settings(S)
         elseif (a == "left" or a == "right") and shop.use_grid(shop.page()) then shop.move(a == "left" and -1 or 1)
