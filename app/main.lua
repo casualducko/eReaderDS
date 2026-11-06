@@ -3400,6 +3400,22 @@ function app.sync_auto_push(now)
     if app.sync_auto() == "on" then app.sync_push(now) end
 end
 
+-- The app going out of sight (to the background, the screen off) or the Duo folded shut:
+-- send the place now (when automatic sync is On), for Android may stop the app
+-- from here on. Folding is told by the window turning tall (the two pages don't fit).
+function app.sync_on_leave(folded)
+    if folded then
+        local W, H = love.graphics.getDimensions()
+        local tall = W < H
+        local was = app.folded
+        app.folded = tall
+        if not (tall and not was) then return end
+        app.sync_auto_push()                      -- (still running, shown as the note: no need to wait)
+    else
+        app.sync_auto_push(true)                  -- (may be stopped next: waits a moment for it)
+    end
+end
+
 -- This device's place as sent: the paragraph and the percentage (a long
 -- paragraph spans pages, so the percentage says you've moved on in it).
 function app.sync_place(b)
@@ -14032,6 +14048,7 @@ local function run_test_script()
             elseif a:match("^lscroll:%d+$") then app.list_scroll(tonumber(a:match("%d+")))      -- (as a slide on the touchscreen)
             elseif a == "kcheck" then app.sync_pull("check")                   -- (KOReader sync: check the server, as on opening a book)
             elseif a == "kpush" then app.sync_push()
+            elseif a == "kleave" then app.sync_on_leave()                      -- (the app going out of sight)
             elseif a == "cover" then local pg = shop.page(); shop.cover(pg.entries[pg.sel])      -- (ask for the selected row's cover)
             elseif a:match("^bosel:%d+$") then local pg = shop.page(); pg.sel = tonumber(a:match("%d+")) -- (BookOrbit: select a row)
             elseif a == "calerr" then                          -- the Calibre page as after its connection stopped
@@ -14147,6 +14164,7 @@ function love.run()
                         app.pending_save()
                         save_progress()
                         Store.save_settings(S)
+                        if require("android").phone then app.sync_on_leave() end
                     elseif name == "focus" and a and S.brightness >= 0 and app.idle.state ~= "off" then
                         -- Back in front (after sleep or GammaOS's menu): the
                         -- system has put its own brightness back.
@@ -14158,6 +14176,7 @@ function love.run()
                     -- screens when an app opens.
                     -- (Checked a little later: waking up, DualStack lets go
                     -- for a moment and takes the app back by itself.)
+                    if name == "resize" and require("android").phone then app.sync_on_leave(true) end
                     if name == "resize" and not require("android").stacked() then
                         app.stack_check_at = math.max(app.stack_check_at or 0, love.timer.getTime() + 3)
                     end
