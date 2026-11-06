@@ -3416,6 +3416,7 @@ end
 
 -- A sync message: what happened in bold, then the details.
 function app.sync_say(head, detail, secs)
+    app.sync.say_at = love.timer.getTime()
     app.toast(detail and detail ~= "" and (head .. "\n" .. detail) or head, secs)
 end
 
@@ -3580,8 +3581,8 @@ function app.sync_decide(b, how, docs, results)
             if send then app.sync.pushed[b.path] = nil end
             app.sync_push()
             if now then app.sync_say("Place sent", where) end
-        elseif now then
-            app.sync_say(head or "Already in sync", where)
+        elseif now or how == "check" then
+            app.sync_say(head or ("In sync with " .. app.sync_server_name()), where)
         end
     end
     local function latest(list)
@@ -3819,6 +3820,7 @@ function app.sync_push(now, skip)
     local meta = S.kosync_meta and { filename = b.path:match("([^/]+)$"), title = b.title, authors = b.author } or nil
     local frac = b:fraction(pos.ch, pos.off)
     app.sync.last_push = love.timer.getTime()
+    app.sync.told = nil
     -- Sent: the server's timestamp for it is the one we've "seen" now.
     local function sent(doc, status, body)
         if not (status and status < 300) then return end
@@ -3841,8 +3843,22 @@ function app.sync_push(now, skip)
                 done = true
                 print("[sync] push " .. xp .. ": " .. tostring(msg.status or msg.message))
                 -- (Only a 2xx is a success: a refusal, 401 for a wrong password, is no better than a dead server.)
-                if msg.kind == "done" and (msg.status or 500) < 300 then sent(doc, msg.status, msg.body); app.sync.failed = nil
-                else app.sync.failed = love.timer.getTime() end
+                if msg.kind == "done" and (msg.status or 500) < 300 then
+                    sent(doc, msg.status, msg.body); app.sync.failed = nil
+                    -- Said once per send (it goes under two names), unless a by-hand sync just said it.
+                    if not app.sync.told and love.timer.getTime() - (app.sync.say_at or -10) > 3 then
+                        app.sync.told = true
+                        app.sync_say("Synced with " .. app.sync_server_name(), math.floor(frac * 100 + 0.5) .. "%")
+                    end
+                else
+                    app.sync.failed = love.timer.getTime()
+                    -- (Not every few minutes: once in ten.)
+                    if love.timer.getTime() - (app.sync.fail_say or -1e9) > 600 then
+                        app.sync.fail_say = love.timer.getTime()
+                        app.sync_say("Couldn't sync with " .. app.sync_server_name(),
+                            msg.status and ("The server answered " .. msg.status) or tostring(msg.message or "no connection"))
+                    end
+                end
             end)
             if now then
                 local give_up = love.timer.getTime() + 4
@@ -14008,6 +14024,8 @@ local function run_test_script()
             elseif a == "catyes" then action("confirm")
             elseif a:match("^act:%a+$") then action(a:sub(5))                 -- (a logical action: up, down, left, right, confirm, toc ...)
             elseif a:match("^lscroll:%d+$") then app.list_scroll(tonumber(a:match("%d+")))      -- (as a slide on the touchscreen)
+            elseif a == "kcheck" then app.sync_pull("check")                   -- (KOReader sync: check the server, as on opening a book)
+            elseif a == "kpush" then app.sync_push()
             elseif a == "cover" then local pg = shop.page(); shop.cover(pg.entries[pg.sel])      -- (ask for the selected row's cover)
             elseif a:match("^bosel:%d+$") then local pg = shop.page(); pg.sel = tonumber(a:match("%d+")) -- (BookOrbit: select a row)
             elseif a == "calerr" then                          -- the Calibre page as after its connection stopped
