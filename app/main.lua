@@ -4115,6 +4115,12 @@ function shop.bo_settings_entries()
         rows[#rows + 1] = { title = "Sync my reading place", author = app.bo_sync_is_on() and "On" or "Off", formats = {},
             summary = "Use this login for KOReader Sync too, so a book read here and in KOReader on another "
                 .. "device keeps its place.", bo_act = function() app.bo_sync_toggle() end }
+        if app.bo_sync_is_on() then
+            rows[#rows + 1] = { title = "Send progress automatically", author = app.sync_auto() == "on" and "On" or "Off", formats = {},
+                summary = "On: your place is sent as you read and when you go back to My Books, so your other "
+                    .. "devices pick up where you stopped. Off: it only asks when you open a book.",
+                bo_act = function() S.kosync_auto = app.sync_auto() == "on" and "ask" or "on"; Store.save_settings(S) end }
+        end
         rows[#rows + 1] = { title = "Log out", author = "", formats = {}, bo_act = function()
             app.ask({ question = "Log out of BookOrbit?", detail = user .. " on " .. host(S.bo_url),
                 yes = "Log out", no = "Stay", on_yes = function()
@@ -4155,6 +4161,10 @@ function app.bo_items()
     if base then
         items[#items + 1] = { label = "Open BookOrbit", value = "›", act = function() app.bo_go() end }
         items[#items + 1] = { label = "Sync my reading place", value = app.bo_sync_is_on() and "On" or "Off", act = function() app.bo_sync_toggle() end }
+        if app.bo_sync_is_on() then
+            items[#items + 1] = { label = "Send progress automatically", value = app.sync_auto() == "on" and "On" or "Off",
+                act = function() S.kosync_auto = app.sync_auto() == "on" and "ask" or "on"; Store.save_settings(S) end }
+        end
         items[#items + 1] = { label = "Log out", act = function()
             app.ask({ question = "Log out of BookOrbit?", detail = user .. " on " .. S.bo_url:gsub("^%a+://", ""),
                 yes = "Log out", no = "Stay", on_yes = function()
@@ -4247,6 +4257,7 @@ function app.bo_sync_toggle()
     local function on()
         S.kosync_custom, S.kosync_custom_name, S.kosync_user, S.kosync_key = app.bo_sync_url(), "BookOrbit", user, key
         S.kosync_match = "binary"
+        S.kosync_auto = "on"                       -- (sent as you read and when you leave the book)
         app.sync_set_server("custom")
         S.kosync_user, S.kosync_key = user, key
         Store.save_settings(S)
