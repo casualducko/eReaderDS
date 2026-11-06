@@ -65,3 +65,11 @@ for i = 1, 4 do
 end
 s[#s + 1] = { t = 0.3, id = 1, x = 500, y = 1320 }; s[#s + 1] = { t = 0.3, id = 2, x = 700, y = 1320 }
 run("two-finger short drift up", s)
+-- parallel two-finger swipe down
+s = { { t = 0, id = 1, x = 500, y = 600, down = true }, { t = 0.01, id = 2, x = 700, y = 600, down = true } }
+for i = 1, 10 do
+    s[#s + 1] = { t = 0.01 + i * 0.04, id = 1, x = 500, y = 600 + i * 50, move = true }
+    s[#s + 1] = { t = 0.01 + i * 0.04, id = 2, x = 700, y = 600 + i * 50, move = true }
+end
+s[#s + 1] = { t = 0.5, id = 1, x = 500, y = 1100 }; s[#s + 1] = { t = 0.5, id = 2, x = 700, y = 1100 }
+run("two-finger swipe down", s)

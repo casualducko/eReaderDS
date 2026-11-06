@@ -3400,6 +3400,18 @@ function app.sync_auto_push(now)
     if app.sync_auto() == "on" then app.sync_push(now) end
 end
 
+-- Back in front after a while away (the Duo opened again): look at the server, in case another
+-- device has gone further on meanwhile (it asks, or goes to the place, as on opening a book). Not
+-- more than once in two minutes, for the window flickers as it comes back.
+function app.sync_on_return()
+    if not (book and book.zip and not book.comic and app.mode == "reader" and app.sync_on()) then return end
+    if app.sync.pulling or app.sync.asked[book.path] or app.asking or not shop.online() then return end
+    local t = love.timer.getTime()
+    if t - (app.sync.returned_at or -1e9) < 120 then return end
+    app.sync.returned_at = t
+    app.sync_pull("check")
+end
+
 -- The app going out of sight (to the background, the screen off) or the Duo folded shut:
 -- send the place now (when automatic sync is On), for Android may stop the app
 -- from here on. Folding is told by the window turning tall (the two pages don't fit).
@@ -11213,7 +11225,7 @@ local function touch_event(kind, sx, sy, from)
     -- A touch that wakes the screens does nothing else, until the finger lifts.
     if (kind == "down" or kind == "pinch_start") and app.idle_input() then app.idle_swallow = true end
     if app.idle_swallow then
-        if kind == "up" or kind == "pinch_end" or kind == "two_tap" or kind == "three_tap" or kind == "two_swipe_up" then app.idle_swallow = nil end
+        if kind == "up" or kind == "pinch_end" or kind == "two_tap" or kind == "three_tap" or kind == "two_swipe_up" or kind == "two_swipe_down" then app.idle_swallow = nil end
         return
     end
     if kind == "move" or kind == "pinch" then app.idle.last = now end
@@ -11244,6 +11256,12 @@ local function touch_event(kind, sx, sy, from)
         -- Two fingers up the screen together: send the place to the sync server now, by hand.
         gesture = nil
         if app.mode == "reader" and not app.asking and not app.choosing and not app.touch_locked then app.sync_send() end
+        return
+    elseif kind == "two_swipe_down" then
+        -- Two fingers down the screen: look at the sync server now (in case this device is behind):
+        -- another device's place that is further on is gone to, one further back is asked about.
+        gesture = nil
+        if app.mode == "reader" and not app.asking and not app.choosing and not app.touch_locked then app.sync_pull("get") end
         return
     elseif kind == "three_tap" then
         -- A tap with three fingers sends an Android app to the background, as Home does
@@ -14065,6 +14083,7 @@ local function run_test_script()
             elseif a:match("^lscroll:%d+$") then app.list_scroll(tonumber(a:match("%d+")))      -- (as a slide on the touchscreen)
             elseif a == "kcheck" then app.sync_pull("check")                   -- (KOReader sync: check the server, as on opening a book)
             elseif a == "kpush" then app.sync_push()
+            elseif a == "swipe2d" then touch_event("two_swipe_down")               -- (two fingers down: look at the server)
             elseif a == "swipe2" then touch_event("two_swipe_up")                   -- (two fingers up: send the place)
             elseif a == "kleave" then app.sync_on_leave()                      -- (the app going out of sight)
             elseif a == "cover" then local pg = shop.page(); shop.cover(pg.entries[pg.sel])      -- (ask for the selected row's cover)
@@ -14183,6 +14202,9 @@ function love.run()
                         save_progress()
                         Store.save_settings(S)
                         if require("android").phone then app.sync_on_leave() end
+                    elseif name == "focus" and a and require("android").phone then
+                        app.sync_on_return()
+                        if S.brightness >= 0 and app.idle.state ~= "off" then Backlight.set(S.brightness) end
                     elseif name == "focus" and a and S.brightness >= 0 and app.idle.state ~= "off" then
                         -- Back in front (after sleep or GammaOS's menu): the
                         -- system has put its own brightness back.
