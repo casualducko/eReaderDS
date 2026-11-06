@@ -3842,7 +3842,7 @@ function app.sync_push(now, skip)
     local meta = S.kosync_meta and { filename = b.path:match("([^/]+)$"), title = b.title, authors = b.author } or nil
     local frac = b:fraction(pos.ch, pos.off)
     app.sync.last_push = love.timer.getTime()
-    app.sync.told = nil
+    app.sync.told = app.sync.quiet_next and true or nil          -- (a quiet send says nothing when it's sent)
     -- Sent: the server's timestamp for it is the one we've "seen" now.
     local function sent(doc, status, body)
         if not (status and status < 300) then return end
@@ -3901,6 +3901,7 @@ function app.sync_tick()
     app.sync.moved[book.path] = true                -- (every mode: Sync with KOReader goes by it)
     if app.sync_auto() ~= "on" then return end
     local t = love.timer.getTime()
+    app.sync.settle_at = t + 20                    -- (and 20 s after the last page turn: see app.sync_settle)
     if app.sync.pulling or app.sync.asked[book.path] or not shop.online() then return end
     if not app.sync.checked[book.path] then
         if t - app.sync.last_try > 60 then app.sync_pull("check") end
@@ -3908,6 +3909,17 @@ function app.sync_tick()
         app.sync.last_push = t
         app.sync_pull("check")
     end
+end
+
+-- A pause of 20 seconds in the page turns: send the place, quietly (no message mid-reading), so the
+-- server is up to date by the time the book is put down, however the device goes to sleep.
+function app.sync_settle()
+    app.sync.settle_at = nil
+    if not (book and book.zip and not book.comic and app.sync_on() and app.sync_auto() == "on") then return end
+    if app.sync.pulling or app.sync.asked[book.path] or not shop.online() then return end
+    app.sync.quiet_next = true
+    app.sync_push()
+    app.sync.quiet_next = nil
 end
 
 -- Settings → KOReader Sync.
@@ -14211,6 +14223,7 @@ function love.run()
         if app.recv and app.recv_poll() then got = true end
         if app.cal and app.cal_poll() then got = true end
         if app.sync.waiting_ask and app.sync_ask_poll() then got = true end
+        if app.sync.settle_at and love.timer.getTime() >= app.sync.settle_at then app.sync_settle() end
         if app.task and not lid.closed then app.task_step(); got = true end
         if library.pending and not lid.closed then app.library_meta_step(); got = true end
         app.add_busy(love.timer.getTime() - b2)
@@ -14272,6 +14285,7 @@ function love.run()
         elseif app.covers_waiting > 0 or app.pages_waiting > 0 then
             love.timer.sleep(0.01)             -- a picture decoding on its thread: look a hundred times a second
         elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or app.cal or app.bk or app.bk_quit_at
+                or app.sync.settle_at
                 or (S.idle_min or 0) > 0 then
             -- Touch, the lid and the timers don't wake love.event.wait(), so poll at a gentle rate.
             if got then app.last_input = love.timer.getTime() end
