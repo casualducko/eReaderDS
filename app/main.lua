@@ -2868,8 +2868,18 @@ function shop.bo_enter(it)
         shop.stack[#shop.stack + 1] = pg
     elseif bo.kind == "books" then shop.bo_push(bo.title, "books", bo.href)
     elseif bo.kind == "sections" then shop.bo_push(bo.title, "sections", bo.href)
+    elseif bo.kind == "search" then
+        app.kb_open({ title = "Search BookOrbit", ok = "Search", hint = "Title, author, series or ISBN",
+            submit = function(q) shop.bo_search(q) end })
     end
     redraw()
+end
+
+-- A search of the whole library (titles, authors, series, ISBNs).
+function shop.bo_search(q)
+    q = (q or ""):match("^%s*(.-)%s*$")
+    if q == "" then return end
+    shop.bo_push("Search: " .. q, "books", require("bookorbit").plugin("catalog/books?sort=title&q=" .. app.url_encode(q)))
 end
 
 -- A book's file address comes from its details; then the usual download.
@@ -3437,6 +3447,7 @@ end
 
 -- The server as it's called in Settings ("CrossPoint", or your own's name).
 function app.sync_server_name()
+    if app.bo_sync_is_on and app.bo_sync_is_on() then return "BookOrbit" end      -- (not "BookOrbit Sync")
     if app.KOSync.SERVERS[S.kosync_server] then return app.KOSync.SERVER_NAMES[S.kosync_server] end
     return S.kosync_custom ~= "" and app.sync_own_name() or app.KOSync.SERVER_NAMES.crosspoint
 end
@@ -11960,7 +11971,7 @@ function handle_action(a)
         elseif a == "up" then shop.move(-step)
         elseif a == "down" then shop.move(step)
         elseif a == "confirm" then shop.confirm()
-        elseif a == "toc" and #shop.stack == 1 and (shop.stack[1].entries[shop.stack[1].sel] or {}).bookorbit then app.bo_settings_open(true)
+        elseif a == "toc" and #shop.stack == 1 and (shop.stack[1].entries[shop.stack[1].sel] or {}).bookorbit then app.bo_settings_open()
         elseif a == "toc" and #shop.stack == 1 then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
         elseif a == "toc" and shop.covers_page(shop.page()) then S.shop_grid = not shop.use_grid(shop.page()); Store.save_settings(S)
         elseif (a == "left" or a == "right") and shop.use_grid(shop.page()) then shop.move(a == "left" and -1 or 1)
@@ -14083,6 +14094,7 @@ local function run_test_script()
             elseif a:match("^lscroll:%d+$") then app.list_scroll(tonumber(a:match("%d+")))      -- (as a slide on the touchscreen)
             elseif a == "kcheck" then app.sync_pull("check")                   -- (KOReader sync: check the server, as on opening a book)
             elseif a == "kpush" then app.sync_push()
+            elseif a:match("^bosearch:") then shop.bo_search(a:sub(10))                  -- (BookOrbit: search for that)
             elseif a == "swipe2d" then touch_event("two_swipe_down")               -- (two fingers down: look at the server)
             elseif a == "swipe2" then touch_event("two_swipe_up")                   -- (two fingers up: send the place)
             elseif a == "kleave" then app.sync_on_leave()                      -- (the app going out of sight)

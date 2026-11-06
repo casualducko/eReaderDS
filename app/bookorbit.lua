@@ -96,6 +96,7 @@ function M.home(dash, base)
     local function tile(title, sub, bo, summary)
         out[#out + 1] = { title = title, author = sub or "", summary = summary or "", formats = {}, bo = bo }
     end
+    tile("Search", "Title, author, series or ISBN", { kind = "search", title = "Search" })
     if #reading > SHELF then
         tile("Continue reading", plural(#reading, "book", "books"), { kind = "list", entries = M.books(dash.continueReading, base),
             title = "Continue reading" })

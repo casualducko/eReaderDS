@@ -32,11 +32,12 @@ local home = B.home({ continueReading = { { id = 1, title = "A", authors = { "X"
         { id = "recent", title = "Recently added", booksHref = "/r" }, { id = "authors", title = "Authors", href = "/a" } },
     readingGoal = { goalBooks = 12, completedBooks = 3, year = 2026 }, readingStreak = { currentStreak = 1, longestStreak = 5 } }, "https://x")
 eq(home[1].shelf, true, "on the shelf"); eq(home[1].frac, 0.4, "progress"); eq(home[1].title, "A", "continue reading first"); eq(home[1].summary, "Continue reading  ·  40% read", "continue note")
-eq(home[2].title, "Discover", "discover tile"); eq(#home[2].bo.entries, 1, "discover books")
-eq(home[3].title, "Recently added", "recent"); eq(home[3].bo.kind, "books", "recent kind")
-eq(home[4].title, "Authors", "authors"); eq(home[4].bo.kind, "sections", "authors kind")
-eq(home[5].author, "3 of 12 books", "goal"); eq(home[5].info, true, "goal is not a link")
-eq(#B.home(nil, "https://x"), 0, "empty dashboard")
+eq(home[2].title, "Search", "search tile"); eq(home[2].bo.kind, "search", "search kind")
+eq(home[3].title, "Discover", "discover tile"); eq(#home[3].bo.entries, 1, "discover books")
+eq(home[4].title, "Recently added", "recent"); eq(home[4].bo.kind, "books", "recent kind")
+eq(home[5].title, "Authors", "authors"); eq(home[5].bo.kind, "sections", "authors kind")
+eq(home[6].author, "3 of 12 books", "goal"); eq(home[6].info, true, "goal is not a link")
+eq(#B.home(nil, "https://x"), 1, "an empty dashboard still has Search")
 
 local sec = B.sections({ items = { { title = "Joe", count = 1, booksHref = "/b?a=Joe", previewBooks = { { thumbnailUrl = "/t/1", hasCover = true } } },
     { title = "bad" } } }, "https://x")
@@ -44,6 +45,6 @@ eq(#sec, 1, "sections need a booksHref"); eq(sec[1].author, "1 book", "count"); 
 local many = {}
 for i = 1, 5 do many[i] = { id = i, title = "T" .. i, authors = {}, progressPercentage = 10, formats = { "epub" } } end
 local h2 = B.home({ continueReading = many }, "https://x")
-eq(#h2, 4, "three on the shelf and a tile for them all"); eq(h2[4].title, "Continue reading", "all-reading tile"); eq(#h2[4].bo.entries, 5, "all five")
-eq(h2[4].shelf, nil, "the tile is not shelf")
+eq(#h2, 5, "three on the shelf, search, and a tile for them all"); eq(h2[4].title, "Search", "search after the shelf"); eq(h2[5].title, "Continue reading", "all-reading tile"); eq(#h2[5].bo.entries, 5, "all five")
+eq(h2[5].shelf, nil, "the tile is not shelf")
 print("bookorbit: " .. n .. " checks ok")

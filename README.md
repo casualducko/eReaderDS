@@ -696,6 +696,24 @@ or copy on a computer (like a Kindle's "My Clippings"):
 with your notes under their highlights (the list shows them too).
 It's written again whenever they change, so add your own notes elsewhere.
 
+## BookOrbit
+
+[BookOrbit](https://bookorbit.app) is a book server you run at home. In **Get Books →
+BookOrbit** (Y for its settings, or Settings → BookOrbit) give its address and the
+**KOReader sync login** from BookOrbit's Settings → KOReader (the user name and password
+made there, not your web login). The home page starts with the books you're reading, with
+their progress, then tiles: Search, Discover, Finished this year, Recently added, All Books,
+and your Libraries, Collections, Authors and Series. Lists of books with covers are a grid
+of covers (Y switches to rows), and a book downloads to My Books. EPUB and TXT only: that's
+what eReaderDS reads.
+
+**Sync my reading place** (in the BookOrbit settings) uses the same login for KOReader
+Sync, matching books by their contents, so a book read here and in KOReader on another device
+keeps its place. **Send progress automatically** sends it as you read, 20 seconds after the
+last page turn, and when you leave the book, close the lid or fold the Duo. By hand, slide
+**two fingers up** to send your place and **two fingers down** to look at the server (in case
+another device has gone further on). When the app comes back to the front it looks too.
+
 ## KOReader Sync
 
 If you also read in **KOReader** or **CrossPoint** (on a phone, Kobo, Kindle,
