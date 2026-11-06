@@ -3257,6 +3257,12 @@ end
 -- the book is found whichever way the other device matches books.
 function app.sync_docs(b)
     local list = {}
+    -- BookOrbit knows a book only by its contents: one name, and no refused send under the other.
+    if app.bo_sync_is_on() then
+        local d = app.sync_doc(b, "binary")
+        if d then list[1] = d end
+        return list
+    end
     for _, m in ipairs({ S.kosync_match, S.kosync_match == "filename" and "binary" or "filename" }) do
         local d = app.sync_doc(b, m)
         if d and d ~= list[1] then list[#list + 1] = d end
