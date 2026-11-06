@@ -2481,6 +2481,163 @@ function shop.start_download(it)
     end)
 end
 
+---------------------------------------------------------------- front page of tiles
+
+-- A page that is a way in rather than a list of books: BookOrbit's home, or an OPDS
+-- catalog's top level (only links). A shelf of covers for what you're reading
+-- (entries marked .shelf, at most three), then tiles two across.
+function shop.use_tiles(pg)
+    if not pg or #pg.entries == 0 then return false end
+    if pg.bo == "home" then return true end
+    if not pg.root or #pg.entries > 16 then return false end
+    for _, e in ipairs(pg.entries) do
+        if e.book or not (e.href or e.search) then return false end
+    end
+    return true
+end
+
+-- Where each entry goes: rects[i] = { x, y, w, h, row, col, shelf }, on the page from the top of the list.
+function shop.tile_layout(pg)
+    local g = shop.grid_geom()
+    local W = g.cols * g.cw + (g.cols - 1) * g.gap
+    local rects, y, row, i = {}, g.y, 0, 1
+    local shelf = 0
+    while pg.entries[i] and pg.entries[i].shelf do shelf = shelf + 1; i = i + 1 end
+    local label_y
+    if shelf > 0 then
+        label_y = y
+        y = y + 44
+        for k = 1, shelf do
+            rects[k] = { x = g.x + (k - 1) * (g.cw + g.gap), y = y, w = g.cw, h = g.ch + 20, row = 0, col = k - 1, shelf = true }
+        end
+        y = y + g.ch + 20 + 26
+        row = 1
+    end
+    local tw, th_ = math.floor((W - g.gap) / 2), 104
+    local k = 0
+    for idx = i, #pg.entries do
+        local c, r = k % 2, math.floor(k / 2)
+        rects[idx] = { x = g.x + c * (tw + g.gap), y = y + r * (th_ + g.gap), w = tw, h = th_, row = row + r, col = c }
+        k = k + 1
+    end
+    return rects, label_y, g
+end
+
+-- The scroll that keeps the selected tile on the page.
+function shop.tile_scroll(pg, rects, g)
+    local r = rects[pg.sel]
+    local top, bottom = g.y, PAGE_H - 90
+    pg.scroll = pg.scroll or 0
+    if r then
+        if r.y - pg.scroll < top then pg.scroll = r.y - top end
+        if r.y + r.h - pg.scroll > bottom then pg.scroll = r.y + r.h - bottom end
+    end
+    if pg.scroll < 0 then pg.scroll = 0 end
+    return pg.scroll, top, bottom
+end
+
+function shop.draw_tiles(side, pg)
+    local th = theme()
+    local rects, label_y, g = shop.tile_layout(pg)
+    shop.cover_cap = 12
+    local scroll, top, bottom = shop.tile_scroll(pg, rects, g)
+    if label_y and label_y - scroll >= top - 4 then
+        love.graphics.setFont(ui.small)
+        color(th.dim)
+        love.graphics.print("Continue reading", g.x, label_y - scroll)
+    end
+    for idx, r in pairs(rects) do
+        local e = pg.entries[idx]
+        local y = r.y - scroll
+        if y >= top - 4 and y + r.h <= bottom + 4 then
+            local selected = idx == pg.sel
+            if r.shelf then
+                if selected then
+                    color(th.sel)
+                    love.graphics.rectangle("fill", r.x - 8, y - 8, r.w + 16, r.h + 16, 10, 10)
+                end
+                local img = shop.cover(e)
+                if img and img:getWidth() < 64 then img = nil end
+                if img then
+                    local iw, ih = img:getDimensions()
+                    local sc = math.min(r.w / iw, g.ch / ih)
+                    love.graphics.setColor(1, 1, 1)
+                    love.graphics.draw(img, r.x + (r.w - iw * sc) / 2, y + g.ch - ih * sc, 0, sc, sc)
+                else
+                    color(th.dim, 0.18)
+                    love.graphics.rectangle("fill", r.x, y, r.w, g.ch, 6, 6)
+                    love.graphics.setFont(ui.small)
+                    color(th.fg)
+                    shop.print_clipped(ui.small, e.title, r.x + 8, y + 12, r.w - 16, g.label, "center")
+                end
+                -- Progress under the cover.
+                color(th.dim, 0.35)
+                love.graphics.rectangle("fill", r.x, y + g.ch + 8, r.w, 8, 4, 4)
+                color(th.fg)
+                local f = e.frac or 0
+                if r.w * f >= 8 then love.graphics.rectangle("fill", r.x, y + g.ch + 8, r.w * f, 8, 4, 4) end
+            else
+                color(selected and th.sel or th.dim, selected and 1 or 0.12)
+                love.graphics.rectangle("fill", r.x, y, r.w, r.h, 12, 12)
+                if not selected then
+                    color(th.dim, 0.4)
+                    love.graphics.rectangle("line", r.x, y, r.w, r.h, 12, 12)
+                end
+                local has_sub = (e.author or "") ~= ""
+                local font_h = ui.font:getHeight()
+                love.graphics.setFont(ui.font)
+                color((e.bo or e.href or e.search) and th.fg or th.dim)
+                local ty
+                if has_sub then
+                    ty = y + (r.h - (font_h + ui.small:getHeight() + 2)) / 2
+                    love.graphics.print(fit_text(ui.font, e.title, r.w - 32), r.x + 16, ty)
+                else
+                    -- (No second line: a long title may wrap onto two.)
+                    local _, lines = ui.font:getWrap(e.title, r.w - 32)
+                    local n = math.min(2, math.max(1, #lines))
+                    ty = y + (r.h - n * font_h) / 2
+                    shop.print_clipped(ui.font, e.title, r.x + 16, ty, r.w - 32, n * font_h, "left")
+                end
+                if has_sub then
+                    love.graphics.setFont(ui.small)
+                    color(th.dim)
+                    love.graphics.print(fit_text(ui.small, e.author, r.w - 32), r.x + 16, ty + font_h + 2)
+                end
+            end
+        end
+    end
+end
+
+-- Left/right go one by one; up/down to the nearest tile in the row above or below.
+function shop.tile_move(pg, dir)
+    local rects = shop.tile_layout(pg)
+    local cur = rects[pg.sel]
+    if not cur then return end
+    if dir == "left" or dir == "right" then
+        local n = pg.sel + (dir == "left" and -1 or 1)
+        if rects[n] then pg.sel = n end
+        return
+    end
+    local want = cur.row + (dir == "up" and -1 or 1)
+    local best, bd
+    for idx, r in pairs(rects) do
+        if r.row == want then
+            -- (the shelf has three across, the tiles two: compare by where their middles are)
+            local d = math.abs((r.x + r.w / 2) - (cur.x + cur.w / 2))
+            if not bd or d < bd then best, bd = idx, d end
+        end
+    end
+    if best then pg.sel = best end
+end
+
+function shop.tile_hit(pg, u, v)
+    local rects, _, g = shop.tile_layout(pg)
+    local scroll = shop.tile_scroll(pg, rects, g)
+    for idx, r in pairs(rects) do
+        if u >= r.x - 8 and u <= r.x + r.w + 8 and v >= r.y - scroll - 8 and v <= r.y - scroll + r.h + 8 then return idx end
+    end
+end
+
 ---------------------------------------------------------------- cover grid
 
 -- Pages of books with covers (a library's list, Standard Ebooks) can be a grid
@@ -6392,7 +6549,8 @@ function shop.draw(side)
         else
             local row_h = 96
             local rows = list_rows(row_h)
-            if shop.use_grid(pg) then shop.draw_grid(side, pg) rows = 0 end
+            if shop.use_tiles(pg) then shop.draw_tiles(side, pg) rows = 0
+            elseif shop.use_grid(pg) then shop.draw_grid(side, pg) rows = 0 end
             if pg.sel < pg.top then pg.top = pg.sel end
             if pg.sel >= pg.top + rows then pg.top = pg.sel - rows + 1 end
             draw_list(side, pg.entries, pg.sel, pg.top, rows, x, 160, w, row_h, function(e, _, rx, ry, rw)
@@ -11444,7 +11602,8 @@ function handle_action(a)
 
     if mode == "shop" then
         local step = shop.use_grid(shop.page()) and 3 or 1
-        if a == "up" then shop.move(-step)
+        if shop.use_tiles(shop.page()) and (a == "up" or a == "down" or a == "left" or a == "right") then shop.tile_move(shop.page(), a)
+        elseif a == "up" then shop.move(-step)
         elseif a == "down" then shop.move(step)
         elseif a == "confirm" then shop.confirm()
         elseif a == "toc" and #shop.stack == 1 then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
@@ -11651,6 +11810,13 @@ function app.on_tap(side, u, v)
         if not pg or side ~= "right" then return end
         if #pg.entries == 0 then
             if pg.error then action("confirm") end        -- try again
+            return
+        end
+        if shop.use_tiles(pg) then
+            local idx = shop.tile_hit(pg, u, v)
+            if idx then
+                if idx == pg.sel then action("confirm") else pg.sel = idx; redraw() end
+            end
             return
         end
         if shop.use_grid(pg) then

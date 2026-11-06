@@ -5,6 +5,7 @@
 local M = {}
 
 M.API = "/api/v1/koreader"
+local SHELF = 3                 -- books on the home page's shelf
 
 -- The server's address from a KOReader Sync address ("https://books.example.com/api/v1/koreader"),
 -- or nil if it isn't one.
@@ -81,13 +82,23 @@ end
 function M.home(dash, base)
     local out = {}
     dash = type(dash) == "table" and dash or {}
+    -- The shelf: up to three books you're reading, with their progress; more of them
+    -- are one tap away in a tile.
     local reading = M.books(dash.continueReading, base)
-    for _, e in ipairs(reading) do
+    for i, e in ipairs(reading) do
         e.summary = "Continue reading" .. (e.summary ~= "" and ("  ·  " .. e.summary) or "")
-        out[#out + 1] = e
+        if i <= SHELF then
+            e.shelf = true
+            e.frac = math.max(0, math.min(1, (tonumber(dash.continueReading[i].progressPercentage) or 0) / 100))
+            out[#out + 1] = e
+        end
     end
     local function tile(title, sub, bo, summary)
         out[#out + 1] = { title = title, author = sub or "", summary = summary or "", formats = {}, bo = bo }
+    end
+    if #reading > SHELF then
+        tile("Continue reading", plural(#reading, "book", "books"), { kind = "list", entries = M.books(dash.continueReading, base),
+            title = "Continue reading" })
     end
     local disc = M.books(dash.discover, base)
     if #disc > 0 then tile("Discover", plural(#disc, "book", "books"), { kind = "list", entries = disc, title = "Discover" },

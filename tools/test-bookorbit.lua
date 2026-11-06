@@ -31,7 +31,7 @@ local home = B.home({ continueReading = { { id = 1, title = "A", authors = { "X"
     sections = { { id = "continue-reading", title = "Continue reading", booksHref = "/c" },
         { id = "recent", title = "Recently added", booksHref = "/r" }, { id = "authors", title = "Authors", href = "/a" } },
     readingGoal = { goalBooks = 12, completedBooks = 3, year = 2026 }, readingStreak = { currentStreak = 1, longestStreak = 5 } }, "https://x")
-eq(home[1].title, "A", "continue reading first"); eq(home[1].summary, "Continue reading  ·  40% read", "continue note")
+eq(home[1].shelf, true, "on the shelf"); eq(home[1].frac, 0.4, "progress"); eq(home[1].title, "A", "continue reading first"); eq(home[1].summary, "Continue reading  ·  40% read", "continue note")
 eq(home[2].title, "Discover", "discover tile"); eq(#home[2].bo.entries, 1, "discover books")
 eq(home[3].title, "Recently added", "recent"); eq(home[3].bo.kind, "books", "recent kind")
 eq(home[4].title, "Authors", "authors"); eq(home[4].bo.kind, "sections", "authors kind")
@@ -41,4 +41,9 @@ eq(#B.home(nil, "https://x"), 0, "empty dashboard")
 local sec = B.sections({ items = { { title = "Joe", count = 1, booksHref = "/b?a=Joe", previewBooks = { { thumbnailUrl = "/t/1", hasCover = true } } },
     { title = "bad" } } }, "https://x")
 eq(#sec, 1, "sections need a booksHref"); eq(sec[1].author, "1 book", "count"); eq(sec[1].cover, "https://x/t/1", "section cover")
+local many = {}
+for i = 1, 5 do many[i] = { id = i, title = "T" .. i, authors = {}, progressPercentage = 10, formats = { "epub" } } end
+local h2 = B.home({ continueReading = many }, "https://x")
+eq(#h2, 4, "three on the shelf and a tile for them all"); eq(h2[4].title, "Continue reading", "all-reading tile"); eq(#h2[4].bo.entries, 5, "all five")
+eq(h2[4].shelf, nil, "the tile is not shelf")
 print("bookorbit: " .. n .. " checks ok")
