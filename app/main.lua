@@ -2638,6 +2638,61 @@ function shop.tile_hit(pg, u, v)
     end
 end
 
+-- A slide on the touchscreen over the cover grid scrolls by rows of covers; over the
+-- front page of tiles, by pixels. (app.scroll_list gets this stand-in for the page.)
+function shop.swipe_state(pg)
+    local sw = shop.swipe or {}
+    shop.swipe = sw
+    sw.swipe, sw.pg = true, pg
+    if shop.use_tiles(pg) then
+        local rects, _, g = shop.tile_layout(pg)
+        local last = 0
+        for _, r in pairs(rects) do last = math.max(last, r.y + r.h) end
+        sw.kind, sw.row_h = "tiles", 100
+        sw.visible = PAGE_H - 90 - g.y
+        sw.max = math.max(0, last - (PAGE_H - 90))
+        sw.n, sw.shown = math.ceil((sw.max + sw.visible) / 100), math.ceil(sw.visible / 100)
+        sw.top = math.floor((pg.scroll or 0) / 100) + 1
+        return sw
+    elseif shop.use_grid(pg) then
+        local g = shop.grid_geom()
+        sw.kind, sw.row_h, sw.cols = "grid", g.cell_h + g.gap, g.cols
+        sw.n, sw.shown = math.ceil(#pg.entries / g.cols), g.rows
+        sw.top = (pg.gtop or 0) + 1
+        return sw
+    end
+end
+
+function shop.swipe_to(sw, top)
+    local pg = sw.pg
+    top = math.max(1, math.min(math.max(1, sw.n - sw.shown + 1), top))
+    if sw.kind == "grid" then
+        pg.gtop = top - 1
+        -- The selection stays on screen: it moves to the nearest row shown.
+        local row = math.floor((pg.sel - 1) / sw.cols)
+        local nrow = math.max(pg.gtop, math.min(pg.gtop + sw.shown - 1, row))
+        pg.sel = math.min(#pg.entries, nrow * sw.cols + (pg.sel - 1) % sw.cols + 1)
+    else
+        pg.scroll = (top == math.max(1, sw.n - sw.shown + 1)) and sw.max or math.min(sw.max, (top - 1) * 100)
+        local rects, _, g = shop.tile_layout(pg)
+        local lo, hi = g.y, PAGE_H - 90
+        local cur = rects[pg.sel]
+        if not cur or cur.y - pg.scroll < lo or cur.y + cur.h - pg.scroll > hi then
+            -- Select the shown tile nearest the one that was.
+            local best, bd
+            for idx, r in pairs(rects) do
+                if r.y - pg.scroll >= lo - 4 and r.y + r.h - pg.scroll <= hi + 4 then
+                    local d = cur and (math.abs(r.y - cur.y) * 4 + math.abs(r.x - cur.x)) or r.y
+                    if not bd or d < bd then best, bd = idx, d end
+                end
+            end
+            if best then pg.sel = best end
+        end
+    end
+    shop.move(0)                                -- near the end: load more
+    redraw()
+end
+
 ---------------------------------------------------------------- cover grid
 
 -- Pages of books with covers (a library's list, Standard Ebooks) can be a grid
@@ -11069,6 +11124,8 @@ function app.scroll_list()
     if m == "library" then l, n, shown = library, #library.items, select(2, app.library_layout(library.top))
     elseif m == "shop" then
         l = shop.page()
+        local sw = l and shop.swipe_state(l)
+        if sw then return sw, sw.n, sw.shown, sw.row_h end
         n, shown = l and #l.entries or 0, list_rows(96)
     elseif m == "toc" and book then l, n, row_h = toc, #book.toc, 58; shown = app.toc_rows()
     elseif m == "bookmarks" and book then l, n, shown = bm, #bookmark_entries(), list_rows(96)
@@ -11095,6 +11152,7 @@ end
 function app.list_scroll(top)
     local l, n, shown = app.scroll_list()
     if not l then return end
+    if l.swipe then return shop.swipe_to(l, top) end
     top = math.max(1, math.min(math.max(1, n - shown + 1), top))
     if top == l.top then return end
     l.top = top
@@ -13725,6 +13783,7 @@ local function run_test_script()
             elseif a == "catremove" then shop.remove_catalog(shop.stack[1].entries[shop.stack[1].sel])
             elseif a == "catyes" then action("confirm")
             elseif a:match("^act:%a+$") then action(a:sub(5))                 -- (a logical action: up, down, left, right, confirm, toc ...)
+            elseif a:match("^lscroll:%d+$") then app.list_scroll(tonumber(a:match("%d+")))      -- (as a slide on the touchscreen)
             elseif a == "cover" then local pg = shop.page(); shop.cover(pg.entries[pg.sel])      -- (ask for the selected row's cover)
             elseif a:match("^bosel:%d+$") then local pg = shop.page(); pg.sel = tonumber(a:match("%d+")) -- (BookOrbit: select a row)
             elseif a == "calerr" then                          -- the Calibre page as after its connection stopped
