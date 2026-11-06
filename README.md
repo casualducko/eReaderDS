@@ -169,7 +169,7 @@ The volume buttons turn pages too (down is forward, up is back). To read in
 bed without a finger turning the page, press **volume down and then volume up**
 within a second: touch switches off (a small minus sign shows in the lower
 right corner, and the volume buttons keep turning pages) and the same press
-switches it back on. To send your place to a KOReader sync server (BookOrbit, say) by hand, press **volume up and then volume down** within a second: the two page turns cancel out and your place is sent, with a message that says it was. Touch always starts on when the app opens. Each page is drawn at the
+switches it back on. To send your place to a KOReader sync server (BookOrbit, say) by hand, slide **two fingers up the screen together**: your place is sent, with a message that says it was. Touch always starts on when the app opens. Each page is drawn at the
 screen's own pixels, so the text is sharp, and nothing is drawn under the
 hinge.
 

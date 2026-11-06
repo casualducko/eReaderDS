@@ -11213,7 +11213,7 @@ local function touch_event(kind, sx, sy, from)
     -- A touch that wakes the screens does nothing else, until the finger lifts.
     if (kind == "down" or kind == "pinch_start") and app.idle_input() then app.idle_swallow = true end
     if app.idle_swallow then
-        if kind == "up" or kind == "pinch_end" or kind == "two_tap" or kind == "three_tap" then app.idle_swallow = nil end
+        if kind == "up" or kind == "pinch_end" or kind == "two_tap" or kind == "three_tap" or kind == "two_swipe_up" then app.idle_swallow = nil end
         return
     end
     if kind == "move" or kind == "pinch" then app.idle.last = now end
@@ -11239,6 +11239,11 @@ local function touch_event(kind, sx, sy, from)
         -- edge is also how Android closes an app).
         gesture = nil
         if app.mode == "reader" and not app.asking and not app.choosing then app.press_hint("menu") end
+        return
+    elseif kind == "two_swipe_up" then
+        -- Two fingers up the screen together: send the place to the sync server now, by hand.
+        gesture = nil
+        if app.mode == "reader" and not app.asking and not app.choosing and not app.touch_locked then app.sync_send() end
         return
     elseif kind == "three_tap" then
         -- A tap with three fingers sends an Android app to the background, as Home does
@@ -12354,16 +12359,6 @@ local REPEATABLE = { right = true, left = true, up = true, down = true, next = t
 -- volume buttons held together, so a chord never reaches the app.) The two turns cancel out; at the end of
 -- the book the forward turn did nothing, so the back turn is undone. `pre` is where the book was before.
 -- It only turns touch off while reading (the volume buttons change values in menus), but turns it on anywhere.
--- Volume up then volume down within 0.8 s (a page back and straight forward): send the place to the
--- sync server now, by hand. The two page turns cancel out; the page is put back if it was at an end.
-function app.volume_sync(pre)
-    if pre and spread and app.mode == "reader" and (spread.ch ~= pre.ch or spread.pi ~= pre.pi) then
-        set_spread(pre.ch, pre.pi)
-        redraw()
-    end
-    app.sync_send()
-end
-
 function app.volume_toggle(pre)
     if pre and spread and app.mode == "reader" then
         -- (set_spread directly, not a page turn with its flip: nothing to animate and no setting to change)
@@ -12485,21 +12480,12 @@ function love.keypressed(key, scancode, isrepeat)
     if isrepeat then
         -- Holding a key repeats movement only (the Back button toggles Settings).
         if vol and app.vol then app.vol.held = true end         -- (a held button is reading, not the toggle)
-        if vol and app.volup then app.volup.held = true end
         if a and REPEATABLE[a] then action(a) end
         return
     end
     log_input("key %s (scancode %s)", key, scancode)
     if vol then
         local now, v = love.timer.getTime(), app.vol
-        local u = app.volup
-        if key == "pagedown" and u and u.t and not u.held and now - u.t < 0.8 and app.mode == "reader" and not app.touch_locked then
-            app.volup, app.vol = nil, nil
-            log_input("volume sync: up then down, %.2fs apart", now - u.t)
-            action(a)                                -- (the page forward, as it would be)
-            app.volume_sync(u.pre)
-            return
-        end
         if key == "pagedown" then
             app.vol = { t = now, pre = spread and app.mode == "reader" and { ch = spread.ch, pi = spread.pi } or nil }
         elseif v and v.t and not v.held and now - v.t < 0.8 and (app.touch_locked or app.mode == "reader") then
@@ -12510,9 +12496,6 @@ function love.keypressed(key, scancode, isrepeat)
             return
         else
             app.vol = nil
-        end
-        if key == "pageup" then                      -- (a page back may be the first half of the sync gesture)
-            app.volup = { t = now, pre = spread and app.mode == "reader" and { ch = spread.ch, pi = spread.pi } or nil }
         end
     end
     if a then action(a) end
@@ -14082,7 +14065,7 @@ local function run_test_script()
             elseif a:match("^lscroll:%d+$") then app.list_scroll(tonumber(a:match("%d+")))      -- (as a slide on the touchscreen)
             elseif a == "kcheck" then app.sync_pull("check")                   -- (KOReader sync: check the server, as on opening a book)
             elseif a == "kpush" then app.sync_push()
-            elseif a == "volsync" then app.volume_sync()                         -- (the volume gesture's send)
+            elseif a == "swipe2" then touch_event("two_swipe_up")                   -- (two fingers up: send the place)
             elseif a == "kleave" then app.sync_on_leave()                      -- (the app going out of sight)
             elseif a == "cover" then local pg = shop.page(); shop.cover(pg.entries[pg.sel])      -- (ask for the selected row's cover)
             elseif a:match("^bosel:%d+$") then local pg = shop.page(); pg.sel = tonumber(a:match("%d+")) -- (BookOrbit: select a row)

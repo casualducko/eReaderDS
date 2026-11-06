@@ -30,6 +30,9 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
     -- time makes it a { "three_tap" } (and no pinch, whichever pair is left).
     local TAP_TIME, TAP_WOBBLE = 0.35, 40      -- seconds; page units
     local pend = nil                           -- { t0, d0, cx, cy, three } while that's undecided
+    -- Two fingers that go up the screen together, keeping their distance (not a pinch):
+    -- { "two_swipe_up" } once they've gone far enough.
+    local SWIPE_UP_MIN, SWIPE_TIME = 0.12, 1.0   -- a share of the window's height; seconds
 
     local function report()
         local n, any = 0, nil
@@ -46,11 +49,24 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
                 pend = { t0 = love.timer.getTime(), d0 = d, cx = cx, cy = cy }
             end
             if pend and n >= 3 then pend.three = true end
-            if pend and not pend.three and (math.abs(d - pend.d0) > TAP_WOBBLE
-                    or Android.window_dist(pend.cx, pend.cy, cx, cy) > TAP_WOBBLE
-                    or love.timer.getTime() - pend.t0 > TAP_TIME) then
-                queue[#queue + 1] = { "pinch_start", pend.d0 }
-                pend = nil
+            if pend and not pend.three and not pend.swiped then
+                local now = love.timer.getTime()
+                local dchg = math.abs(d - pend.d0)
+                local mv = Android.window_dist(pend.cx, pend.cy, cx, cy)
+                local up, side = pend.cy - cy, math.abs(cx - pend.cx)
+                local going_up = up > 0 and up > side * 1.5
+                pend.mv = math.max(pend.mv or 0, mv)               -- (a tap keeps the fingers still)
+                if dchg <= TAP_WOBBLE and going_up and up > love.graphics.getHeight() * SWIPE_UP_MIN
+                        and now - pend.t0 <= SWIPE_TIME then
+                    queue[#queue + 1] = { "two_swipe_up" }      -- (the rest, until they lift, is nothing)
+                    pend.swiped = true
+                -- A pinch once they spread or close past a wobble, move together some other way
+                -- than up, or stay down; going up they get a little longer to be a swipe.
+                elseif dchg > TAP_WOBBLE or (mv > TAP_WOBBLE and not going_up)
+                        or now - pend.t0 > (going_up and SWIPE_TIME or TAP_TIME) then
+                    queue[#queue + 1] = { "pinch_start", pend.d0 }
+                    pend = nil
+                end
             end
             if not pend then queue[#queue + 1] = { pinching and "pinch" or "pinch_start", d } end
             pinching = true
@@ -60,7 +76,7 @@ if love and love.system and (love.system.getOS() == "Android" or love.system.get
                 if pend then
                     -- (Held still too long for a tap: nothing, but the gesture is over.)
                     local ev = "pinch_end"
-                    if love.timer.getTime() - pend.t0 <= TAP_TIME then ev = pend.three and "three_tap" or "two_tap" end
+                    if love.timer.getTime() - pend.t0 <= TAP_TIME and not pend.swiped and (pend.mv or 0) <= TAP_WOBBLE then ev = pend.three and "three_tap" or "two_tap" end
                     queue[#queue + 1] = { ev }
                     pend = nil
                 else
