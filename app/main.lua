@@ -2855,6 +2855,7 @@ end
 
 -- Get Books → require("bookorbit").
 function shop.bo_open(catalog)
+    app.bo_sync_fix()
     shop.catalog = catalog
     shop.bo_push("BookOrbit", "home", require("bookorbit").plugin("catalog/dashboard"))
 end
@@ -4129,6 +4130,16 @@ end
 -- The page's own API address for KOReader Sync, if this account is also its login.
 function app.bo_sync_url() return S.bo_url .. require("bookorbit").API end
 
+-- BookOrbit finds a book by its file's fingerprint (the contents), never by its name: with
+-- KOReader Sync going to it, books are matched by contents.
+function app.bo_sync_fix()
+    if app.bo_sync_is_on() and S.kosync_match ~= "binary" then
+        S.kosync_match = "binary"
+        app.sync.checked, app.sync.pushed, app.sync.docs = {}, {}, {}
+        Store.save_settings(S)
+    end
+end
+
 function app.bo_sync_is_on()
     local base, user = app.bo_account()
     return base ~= nil and app.sync_on() and S.kosync_server == "custom" and S.kosync_custom == app.bo_sync_url()
@@ -4235,6 +4246,7 @@ function app.bo_sync_toggle()
     end
     local function on()
         S.kosync_custom, S.kosync_custom_name, S.kosync_user, S.kosync_key = app.bo_sync_url(), "BookOrbit", user, key
+        S.kosync_match = "binary"
         app.sync_set_server("custom")
         S.kosync_user, S.kosync_key = user, key
         Store.save_settings(S)
