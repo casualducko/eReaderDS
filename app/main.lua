@@ -2352,10 +2352,15 @@ function shop.start()
                 .. "your libraries, authors and series, and downloads. Sign in with the KOReader login from "
                 .. "BookOrbit's Settings → KOReader." }
     end
+    local bo_host = bo and Opds.parse_url(bo.url) and Opds.parse_url(bo.url).host
     for _, c in ipairs(library.catalogs or {}) do
         local u = Opds.parse_url(c.url)
-        entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = c.about or "",
-            formats = {}, catalog = c }
+        -- (Your older OPDS catalog of the same BookOrbit server is the BookOrbit row now.)
+        local same = bo_host and u and u.host == bo_host and c.url:find("/api/v1/opds", 1, true)
+        if not same then
+            entries[#entries + 1] = { title = c.name, author = u and u.host or "", summary = c.about or "",
+                formats = {}, catalog = c }
+        end
     end
     entries[#entries + 1] = { title = "Add a Catalog", author = "Calibre, Calibre-Web or any OPDS server",
         formats = {}, add = true, summary = "Get books from your own library over Wi-Fi. Type its address, "
