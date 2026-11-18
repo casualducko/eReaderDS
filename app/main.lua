@@ -4433,6 +4433,12 @@ end
 -- are for the handhelds: a phone has its own, in its Settings.)
 function app.device_rows()
     local rows = {}
+    -- A Mac: the whole screen for the book (also F while reading, Control Command F, or the green button).
+    if require("android").mac then
+        rows[#rows + 1] = { label = "Full screen", value = S.fullscreen and "On" or "Off", adjust = function()
+            app.mac_fullscreen(not S.fullscreen)
+        end }
+    end
     if not require("android").phone then
         -- The grip: buttons under the right hand (the usual), or turned
         -- round with them under the left (everything turns 180°).
@@ -11632,6 +11638,7 @@ function love.mousepressed(x, y, button)
     if x >= SCREEN_W and not Touch.enabled then touch_event("down", x - SCREEN_W, y) end
 end
 function love.mousemoved(x, y)
+    app.cursor_moved()
     if Touch.mouse then Touch.mouse("move", x, y) return end
     if gesture and not Touch.enabled and love.mouse.isDown(1) then
         touch_event("move", math.max(0, x / app.scale - SCREEN_W), y / app.scale)
@@ -12423,6 +12430,28 @@ end
 function app.mac_fullscreen(on)
     pcall(love.window.setFullscreen, on, "desktop")
     if S.fullscreen ~= on then S.fullscreen = on; Store.save_settings(S) end
+    if on then app.cursor_hide_at = love.timer.getTime() + 2.5
+    else app.cursor_hide_at = nil; love.mouse.setVisible(true); app.cursor_hidden = nil end
+end
+
+-- Full screen, reading: the pointer goes away after 2.5 s without moving (so it isn't over the text) and
+-- comes back with the next move, in a menu or when full screen ends.
+function app.cursor_moved()
+    if not require("android").mac then return end
+    if app.cursor_hidden then love.mouse.setVisible(true); app.cursor_hidden = nil end
+    app.cursor_hide_at = S.fullscreen and love.timer.getTime() + 2.5 or nil
+end
+
+function app.cursor_tick()
+    if app.cursor_hidden and (app.mode ~= "reader" or not S.fullscreen) then
+        love.mouse.setVisible(true); app.cursor_hidden = nil
+    end
+    if app.cursor_hide_at and love.timer.getTime() >= app.cursor_hide_at then
+        app.cursor_hide_at = nil
+        if S.fullscreen and app.mode == "reader" and not gesture and not app.asking and not app.cursor_hidden then
+            love.mouse.setVisible(false); app.cursor_hidden = true
+        end
+    end
 end
 
 function app.mac_key(key, isrepeat, force_cmd)
@@ -12439,6 +12468,10 @@ function app.mac_key(key, isrepeat, force_cmd)
         elseif cmd and key == "v" then app.kb_type((love.system.getClipboardText() or ""):gsub("[\r\n]+", " ")) return true
         end
         return not cmd
+    end
+    if not cmd and not isrepeat and key == "f" and app.mode == "reader" and not love.keyboard.isDown("lctrl", "rctrl", "lalt", "ralt") then
+        app.mac_fullscreen(not S.fullscreen)               -- (F: full screen, and back)
+        return true
     end
     if not cmd or isrepeat then return false end
     local reading = app.mode == "reader"
@@ -14097,6 +14130,10 @@ local function run_test_script()
             elseif a:match("^bosearch:") then shop.bo_search(a:sub(10))                  -- (BookOrbit: search for that)
             elseif a == "swipe2d" then touch_event("two_swipe_down")               -- (two fingers down: look at the server)
             elseif a == "swipe2" then touch_event("two_swipe_up")                   -- (two fingers up: send the place)
+            elseif a == "cursorhide" then                                          -- (Mac full screen: the pointer hides after a pause)
+                S.fullscreen = true; app.cursor_hide_at = love.timer.getTime() - 1; app.cursor_tick()
+                print("[cursor] hidden after pause: " .. tostring(app.cursor_hidden))
+                app.cursor_moved(); print("[cursor] shown again on a move: " .. tostring(not app.cursor_hidden)); S.fullscreen = false
             elseif a == "kleave" then app.sync_on_leave()                      -- (the app going out of sight)
             elseif a == "cover" then local pg = shop.page(); shop.cover(pg.entries[pg.sel])      -- (ask for the selected row's cover)
             elseif a:match("^bosel:%d+$") then local pg = shop.page(); pg.sel = tonumber(a:match("%d+")) -- (BookOrbit: select a row)
@@ -14264,6 +14301,7 @@ function love.run()
         if app.cal and app.cal_poll() then got = true end
         if app.sync.waiting_ask and app.sync_ask_poll() then got = true end
         if app.sync.settle_at and love.timer.getTime() >= app.sync.settle_at then app.sync_settle() end
+        if app.cursor_hide_at or app.cursor_hidden then app.cursor_tick() end
         if app.task and not lid.closed then app.task_step(); got = true end
         if library.pending and not lid.closed then app.library_meta_step(); got = true end
         app.add_busy(love.timer.getTime() - b2)
@@ -14325,7 +14363,7 @@ function love.run()
         elseif app.covers_waiting > 0 or app.pages_waiting > 0 then
             love.timer.sleep(0.01)             -- a picture decoding on its thread: look a hundred times a second
         elseif Touch.enabled or KeyProbe.enabled or overlay or net.count > 0 or app.recv or app.cal or app.bk or app.bk_quit_at
-                or app.sync.settle_at
+                or app.sync.settle_at or app.cursor_hide_at
                 or (S.idle_min or 0) > 0 then
             -- Touch, the lid and the timers don't wake love.event.wait(), so poll at a gentle rate.
             if got then app.last_input = love.timer.getTime() end
